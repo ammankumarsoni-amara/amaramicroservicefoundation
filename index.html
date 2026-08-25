@@ -273,6 +273,7 @@
         }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary); background: rgba(255,255,255,0.08); }
         .form-group select option { background: #111827; color: #fff; }
+        select, input, textarea { color-scheme: dark; }
 
         .dmy-grid { display: grid; grid-template-columns: 1fr 1.3fr 1.2fr; gap: 6px; }
 
@@ -360,6 +361,36 @@
         .secure-cloud-status{padding:9px 10px;border-radius:9px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.22);font-size:.72rem;color:#a7f3d0;margin:8px 0}
         .secure-cloud-warning{padding:9px 10px;border-radius:9px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.22);font-size:.7rem;color:#fde68a;margin:8px 0}
         @media(max-width:600px){.secure-cloud-grid{grid-template-columns:1fr}}
+
+        /* V32.1 action controls: prevent native white buttons on mobile Chrome. */
+        .opex-action-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+        .opex-mini-btn{appearance:none;-webkit-appearance:none;border:1px solid rgba(96,165,250,.24);border-radius:8px;padding:6px 9px;cursor:pointer;color:#e2e8f0 !important;background:rgba(15,23,42,.88) !important;font-size:.62rem;font-weight:800;line-height:1.1;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);}
+        .opex-mini-btn:hover{background:rgba(30,41,59,.98) !important;border-color:rgba(96,165,250,.45);}
+        .opex-mini-btn.danger{color:#fecaca !important;background:rgba(127,29,29,.34) !important;border-color:rgba(248,113,113,.28);}
+        .opex-mini-btn i{margin-right:3px;}
+        .opex-summary-card{display:none !important;}
+
+        /* V32 UI polish: keep controls inside the dark mobile theme. */
+        .growth-panel{background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.018));border:1px solid rgba(96,165,250,.16);overflow:hidden;}
+        .growth-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+        .growth-title{font-size:.88rem;font-weight:900;color:#e2e8f0;}.growth-title i{color:#60a5fa;margin-right:6px;}
+        .growth-sub{font-size:.61rem;color:#94a3b8;margin-top:3px;line-height:1.4;max-width:310px;}
+        .growth-actions{display:grid;grid-template-columns:repeat(3,minmax(145px,1fr));gap:8px;width:100%;margin-top:2px;padding:8px;border:1px solid rgba(96,165,250,.16);border-radius:13px;background:linear-gradient(180deg,rgba(2,6,23,.44),rgba(15,23,42,.30));}
+        .growth-actions .growth-control{min-width:0;padding:7px;border-radius:11px;background:linear-gradient(180deg,rgba(59,130,246,.13),rgba(15,23,42,.48));border:1px solid rgba(96,165,250,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.025);}
+        .growth-actions label{display:block;font-size:.58rem;color:#93c5fd;font-weight:900;margin:0 0 4px 2px;text-transform:uppercase;letter-spacing:.05em;}
+        .growth-actions select{appearance:none;-webkit-appearance:none;width:100%;min-width:0;min-height:40px;padding:10px 34px 10px 11px;border-radius:10px;background-color:#101827 !important;color:#f8fafc !important;border:1px solid rgba(96,165,250,.32);font-size:.76rem;font-weight:850;outline:none;color-scheme:dark;background-image:linear-gradient(45deg,transparent 50%,#94a3b8 50%),linear-gradient(135deg,#94a3b8 50%,transparent 50%);background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;background-size:6px 6px,6px 6px;background-repeat:no-repeat;}
+        .growth-actions select:focus{border-color:#60a5fa;box-shadow:0 0 0 2px rgba(96,165,250,.14);}
+        .growth-actions select option,.growth-actions select optgroup{background:#101827 !important;color:#fff !important;}
+        .lender-pay-btn{appearance:none;-webkit-appearance:none;border:1px solid rgba(96,165,250,.42)!important;background:linear-gradient(135deg,#2563eb,#1d4ed8)!important;color:#fff!important;box-shadow:0 3px 10px rgba(37,99,235,.18);}
+        .lender-pay-btn:active{transform:translateY(1px);}
+        @media(max-width:640px){.growth-actions{grid-template-columns:1fr;gap:7px;}.growth-actions .growth-control{width:100%;}.growth-actions .growth-control:last-child{grid-column:auto;}.growth-actions select{font-size:.80rem;min-height:44px;padding:10px 38px 10px 12px;width:100%;min-width:0;}.growth-actions .growth-control:first-child select{min-width:0;}.growth-actions .growth-control:nth-child(2) select{min-width:0;}}
+        .growth-chart-wrap{min-height:205px;position:relative;background:linear-gradient(180deg,rgba(15,23,42,.42),rgba(2,6,23,.22));border:1px solid rgba(96,165,250,.10);border-radius:10px;padding:8px 5px 6px;overflow:hidden;}
+        .growth-legend{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 8px;font-size:.58rem;color:#94a3b8;}
+        .growth-legend span{display:inline-flex;align-items:center;gap:4px;}.growth-dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+        .growth-svg{width:100%;height:185px;display:block;}
+        .growth-empty{display:grid;place-items:center;min-height:165px;color:#64748b;font-size:.7rem;}
+        .growth-period-note{font-size:.59rem;color:#64748b;margin-top:5px;text-align:right;} .growth-chart-topline{display:flex;justify-content:space-between;gap:8px;align-items:center;margin:0 2px 7px;font-size:.61rem;color:#94a3b8}.growth-chart-topline span{font-weight:800;color:#cbd5e1}.growth-chart-topline i{color:#60a5fa;margin-right:4px}.growth-chart-topline b{font-size:.58rem;color:#60a5fa;background:rgba(59,130,246,.10);border:1px solid rgba(96,165,250,.18);padding:4px 7px;border-radius:999px}
+        @media(max-width:640px){.growth-actions{width:100%;}.growth-actions select{flex:1;min-width:0;width:50%;}.growth-chart-wrap{overflow-x:auto}.growth-svg{min-width:650px;}}
 </style>
 
 <style id="mf-upcoming-emi-css">
@@ -379,6 +410,48 @@
 .upcoming-phone{color:#60a5fa;text-decoration:none;font-weight:700}.upcoming-amount{color:#34d399;font-weight:800}.upcoming-empty{padding:22px;text-align:center;color:#64748b;font-size:.75rem}
 .upcoming-date-box{display:flex;align-items:center;gap:5px}.upcoming-date-box>input[type="text"]{flex:1;min-width:0}.upcoming-date-btn{width:34px;height:34px;border:1px solid rgba(96,165,250,.35);border-radius:8px;background:rgba(59,130,246,.12);color:#93c5fd;cursor:pointer;flex:0 0 34px}.upcoming-date-picker-hidden{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important}.upcoming-priority{margin-top:10px;padding:10px;border:1px solid rgba(248,113,113,.22);border-radius:12px;background:linear-gradient(180deg,rgba(248,113,113,.06),rgba(15,23,42,.34))}.upcoming-priority-head{display:flex;justify-content:space-between;align-items:center;gap:8px}.upcoming-priority-title{font-weight:800;color:#fff;font-size:.8rem}.upcoming-priority-sub{font-size:.62rem;color:#94a3b8;margin-top:2px}.upcoming-priority-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}.upcoming-priority-mini{padding:7px 9px;border-radius:9px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06)}.upcoming-priority-mini small{display:block;color:#94a3b8;font-size:.58rem}.upcoming-priority-mini b{font-size:.92rem}.upcoming-priority-list{margin-top:8px;display:grid;gap:5px}.upcoming-priority-row{display:grid;grid-template-columns:1.55fr .85fr .7fr 1fr auto;gap:6px;align-items:center;padding:7px 8px;border-radius:8px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055);font-size:.64rem}.upcoming-priority-row .p-name{font-weight:800;color:#fff}.upcoming-priority-row .p-date{color:#fca5a5}.upcoming-priority-row .p-amt{color:#34d399;font-weight:800}.upcoming-priority-row .p-phone{color:#60a5fa}.upcoming-priority-more{margin-top:6px;text-align:center;color:#94a3b8;font-size:.6rem}@media(max-width:700px){.upcoming-emi-controls{grid-template-columns:1fr 1fr}.upcoming-emi-summary{grid-template-columns:1fr 1fr}.upcoming-priority-row{grid-template-columns:1.4fr .8fr .7fr auto}.upcoming-priority-row .p-phone{display:none}}
 @media(max-width:420px){.upcoming-emi-controls{grid-template-columns:1fr}.upcoming-emi-head{display:block}.upcoming-emi-actions button{flex:1}.upcoming-priority-grid{grid-template-columns:1fr 1fr}.upcoming-priority-row{grid-template-columns:1fr auto auto}.upcoming-priority-row .p-date{font-size:.58rem}.upcoming-priority-row .p-amt{font-size:.62rem}}
+</style>
+
+
+<style id="mf-pay-lender-modal-final-fix">
+/* FINAL PAY LENDER MODAL ISOLATION — keeps the repayment window above every card/container */
+#modal-pay-lender{
+  display:none !important;
+  position:fixed !important;
+  inset:0 !important;
+  width:100vw !important;
+  height:100vh !important;
+  box-sizing:border-box !important;
+  padding:14px !important;
+  margin:0 !important;
+  align-items:center !important;
+  justify-content:center !important;
+  background:rgba(3,7,18,.84) !important;
+  backdrop-filter:blur(8px) !important;
+  -webkit-backdrop-filter:blur(8px) !important;
+  z-index:2147483000 !important;
+}
+#modal-pay-lender.active{display:flex !important;}
+#modal-pay-lender > .modal-card{
+  position:relative !important;
+  display:block !important;
+  width:min(100%,560px) !important;
+  max-width:560px !important;
+  max-height:min(92vh,900px) !important;
+  margin:0 auto !important;
+  box-sizing:border-box !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  transform:none !important;
+}
+#modal-pay-lender .modal-title{position:sticky;top:0;z-index:3;background:#111827;padding-bottom:12px;}
+@media(max-width:640px){
+  #modal-pay-lender{padding:8px !important;align-items:flex-end !important;}
+  #modal-pay-lender > .modal-card{
+    width:100% !important;max-width:none !important;max-height:94vh !important;
+    border-radius:18px 18px 0 0 !important;padding:15px !important;
+  }
+}
 </style>
 
 </head>
@@ -449,6 +522,33 @@
             </div>
         </div>
 
+        <!-- BUSINESS GROWTH ANALYTICS -->
+        <section id="business-growth-panel" class="client-card growth-panel" style="margin-top:10px;padding:12px 13px;">
+            <div class="growth-head">
+                <div>
+                    <div class="growth-title"><i class="fa-solid fa-chart-line"></i> Business Growth</div>
+                    <div class="growth-sub">Monthly view of disbursement, gross earnings, operating cost and true net profit.</div>
+                </div>
+                <div class="growth-actions">
+                    <div class="growth-control"><label>View</label><select id="growth-period-select" onchange="renderBusinessGrowthChart()" aria-label="Growth view">
+                        <option value="MONTHLY">Monthly</option>
+                        <option value="QUARTERLY">Quarterly</option>
+                        <option value="YEARLY">Yearly</option>
+                        <option value="FY">Financial Yearly</option>
+                    </select></div>
+                    <div class="growth-control"><label>Year</label><select id="growth-year-select" onchange="renderBusinessGrowthChart()" aria-label="Growth year"></select></div>
+                    <div class="growth-control"><label>Metric</label><select id="growth-metric-select" onchange="renderBusinessGrowthChart()" aria-label="Growth metric">
+                        <option value="ALL">All Metrics</option>
+                        <option value="DISB">Market Disbursement</option>
+                        <option value="GROSS">Gross Revenue</option>
+                        <option value="OPEX">Expenses & Payroll</option>
+                        <option value="NET">Net Profit</option>
+                    </select></div>
+                </div>
+            </div>
+            <div id="business-growth-chart" class="growth-chart-wrap"></div>
+        </section>
+
         <!-- Tab Navigation -->
         <div class="tab-scroll-wrapper">
             <div class="tab-bar">
@@ -506,7 +606,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap:6px; flex-wrap: wrap;">
                 <div>
                     <h6 style="font-weight: 800; font-size: 0.95rem; color: #fff; margin: 0;">Operational Expenses & Staff Salaries</h6>
-                    <small style="color:var(--text-muted); font-size:0.72rem;">Track Staff Payroll, Fuel/Petrol, Tea & Custom Expenses</small>
+                    <small style="color:var(--text-muted); font-size:0.72rem;">Track staff payroll and business expenses with clean monthly/yearly controls</small>
                 </div>
                 <div style="display: flex; gap: 6px;">
                     <button class="btn-header btn-blue" onclick="openAddExpenseModal()"><i class="fa-solid fa-plus"></i> Add Expense</button>
@@ -532,21 +632,20 @@
             <div style="margin-bottom: 14px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
                     <div>
-                        <b style="font-size:0.85rem;color:#60a5fa;"><i class="fa-solid fa-users-gear me-1"></i> Staff, Collection & Activity</b>
-                        <div style="font-size:.66rem;color:#64748b;margin-top:2px;">Compact role-wise staff cards, collection-agent view and a cashbook-style activity feed.</div>
+                        <b style="font-size:0.85rem;color:#60a5fa;"><i class="fa-solid fa-users-gear me-1"></i> Staff & Collection Agents</b>
+                        <div style="font-size:.66rem;color:#64748b;margin-top:2px;">Role-wise staff cards and collection-agent view with month/year payroll filters, history, edit and delete.</div>
                     </div>
                     <div style="display:flex;gap:5px;flex-wrap:wrap;">
                         <button type="button" class="filter-chip active" id="staff-view-all" onclick="setStaffOpexView('ALL')">All</button>
                         <button type="button" class="filter-chip" id="staff-view-staff" onclick="setStaffOpexView('STAFF')">Staff</button>
                         <button type="button" class="filter-chip" id="staff-view-agents" onclick="setStaffOpexView('AGENTS')">Collection Agents</button>
-                        <button type="button" class="filter-chip" id="staff-view-activity" onclick="setStaffOpexView('ACTIVITY')">Activity</button>
                     </div>
                 </div>
                 <div class="client-card" style="padding:8px 10px;margin-bottom:9px;background:rgba(255,255,255,.025);">
                     <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center;">
                         <select id="opex-staff-month-filter" onchange="renderStaffAndActivityViews()" style="padding:8px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;font-weight:700;font-size:.76rem;"><option value="ALL">All Months</option></select>
                         <select id="opex-staff-year-filter" onchange="renderStaffAndActivityViews()" style="padding:8px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;font-weight:700;font-size:.76rem;"><option value="ALL">All Years</option></select>
-                        <button type="button" class="btn-edit-sm" onclick="resetStaffActivityFilters()" style="padding:7px 9px;white-space:nowrap;"><i class="fa-solid fa-rotate-left"></i></button>
+                        <button type="button" class="btn-edit-sm" onclick="resetStaffPayrollFilters()" style="padding:7px 9px;white-space:nowrap;"><i class="fa-solid fa-rotate-left"></i></button>
                     </div>
                     <div id="opex-staff-filter-summary" style="font-size:.66rem;color:#64748b;margin-top:6px;"></div>
                 </div>
@@ -801,7 +900,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Salary Amount Paid (₹) *</label>
+                    <label>Salary Paid (₹) *</label>
                     <input type="number" id="ps-amount" required style="color:#34d399; font-weight:800; font-size:1.1rem;">
                 </div>
 
@@ -817,20 +916,12 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Payment Date *</label>
+                    <label>Actual Payment Date *</label>
                     <div class="dmy-grid">
                         <select id="ps-day" required></select>
                         <select id="ps-month" required></select>
                         <select id="ps-year" required></select>
                     </div>
-                </div>
-
-                <input type="hidden" id="lp-gst" value="0">
-
-                <div class="form-group" style="background:rgba(245,158,11,.08);padding:10px;border-radius:10px;border:1px solid rgba(245,158,11,.22);">
-                    <label style="color:#fbbf24;font-weight:800;">Total Actual Payment (₹)</label>
-                    <input type="number" id="lp-total-paid" value="0" min="0" step="any" required oninput="this.dataset.userEdited='1'" style="font-size:1rem;font-weight:800;">
-                    <div style="font-size:.68rem;color:#94a3b8;margin-top:5px;">Scheduled EMI = Principal + Interest. GST is separate. This is the actual amount paid to the lender.</div>
                 </div>
 
                 <div class="form-group">
@@ -1775,80 +1866,45 @@
             if (tab === 'products') renderProductsList();
         }
 
-        function renderAll() {
-            renderKPIs();
-            renderProductFilters();
-            renderFeed();
-            renderExpensesAndStaff();
-            renderBorrowingsList();
-            renderAllLoansTable();
-            renderLoanMasterSummary();
-            populatePassbookDropdown();
-            initUpcomingEmiSchedule();
-            renderUpcomingEmiSchedule();
-        }
-
-        function renderKPIs() {
-            let totalDisbursed = 0, totalPrinRec = 0, totalIntProfit = 0, totalFileCharges = 0, totalForecloseProfit = 0, totalPenaltyProfit = 0;
-
-            state.loans.forEach(loan => {
-                const prod = state.products[loan.product];
-                if (prod) {
-                    totalDisbursed += prod.amount;
-                    totalFileCharges += prod.fileCharge;
-
-                    loan.payments.forEach(p => {
-                        totalPrinRec += p.principal;
-                        totalIntProfit += p.interest;
-                        totalPenaltyProfit += (p.penalty || 0);
-                    });
-
-                    if (loan.foreclosed) {
-                        totalPrinRec += prod.amount;
-                        const fFee = loan.foreclosureData.feeAmount || 0;
-                        totalForecloseProfit += fFee;
-                    }
-                }
-            });
-
-            let totalLenderInterestPaid = 0;
-            let totalLenderGstPaid = 0;
-            state.borrowings.forEach(b => {
-                b.repayments.forEach(r => {
-                    totalLenderInterestPaid += (r.interest || 0);
-                    totalLenderGstPaid += (r.gst || 0);
-                });
-            });
-
-            let totalSalariesPaid = 0;
-            state.staff.forEach(s => {
-                s.salaryPayments.forEach(sp => {
-                    totalSalariesPaid += (sp.amount || 0);
-                });
-            });
-
-            let totalGeneralExpenses = 0;
-            state.expenses.forEach(ex => {
-                totalGeneralExpenses += (ex.amount || 0);
-            });
-
-            const totalOpexCost = totalSalariesPaid + totalGeneralExpenses;
-            const totalBorrowingCost = totalLenderInterestPaid + totalLenderGstPaid;
-            const grossEarnings = totalFileCharges + totalIntProfit + totalForecloseProfit + totalPenaltyProfit;
-            const trueNetSpread = grossEarnings - totalBorrowingCost - totalOpexCost;
-
-            const activeOutstanding = state.loans.filter(l => !l.foreclosed).reduce((sum, l) => {
-                const p = state.products[l.product];
-                const paid = l.payments.reduce((s, x) => s + x.amount, 0);
-                return sum + ((p.emi * p.tenure) - paid);
-            }, 0);
-
-            document.getElementById("kpi-disbursed").innerText = "₹" + totalDisbursed.toLocaleString('en-IN');
-            document.getElementById("kpi-gross-profit").innerText = "₹" + grossEarnings.toLocaleString('en-IN');
-            document.getElementById("kpi-borrow-cost").innerText = "-₹" + totalBorrowingCost.toLocaleString('en-IN');
-            document.getElementById("kpi-opex-cost").innerText = "-₹" + totalOpexCost.toLocaleString('en-IN');
-            document.getElementById("kpi-net-spread").innerText = "₹" + trueNetSpread.toLocaleString('en-IN');
-            document.getElementById("kpi-outstanding").innerText = "₹" + activeOutstanding.toLocaleString('en-IN');
+        function renderBusinessGrowthChart(){
+            const wrap=document.getElementById('business-growth-chart'); if(!wrap)return;
+            const yearSel=document.getElementById('growth-year-select');
+            const period=document.getElementById('growth-period-select')?.value||'MONTHLY';
+            const metric=document.getElementById('growth-metric-select')?.value||'ALL';
+            const now=new Date().getFullYear();
+            const dataYears=[];
+            (state.loans||[]).forEach(l=>{if(l.disbursalDate)dataYears.push(new Date(l.disbursalDate).getFullYear());(l.payments||[]).forEach(p=>{if(p.date)dataYears.push(new Date(p.date).getFullYear());});if(l.foreclosed&&l.foreclosureData?.date)dataYears.push(new Date(l.foreclosureData.date).getFullYear());});
+            (state.expenses||[]).forEach(e=>{if(e.date)dataYears.push(new Date(e.date).getFullYear());});
+            (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(p=>{if(p.date)dataYears.push(new Date(p.date).getFullYear());}));
+            const years=[...new Set([...Array.from({length:101},(_,i)=>now-50+i),...dataYears.filter(Number.isFinite)])].sort((a,b)=>b-a);
+            if(yearSel){const old=yearSel.value||String(now);yearSel.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join('');yearSel.value=years.includes(Number(old))?old:String(now);}
+            const selectedYear=Number(yearSel?.value||now);
+            const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const blank=()=>({disb:0,gross:0,opex:0,net:0});
+            const monthData=months.map((m,i)=>({label:m,month:i,...blank()}));
+            const addDateValue=(iso,field,val)=>{if(!iso)return;const d=new Date(iso);if(Number.isNaN(d.getTime()))return;if(d.getFullYear()===selectedYear)monthData[d.getMonth()][field]+=Number(val)||0;};
+            (state.loans||[]).forEach(l=>{const p=state.products?.[l.product];if(p){addDateValue(l.disbursalDate,'disb',p.amount);addDateValue(l.disbursalDate,'gross',p.fileCharge);} (l.payments||[]).forEach(pay=>addDateValue(pay.date,'gross',(Number(pay.interest)||0)+(Number(pay.penalty)||0)));if(l.foreclosed&&l.foreclosureData)addDateValue(l.foreclosureData.date||l.foreclosureData.settlementDate||l.disbursalDate,'gross',l.foreclosureData.feeAmount);});
+            (state.expenses||[]).forEach(e=>addDateValue(e.date,'opex',e.amount));
+            (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(p=>addDateValue(p.date,'opex',p.amount)));
+            monthData.forEach(x=>x.net=x.gross-x.opex);
+            let data=[],periodLabel='';
+            if(period==='MONTHLY'){data=monthData;periodLabel=`Monthly view — ${selectedYear}`;}
+            else if(period==='QUARTERLY'){data=[0,1,2,3].map(q=>{const x=blank();monthData.slice(q*3,q*3+3).forEach(m=>{x.disb+=m.disb;x.gross+=m.gross;x.opex+=m.opex;x.net+=m.net;});return {...x,label:`Q${q+1}`};});periodLabel=`Quarterly view — ${selectedYear}`;}
+            else if(period==='YEARLY'){
+                const getY=y=>{const x=blank();(state.loans||[]).forEach(l=>{const p=state.products?.[l.product];if(p&&l.disbursalDate&&new Date(l.disbursalDate).getFullYear()===y){x.disb+=Number(p.amount)||0;x.gross+=Number(p.fileCharge)||0;}(l.payments||[]).forEach(pay=>{if(pay.date&&new Date(pay.date).getFullYear()===y)x.gross+=(Number(pay.interest)||0)+(Number(pay.penalty)||0);});if(l.foreclosed&&l.foreclosureData?.date&&new Date(l.foreclosureData.date).getFullYear()===y)x.gross+=Number(l.foreclosureData.feeAmount)||0;});(state.expenses||[]).forEach(e=>{if(e.date&&new Date(e.date).getFullYear()===y)x.opex+=Number(e.amount)||0;});(state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(p=>{if(p.date&&new Date(p.date).getFullYear()===y)x.opex+=Number(p.amount)||0;}));x.net=x.gross-x.opex;return x;};
+                data=Array.from({length:10},(_,i)=>{const y=selectedYear-9+i;return {...getY(y),label:String(y)}});periodLabel=`Yearly trend — ${selectedYear-9} to ${selectedYear}`;
+            }else{
+                const getFY=fyEnd=>{const x=blank(), inFY=iso=>{if(!iso)return false;const d=new Date(iso),fy=(d.getMonth()+1>=4)?d.getFullYear()+1:d.getFullYear();return fy===fyEnd;};(state.loans||[]).forEach(l=>{const p=state.products?.[l.product];if(p&&inFY(l.disbursalDate)){x.disb+=Number(p.amount)||0;x.gross+=Number(p.fileCharge)||0;}(l.payments||[]).forEach(pay=>{if(inFY(pay.date))x.gross+=(Number(pay.interest)||0)+(Number(pay.penalty)||0);});if(l.foreclosed&&l.foreclosureData&&inFY(l.foreclosureData.date||l.foreclosureData.settlementDate))x.gross+=Number(l.foreclosureData.feeAmount)||0;});(state.expenses||[]).forEach(e=>{if(inFY(e.date))x.opex+=Number(e.amount)||0;});(state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(p=>{if(inFY(p.date))x.opex+=Number(p.amount)||0;}));x.net=x.gross-x.opex;return x;};
+                data=Array.from({length:10},(_,i)=>{const fy=selectedYear-9+i;return {...getFY(fy),label:`FY ${fy-1}-${String(fy).slice(-2)}`}});periodLabel=`Financial Yearly trend — FY ending ${selectedYear}`;
+            }
+            const keys=metric==='ALL'?['disb','gross','opex','net']:[metric.toLowerCase()];
+            const labels={disb:'Market Disbursement',gross:'Gross Revenue',opex:'Expenses & Payroll',net:'Net Profit'};const dot={disb:'#60a5fa',gross:'#34d399',opex:'#f472b6',net:'#fbbf24'};const visible=keys.filter(k=>labels[k]);
+            const totals=visible.map(k=>`${labels[k]} ₹${data.reduce((a,x)=>a+(Number(x[k])||0),0).toLocaleString('en-IN')}`).join(' · ');
+            const max=Math.max(1,...data.flatMap(x=>visible.map(k=>Math.abs(Number(x[k])||0))));const W=Math.max(680,data.length*62),H=185,padL=42,padR=10,padT=12,padB=28,plotW=W-padL-padR,plotH=H-padT-padB,step=plotW/Math.max(1,data.length);
+            const grid=[0,.25,.5,.75,1].map(r=>{const y=padT+plotH-plotH*r;return `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="rgba(148,163,184,.12)"/><text x="${padL-5}" y="${y+3}" text-anchor="end" font-size="8" fill="#64748b">${Math.round(max*r).toLocaleString('en-IN')}</text>`}).join('');
+            const barGap=Math.max(2,Math.min(6,step/(visible.length+2)));const bars=data.map((x,i)=>{const groupX=padL+i*step+step*.12,groupW=step*.76;return visible.map((k,j)=>{const v=Number(x[k])||0,h=Math.abs(v)/max*plotH,bw=Math.max(5,(groupW-barGap*(visible.length-1))/visible.length),bx=groupX+j*(bw+barGap),by=padT+plotH-h;return `<rect x="${bx}" y="${by}" width="${bw}" height="${Math.max(1,h)}" rx="3" fill="${dot[k]}" opacity=".82"><title>${x.label} — ${labels[k]}: ₹${v.toLocaleString('en-IN')}</title></rect>`}).join('')}).join('');
+            const xlabels=data.map((x,i)=>`<text x="${padL+i*step+step/2}" y="${H-7}" text-anchor="middle" font-size="8" fill="#94a3b8">${x.label}</text>`).join('');const legend=visible.map(k=>`<span><i class="growth-dot" style="background:${dot[k]}"></i>${labels[k]}</span>`).join('');
+            wrap.innerHTML=`<div class="growth-chart-topline"><span><i class="fa-solid fa-chart-column"></i> ${periodLabel}</span><b>${metric==='ALL'?'All metrics':labels[metric.toLowerCase()]||metric}</b></div><div class="growth-legend">${legend}</div><div style="overflow-x:auto;"><svg class="growth-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${bars}${xlabels}</svg></div><div class="growth-period-note">${periodLabel} · ${totals||'No transactions yet'}</div>`;
         }
 
         // EXPENSES & PAYROLL LOGIC & RENDERING
@@ -1916,7 +1972,7 @@
         let currentStaffOpexView = 'ALL';
 
         function setStaffOpexView(view) {
-            currentStaffOpexView = view || 'ALL';
+            currentStaffOpexView = (view === 'ACTIVITY' ? 'ALL' : (view || 'ALL'));
             ['ALL','STAFF','AGENTS','ACTIVITY'].forEach(v=>{
                 const el=document.getElementById('staff-view-'+(v==='ALL'?'all':v==='STAFF'?'staff':v==='AGENTS'?'agents':'activity'));
                 if(el) el.classList.toggle('active',currentStaffOpexView===v);
@@ -1944,7 +2000,7 @@
             if([...y.options].some(o=>o.value===oldY))y.value=oldY;
         }
 
-        function resetStaffActivityFilters(){
+        function resetStaffPayrollFilters(){
             const m=document.getElementById('opex-staff-month-filter'),y=document.getElementById('opex-staff-year-filter');
             if(m)m.value='ALL';if(y)y.value='ALL';renderStaffAndActivityViews();
         }
@@ -1963,17 +2019,6 @@
             const summary=document.getElementById('opex-staff-filter-summary');
             if(summary)summary.innerHTML=`${shownStaff.length} ${currentStaffOpexView==='AGENTS'?'collection agent':'staff'} record${shownStaff.length===1?'':'s'} · ${paymentCount} salary payment${paymentCount===1?'':'s'} · Total <b style="color:#fff;">₹${paymentTotal.toLocaleString('en-IN')}</b>${mf!=='ALL'?' · '+['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(mf)]:''}${yf!=='ALL'?' · '+yf:''}`;
 
-            if(currentStaffOpexView==='ACTIVITY'){
-                const events=[];
-                state.expenses.forEach((e,idx)=>{const {month,year}=getExpenseMonthYear(e);if((mf==='ALL'||Number(mf)===month)&&(yf==='ALL'||Number(yf)===year))events.push({date:e.date||'',type:'Expense',title:e.category||'Expense',sub:e.desc||'Expense outflow',amount:Number(e.amount)||0,mode:e.mode||'-',idx});});
-                staff.forEach(s=>(s.salaryPayments||[]).forEach((p,idx)=>{const {month,year}=getStaffPaymentPeriod(p);if((mf==='ALL'||Number(mf)===month)&&(yf==='ALL'||Number(yf)===year))events.push({date:p.date||'',type:'Salary',title:s.name,sub:`${p.salaryMonth||p.month||'-'} · ${s.role||'Staff'}`,amount:Number(p.amount)||0,mode:p.mode||'-',staffId:s.id,payIdx:idx});}));
-                events.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-                const total=events.reduce((a,e)=>a+e.amount,0);
-                const rows=events.slice(0,12).map(e=>`<div style="display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.05);"><div style="width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:${e.type==='Salary'?'rgba(244,114,182,.10)':'rgba(96,165,250,.10)'};color:${e.type==='Salary'?'#f472b6':'#60a5fa'};"><i class="fa-solid ${e.type==='Salary'?'fa-money-bill-wave':'fa-receipt'}"></i></div><div style="min-width:0;"><div style="font-size:.7rem;color:#e2e8f0;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${mfExpenseEscape(e.title)}</div><div style="font-size:.6rem;color:#64748b;margin-top:2px;">${formatToIndianDate(e.date)} · ${mfExpenseEscape(e.sub)} · ${mfExpenseEscape(e.mode)}</div></div><div style="text-align:right;"><div style="font-size:.76rem;font-weight:900;color:${e.type==='Salary'?'#f472b6':'#fbbf24'};">₹${e.amount.toLocaleString('en-IN')}</div><div style="font-size:.55rem;color:#64748b;">${e.type}</div></div></div>`).join('');
-                list.innerHTML=`<div class="client-card" style="padding:10px 11px;background:rgba(255,255,255,.018);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;"><b style="font-size:.75rem;color:#cbd5e1;"><i class="fa-solid fa-clock-rotate-left me-1"></i> Cashbook Activity</b><b style="font-size:.8rem;color:#f472b6;">₹${total.toLocaleString('en-IN')}</b></div><div style="font-size:.6rem;color:#64748b;margin-bottom:7px;">Latest 12 payroll and expense movements</div>${rows||'<div style="padding:18px;text-align:center;color:#64748b;font-size:.7rem;">No activity for this filter.</div>'}</div>`;
-                return;
-            }
-
             if(!shownStaff.length){
                 list.innerHTML=`<div class="client-card" style="padding:18px;text-align:center;color:#64748b;font-size:.72rem;">No ${currentStaffOpexView==='AGENTS'?'collection agents':'staff members'} found for this view.</div>`;return;
             }
@@ -1982,7 +2027,7 @@
                 const groupPaid=members.reduce((a,s)=>a+(s.salaryPayments||[]).filter(isMatch).reduce((x,p)=>x+(Number(p.amount)||0),0),0);
                 const memberCards=members.map(s=>{
                     const pays=(s.salaryPayments||[]).filter(isMatch);const paid=pays.reduce((a,p)=>a+(Number(p.amount)||0),0);const last=(s.salaryPayments||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];
-                    return `<div class="client-card" style="padding:9px 10px;margin:0;cursor:pointer;border-left:3px solid ${isAgent(s)?'#fbbf24':'#60a5fa'};" onclick="openStaffPayrollDetail('${s.id}')"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="min-width:0;"><div style="font-size:.8rem;font-weight:900;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${mfExpenseEscape(s.name)}</div><div style="font-size:.59rem;color:#64748b;margin-top:2px;">${mfExpenseEscape(s.id)} · ₹${Number(s.salary||0).toLocaleString('en-IN')}/mo</div></div><div style="text-align:right;"><div style="font-size:.82rem;font-weight:900;color:${isAgent(s)?'#fbbf24':'#f472b6'};">₹${paid.toLocaleString('en-IN')}</div><div style="font-size:.56rem;color:#64748b;">${pays.length} filtered payment${pays.length===1?'':'s'}</div></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:.57rem;color:#64748b;"><span>Last: ${last?.date?formatToIndianDate(last.date):'No payment'}</span><span style="color:#60a5fa;">View history <i class="fa-solid fa-chevron-right"></i></span></div></div>`;
+                    return `<div class="client-card" style="padding:9px 10px;margin:0;border-left:3px solid ${isAgent(s)?'#fbbf24':'#60a5fa'};"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="min-width:0;cursor:pointer;flex:1;" onclick="openStaffPayrollDetail('${s.id}')"><div style="font-size:.8rem;font-weight:900;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${mfExpenseEscape(s.name)}</div><div style="font-size:.59rem;color:#64748b;margin-top:2px;">${mfExpenseEscape(s.id)} · ${mfExpenseEscape(s.role||'Staff')} · ₹${Number(s.salary||0).toLocaleString('en-IN')}/mo</div></div><div style="text-align:right;"><div style="font-size:.82rem;font-weight:900;color:${isAgent(s)?'#fbbf24':'#f472b6'};">₹${paid.toLocaleString('en-IN')}</div><div style="font-size:.56rem;color:#64748b;">${pays.length} filtered payment${pays.length===1?'':'s'}</div></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:.57rem;color:#64748b;"><span>Last: ${last?.date?formatToIndianDate(last.date):'No payment'}</span><span style="color:#60a5fa;cursor:pointer;" onclick="openStaffPayrollDetail('${s.id}')">View history <i class="fa-solid fa-chevron-right"></i></span></div><div class="opex-action-row"><button type="button" class="opex-mini-btn" onclick="openEditStaffModal('${s.id}')"><i class="fa-solid fa-pen"></i> Edit Staff</button><button type="button" class="opex-mini-btn danger" onclick="deleteStaffDirect('${s.id}')"><i class="fa-solid fa-trash"></i> Delete</button><button type="button" class="opex-mini-btn" onclick="openPaySalaryModal('${s.id}')"><i class="fa-solid fa-money-bill-wave"></i> Pay Salary</button></div></div>`;
                 }).join('');
                 return `<div style="margin-bottom:9px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;padding:0 2px;"><b style="font-size:.67rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;"><i class="fa-solid fa-layer-group me-1"></i>${mfExpenseEscape(role)}</b><b style="font-size:.67rem;color:#cbd5e1;">₹${groupPaid.toLocaleString('en-IN')}</b></div><div style="display:grid;gap:6px;">${memberCards}</div></div>`;
             }).join('');
@@ -2046,18 +2091,7 @@
                 return;
             }
 
-            // Cashbook-style month/year analytics: compact bars instead of a long raw list.
-            const expenseYears = {};
-            state.expenses.forEach(e=>{ const {year}=getExpenseMonthYear(e); expenseYears[year]=(expenseYears[year]||0)+(Number(e.amount)||0); });
-            const activeYear = yearFilter==='ALL' ? (Object.keys(expenseYears).map(Number).sort((a,b)=>b-a)[0] || new Date().getFullYear()) : Number(yearFilter);
-            const monthTotals = Array.from({length:12},()=>0);
-            state.expenses.forEach(e=>{ const {month,year}=getExpenseMonthYear(e); if(year===activeYear && (catFilter==='ALL'||e.category===catFilter)) monthTotals[month-1]+=(Number(e.amount)||0); });
-            const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            const maxMonth=Math.max(1,...monthTotals);
-            const monthBars=monthTotals.map((v,i)=>`<div style="flex:1;min-width:18px;text-align:center;"><div title="${monthNames[i]} ${activeYear}: ₹${v.toLocaleString('en-IN')}" style="height:58px;display:flex;align-items:flex-end;justify-content:center;"><div style="width:100%;max-width:22px;height:${Math.max(v?5:1,Math.round((v/maxMonth)*52))}px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,rgba(244,114,182,.95),rgba(96,165,250,.45));"></div></div><div style="font-size:.56rem;color:#64748b;margin-top:3px;">${monthNames[i]}</div></div>`).join('');
-            const yearRows=Object.keys(expenseYears).map(Number).sort((a,b)=>b-a).slice(0,6).map(y=>{ const val=expenseYears[y]||0; const maxY=Math.max(1,...Object.values(expenseYears)); return `<div style="display:grid;grid-template-columns:42px 1fr 74px;gap:6px;align-items:center;margin:4px 0;"><span style="font-size:.61rem;color:#94a3b8;">${y}</span><div style="height:7px;background:rgba(255,255,255,.05);border-radius:99px;overflow:hidden;"><div style="height:100%;width:${Math.max(val?3:0,(val/maxY)*100)}%;background:linear-gradient(90deg,#60a5fa,#f472b6);border-radius:99px;"></div></div><b style="font-size:.62rem;color:#cbd5e1;text-align:right;">₹${val.toLocaleString('en-IN')}</b></div>`; }).join('');
-            const analytics=`<div class="client-card" style="padding:9px 10px;margin-bottom:9px;background:rgba(255,255,255,.018);border:1px solid rgba(96,165,250,.10);"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px;"><div><b style="font-size:.73rem;color:#cbd5e1;"><i class="fa-solid fa-chart-column me-1"></i> Expense Cashbook Summary</b><div style="font-size:.58rem;color:#64748b;margin-top:2px;">Monthly movement for ${activeYear}${catFilter!=='ALL'?' · '+mfExpenseEscape(catFilter):''}</div></div><div style="text-align:right;"><div style="font-size:.57rem;color:#64748b;">Year Total</div><b style="font-size:.9rem;color:#f472b6;">₹${(expenseYears[activeYear]||0).toLocaleString('en-IN')}</b></div></div><div style="display:flex;gap:3px;align-items:flex-end;padding:2px 0 0;">${monthBars}</div><div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,.05);"><div style="font-size:.62rem;color:#64748b;margin-bottom:4px;">Recent yearly totals</div>${yearRows||'<span style="font-size:.65rem;color:#64748b;">No expense data yet.</span>'}</div></div>`;
-
+            // Clean summary only — no decorative chart. Detailed history remains available per category.
             const groups = {};
             filtered.forEach(e=>{ const g=groups[e.category] ||= []; g.push(e); });
             const cards = Object.entries(groups).sort((a,b)=>b[1].reduce((s,e)=>s+(Number(e.amount)||0),0)-a[1].reduce((s,e)=>s+(Number(e.amount)||0),0)).map(([category,entries])=>{
@@ -2066,20 +2100,23 @@
                 const latestDate=latest?.date?formatToIndianDate(latest.date):'-';
                 const colors={'Fuel / Travel':'#fbbf24','Office Rent':'#60a5fa','Tea & Refreshments':'#38bdf8'};
                 const accent=colors[category]||'#f472b6';
-                return `<div class="client-card" style="padding:10px 12px;margin-bottom:7px;cursor:pointer;border-left:3px solid ${accent};" onclick="openExpenseCategoryDetail(decodeURIComponent('${encodeURIComponent(category)}'),'${monthFilter}','${yearFilter}')">
+                const latestIndex=latest?state.expenses.indexOf(latest):-1;
+                return `<div class="client-card" style="padding:10px 12px;margin-bottom:7px;border-left:3px solid ${accent};">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-                        <div style="min-width:0;">
+                        <div style="min-width:0;flex:1;">
                             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span class="expense-badge" style="font-size:.68rem;">${mfExpenseEscape(category)}</span><span style="font-size:.65rem;color:#64748b;">${entries.length} entr${entries.length===1?'y':'ies'}</span></div>
                             <div style="font-size:.67rem;color:#94a3b8;margin-top:4px;">Last: ${latestDate}${latest?.desc?' · '+mfExpenseEscape(latest.desc):''}</div>
                         </div>
-                        <div style="text-align:right;white-space:nowrap;"><div style="font-size:1rem;font-weight:900;color:${accent};">₹${catTotal.toLocaleString('en-IN')}</div><div style="font-size:.61rem;color:#64748b;margin-top:2px;">View history <i class="fa-solid fa-chevron-right"></i></div></div>
+                        <div style="text-align:right;white-space:nowrap;"><div style="font-size:1rem;font-weight:900;color:${accent};">₹${catTotal.toLocaleString('en-IN')}</div><div style="font-size:.61rem;color:#64748b;margin-top:2px;">${entries.length} entries</div></div>
+                    </div>
+                    <div class="opex-action-row">
+                        <button type="button" class="opex-mini-btn" onclick="openExpenseCategoryDetail(decodeURIComponent('${encodeURIComponent(category)}'),'${monthFilter}','${yearFilter}')"><i class="fa-solid fa-eye"></i> Details</button>
+                        ${latestIndex>=0?`<button type="button" class="opex-mini-btn" onclick="openEditExpenseModal(${latestIndex})"><i class="fa-solid fa-pen"></i> Edit Latest</button><button type="button" class="opex-mini-btn danger" onclick="deleteExpenseEntry(${latestIndex})"><i class="fa-solid fa-trash"></i> Delete Latest</button>`:''}
                     </div>
                 </div>`;
             }).join('');
 
-            const recent = filtered.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,5);
-            const recentRows = recent.map(e=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:7px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.05);"><div style="min-width:0;flex:1;"><div style="font-size:.68rem;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><b>${mfExpenseEscape(e.category)}</b> · ${mfExpenseEscape(e.desc||'No description')}</div><div style="font-size:.61rem;color:#64748b;margin-top:2px;">${formatToIndianDate(e.date)} · ${mfExpenseEscape(e.mode||'-')}</div></div><div style="font-size:.78rem;font-weight:800;color:#f472b6;white-space:nowrap;">₹${Number(e.amount||0).toLocaleString('en-IN')}</div></div>`).join('');
-            list.innerHTML = `${analytics}<div style="margin-bottom:9px;">${cards}</div><div class="client-card" style="padding:8px 11px;background:rgba(255,255,255,.018);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;"><b style="font-size:.72rem;color:#cbd5e1;"><i class="fa-solid fa-clock-rotate-left me-1"></i> Latest Activity</b><span style="font-size:.61rem;color:#64748b;">Showing ${recent.length} of ${filtered.length}</span></div>${recentRows}</div>`;
+            list.innerHTML = `<div style="margin-bottom:9px;">${cards}</div>`;
         }
 
         function openAllExpenseDetails() {
@@ -2175,6 +2212,14 @@
             if (confirm("Delete employee " + id + "?")) {
                 state.staff = state.staff.filter(x => x.id !== id);
                 closeModal("modal-staff");
+                persist();
+            }
+        }
+
+        function deleteStaffDirect(id){
+            const s=state.staff.find(x=>x.id===id); if(!s)return;
+            if(confirm(`Delete staff member ${s.name}? Their salary history will also be removed.`)){
+                state.staff=state.staff.filter(x=>x.id!==id);
                 persist();
             }
         }
@@ -2808,7 +2853,7 @@
                         </div>
                         <div style="display:flex;gap:6px;align-items:center;">
                             <button type="button" class="btn-header btn-blue" style="padding:5px 10px;font-size:.70rem;position:relative;z-index:5;" onclick="event.stopPropagation(); openBorrowingSchedule('${b.id}');"><i class="fa-solid fa-table-list"></i> Schedule</button>
-                            <button type="button" class="btn-header btn-blue" style="padding:5px 10px;font-size:.70rem;position:relative;z-index:5;" onclick="event.stopPropagation(); openPayLenderModal('${b.id}');"><i class="fa-solid fa-receipt"></i> Pay Lender</button>
+                            <button type="button" class="btn-header btn-blue lender-pay-btn" data-pay-borrow-id="${encodeURIComponent(String(b.id))}" style="padding:6px 11px;font-size:.70rem;position:relative;z-index:9999;pointer-events:auto;touch-action:manipulation;cursor:pointer;"><i class="fa-solid fa-money-bill-transfer"></i> Pay Lender</button>
                         </div>
                     </div>
                 `;
@@ -2944,41 +2989,59 @@
         }
 
         function openPayLenderModal(borrowId) {
-            const b = state.borrowings.find(x=>x.id===borrowId);
-            if (!b) { alert("Borrowing record not found."); return; }
-            if (!b.tenure) { alert("This older borrowing has no tenure. Open Edit and enter tenure first."); return; }
-            b.repayments = Array.isArray(b.repayments) ? b.repayments : [];
-            const rows = mfBuildAmortisation(b);
-            const paidNos = new Set(b.repayments.map(r=>Number(r.emiNo)).filter(Boolean));
-            let next = rows.find(r=>!paidNos.has(r.no));
-            // Legacy repayments without emiNo are preserved; assign the next schedule slot by count only for display.
-            if (!next && b.repayments.length < rows.length) next = rows[b.repayments.length];
-            if (!next) { alert("All scheduled EMIs for this loan are already recorded."); return; }
+            try {
+                const cleanId = String(borrowId ?? '').trim();
+                const b = state.borrowings.find(x => String(x.id).trim() === cleanId);
+                if (!b) { alert("Borrowing record not found. Please reopen Capital Borrowings and try again."); return false; }
+                b.repayments = Array.isArray(b.repayments) ? b.repayments : [];
 
-            const paidP=b.repayments.reduce((s,r)=>s+(Number(r.principal)||0),0);
-            const remP=Math.max(0,(Number(b.amount)||0)-paidP);
-            document.getElementById("lp-borrow-id").value=b.id;
-            document.getElementById("lp-name-disp").innerText=b.lenderName;
-            document.getElementById("lp-id-disp").innerText=b.id;
-            document.getElementById("lp-orig-disp").innerText=mfMoney(b.amount);
-            document.getElementById("lp-rate-disp").innerText=b.rate+"% p.a. · "+(b.interestBasis || "Reducing Balance");
-            document.getElementById("lp-rem-disp").innerText=mfMoney(remP);
-            document.getElementById("lp-gst-disp").innerText=b.applyGst?"Yes (18% on Int)":"No";
-            document.getElementById("lp-emi-no").innerText=next.no;
-            document.getElementById("lp-due-date").innerText=formatToIndianDate(next.dueDate);
-            document.getElementById("lp-scheduled-emi").innerText=mfMoney(next.emi);
-            document.getElementById("lp-after-balance").innerText=mfMoney(next.closing);
-            document.getElementById("lp-principal").value=next.principal;
-            document.getElementById("lp-interest").value=next.interest;
-            document.getElementById("lp-gst").value=0;
-            if(document.getElementById("lp-total-paid")) { document.getElementById("lp-total-paid").dataset.userEdited=""; document.getElementById("lp-total-paid").value=next.emi; }
-            initDmySelectors("lp");
-            const now=new Date(); const d=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
-            setDmyValues("lp",d);
-            document.getElementById("lp-emi-month").value=String(next.dueDate).slice(5,7);
-            document.getElementById("lp-emi-year").value=String(next.dueDate).slice(0,4);
-            calcLenderPaymentTotals();
-            document.getElementById("modal-pay-lender").classList.add("active");
+                // Do not block legacy borrowings merely because tenure is stored in an older format.
+                // The same amortisation builder used by Schedule is the source of truth.
+                const rows = mfBuildAmortisation(b);
+                if (!Array.isArray(rows) || !rows.length) {
+                    alert("No lender repayment schedule is available for this borrowing. Please open Edit Borrowing and check the tenure, frequency and rate.");
+                    return false;
+                }
+                const paidNos = new Set(b.repayments.map(r => Number(r.emiNo)).filter(Boolean));
+                let next = rows.find(r => !paidNos.has(r.no));
+                if (!next && b.repayments.length < rows.length) next = rows[b.repayments.length];
+                if (!next) { alert("All scheduled lender EMIs for this borrowing are already recorded."); return false; }
+
+                const paidP = b.repayments.reduce((sum,r)=>sum+(Number(r.principal)||0),0);
+                const remP = Math.max(0,(Number(b.amount)||0)-paidP);
+                const set = (id,val,prop='value') => { const el=document.getElementById(id); if(el) el[prop]=val; };
+                set('lp-borrow-id',b.id);
+                set('lp-name-disp',b.lenderName,'innerText');
+                set('lp-id-disp',b.id,'innerText');
+                set('lp-orig-disp',mfMoney(b.amount),'innerText');
+                set('lp-rate-disp',(b.rate||0)+"% p.a. · "+(b.interestBasis || "Reducing Balance"),'innerText');
+                set('lp-rem-disp',mfMoney(remP),'innerText');
+                set('lp-gst-disp',b.applyGst?"Yes (18% on Int)":"No",'innerText');
+                set('lp-emi-no',next.no,'innerText');
+                set('lp-due-date',formatToIndianDate(next.dueDate),'innerText');
+                set('lp-scheduled-emi',mfMoney(next.emi),'innerText');
+                set('lp-after-balance',mfMoney(next.closing),'innerText');
+                set('lp-principal',next.principal);
+                set('lp-interest',next.interest);
+                set('lp-gst',0);
+                const pct=document.getElementById('lp-gst-pct'); if(pct) pct.value=b.applyGst?18:0;
+                const total=document.getElementById('lp-total-paid'); if(total){ total.dataset.userEdited=''; total.value=Number(next.emi)||((Number(next.principal)||0)+(Number(next.interest)||0)); }
+                if(typeof initDmySelectors==='function') initDmySelectors('lp');
+                const now=new Date();
+                const actual=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+                if(typeof setDmyValues==='function') setDmyValues('lp',actual);
+                const em=document.getElementById('lp-emi-month'); if(em) em.value=String(next.dueDate).slice(5,7);
+                const ey=document.getElementById('lp-emi-year'); if(ey) ey.value=String(next.dueDate).slice(0,4);
+                if(typeof calcLenderPaymentTotals==='function') calcLenderPaymentTotals();
+                const modal=document.getElementById('modal-pay-lender');
+                if(!modal) { alert("Lender payment window is missing. Please refresh the page once."); return false; }
+                modal.classList.add('active');
+                return true;
+            } catch(err) {
+                console.error('Pay Lender error:', err);
+                alert('Pay Lender could not be opened. Please refresh the page once and try again.');
+                return false;
+            }
         }
 
         function calcLenderPaymentTotals() {
@@ -2990,42 +3053,49 @@
             if (gstHidden) gstHidden.value = gst;
             const total = p + i + gst;
             const totalPaid = document.getElementById("lp-total-paid");
-            if (totalPaid) totalPaid.value = total;
+            if (totalPaid && totalPaid.dataset.userEdited !== '1') totalPaid.value = total;
             const out = document.getElementById("lp-total-outflow");
             if (out) out.innerText = mfMoney(total);
         }
 
         function handleLenderPaySubmit(e) {
             e.preventDefault();
-            const borrowId=document.getElementById("lp-borrow-id").value;
-            const b=state.borrowings.find(x=>x.id===borrowId);
-            if(!b) return;
+            const borrowId=String(document.getElementById("lp-borrow-id")?.value||'');
+            const b=state.borrowings.find(x=>String(x.id)===borrowId);
+            if(!b) { alert('Borrowing record not found.'); return; }
             const rows=mfBuildAmortisation(b);
-            const emiNo=Number(document.getElementById("lp-emi-no").innerText)||1;
+            const emiNo=Number(document.getElementById("lp-emi-no")?.innerText)||1;
             const scheduled=rows.find(r=>r.no===emiNo);
             if(!scheduled){alert("Scheduled EMI not found.");return;}
             b.repayments=Array.isArray(b.repayments)?b.repayments:[];
             if(b.repayments.some(r=>Number(r.emiNo)===emiNo)){alert(`EMI #${emiNo} is already marked as paid.`);return;}
             const actualPaidDate=getDmyIsoString("lp");
-            const mode=document.getElementById("lp-mode").value;
+            const mode=document.getElementById("lp-mode")?.value||'Bank Transfer / UPI';
             b.repayments.push({
-                date:actualPaidDate,
-                dueDate:scheduled.dueDate,
-                emiNo:emiNo,
-                emiMonth:String(scheduled.dueDate).slice(5,7),
-                emiYear:Number(String(scheduled.dueDate).slice(0,4)),
-                principal:scheduled.principal,
-                interest:scheduled.interest,
-                gst:Number(document.getElementById("lp-gst").value)||0,
-                totalPaid:Number(document.getElementById("lp-total-paid").value)|| (scheduled.principal+scheduled.interest),
-                mode:mode
+                date:actualPaidDate,dueDate:scheduled.dueDate,emiNo:emiNo,
+                emiMonth:String(scheduled.dueDate).slice(5,7),emiYear:Number(String(scheduled.dueDate).slice(0,4)),
+                principal:scheduled.principal,interest:scheduled.interest,
+                gst:Number(document.getElementById("lp-gst")?.value)||0,
+                totalPaid:Number(document.getElementById("lp-total-paid")?.value)||(scheduled.principal+scheduled.interest),mode:mode
             });
             closeModal("modal-pay-lender");
             persist();
-            alert(`EMI #${emiNo} recorded.
-Due Date: ${formatToIndianDate(scheduled.dueDate)}
-Actual Paid Date: ${formatToIndianDate(actualPaidDate)}`);
+            renderBorrowingsList();
+            alert(`EMI #${emiNo} recorded.\nDue Date: ${formatToIndianDate(scheduled.dueDate)}\nActual Paid Date: ${formatToIndianDate(actualPaidDate)}`);
         }
+
+        // One delegated handler only. It works for dynamically rendered lender cards and mobile Chrome.
+        document.addEventListener('click', function(ev) {
+            const btn = ev.target && ev.target.closest ? ev.target.closest('.lender-pay-btn') : null;
+            if (!btn) return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            ev.stopImmediatePropagation();
+            const encoded = btn.getAttribute('data-pay-borrow-id') || '';
+            let id = encoded;
+            try { id = decodeURIComponent(encoded); } catch(e) {}
+            openPayLenderModal(id);
+        }, true);
 
         // Customer Modal Handlers
         function openAddClientModal() { populateLoanCollectorSelect();
@@ -4728,7 +4798,8 @@ Actual Paid Date: ${formatToIndianDate(actualPaidDate)}`);
         function printFinanceDetailReport(){
             const title=document.getElementById('finance-detail-title').innerText, body=document.getElementById('finance-detail-content').innerHTML, period=financePeriodLabel();
             const w=window.open('','_blank'); if(!w){alert('Please allow pop-ups to print the report.');return;}
-            w.document.write(`<html><head><title>${financeEsc(title)}</title><style>body{font-family:Arial,sans-serif;color:#111;padding:22px;font-size:11px}h1{font-size:20px;margin:0 0 5px}h3{margin:18px 0 7px}.finance-detail-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.finance-mini-card{border:1px solid #ddd;padding:8px;border-radius:6px}.finance-mini-card span{display:block;color:#666;font-size:9px}.finance-mini-card b{font-size:13px}.finance-section{margin-top:12px;border:1px solid #ddd;border-radius:6px;overflow:hidden}.finance-section-head{padding:8px;background:#f3f4f6;font-weight:bold}.finance-table{width:100%;border-collapse:collapse;font-size:9px}.finance-table th,.finance-table td{border:1px solid #ddd;padding:5px;text-align:left}.finance-table th{background:#eee}.finance-waterfall{display:grid;gap:5px;padding:8px}.finance-line{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:5px}.finance-line.total{font-weight:bold;background:#f5f5f5}.finance-pill{font-size:8px}.finance-report-note{color:#555;margin:6px 0}.no-print{display:none!important}@media print{body{padding:10px}}</style></head><body><h1>${financeEsc(title)}</h1><div>Period: ${financeEsc(period)} &nbsp; | &nbsp; Generated: ${new Date().toLocaleString('en-IN')}</div>${body}
+            w.document.write(`<html><head><title>${financeEsc(title)}</title><style>body{font-family:Arial,sans-serif;color:#111;padding:22px;font-size:11px}h1{font-size:20px;margin:0 0 5px}h3{margin:18px 0 7px}.finance-detail-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.finance-mini-card{border:1px solid #ddd;padding:8px;border-radius:6px}.finance-mini-card span{display:block;color:#666;font-size:9px}.finance-mini-card b{font-size:13px}.finance-section{margin-top:12px;border:1px solid #ddd;border-radius:6px;overflow:hidden}.finance-section-head{padding:8px;background:#f3f4f6;font-weight:bold}.finance-table{width:100%;border-collapse:collapse;font-size:9px}.finance-table th,.finance-table td{border:1px solid #ddd;padding:5px;text-align:left}.finance-table th{background:#eee}.finance-waterfall{display:grid;gap:5px;padding:8px}.finance-line{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:5px}.finance-line.total{font-weight:bold;background:#f5f5f5}.finance-pill{font-size:8px}.finance-report-note{color:#555;margin:6px 0}.no-print{display:none!important}@media print{body{padding:10px}}
+</style></head><body><h1>${financeEsc(title)}</h1><div>Period: ${financeEsc(period)} &nbsp; | &nbsp; Generated: ${new Date().toLocaleString('en-IN')}</div>${body}
 </body></html>`); w.document.close(); w.onload=()=>{w.focus();w.print();};
         }
 
@@ -4746,5 +4817,49 @@ window.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('load',()=>{ initializeSecureStorage(); });
 </script>
+
+<script id="mf-pay-lender-modal-final-js">
+(function(){
+  function normalizePayLenderModal(){
+    var m=document.getElementById('modal-pay-lender');
+    if(!m) return;
+    /* A fixed modal must be a direct child of BODY; nested transforms/overflow
+       in cards can otherwise make it render inside the borrowing card. */
+    if(m.parentElement !== document.body){
+      document.body.appendChild(m);
+    }
+    m.style.zIndex='2147483000';
+  }
+  function closePayLenderClean(){
+    var m=document.getElementById('modal-pay-lender');
+    if(m) m.classList.remove('active');
+  }
+  function initPayLenderModalFix(){
+    normalizePayLenderModal();
+    /* Never allow accidental duplicate modal nodes. */
+    var all=document.querySelectorAll('[id="modal-pay-lender"]');
+    for(var i=1;i<all.length;i++) all[i].remove();
+    var m=document.getElementById('modal-pay-lender');
+    if(m){
+      m.addEventListener('click',function(e){
+        if(e.target===m) closePayLenderClean();
+      });
+      document.addEventListener('keydown',function(e){
+        if(e.key==='Escape') closePayLenderClean();
+      });
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',initPayLenderModalFix);
+  else initPayLenderModalFix();
+  window.addEventListener('load',normalizePayLenderModal);
+  /* The borrowing renderer can re-run; keep the modal outside rendered cards. */
+  var mo=new MutationObserver(function(){
+    var m=document.getElementById('modal-pay-lender');
+    if(m && m.parentElement!==document.body) document.body.appendChild(m);
+  });
+  mo.observe(document.body,{childList:true,subtree:true});
+})();
+</script>
+
 </body>
 </html>
