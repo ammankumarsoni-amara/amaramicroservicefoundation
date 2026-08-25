@@ -269,6 +269,14 @@
             overflow-y: auto;
         }
         .modal-title { font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .lender-repay-actions{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+        .lender-repay-btn{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#e2e8f0;border-radius:7px;padding:4px 7px;font-size:.64rem;font-weight:800;cursor:pointer}
+        .lender-repay-btn.edit{color:#93c5fd;border-color:rgba(59,130,246,.35);background:rgba(59,130,246,.10)}
+        .lender-repay-btn.delete{color:#fca5a5;border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.10)}
+        .lender-schedule-table-wrap{overflow:auto;border:1px solid rgba(255,255,255,.07);border-radius:10px}
+        .lender-schedule-table{min-width:980px}
+        .lender-schedule-table th:last-child,.lender-schedule-table td:last-child{position:sticky;right:0;background:#111827;z-index:2}
+
         
         .form-group { margin-bottom: 12px; }
         .form-group label { display: block; font-size: 0.76rem; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; }
@@ -1159,6 +1167,7 @@
             </div>
             <form id="form-pay-lender" onsubmit="handleLenderPaySubmit(event)">
                 <input type="hidden" id="lp-borrow-id">
+                <input type="hidden" id="lp-edit-index" value="-1">
 
                 <div style="background: rgba(255,255,255,0.04); padding: 11px; border-radius: 10px; margin-bottom: 12px; font-size: 0.82rem; border: 1px solid var(--border-subtle);">
                     <div style="display:flex; justify-content:space-between;"><span>Lender: <b id="lp-name-disp" style="color:#fff;">-</b></span> <span class="borrow-badge" id="lp-id-disp">-</span></div>
@@ -1221,7 +1230,7 @@
                     </div>
                 </div>
 
-                <button type="submit" class="btn-submit">✓ Record Lender EMI / Payment</button>
+                <button type="submit" class="btn-submit" id="btn-lender-pay-submit">✓ Record Lender EMI / Payment</button>
             </form>
         </div>
     </div>
@@ -3042,81 +3051,104 @@
             return (Number(b.processingFee)||0)+(Number(b.processingGst)||0)+(Number(b.otherCharges)||0)+(Number(b.otherGst)||0);
         }
 
+        function normalizeLenderModal(id){
+            const m=document.getElementById(id);
+            if(!m) return null;
+            if(m.parentElement!==document.body) document.body.appendChild(m);
+            m.style.zIndex='2147483000';
+            return m;
+        }
+
         function openBorrowingSchedule(borrowId) {
-            const b = state.borrowings.find(x=>x.id===borrowId);
-            if (!b) return;
-            if (!b.tenure) { alert("This older borrowing has no tenure. Open Edit and enter tenure first."); return; }
+            const b = state.borrowings.find(x=>String(x.id)===String(borrowId));
+            if(!b) return;
             const rows = mfBuildAmortisation(b);
+            if(!rows.length){ alert('No lender repayment schedule is available. Please check the borrowing tenure and rate.'); return; }
             const repayments = Array.isArray(b.repayments) ? b.repayments : [];
-            const paidByNo = new Map(repayments.map(r=>[Number(r.emiNo),r]));
+            const paidByNo = new Map();
+            repayments.forEach((r,i)=>{ if(Number(r.emiNo)) paidByNo.set(Number(r.emiNo),{repayment:r,index:i}); });
             const totalInterest = rows.reduce((s,r)=>s+r.interest,0);
-            const totalInterestGst = rows.reduce((s,r)=>s+r.gst,0);
             const upfront = mfUpfrontCost(b);
             const totalCost = totalInterest+upfront;
-            document.getElementById("borrowing-schedule-title").innerText = `${b.lenderName} — Auto Amortisation Schedule (${b.interestBasis || 'Reducing Balance'})`;
-            document.getElementById("borrowing-schedule-summary").innerHTML = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;"><div style="padding:8px;border-radius:9px;background:rgba(59,130,246,.10);"><small>Principal</small><br><b>${mfMoney(b.amount)}</b></div><div style="padding:8px;border-radius:9px;background:rgba(248,113,113,.10);"><small>Total Interest</small><br><b>${mfMoney(totalInterest)}</b></div><div style="padding:8px;border-radius:9px;background:rgba(251,191,36,.10);"><small>Upfront Charges</small><br><b>${mfMoney(upfront)}</b></div><div style="padding:8px;border-radius:9px;background:rgba(52,211,153,.10);"><small>Total Loan Cost</small><br><b>${mfMoney(totalCost)}</b></div></div><div style="font-size:.68rem;color:#94a3b8;margin-top:7px;">Calculation Basis: ${b.interestBasis || 'Reducing Balance'} · Total Loan Cost = scheduled interest + processing fee/GST + other charges/GST. Interest GST is separate and is recorded only when paid. Upfront charges reduce cash received; they do not increase lender principal unless explicitly financed.</div>`;
-            let t=`<table style="width:100%;border-collapse:collapse;font-size:.69rem;"><thead><tr>${["#","Auto EMI Due","EMI","Principal","Interest","GST (separate)","Closing Principal","Actual Paid","Status"].map(x=>`<th style="padding:7px;text-align:left;white-space:nowrap;">${x}</th>`).join("")}</tr></thead><tbody>`;
-            const today = new Date().toISOString().slice(0,10);
-            t += rows.map(r=>{ const paid=paidByNo.get(r.no); const status=paid?"PAID":(r.dueDate<today?"DUE":"UPCOMING"); const c=status==="PAID"?"#34d399":status==="DUE"?"#f87171":"#fbbf24"; return `<tr style="border-top:1px solid rgba(255,255,255,.06);"><td style="padding:7px;">${r.no}</td><td style="padding:7px;">${formatToIndianDate(r.dueDate)}</td><td style="padding:7px;">${mfMoney(r.emi)}</td><td style="padding:7px;">${mfMoney(r.principal)}</td><td style="padding:7px;">${mfMoney(r.interest)}</td><td style="padding:7px;">${mfMoney(r.gst)}</td><td style="padding:7px;">${mfMoney(r.closing)}</td><td style="padding:7px;">${paid?formatToIndianDate(paid.date):"-"}</td><td style="padding:7px;color:${c};font-weight:800;">${status}</td></tr>`; }).join("");
-            t += `</tbody></table>`;
-            document.getElementById("borrowing-schedule-content").innerHTML=t;
-            document.getElementById("modal-borrowing-schedule").classList.add("active");
+            const modal=normalizeLenderModal('modal-borrowing-schedule');
+            if(!modal) return;
+            document.getElementById('borrowing-schedule-title').innerText = `${b.lenderName} — Auto Amortisation Schedule (${b.interestBasis || 'Reducing Balance'})`;
+            document.getElementById('borrowing-schedule-summary').innerHTML = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;"><div style="padding:8px;border-radius:9px;background:rgba(59,130,246,.10);"><small>Principal</small><br><b>${mfMoney(b.amount)}</b></div><div style="padding:8px;border-radius:9px;background:rgba(248,113,113,.10);"><small>Total Interest</small><br><b>${mfMoney(totalInterest)}</b></div><div style="padding:8px;border-radius:9px;background:rgba(251,191,36,.10);"><small>Upfront Charges</small><br><b>${mfMoney(upfront)}</b></div><div style="padding:8px;border-radius:9px;background:rgba(52,211,153,.10);"><small>Total Loan Cost</small><br><b>${mfMoney(totalCost)}</b></div></div><div style="font-size:.68rem;color:#94a3b8;margin-top:7px;">Calculation Basis: ${b.interestBasis || 'Reducing Balance'} · Interest GST is recorded separately at payment time.</div>`;
+            let t=`<div class="lender-schedule-table-wrap"><table class="lender-schedule-table"><thead><tr>${['#','Auto EMI Due','EMI','Principal','Interest','GST','Closing Principal','Actual Paid','Status','Actions'].map(x=>`<th style="padding:7px;text-align:left;white-space:nowrap;">${x}</th>`).join('')}</tr></thead><tbody>`;
+            const today=new Date().toISOString().slice(0,10);
+            t += rows.map(r=>{
+                const rec=paidByNo.get(r.no); const paid=rec?.repayment;
+                const status=paid?'PAID':(r.dueDate<today?'DUE':'UPCOMING');
+                const c=status==='PAID'?'#34d399':status==='DUE'?'#f87171':'#fbbf24';
+                const actions=paid
+                    ? `<div class="lender-repay-actions"><button type="button" class="lender-repay-btn edit" onclick="editLenderRepayment('${encodeURIComponent(b.id)}',${rec.index})"><i class="fa-solid fa-pen"></i> Edit</button><button type="button" class="lender-repay-btn delete" onclick="deleteLenderRepayment('${encodeURIComponent(b.id)}',${rec.index})"><i class="fa-solid fa-trash"></i> Delete</button></div>`
+                    : `<button type="button" class="lender-repay-btn edit" onclick="openPayLenderModal('${encodeURIComponent(b.id)}')"><i class="fa-solid fa-receipt"></i> Pay</button>`;
+                return `<tr style="border-top:1px solid rgba(255,255,255,.06);"><td style="padding:7px;">${r.no}</td><td style="padding:7px;">${formatToIndianDate(r.dueDate)}</td><td style="padding:7px;">${mfMoney(r.emi)}</td><td style="padding:7px;">${mfMoney(r.principal)}</td><td style="padding:7px;">${mfMoney(r.interest)}</td><td style="padding:7px;">${mfMoney(paid?.gst||0)}</td><td style="padding:7px;">${mfMoney(r.closing)}</td><td style="padding:7px;">${paid?formatToIndianDate(paid.date):'-'}</td><td style="padding:7px;color:${c};font-weight:800;">${status}</td><td style="padding:7px;">${actions}</td></tr>`;
+            }).join('');
+            t += '</tbody></table></div>';
+            document.getElementById('borrowing-schedule-content').innerHTML=t;
+            modal.classList.add('active');
         }
 
         function openPayLenderModal(borrowId) {
             try {
-                const cleanId = String(borrowId ?? '').trim();
-                const b = state.borrowings.find(x => String(x.id).trim() === cleanId);
-                if (!b) { alert("Borrowing record not found. Please reopen Capital Borrowings and try again."); return false; }
-                b.repayments = Array.isArray(b.repayments) ? b.repayments : [];
+                let cleanId=String(borrowId ?? '').trim();
+                try{ cleanId=decodeURIComponent(cleanId); }catch(e){}
+                const b=state.borrowings.find(x=>String(x.id).trim()===cleanId);
+                if(!b){ alert('Borrowing record not found.'); return false; }
+                b.repayments=Array.isArray(b.repayments)?b.repayments:[];
+                const rows=mfBuildAmortisation(b);
+                if(!rows.length){ alert('No lender repayment schedule is available. Please check the borrowing tenure and rate.'); return false; }
+                const paidNos=new Set(b.repayments.map(r=>Number(r.emiNo)).filter(Boolean));
+                let next=rows.find(r=>!paidNos.has(r.no));
+                if(!next && b.repayments.length<rows.length) next=rows[b.repayments.length];
+                if(!next){ alert('All scheduled lender EMIs for this borrowing are already recorded.'); return false; }
+                const paidP=b.repayments.reduce((sum,r)=>sum+(Number(r.principal)||0),0);
+                const remP=Math.max(0,(Number(b.amount)||0)-paidP);
+                const set=(id,val,prop='value')=>{const el=document.getElementById(id);if(el)el[prop]=val;};
+                set('lp-edit-index',-1); set('lp-borrow-id',b.id);
+                set('lp-name-disp',b.lenderName,'innerText'); set('lp-id-disp',b.id,'innerText'); set('lp-orig-disp',mfMoney(b.amount),'innerText');
+                set('lp-rate-disp',(b.rate||0)+'% p.a. · '+(b.interestBasis||'Reducing Balance'),'innerText'); set('lp-rem-disp',mfMoney(remP),'innerText');
+                set('lp-gst-disp',b.applyGst?'Yes (18% on Int)':'No','innerText'); set('lp-emi-no',next.no,'innerText'); set('lp-due-date',formatToIndianDate(next.dueDate),'innerText');
+                set('lp-scheduled-emi',mfMoney(next.emi),'innerText'); set('lp-after-balance',mfMoney(next.closing),'innerText'); set('lp-principal',next.principal); set('lp-interest',next.interest); set('lp-gst',0);
+                const pct=document.getElementById('lp-gst-pct'); if(pct)pct.value=b.applyGst?18:0;
+                const total=document.getElementById('lp-total-paid'); if(total){total.dataset.userEdited='';total.value=Number(next.emi)||((Number(next.principal)||0)+(Number(next.interest)||0));}
+                const mode=document.getElementById('lp-mode'); if(mode)mode.value='Bank Transfer';
+                if(typeof initDmySelectors==='function')initDmySelectors('lp');
+                const now=new Date(); const actual=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; if(typeof setDmyValues==='function')setDmyValues('lp',actual);
+                const em=document.getElementById('lp-emi-month');if(em)em.value=String(next.dueDate).slice(5,7);const ey=document.getElementById('lp-emi-year');if(ey)ey.value=String(next.dueDate).slice(0,4);
+                const title=document.querySelector('#modal-pay-lender .modal-title span');if(title)title.innerText='Record Lender Repayment / EMI';
+                const submit=document.getElementById('btn-lender-pay-submit');if(submit)submit.innerText='✓ Record Lender EMI / Payment';
+                calcLenderPaymentTotals();
+                const modal=normalizeLenderModal('modal-pay-lender');if(!modal)return false;modal.classList.add('active');return true;
+            }catch(err){console.error('Pay Lender error:',err);alert('Pay Lender could not be opened. Please refresh the page once and try again.');return false;}
+        }
 
-                // Do not block legacy borrowings merely because tenure is stored in an older format.
-                // The same amortisation builder used by Schedule is the source of truth.
-                const rows = mfBuildAmortisation(b);
-                if (!Array.isArray(rows) || !rows.length) {
-                    alert("No lender repayment schedule is available for this borrowing. Please open Edit Borrowing and check the tenure, frequency and rate.");
-                    return false;
-                }
-                const paidNos = new Set(b.repayments.map(r => Number(r.emiNo)).filter(Boolean));
-                let next = rows.find(r => !paidNos.has(r.no));
-                if (!next && b.repayments.length < rows.length) next = rows[b.repayments.length];
-                if (!next) { alert("All scheduled lender EMIs for this borrowing are already recorded."); return false; }
+        function editLenderRepayment(encodedBorrowId,index){
+            let borrowId=String(encodedBorrowId||'');try{borrowId=decodeURIComponent(borrowId);}catch(e){}
+            const b=state.borrowings.find(x=>String(x.id)===borrowId);if(!b)return;
+            const r=(b.repayments||[])[Number(index)];if(!r)return;
+            const rows=mfBuildAmortisation(b);const scheduled=rows.find(x=>Number(x.no)===Number(r.emiNo));if(!scheduled)return;
+            const set=(id,val,prop='value')=>{const el=document.getElementById(id);if(el)el[prop]=val;};
+            set('lp-edit-index',Number(index));set('lp-borrow-id',b.id);set('lp-name-disp',b.lenderName,'innerText');set('lp-id-disp',b.id,'innerText');set('lp-orig-disp',mfMoney(b.amount),'innerText');
+            set('lp-rate-disp',(b.rate||0)+'% p.a. · '+(b.interestBasis||'Reducing Balance'),'innerText');
+            const paidP=(b.repayments||[]).reduce((sum,x,i)=>i===Number(index)?sum:sum+(Number(x.principal)||0),0);set('lp-rem-disp',mfMoney(Math.max(0,Number(b.amount||0)-paidP)),'innerText');
+            set('lp-gst-disp',b.applyGst?'Yes (18% on Int)':'No','innerText');set('lp-emi-no',scheduled.no,'innerText');set('lp-due-date',formatToIndianDate(scheduled.dueDate),'innerText');set('lp-scheduled-emi',mfMoney(scheduled.emi),'innerText');set('lp-after-balance',mfMoney(scheduled.closing),'innerText');
+            set('lp-principal',scheduled.principal);set('lp-interest',scheduled.interest);set('lp-gst',Number(r.gst)||0);set('lp-gst-pct',b.applyGst?18:0);set('lp-total-paid',Number(r.totalPaid)||scheduled.emi);set('lp-mode',r.mode||'Bank Transfer');
+            if(typeof initDmySelectors==='function')initDmySelectors('lp');if(typeof setDmyValues==='function')setDmyValues('lp',r.date||scheduled.dueDate);
+            set('lp-emi-month',String(scheduled.dueDate).slice(5,7));set('lp-emi-year',String(scheduled.dueDate).slice(0,4));
+            const title=document.querySelector('#modal-pay-lender .modal-title span');if(title)title.innerText=`Edit Lender EMI Payment — EMI #${scheduled.no}`;
+            const submit=document.getElementById('btn-lender-pay-submit');if(submit)submit.innerText='✓ Update Lender EMI Payment';
+            const modal=normalizeLenderModal('modal-pay-lender');if(modal)modal.classList.add('active');
+        }
 
-                const paidP = b.repayments.reduce((sum,r)=>sum+(Number(r.principal)||0),0);
-                const remP = Math.max(0,(Number(b.amount)||0)-paidP);
-                const set = (id,val,prop='value') => { const el=document.getElementById(id); if(el) el[prop]=val; };
-                set('lp-borrow-id',b.id);
-                set('lp-name-disp',b.lenderName,'innerText');
-                set('lp-id-disp',b.id,'innerText');
-                set('lp-orig-disp',mfMoney(b.amount),'innerText');
-                set('lp-rate-disp',(b.rate||0)+"% p.a. · "+(b.interestBasis || "Reducing Balance"),'innerText');
-                set('lp-rem-disp',mfMoney(remP),'innerText');
-                set('lp-gst-disp',b.applyGst?"Yes (18% on Int)":"No",'innerText');
-                set('lp-emi-no',next.no,'innerText');
-                set('lp-due-date',formatToIndianDate(next.dueDate),'innerText');
-                set('lp-scheduled-emi',mfMoney(next.emi),'innerText');
-                set('lp-after-balance',mfMoney(next.closing),'innerText');
-                set('lp-principal',next.principal);
-                set('lp-interest',next.interest);
-                set('lp-gst',0);
-                const pct=document.getElementById('lp-gst-pct'); if(pct) pct.value=b.applyGst?18:0;
-                const total=document.getElementById('lp-total-paid'); if(total){ total.dataset.userEdited=''; total.value=Number(next.emi)||((Number(next.principal)||0)+(Number(next.interest)||0)); }
-                if(typeof initDmySelectors==='function') initDmySelectors('lp');
-                const now=new Date();
-                const actual=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-                if(typeof setDmyValues==='function') setDmyValues('lp',actual);
-                const em=document.getElementById('lp-emi-month'); if(em) em.value=String(next.dueDate).slice(5,7);
-                const ey=document.getElementById('lp-emi-year'); if(ey) ey.value=String(next.dueDate).slice(0,4);
-                if(typeof calcLenderPaymentTotals==='function') calcLenderPaymentTotals();
-                const modal=document.getElementById('modal-pay-lender');
-                if(!modal) { alert("Lender payment window is missing. Please refresh the page once."); return false; }
-                modal.classList.add('active');
-                return true;
-            } catch(err) {
-                console.error('Pay Lender error:', err);
-                alert('Pay Lender could not be opened. Please refresh the page once and try again.');
-                return false;
-            }
+        function deleteLenderRepayment(encodedBorrowId,index){
+            let borrowId=String(encodedBorrowId||'');try{borrowId=decodeURIComponent(borrowId);}catch(e){}
+            const b=state.borrowings.find(x=>String(x.id)===borrowId);if(!b||!Array.isArray(b.repayments))return;
+            const i=Number(index);const r=b.repayments[i];if(!r)return;
+            if(!confirm(`Delete lender EMI #${r.emiNo||'-'} payment record?`))return;
+            b.repayments.splice(i,1);persist();
+            const schedule=document.getElementById('modal-borrowing-schedule');if(schedule&&schedule.classList.contains('active'))openBorrowingSchedule(b.id);
         }
 
         function calcLenderPaymentTotals() {
@@ -3135,28 +3167,23 @@
 
         function handleLenderPaySubmit(e) {
             e.preventDefault();
-            const borrowId=String(document.getElementById("lp-borrow-id")?.value||'');
-            const b=state.borrowings.find(x=>String(x.id)===borrowId);
-            if(!b) { alert('Borrowing record not found.'); return; }
-            const rows=mfBuildAmortisation(b);
-            const emiNo=Number(document.getElementById("lp-emi-no")?.innerText)||1;
-            const scheduled=rows.find(r=>r.no===emiNo);
-            if(!scheduled){alert("Scheduled EMI not found.");return;}
+            const borrowId=String(document.getElementById('lp-borrow-id')?.value||'');
+            const b=state.borrowings.find(x=>String(x.id)===borrowId);if(!b)return;
+            const rows=mfBuildAmortisation(b);const emiNo=Number(document.getElementById('lp-emi-no')?.innerText)||1;const scheduled=rows.find(r=>r.no===emiNo);if(!scheduled)return;
             b.repayments=Array.isArray(b.repayments)?b.repayments:[];
-            if(b.repayments.some(r=>Number(r.emiNo)===emiNo)){alert(`EMI #${emiNo} is already marked as paid.`);return;}
-            const actualPaidDate=getDmyIsoString("lp");
-            const mode=document.getElementById("lp-mode")?.value||'Bank Transfer / UPI';
-            b.repayments.push({
-                date:actualPaidDate,dueDate:scheduled.dueDate,emiNo:emiNo,
-                emiMonth:String(scheduled.dueDate).slice(5,7),emiYear:Number(String(scheduled.dueDate).slice(0,4)),
-                principal:scheduled.principal,interest:scheduled.interest,
-                gst:Number(document.getElementById("lp-gst")?.value)||0,
-                totalPaid:Number(document.getElementById("lp-total-paid")?.value)||(scheduled.principal+scheduled.interest),mode:mode
-            });
-            closeModal("modal-pay-lender");
-            persist();
-            renderBorrowingsList();
-            alert(`EMI #${emiNo} recorded.\nDue Date: ${formatToIndianDate(scheduled.dueDate)}\nActual Paid Date: ${formatToIndianDate(actualPaidDate)}`);
+            const editIndex=Number(document.getElementById('lp-edit-index')?.value||-1);
+            const actualPaidDate=getDmyIsoString('lp');
+            const mode=document.getElementById('lp-mode')?.value||'Bank Transfer / UPI';
+            const record={date:actualPaidDate,dueDate:scheduled.dueDate,emiNo:emiNo,emiMonth:String(scheduled.dueDate).slice(5,7),emiYear:Number(String(scheduled.dueDate).slice(0,4)),principal:scheduled.principal,interest:scheduled.interest,gst:Number(document.getElementById('lp-gst')?.value)||0,totalPaid:Number(document.getElementById('lp-total-paid')?.value)||(scheduled.principal+scheduled.interest),mode:mode};
+            if(editIndex>=0){
+                if(!b.repayments[editIndex])return;
+                b.repayments[editIndex]=record;
+            }else{
+                if(b.repayments.some(r=>Number(r.emiNo)===emiNo)){alert(`EMI #${emiNo} is already marked as paid.`);return;}
+                b.repayments.push(record);
+            }
+            closeModal('modal-pay-lender');persist();
+            const schedule=document.getElementById('modal-borrowing-schedule');if(schedule&&schedule.classList.contains('active'))openBorrowingSchedule(b.id);
         }
 
         // One delegated handler only. It works for dynamically rendered lender cards and mobile Chrome.
@@ -4890,6 +4917,13 @@ window.addEventListener('online',()=>{
 window.addEventListener('visibilitychange',()=>{
     if(document.visibilityState==='visible' && navigator.onLine && googleAccessToken) reconcileGoogleDrive(true).catch(()=>{});
 });
+let mfCloudPollBusy=false;
+setInterval(()=>{
+    if(!document.hidden && navigator.onLine && googleAccessToken && !mfCloudPollBusy){
+        mfCloudPollBusy=true;
+        reconcileGoogleDrive(true).catch(()=>{}).finally(()=>{mfCloudPollBusy=false;});
+    }
+},10000);
 window.addEventListener('load',()=>{ initializeSecureStorage(); });
 </script>
 
@@ -4926,7 +4960,10 @@ window.addEventListener('load',()=>{ initializeSecureStorage(); });
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',initPayLenderModalFix);
   else initPayLenderModalFix();
-  window.addEventListener('load',normalizePayLenderModal);
+  window.addEventListener('load',function(){
+    normalizePayLenderModal();
+    if(typeof normalizeLenderModal==='function') normalizeLenderModal('modal-borrowing-schedule');
+  });
   /* The borrowing renderer can re-run; keep the modal outside rendered cards. */
   var mo=new MutationObserver(function(){
     var m=document.getElementById('modal-pay-lender');
