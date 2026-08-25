@@ -43,6 +43,10 @@
         
         .biz-brand-box { display: flex; align-items: center; gap: 8px; flex: 1; }
         .biz-input {
+            flex:1;
+            min-width:0;
+            max-width:none;
+            box-sizing:border-box;
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid rgba(255, 255, 255, 0.12);
             color: #fff;
@@ -452,7 +456,11 @@
     border-radius:18px 18px 0 0 !important;padding:15px !important;
   }
 }
-</style>
+        @media (max-width: 640px){
+            .biz-brand-box{width:100%;}
+            .biz-input{width:100%;max-width:none;font-size:.92rem;padding:7px 10px;}
+        }
+    </style>
 
 </head>
 <body>
@@ -1753,12 +1761,20 @@
         async function initializeSecureStorage(){
             try{
                 const snap=await idbGetSnapshot();
-                if(snap && snap.state && snap.state.loans && snap.state.products){
-                    state=snap.state;
-                }else{
-                    // First run: migrate the existing localStorage database into IndexedDB.
-                    await idbPutSnapshot();
-                }
+                let localState=null, localDirtyAt=0;
+                try{
+                    const raw=localStorage.getItem('MF_OPEX_PRO_DB');
+                    if(raw) localState=JSON.parse(raw);
+                    localDirtyAt=Date.parse(localStorage.getItem('MF_LOCAL_DIRTY_AT')||'')||0;
+                }catch(e){}
+                const hasData=obj=>!!(obj && obj.products && (Array.isArray(obj.loans)?obj.loans.length:0)+(Array.isArray(obj.borrowings)?obj.borrowings.length:0)+(Array.isArray(obj.staff)?obj.staff.length:0)+(Array.isArray(obj.expenses)?obj.expenses.length:0));
+                const idbHasData=hasData(snap?.state), localHasData=hasData(localState);
+                const snapUpdated=Date.parse(snap?.updatedAt||'')||0;
+                // Never let an empty/stale IndexedDB snapshot wipe a populated local database.
+                if(localHasData && (!idbHasData || localDirtyAt>snapUpdated)) state=localState;
+                else if(idbHasData) state=snap.state;
+                else if(localState && localState.products) state=localState;
+                else await idbPutSnapshot();
                 normalizeOperationalPeriods(); normalizeBorrowingCosts();
                 mfDbReady=true;
                 localStorage.setItem("MF_OPEX_PRO_DB_META", JSON.stringify({migratedToIndexedDB:true,updatedAt:new Date().toISOString()}));
@@ -1864,6 +1880,65 @@
             if (tab === 'borrowings') renderBorrowingsList();
             if (tab === 'passbook') populatePassbookDropdown();
             if (tab === 'products') renderProductsList();
+        }
+
+        // ================= DASHBOARD RENDER + KPI RESTORE FIX =================
+        // Keep the existing V32 calculations intact; this only reconnects the dashboard
+        // render pipeline that the Pay Lender patch accidentally omitted.
+        function renderKPIs(){
+            const loans=Array.isArray(state.loans)?state.loans:[];
+            const products=state.products||{};
+            let totalDisbursed=0,totalFile=0,totalInterest=0,totalPenalty=0,totalForeclose=0;
+            loans.forEach(l=>{
+                const p=products[l.product]; if(!p) return;
+                totalDisbursed += Number(p.amount)||0;
+                totalFile += Number(p.fileCharge)||0;
+                (l.payments||[]).forEach(pay=>{
+                    totalInterest += Number(pay.interest)||0;
+                    totalPenalty += Number(pay.penalty)||0;
+                });
+                if(l.foreclosed) totalForeclose += Number(l.foreclosureData?.feeAmount)||0;
+            });
+            let lenderInterest=0,lenderGst=0,lenderUpfront=0;
+            (state.borrowings||[]).forEach(b=>{
+                (b.repayments||[]).forEach(r=>{
+                    lenderInterest += Number(r.interest)||0;
+                    lenderGst += Number(r.gst)||0;
+                });
+                lenderUpfront += (Number(b.processingFee)||0)+(Number(b.processingGst)||0)+(Number(b.otherCharges)||0)+(Number(b.otherGst)||0);
+            });
+            let salaries=0;
+            (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(sp=>salaries+=Number(sp.amount)||0));
+            const generalExpenses=(state.expenses||[]).reduce((a,e)=>a+(Number(e.amount)||0),0);
+            const gross=totalFile+totalInterest+totalPenalty+totalForeclose;
+            const lenderCost=lenderInterest+lenderGst+lenderUpfront;
+            const opex=salaries+generalExpenses;
+            const net=gross-lenderCost-opex;
+            const outstanding=loans.filter(l=>!l.foreclosed).reduce((sum,l)=>{
+                const p=products[l.product]; if(!p)return sum;
+                const paid=(l.payments||[]).reduce((a,x)=>a+(Number(x.amount)||0),0);
+                return sum+Math.max(0,(Number(p.emi)||0)*(Number(p.tenure)||0)-paid);
+            },0);
+            const set=(id,v)=>{const el=document.getElementById(id);if(el)el.innerText=v;};
+            set('kpi-disbursed','₹'+totalDisbursed.toLocaleString('en-IN'));
+            set('kpi-gross-profit','₹'+gross.toLocaleString('en-IN'));
+            set('kpi-borrow-cost','-₹'+lenderCost.toLocaleString('en-IN'));
+            set('kpi-opex-cost','-₹'+opex.toLocaleString('en-IN'));
+            set('kpi-net-spread','₹'+net.toLocaleString('en-IN'));
+            set('kpi-outstanding','₹'+outstanding.toLocaleString('en-IN'));
+        }
+
+        function renderAll(){
+            renderKPIs();
+            if(typeof renderBusinessGrowthChart==='function') renderBusinessGrowthChart();
+            if(typeof renderProductFilters==='function') renderProductFilters();
+            if(typeof renderFeed==='function') renderFeed();
+            if(typeof renderExpensesAndStaff==='function') renderExpensesAndStaff();
+            if(typeof renderBorrowingsList==='function') renderBorrowingsList();
+            if(typeof renderAllLoansTable==='function') renderAllLoansTable();
+            if(typeof populatePassbookDropdown==='function') populatePassbookDropdown();
+            if(typeof renderLoanMasterSummary==='function') renderLoanMasterSummary();
+            if(typeof renderUpcomingEmiSchedule==='function') renderUpcomingEmiSchedule();
         }
 
         function renderBusinessGrowthChart(){
