@@ -7,6 +7,9 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Firebase Real-Time Sync (fast, no re-login needed, works across mobile + laptop) -->
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
     <style>
         :root {
             --bg-body: #090d16;
@@ -1533,8 +1536,28 @@
                 <div class="secure-cloud-card"><b>📊 Excel & JSON Export</b><span>Your existing reports/export and one-click JSON backup remain available.</span></div>
             </div>
 
+            <div style="margin-top:12px;border-top:2px solid #34d399;padding-top:12px;">
+                <div style="font-size:.84rem;font-weight:800;color:#34d399;margin-bottom:3px;"><i class="fa-solid fa-bolt"></i> Firebase Fast Sync (Recommended — one-time setup)</div>
+                <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;line-height:1.4;">No re-login every few days, no size limits for your data, works instantly on mobile and laptop with the same Sync Code. This is the primary, most reliable sync method — use it as your main cloud connection.</div>
+
+                <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Firebase Config (paste the whole firebaseConfig object here)</label>
+                <textarea id="firebase-config-input" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}' style="width:100%;min-height:70px;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.72rem;font-family:monospace;margin-bottom:7px;"></textarea>
+
+                <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Sync Code (create one secret code — use the SAME code on mobile and laptop)</label>
+                <input type="text" id="firebase-sync-code" placeholder="e.g. amma-loan-2026-secure" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;margin-bottom:7px;">
+
+                <button class="btn-header btn-green" style="width:100%;justify-content:center;" onclick="connectFirebaseSync()"><i class="fa-solid fa-bolt"></i> Connect Fast Sync</button>
+                <div id="firebase-sync-status" style="font-size:.68rem;color:#94a3b8;margin-top:7px;">Not connected yet.</div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px;">
+                    <button class="btn-header btn-blue" style="justify-content:center;" onclick="pushStateToFirebase(false)"><i class="fa-solid fa-cloud-arrow-up"></i> Push Now</button>
+                    <button class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="pullStateFromFirebase(true)"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Latest</button>
+                </div>
+                <div style="font-size:.62rem;color:#64748b;margin-top:6px;line-height:1.35;"><b>Note:</b> Keep your Sync Code private — anyone with this exact code can read/write this business data. Treat it like a password.</div>
+            </div>
+
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
-                <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Google Drive Connection (one-time setup)</div>
+                <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Google Drive Connection (secondary backup, optional)</div>
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Google OAuth Web Client ID</label>
                 <input type="text" id="google-client-id" placeholder="xxxx.apps.googleusercontent.com" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;margin-bottom:7px;">
                 <button class="btn-header btn-green" style="width:100%;justify-content:center;" onclick="connectGoogleDrive()"><i class="fa-brands fa-google-drive"></i> Connect My Google Drive</button>
@@ -1799,6 +1822,139 @@
             }
         }
 
+        // ================== FIREBASE FAST SYNC ==================
+        let mfFirebaseApp = null;
+        let mfFirestoreDb = null;
+        let mfFirebaseSyncCode = null;
+        let mfFirebaseListenerUnsub = null;
+        let mfFirebaseDeviceId = localStorage.getItem('MF_DEVICE_ID') || ('DEV-' + Math.random().toString(36).slice(2, 10));
+        localStorage.setItem('MF_DEVICE_ID', mfFirebaseDeviceId);
+        let mfFirebasePushTimer = null;
+        let mfIgnoreNextSnapshot = false;
+
+        function setFirebaseStatus(msg, isWarning) {
+            const el = document.getElementById('firebase-sync-status');
+            if (el) { el.textContent = msg; el.style.color = isWarning ? '#fde68a' : '#a7f3d0'; }
+        }
+
+        function connectFirebaseSync() {
+            try {
+                const cfgRaw = (document.getElementById('firebase-config-input')?.value || '').trim();
+                const syncCode = (document.getElementById('firebase-sync-code')?.value || '').trim();
+                if (!cfgRaw || !syncCode) { alert('Please paste your Firebase config AND enter a Sync Code.'); return; }
+                const cfg = JSON.parse(cfgRaw);
+                localStorage.setItem('MF_FIREBASE_CONFIG', cfgRaw);
+                localStorage.setItem('MF_FIREBASE_SYNC_CODE', syncCode);
+                initFirebaseSync(cfg, syncCode, true);
+            } catch (e) {
+                alert('That Firebase config does not look valid. Please copy the whole object exactly as Firebase gave it to you, including the { } brackets.');
+            }
+        }
+
+        function initFirebaseSync(cfg, syncCode, showAlerts) {
+            try {
+                if (!mfFirebaseApp) {
+                    mfFirebaseApp = firebase.initializeApp(cfg);
+                    mfFirestoreDb = firebase.firestore();
+                }
+                mfFirebaseSyncCode = syncCode;
+                setFirebaseStatus('🟢 Connected — fast sync is active for Sync Code: ' + syncCode);
+                startFirebaseListener();
+                // First time connecting: pull whatever is already on the cloud (if any), else push current data.
+                mfFirestoreDb.collection('microfinance_business').doc(syncCode).get().then(doc => {
+                    if (doc.exists && showAlerts) {
+                        if (confirm('Cloud already has data saved under this Sync Code. Load that data now? (Choose Cancel to keep what is on THIS device and overwrite the cloud instead.)')) {
+                            pullStateFromFirebase(false);
+                        } else {
+                            pushStateToFirebase(true);
+                        }
+                    } else if (showAlerts) {
+                        pushStateToFirebase(true);
+                    }
+                }).catch(err => { console.error(err); setFirebaseStatus('⚠️ Could not reach Firebase. Check your internet and config.', true); });
+            } catch (e) {
+                console.error(e);
+                setFirebaseStatus('⚠️ Firebase connection failed: ' + e.message, true);
+            }
+        }
+
+        function startFirebaseListener() {
+            if (mfFirebaseListenerUnsub) { mfFirebaseListenerUnsub(); mfFirebaseListenerUnsub = null; }
+            if (!mfFirestoreDb || !mfFirebaseSyncCode) return;
+            mfFirebaseListenerUnsub = mfFirestoreDb.collection('microfinance_business').doc(mfFirebaseSyncCode)
+                .onSnapshot(doc => {
+                    if (!doc.exists) return;
+                    const data = doc.data();
+                    if (!data || !data.payload) return;
+                    if (data.updatedByDevice === mfFirebaseDeviceId) return; // ignore our own write
+                    showFirebaseUpdateBanner(data.updatedAtLabel || '');
+                }, err => { console.error('Firebase listen error', err); });
+        }
+
+        function showFirebaseUpdateBanner(whenLabel) {
+            let bar = document.getElementById('firebase-update-banner');
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.id = 'firebase-update-banner';
+                bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#0f766e;color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-size:.78rem;gap:10px;box-shadow:0 -4px 14px rgba(0,0,0,.35);';
+                document.body.appendChild(bar);
+            }
+            bar.innerHTML = `<span><i class="fa-solid fa-cloud-arrow-down me-1"></i> New data synced from another device${whenLabel ? ' (' + whenLabel + ')' : ''}.</span>
+                <span>
+                    <button style="background:#fff;color:#0f766e;border:none;padding:6px 12px;border-radius:8px;font-weight:800;cursor:pointer;margin-right:6px;" onclick="pullStateFromFirebase(false);document.getElementById('firebase-update-banner').remove();">Load It</button>
+                    <button style="background:transparent;color:#fff;border:1px solid #fff;padding:6px 12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="document.getElementById('firebase-update-banner').remove();">Dismiss</button>
+                </span>`;
+        }
+
+        function pushStateToFirebase(silent) {
+            if (!mfFirestoreDb || !mfFirebaseSyncCode) { if (!silent) alert('Connect Fast Sync first.'); return; }
+            mfIgnoreNextSnapshot = true;
+            mfFirestoreDb.collection('microfinance_business').doc(mfFirebaseSyncCode).set({
+                payload: JSON.stringify(state),
+                updatedByDevice: mfFirebaseDeviceId,
+                updatedAtLabel: new Date().toLocaleString('en-IN'),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+                setFirebaseStatus('🟢 Synced to cloud — ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+            }).catch(err => {
+                console.error(err);
+                setFirebaseStatus('⚠️ Push failed: ' + err.message, true);
+            });
+        }
+
+        function pullStateFromFirebase(showConfirm) {
+            if (!mfFirestoreDb || !mfFirebaseSyncCode) { alert('Connect Fast Sync first.'); return; }
+            if (showConfirm && !confirm('This will replace the data on THIS device with the latest cloud data. Continue?')) return;
+            mfFirestoreDb.collection('microfinance_business').doc(mfFirebaseSyncCode).get().then(doc => {
+                if (!doc.exists) { alert('No cloud data found yet for this Sync Code.'); return; }
+                const data = doc.data();
+                state = JSON.parse(data.payload);
+                localStorage.setItem("MF_OPEX_PRO_DB", JSON.stringify(state));
+                idbPutSnapshot().finally(() => { renderAll(); setFirebaseStatus('🟢 Loaded latest cloud data — ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})); });
+            }).catch(err => { console.error(err); setFirebaseStatus('⚠️ Pull failed: ' + err.message, true); });
+        }
+
+        function scheduleFirebasePush() {
+            if (!mfFirestoreDb || !mfFirebaseSyncCode) return;
+            clearTimeout(mfFirebasePushTimer);
+            mfFirebasePushTimer = setTimeout(() => { pushStateToFirebase(true); }, 1500);
+        }
+
+        // Auto-connect on page load if previously configured, so the user never has to redo this.
+        (function autoConnectFirebase() {
+            try {
+                const cfgRaw = localStorage.getItem('MF_FIREBASE_CONFIG');
+                const syncCode = localStorage.getItem('MF_FIREBASE_SYNC_CODE');
+                if (cfgRaw && syncCode) {
+                    const cfg = JSON.parse(cfgRaw);
+                    const doInit = () => initFirebaseSync(cfg, syncCode, false);
+                    if (typeof firebase !== 'undefined') doInit();
+                    else window.addEventListener('load', doInit);
+                }
+            } catch (e) { console.warn('Firebase auto-connect skipped', e); }
+        })();
+        // ================== END FIREBASE FAST SYNC ==================
+
         function persist(){
             const now=new Date();
             try{ localStorage.setItem("MF_LOCAL_DIRTY_AT", now.toISOString()); }catch(e){}
@@ -1818,6 +1974,7 @@
         }
 
         function scheduleAutomaticCloudSync(){
+            scheduleFirebasePush();
             clearTimeout(cloudSyncTimer);
             // Debounce rapid changes so a batch of edits becomes one cloud snapshot.
             cloudSyncTimer=setTimeout(()=>{
@@ -4574,6 +4731,9 @@
             const savedId=localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'';
             const input=document.getElementById('google-client-id'); if(input) input.value=savedId;
             const wh=document.getElementById('cloud-webhook-url'); if(wh) wh.value=state.cloudWebhookUrl||'';
+            const fbCfg=document.getElementById('firebase-config-input'); if(fbCfg) fbCfg.value=localStorage.getItem('MF_FIREBASE_CONFIG')||'';
+            const fbCode=document.getElementById('firebase-sync-code'); if(fbCode) fbCode.value=localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'';
+            if(mfFirestoreDb && mfFirebaseSyncCode) setFirebaseStatus('🟢 Connected — fast sync is active for Sync Code: '+mfFirebaseSyncCode);
             updateSecureCloudStatus();
             document.getElementById('modal-cloud').classList.add('active');
         }
