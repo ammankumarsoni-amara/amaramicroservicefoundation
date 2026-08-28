@@ -1582,7 +1582,14 @@
                 <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, use the existing Google Apps Script webhook option or host this app on your HTTPS domain.</div>
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (recommended)</label>
                 <input type="password" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for cloud backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
-                <div style="font-size:.64rem;color:#94a3b8;margin-top:5px;line-height:1.35;">When set, the database sent to Google Drive is AES-GCM encrypted in the browser. Keep this PIN safe; without it, an encrypted cloud backup cannot be restored.</div>
+                <label style="display:flex;align-items:center;gap:6px;font-size:.66rem;color:#94a3b8;margin-top:7px;cursor:pointer;">
+                    <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Remember this PIN on this device (saved only in this browser)
+                </label>
+                <div style="display:flex;gap:7px;margin-top:7px;">
+                    <button type="button" class="btn-header btn-blue" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;" onclick="saveCloudPinNow()"><i class="fa-solid fa-floppy-disk"></i> Save PIN</button>
+                    <button type="button" class="btn-header" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;background:#3f1d2e;color:#fb7185;border:1px solid rgba(251,113,133,.25);" onclick="resetCloudPin()"><i class="fa-solid fa-rotate-left"></i> Reset PIN</button>
+                </div>
+                <div style="font-size:.64rem;color:#94a3b8;margin-top:5px;line-height:1.35;">When set, the database sent to Google Drive is AES-GCM encrypted in the browser. Keep this PIN safe; without it, an encrypted cloud backup cannot be restored. <b>Save PIN</b> remembers it on this device/browser so it auto-fills next time. <b>Reset PIN</b> forgets the saved PIN here and clears the box — do this if you're changing the PIN or using a shared device. If the box is ever empty during a sync, this app will now warn you instead of silently uploading an unencrypted backup.</div>
             </div>
 
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
@@ -3291,7 +3298,7 @@
         }
 
         function mfMoney(v) {
-            return "₹" + Math.round(Number(v) || 0).toLocaleString("en-IN");
+            return "₹" + (Number(v) || 0).toLocaleString("en-IN");
         }
 
         function mfAddMonths(iso, months) {
@@ -4770,6 +4777,41 @@
         function bytesToB64(bytes){let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s);}
         function b64ToBytes(b64){const s=atob(b64);const a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return a;}
 
+        function cloudPinStorageKey(){ return 'MF_CLOUD_ENC_PIN'; }
+        function cloudPinRememberKey(){ return 'MF_CLOUD_ENC_PIN_REMEMBER'; }
+        function cloudLastSyncEncryptedKey(){ return 'MF_CLOUD_LAST_SYNC_ENCRYPTED'; }
+
+        function restoreSavedCloudPin(){
+            const remember = localStorage.getItem(cloudPinRememberKey()) === '1';
+            const input = document.getElementById('cloud-encryption-pin');
+            const cb = document.getElementById('cloud-pin-remember');
+            if (input) input.value = remember ? (localStorage.getItem(cloudPinStorageKey()) || '') : '';
+            if (cb) cb.checked = remember;
+        }
+
+        function saveCloudPinNow(){
+            const pin = (document.getElementById('cloud-encryption-pin')?.value || '').trim();
+            if (!pin) { alert('Type the PIN in the box first, then tap Save PIN.'); return; }
+            localStorage.setItem(cloudPinStorageKey(), pin);
+            localStorage.setItem(cloudPinRememberKey(), '1');
+            const cb = document.getElementById('cloud-pin-remember'); if (cb) cb.checked = true;
+            alert('PIN saved on this device. It will auto-fill here next time, so you don\'t have to retype it before every sync/restore.');
+        }
+
+        function resetCloudPin(){
+            if (!confirm('This forgets the PIN saved on this device and clears the box. You will need to remember and re-enter the exact PIN yourself to restore any existing encrypted backup. Continue?')) return;
+            localStorage.removeItem(cloudPinStorageKey());
+            localStorage.removeItem(cloudPinRememberKey());
+            const input = document.getElementById('cloud-encryption-pin'); if (input) input.value = '';
+            const cb = document.getElementById('cloud-pin-remember'); if (cb) cb.checked = false;
+        }
+
+        function onCloudPinRememberChange(){
+            const cb = document.getElementById('cloud-pin-remember');
+            if (cb && cb.checked) saveCloudPinNow();
+            else { localStorage.removeItem(cloudPinStorageKey()); localStorage.removeItem(cloudPinRememberKey()); }
+        }
+
         async function makeCloudBackupBlob(){
             const pin=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
             const plain=JSON.stringify({format:'MF-SECURE-CLOUD-V2',business:state.bizName||'MicroFinance',updatedAt:new Date().toISOString(),state:state});
@@ -4797,6 +4839,15 @@
         async function syncNowToGoogleDrive(background=false){
             if(cloudSyncBusy) return; cloudSyncBusy=true;
             try{
+                const pinNow=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
+                const wasEncrypted=localStorage.getItem(cloudLastSyncEncryptedKey())==='1';
+                if(wasEncrypted && !pinNow){
+                    if(background){
+                        updateSecureCloudStatus('🟡 Skipped auto cloud sync: your Cloud Encryption PIN box is empty, and the last backup was encrypted. Open Cloud Settings, enter/Save your PIN, then Sync Now — this avoids silently saving an unencrypted backup.',true);
+                        cloudSyncBusy=false; return;
+                    }
+                    if(!confirm('Your last Google Drive backup was PIN-encrypted, but the PIN box is empty right now. Continuing will upload this backup WITHOUT encryption. Continue anyway?')){ cloudSyncBusy=false; return; }
+                }
                 if(!googleAccessToken) await getGoogleToken(!background);
                 if(!googleAccessToken) throw new Error('Google Drive is not connected.');
                 const folder=await ensureDriveFolder();
@@ -4816,6 +4867,7 @@
                 }
                 if(!resp.ok) throw new Error('Drive upload '+resp.status);
                 const result=await resp.json(); googleDriveFileId=result.id||googleDriveFileId;
+                localStorage.setItem(cloudLastSyncEncryptedKey(), pinNow ? '1' : '0');
                 // Keep one recovery snapshot per calendar day in addition to the live current database.
                 const day=new Date().toISOString().slice(0,10);
                 const lastDay=localStorage.getItem('MF_LAST_DRIVE_SNAPSHOT_DAY');
@@ -4939,6 +4991,7 @@
             const wh=document.getElementById('cloud-webhook-url'); if(wh) wh.value=state.cloudWebhookUrl||'';
             const fbCfg=document.getElementById('firebase-config-input'); if(fbCfg) fbCfg.value=localStorage.getItem('MF_FIREBASE_CONFIG')||'';
             const fbCode=document.getElementById('firebase-sync-code'); if(fbCode) fbCode.value=localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'';
+            restoreSavedCloudPin();
             if(mfFirestoreDb && mfFirebaseSyncCode) setFirebaseStatus('🟢 Connected — fast sync is active for Sync Code: '+mfFirebaseSyncCode);
             renderAppLockSection();
             updateSecureCloudStatus();
@@ -5141,7 +5194,7 @@
         }
 
 
-        function money(n) { return "₹" + Math.round(Number(n)||0).toLocaleString('en-IN'); }
+        function money(n) { return "₹" + (Number(n)||0).toLocaleString('en-IN'); }
         function financeEsc(v) { return String(v ?? '-').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])); }
 
         let financeCurrentType = 'net';
