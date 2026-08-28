@@ -915,4 +915,542 @@
                 <input type="hidden" id="ps-staff-id">
                 <input type="hidden" id="ps-payment-index" value="-1">
 
-                <div style="background: rgba(255,255,255,0.04); padding: 11px; border-
+                <div style="background: rgba(255,255,255,0.04); padding: 11px; border-radius: 10px; margin-bottom: 12px; font-size: 0.82rem; border: 1px solid var(--border-subtle);">
+                    <div style="display:flex; justify-content:space-between;"><span>Employee: <b id="ps-name-disp" style="color:#fff;">-</b></span> <span class="expense-badge" id="ps-role-disp">-</span></div>
+                    <div style="display:flex; justify-content:space-between; margin-top:3px;"><span>Designated Salary: <b id="ps-salary-disp" style="color:#34d399;">₹0</b></span></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Salary Paid (₹) *</label>
+                    <input type="number" id="ps-amount" required style="color:#34d399; font-weight:800; font-size:1.1rem;">
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div class="form-group">
+                        <label>Salary For Month *</label>
+                        <select id="ps-salary-month" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Salary For Year *</label>
+                        <select id="ps-salary-year" required></select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Actual Payment Date *</label>
+                    <div class="dmy-grid">
+                        <select id="ps-day" required></select>
+                        <select id="ps-month" required></select>
+                        <select id="ps-year" required></select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Payment Mode</label>
+                    <select id="ps-mode">
+                        <option value="Bank Transfer">Bank Transfer / UPI</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Cheque">Cheque</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn-submit" style="background: linear-gradient(135deg, #ec4899, #be185d);">✓ Record Salary Paid</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 4: ADD GENERAL / CUSTOM EXPENSE -->
+    <div class="modal-overlay" id="modal-expense">
+        <div class="modal-card">
+            <div class="modal-title">
+                <span>Record Business Expense</span>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-expense')" style="cursor: pointer; color: #94a3b8;"></i>
+            </div>
+            <form id="form-expense" onsubmit="handleExpenseSubmit(event)">
+                <input type="hidden" id="ex-mode-action" value="ADD">
+                <input type="hidden" id="ex-edit-index" value="-1">
+                <div class="form-group">
+                    <label>Expense Category *</label>
+                    <div style="display: flex; gap: 6px;">
+                        <select id="ex-category" style="flex: 1;" required>
+                            <option value="Fuel / Travel">Fuel / Petrol (फील्ड रिकवरी पेट्रोल)</option>
+                            <option value="Tea & Refreshments">Tea & Refreshments (चाय-पानी नाश्ता)</option>
+                            <option value="Office Rent">Office Rent / Electricity</option>
+                            <option value="Printing & Stationery">Printing, Forms & Stationery</option>
+                            <option value="Mobile & Internet">Mobile & Internet Recharges</option>
+                            <option value="Legal / Collection Charges">Legal & Field Recovery Expenses</option>
+                        </select>
+                        <button type="button" class="btn-header btn-blue" style="padding:0 10px;" onclick="promptNewCategory()" title="Add Custom Category"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div class="form-group">
+                        <label>Expense For Month *</label>
+                        <select id="ex-month-period" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Expense For Year *</label>
+                        <select id="ex-year-period" required></select>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div class="form-group">
+                        <label>Amount (₹) *</label>
+                        <input type="number" id="ex-amount" placeholder="250" required style="color:#f472b6; font-weight:800; font-size:1.05rem;">
+                    </div>
+                    <div class="form-group">
+                        <label>Paid By Mode</label>
+                        <select id="ex-mode">
+                            <option value="Cash">Cash</option>
+                            <option value="UPI">UPI / GPay</option>
+                            <option value="Bank">Bank Account</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Paid To / Person / Description</label>
+                    <input type="text" id="ex-desc" placeholder="e.g. Mukesh (Bike Petrol) / Office Tea Bill">
+                </div>
+
+                <div class="form-group">
+                    <label>Expense Date *</label>
+                    <div class="dmy-grid">
+                        <select id="ex-day" required></select>
+                        <select id="ex-month" required></select>
+                        <select id="ex-year" required></select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit" id="btn-save-expense">✓ Save Expense</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: EXPENSE CATEGORY DETAIL -->
+    <div class="modal-overlay" id="modal-expense-detail">
+        <div class="modal-card" style="max-width:900px;">
+            <div class="modal-title">
+                <span id="expense-detail-heading">Expense Detail</span>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-expense-detail')" style="cursor:pointer;color:#94a3b8;"></i>
+            </div>
+            <div id="expense-detail-content"></div>
+        </div>
+    </div>
+
+    <!-- MODAL 5: ADD / EDIT BORROWING CAPITAL LOAN -->
+    <div class="modal-overlay" id="modal-borrowing">
+        <div class="modal-card">
+            <div class="modal-title">
+                <span id="modal-borrowing-heading">Add Borrowed Capital Loan</span>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-borrowing')" style="cursor: pointer; color: #94a3b8;"></i>
+            </div>
+            <form id="form-borrowing" onsubmit="handleBorrowingSubmit(event)">
+                <input type="hidden" id="b-mode" value="ADD">
+                <input type="hidden" id="b-id">
+
+                <div class="form-group">
+                    <label>Lender / Source Name *</label>
+                    <input type="text" id="b-lender-name" placeholder="e.g. HDFC Bank / Credit Card Loan / Rajesh Ji (Private)" required>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 8px;">
+                    <div class="form-group">
+                        <label>Category *</label>
+                        <select id="b-category" onchange="toggleGstCheckbox()">
+                            <option value="Private Person">Private Individual</option>
+                            <option value="Bank Personal Loan">Bank Loan / NBFC</option>
+                            <option value="Credit Card Loan">Credit Card Loan</option>
+                            <option value="Self Capital">Self Capital</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Loan Amount (₹) *</label>
+                        <input type="number" id="b-amount" placeholder="200000" required>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div class="form-group">
+                        <label>Annual Interest Rate (%) *</label>
+                        <input type="number" id="b-rate" placeholder="12" step="any" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tenure (Months) *</label>
+                        <input type="number" id="b-tenure" placeholder="24" min="1" max="600" step="1" required>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div class="form-group">
+                        <label>Interest Calculation Basis *</label>
+                        <select id="b-interest-basis">
+                            <option value="Reducing Balance">Reducing Balance (Bank EMI)</option>
+                            <option value="Flat Rate">Flat Rate</option>
+                        </select>
+                        <div style="font-size:.66rem;color:#94a3b8;margin-top:4px;">Reducing = interest on outstanding principal each month. Flat = interest on original principal for the full tenure.</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Repayment Type *</label>
+                        <select id="b-type">
+                            <option value="Monthly EMI">Monthly EMI</option>
+                            <option value="Interest Only">Interest Only</option>
+                            <option value="One Time Bullet">One Time Bullet</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group" style="background: rgba(16,185,129,0.08); padding: 10px; border-radius: 9px; border: 1px solid rgba(16,185,129,0.25);">
+                    <div style="font-weight:800; color:#34d399; margin-bottom:8px;">Upfront Loan Charges (Paid When Capital Is Taken)</div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Processing Fee (%)</label>
+                            <input type="number" id="b-processing-fee-pct" value="0" min="0" max="100" step="any" placeholder="e.g. 2" oninput="calcBorrowingUpfrontFields()">
+                            <div id="b-processing-fee-calc" style="font-size:.68rem;color:#94a3b8;margin-top:3px;">Calculated: ₹0</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Processing Fee GST (%)</label>
+                            <input type="number" id="b-processing-gst-pct" value="0" min="0" max="100" step="any" placeholder="e.g. 18" oninput="calcBorrowingUpfrontFields()">
+                            <div id="b-processing-gst-calc" style="font-size:.68rem;color:#94a3b8;margin-top:3px;">Calculated: ₹0</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Other Charges (₹)</label>
+                            <input type="number" id="b-other-charges" value="0" min="0" step="any" placeholder="0">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Other Charges GST (₹)</label>
+                            <input type="number" id="b-other-gst" value="0" min="0" step="any" placeholder="0">
+                        </div>
+                    </div>
+                    <div style="margin-top:8px; font-size:.72rem; color:#94a3b8;">
+                        These are treated as actual financing outflows and are included in Lender Cost / True In-Hand.
+                    </div>
+                </div>
+
+                <div class="form-group" style="background: rgba(255,255,255,0.04); padding: 10px; border-radius: 9px; border: 1px solid var(--border-subtle);">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0; color:#fff; font-size:0.8rem;">
+                        <input type="checkbox" id="b-apply-gst" style="width:16px; height:16px;">
+                        <span>Apply 18% GST on Interest Payments</span>
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label>Borrowing Date (Date / Month / Year) *</label>
+                    <div class="dmy-grid">
+                        <select id="b-day" required></select>
+                        <select id="b-month" required></select>
+                        <select id="b-year" required></select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit" id="btn-save-borrowing">Save Borrowing Loan</button>
+                <button type="button" class="btn-delete" id="btn-delete-borrowing" style="display: none;" onclick="deleteBorrowingAction()">Delete Loan</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 6A: AUTO AMORTISATION SCHEDULE -->
+    <div class="modal-overlay" id="modal-borrowing-schedule">
+        <div class="modal-card" style="max-width:1100px;">
+            <div class="modal-title">
+                <span id="borrowing-schedule-title">Amortisation Schedule</span>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-borrowing-schedule')" style="cursor:pointer;color:#94a3b8;"></i>
+            </div>
+            <div id="borrowing-schedule-summary" style="margin-bottom:10px;"></div>
+            <div id="borrowing-schedule-content" style="max-height:60vh;overflow:auto;"></div>
+        </div>
+    </div>
+
+    <!-- MODAL: BORROWING COST BREAKDOWN (File/Processing Charge + Interest + GST) -->
+    <div class="modal-overlay" id="modal-borrowing-cost-breakdown">
+        <div class="modal-card" style="max-width:520px;">
+            <div class="modal-title">
+                <span><i class="fa-solid fa-receipt me-2"></i> Cost Breakdown — All Lenders</span>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-borrowing-cost-breakdown')" style="cursor:pointer;color:#94a3b8;"></i>
+            </div>
+            <div id="borrowing-cost-breakdown-content"></div>
+        </div>
+    </div>
+
+    <!-- MODAL 6: PAY LENDER REPAYMENT -->
+    <div class="modal-overlay" id="modal-pay-lender">
+        <div class="modal-card">
+            <div class="modal-title">
+                <span>Record Lender Repayment / EMI</span>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-pay-lender')" style="cursor: pointer; color: #94a3b8;"></i>
+            </div>
+            <form id="form-pay-lender" onsubmit="handleLenderPaySubmit(event)">
+                <input type="hidden" id="lp-borrow-id">
+                <input type="hidden" id="lp-edit-index" value="-1">
+
+                <div style="background: rgba(255,255,255,0.04); padding: 11px; border-radius: 10px; margin-bottom: 12px; font-size: 0.82rem; border: 1px solid var(--border-subtle);">
+                    <div style="display:flex; justify-content:space-between;"><span>Lender: <b id="lp-name-disp" style="color:#fff;">-</b></span> <span class="borrow-badge" id="lp-id-disp">-</span></div>
+                    <div style="display:flex; justify-content:space-between; margin-top:3px;"><span>Remaining Principal: <b id="lp-rem-disp" style="color:#f87171;">₹0</b></span> <span>Rate: <b id="lp-rate-disp" style="color:#fbbf24;">0%</b></span></div>
+                    <div style="display:flex; justify-content:space-between; margin-top:3px;"><span>Original Loan: <b id="lp-orig-disp" style="color:#60a5fa;">₹0</b></span> <span>Interest GST: <b id="lp-gst-disp" style="color:#38bdf8;">No</b></span></div>
+                </div>
+
+                <div id="lp-auto-schedule-box" style="background:rgba(16,185,129,.08);padding:10px;border-radius:10px;border:1px solid rgba(16,185,129,.22);margin-bottom:10px;">
+                    <div style="display:flex;justify-content:space-between;gap:8px;">
+                        <span>EMI No. <b id="lp-emi-no" style="color:#60a5fa;">1</b></span>
+                        <span>Due Date <b id="lp-due-date" style="color:#fbbf24;">-</b></span>
+                    </div>
+                    <b id="lp-scheduled-emi" style="display:none;">₹0</b>
+                    <b id="lp-after-balance" style="display:none;">₹0</b>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+                    <div class="form-group">
+                        <label>Principal (₹) — enter actual amount</label>
+                        <input type="number" id="lp-principal" value="" placeholder="0" step="any" oninput="calcLenderPaymentTotals()" style="background:rgba(255,255,255,0.08);color:#fff;">
+                    </div>
+                    <div class="form-group">
+                        <label>Interest (₹) — enter actual amount</label>
+                        <input type="number" id="lp-interest" value="" placeholder="0" step="any" oninput="calcLenderPaymentTotals()" style="background:rgba(255,255,255,0.08);color:#fff;">
+                    </div>
+                    <div class="form-group" id="lp-gst-field-wrap">
+                        <label>GST on Interest (%)</label>
+                        <input type="number" id="lp-gst-pct" value="18" min="0" max="100" step="any" oninput="calcLenderPaymentTotals()" style="background:rgba(255,255,255,0.08);color:#38bdf8;">
+                        <input type="hidden" id="lp-gst" value="0">
+                        <div style="font-size:.72rem;color:#38bdf8;margin-top:5px;font-weight:700;">GST Amount: ₹<span id="lp-gst-amount-disp">0</span></div>
+                    </div>
+                </div>
+
+                <div class="form-group" style="background:rgba(59,130,246,.08);padding:10px;border-radius:10px;border:1px solid rgba(59,130,246,.22);">
+                    <label style="color:#93c5fd;font-weight:800;">Actual Paid Date — Day / Month / Year *</label>
+                    <div class="dmy-grid">
+                        <select id="lp-day" required></select>
+                        <select id="lp-month" required></select>
+                        <select id="lp-year" required></select>
+                    </div>
+                    <div style="font-size:.68rem;color:#94a3b8;margin-top:5px;">You enter only the actual date you paid. The EMI due date is calculated automatically from the borrowing date.</div>
+                </div>
+                <input type="hidden" id="lp-emi-month">
+                <input type="hidden" id="lp-emi-year">
+
+                <div class="form-group">
+                    <label>Payment Mode</label>
+                    <select id="lp-mode">
+                        <option value="Bank Transfer">Bank Transfer / UPI</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Cheque">Cheque</option>
+                    </select>
+                </div>
+
+                <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.25)); border: 1px solid rgba(59, 130, 246, 0.4); padding: 10px 12px; border-radius: 10px; margin-bottom: 14px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:700; font-size:0.82rem; color:#bfdbfe;">Total Outflow:</span>
+                        <b style="font-size:1.25rem; color:#60a5fa;" id="lp-total-outflow">₹0</b>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit" id="btn-lender-pay-submit">✓ Record Lender EMI / Payment</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 7: ADD / EDIT CUSTOM PRODUCT -->
+    <div class="modal-overlay" id="modal-product">
+        <div class="modal-card">
+            <div class="modal-title">
+                <span id="modal-prod-heading">Create New Loan Product</span>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-product')" style="cursor: pointer; color: #94a3b8;"></i>
+            </div>
+            <form id="form-product" onsubmit="handleProductSubmit(event)" novalidate>
+                <input type="hidden" id="fp-code">
+                <div class="form-group">
+                    <label>Product Display Name *</label>
+                    <input type="text" id="fp-name" placeholder="e.g. ₹50,000 Monthly Loan" required>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div class="form-group">
+                        <label>Loan Amount (₹) *</label>
+                        <input type="number" id="fp-amount" placeholder="50000" step="0.01" oninput="productRateChanged()" required>
+                    </div>
+                    <div class="form-group">
+                        <label>File Charge (₹) *</label>
+                        <input type="number" id="fp-filecharge" placeholder="2500" step="0.01" oninput="productFileChargeChanged()" required>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div class="form-group">
+                        <label>Total EMIs (Tenure) *</label>
+                        <input type="number" id="fp-tenure" placeholder="24" min="1" step="1" oninput="productTenureChanged()" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Annual Interest Rate (%) *</label>
+                        <input type="number" id="fp-rate" placeholder="18.15" min="0" step="any" oninput="productRateChanged()" required>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div class="form-group">
+                        <label>Interest Calculation Basis *</label>
+                        <select id="fp-interest-basis" onchange="productBasisChanged()">
+                            <option value="Reducing Basis">Reducing Basis (Bank EMI)</option>
+                            <option value="Flat Rate">Flat Rate</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Repayment Frequency *</label>
+                        <select id="fp-frequency" onchange="productFrequencyChanged()">
+                            <option value="7">Weekly (7 Days)</option>
+                            <option value="10">10 Days</option>
+                            <option value="15">Fortnightly (15 Days)</option>
+                            <option value="30">Monthly (30 Days)</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.16);padding:8px;border-radius:9px;margin-bottom:8px;">
+                    <div style="font-size:.68rem;color:#cbd5e1;margin-bottom:6px;font-weight:800;">CALCULATION MODE — choose what you want to enter</div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <button type="button" id="fp-mode-rate" class="btn-edit-sm" style="flex:1;background:#2563eb;color:#fff;" onclick="setProductCalcMode('rate')">Rate → EMI</button>
+                        <button type="button" id="fp-mode-emi" class="btn-edit-sm" style="flex:1;" onclick="setProductCalcMode('emi')">EMI → Rate</button>
+                    </div>
+                    <div id="fp-mode-note" style="font-size:.64rem;color:#94a3b8;margin-top:5px;">Enter Annual Interest Rate; EMI will calculate automatically.</div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div class="form-group">
+                        <label>EMI Amount (₹) — Auto Calculated / Manual Target *</label>
+                        <input type="number" id="fp-emi" placeholder="2500" step="0.01" min="0" oninput="productEmiChanged()" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Default Late Penalty (₹) *</label>
+                        <input type="number" id="fp-penalty" placeholder="170" step="0.01" required>
+                    </div>
+                </div>
+                <div id="fp-calc-note" style="font-size:.66rem;color:#94a3b8;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.14);padding:8px;border-radius:9px;margin-bottom:10px;line-height:1.55;">Interest is calculated on the full Loan Amount. File Charge is a separate income/charge and is never deducted from the interest principal.</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(255,255,255,0.04); padding: 8px; border-radius: 9px; margin-bottom: 12px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Principal / EMI</label>
+                        <input type="number" id="fp-principal" readonly style="opacity:0.8;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Interest / EMI</label>
+                        <input type="number" id="fp-interest" readonly style="opacity:0.8;">
+                    </div>
+                </div>
+                <button type="submit" class="btn-submit">Save Product</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 8: COLLECT REGULAR EMI -->
+    <div class="modal-overlay" id="modal-collect">
+        <div class="modal-card">
+            <div class="modal-title">
+                <span>Collect Installment & Penalty</span>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-collect')" style="cursor: pointer; color: #94a3b8;"></i>
+            </div>
+            <form id="form-collect" onsubmit="handleCollectSubmit(event)">
+                <input type="hidden" id="pay-loan-id">
+
+                <div style="background: rgba(255,255,255,0.04); padding: 10px; border-radius: 10px; margin-bottom: 12px; font-size: 0.85rem; border: 1px solid var(--border-subtle);">
+                    <div style="display:flex; justify-content:space-between;"><span>Customer: <b id="pay-name-display" style="color:#fff;">-</b></span> <span class="loan-badge" id="pay-id-display">-</span></div>
+                    <div style="display:flex; justify-content:space-between; margin-top:3px;"><span style="color:#94a3b8;">Scheduled Due Date:</span> <b id="pay-scheduled-due-disp" style="color:#fbbf24;">-</b></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Collected EMI Amount (₹) *</label>
+                    <input type="number" id="pay-amount" required style="color: #34d399; font-weight: 800; font-size: 1.15rem;">
+                </div>
+
+                <!-- Late Penalty Field: BLANK (0) BY DEFAULT -->
+                <div class="form-group" style="background: rgba(245, 158, 11, 0.08); border: 1px dashed rgba(245, 158, 11, 0.3); padding: 9px; border-radius: 9px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                        <label style="color:#fbbf24; margin:0; font-weight:700;"><i class="fa-solid fa-triangle-exclamation me-1"></i> Late Penalty Charged (₹) [Leave 0 if Waived]</label>
+                        <span style="font-size:0.65rem; color:#cbd5e1;">(Hidden from client PDF)</span>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <input type="number" id="pay-penalty" value="0" style="color:#fbbf24; font-weight:800; font-size:1rem; flex:1;" placeholder="0">
+                        <button type="button" class="btn-edit-sm" style="background:#f59e0b; color:#0f172a; font-weight:800; border:none;" onclick="applySuggestedPenalty()" id="btn-suggest-pen">Apply ₹0</button>
+                    </div>
+                </div>
+
+                <!-- Due Date -->
+                <div class="form-group">
+                    <label>Scheduled / Due Date of Installment *</label>
+                    <div class="dmy-grid">
+                        <select id="pay-due-day" required></select>
+                        <select id="pay-due-month" required></select>
+                        <select id="pay-due-year" required></select>
+                    </div>
+                </div>
+
+                <!-- Actual Receive Date -->
+                <div class="form-group">
+                    <label>Actual Receive Date (When Client Paid Money) *</label>
+                    <div class="dmy-grid">
+                        <select id="pay-rec-day" required></select>
+                        <select id="pay-rec-month" required></select>
+                        <select id="pay-rec-year" required></select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Payment Mode</label>
+                    <select id="pay-mode">
+                        <option value="Cash">Cash</option>
+                        <option value="UPI">UPI / GPay / PhonePe</option>
+                        <option value="Bank">Bank Transfer</option>
+                    </select>
+                </div>
+
+                <div style="background: rgba(255,255,255,0.04); padding: 9px 12px; border-radius: 9px; font-size: 0.8rem; margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between;"><span>Principal Share:</span> <b style="color: #60a5fa;" id="split-p">₹0</b></div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 3px;"><span>Interest Profit:</span> <b style="color: #fbbf24;" id="split-i">₹0</b></div>
+                </div>
+
+                <button type="submit" class="btn-submit" style="background: linear-gradient(135deg, #10b981, #059669);">✓ Confirm Payment</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 9: LEGACY / BULK EMI COLLECTION -->
+    <div class="modal-overlay" id="modal-bulk-emi">
+        <div class="modal-card">
+            <div class="modal-title">
+                <span><i class="fa-solid fa-layer-group" style="color:#60a5fa;margin-right:6px;"></i> Legacy EMI Collection</span>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-bulk-emi')" style="cursor:pointer;color:#94a3b8;"></i>
+            </div>
+            <input type="hidden" id="bulk-emi-loan-id">
+            <input type="hidden" id="bulk-emi-mode" value="ALL">
+            <div style="background:rgba(255,255,255,.04);padding:10px;border-radius:10px;border:1px solid var(--border-subtle);">
+                <div style="display:flex;justify-content:space-between;gap:8px;">
+                    <span>Customer: <b id="bulk-emi-name" style="color:#fff;">-</b></span>
+                    <span class="loan-badge" id="bulk-emi-id">-</span>
+                </div>
+                <div style="margin-top:4px;color:#94a3b8;font-size:.68rem;">Historical EMIs are marked paid using their scheduled due date as the paid date.</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;">
+                <button type="button" id="bulk-mode-all-btn" class="legacy-emi-btn green" onclick="setBulkEmiMode('ALL')">✓ All Remaining EMIs</button>
+                <button type="button" id="bulk-mode-range-btn" class="legacy-emi-btn blue" onclick="setBulkEmiMode('RANGE')">Date Range</button>
+            </div>
+            <div id="bulk-range-fields" style="display:none;margin-top:10px;">
+                <div class="legacy-emi-note">Select the historical due-date range. Only unpaid EMIs inside this range will be marked paid; EMIs outside it remain due/upcoming.</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div class="form-group"><label>From Due Date *</label><input type="date" id="bulk-from-date"></div>
+                    <div class="form-group"><label>To Due Date *</label><input type="date" id="bulk-to-date"></div>
+                </div>
+            </div>
+            <div id="bulk-emi-preview" class="bulk-preview">Choose an option to preview the EMIs that will be marked paid.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+                <button type="button" class="btn-edit-sm" onclick="closeModal('modal-bulk-emi')" style="padding:10px;">Cancel</button>
+                <button type="button" class="btn-submit" style="background:linear-gradient(135deg,#10b981,#047857);" onclick="confirmBulkEmiCollection()">✓ Mark Selected EMIs Paid On Time</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 9: FORECLOSURE SETTLEMENT ENGINE -->
+    <div class="modal-overlay" id="modal-foreclose">
+        <div class="modal-card">
+            <div class="modal-title">
+                <span><i class="fa-solid fa-handshake text-purple me-2"></i> Loan Foreclosure Settlement</span>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-foreclose')" style="cursor: pointer; color: #94a3b8;"></i>
+            </div>
+            <form id="form-foreclose" onsubmit="handleForecloseSubmit(event)">
+                <input type="hidden" id="fc-settle-loan-id">
+
+                <div style="background: rgba(255,255,255,0.04); padding: 11px; border-radius: 10px; margin-bottom: 12px; font-size: 0.82rem; border: 1px solid var(--border-subtle);">
+                    <div style="display:flex; justify-content:space-between;"><span>Customer: <b id="fc-settle-name" style="color:#fff;">-</b></span> <span class="loan-badge" id="fc-settle-id">-</span></div>
+                    <div style="display:fle
