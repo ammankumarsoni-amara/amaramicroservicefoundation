@@ -1980,6 +1980,11 @@
         // ================== END FIREBASE FAST SYNC ==================
 
         // ================== APP LOCK PIN ==================
+        // NOTE: the "unlocked" state is kept ONLY in this in-memory variable (not sessionStorage/localStorage).
+        // This means the PIN is required every single time the app is opened/reloaded — sessionStorage used to
+        // survive across tab reuse on some mobile browsers, which made the lock unlock itself unpredictably.
+        let mfAppUnlockedThisSession = false;
+
         async function mfHashPin(pin) {
             try {
                 if (window.crypto && crypto.subtle) {
@@ -1997,7 +2002,7 @@
 
         function maybeShowAppLockScreen() {
             if (!isAppLockSet()) return;
-            if (sessionStorage.getItem('MF_UNLOCKED') === '1') return;
+            if (mfAppUnlockedThisSession) return;
             const overlay = document.getElementById('app-lock-overlay');
             if (overlay) { overlay.style.display = 'flex'; setTimeout(() => document.getElementById('app-lock-input')?.focus(), 200); }
         }
@@ -2008,7 +2013,7 @@
             const hash = await mfHashPin(val);
             const err = document.getElementById('app-lock-error');
             if (hash === stored) {
-                sessionStorage.setItem('MF_UNLOCKED', '1');
+                mfAppUnlockedThisSession = true;
                 document.getElementById('app-lock-overlay').style.display = 'none';
             } else {
                 if (err) err.innerText = 'Incorrect PIN. Please try again.';
@@ -2031,7 +2036,7 @@
                 if (np !== cp) { alert('The two PINs did not match. Please try again.'); return; }
                 mfHashPin(np.trim()).then(h => {
                     localStorage.setItem('MF_APP_PIN_HASH', h);
-                    sessionStorage.setItem('MF_UNLOCKED', '1');
+                    mfAppUnlockedThisSession = true;
                     document.getElementById('app-lock-overlay').style.display = 'none';
                     alert('PIN reset successfully.');
                 });
@@ -2049,8 +2054,8 @@
             const doSet = () => {
                 mfHashPin(np).then(h => {
                     localStorage.setItem('MF_APP_PIN_HASH', h);
-                    sessionStorage.setItem('MF_UNLOCKED', '1');
-                    alert('App Lock PIN saved. From now on, this PIN will be required whenever this app is opened in a new browser session.');
+                    mfAppUnlockedThisSession = true;
+                    alert('App Lock PIN saved. From now on, this PIN will be required every time this app is opened.');
                     renderAppLockSection();
                 });
             };
@@ -2095,7 +2100,7 @@
                     </div>`;
             } else {
                 wrap.innerHTML = `
-                    <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;">No lock is set — anyone with this link can currently open the app. Set a PIN so it's required every time the app is opened in a new browser session.</div>
+                    <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;">No lock is set — anyone with this link can currently open the app. Set a PIN so it's required every time the app is opened.</div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
                         <input type="password" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
                         <input type="password" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
@@ -2108,6 +2113,7 @@
         // Show the PIN screen immediately if a lock is set for this device, before anything else is usable.
         document.addEventListener('DOMContentLoaded', () => {
             maybeShowAppLockScreen();
+            restoreSavedCloudPin();
             const inp = document.getElementById('app-lock-input');
             if (inp) inp.addEventListener('keyup', e => { if (e.key === 'Enter') attemptAppUnlock(); });
         });
@@ -3229,6 +3235,7 @@
 
                 const remP = Math.max(0, (Number(b.amount)||0) - paidP);
                 const netCapital = Math.max(0, (Number(b.amount)||0) - upfront);
+                const paidFileIntGst = paidI + paidG + (upfront - upfrontGst); // File Charge (incl. its GST) + Interest + Interest GST — matches the top KPI and Cost Breakdown total, no double-count
 
                 const card = document.createElement("div");
                 card.className = "client-card";
@@ -3264,7 +3271,7 @@
                         Processing: ${Number(b.processingFeePct||0).toLocaleString('en-IN',{maximumFractionDigits:2})}% = ₹${Number(b.processingFee||0).toLocaleString('en-IN')} + GST ${Number(b.processingGstPct||0).toLocaleString('en-IN',{maximumFractionDigits:2})}% = ₹${Number(b.processingGst||0).toLocaleString('en-IN')}
                         &nbsp;·&nbsp; Other: ₹${Number(b.otherCharges||0).toLocaleString('en-IN')} + GST ₹${Number(b.otherGst||0).toLocaleString('en-IN')}
                     </div>
-                    ${(() => { const paidCount=(b.repayments||[]).length; return paidCount>0 ? `<div style="font-size:.68rem;color:#34d399;line-height:1.5;margin-bottom:8px;">Paid till now: <b>${paidCount} installment${paidCount>1?'s':''}</b> · Principal Paid: <b>${mfMoney(paidP)}</b> · Interest+GST Paid: <b>${mfMoney(paidI+paidG)}</b></div>` : `<div style="font-size:.68rem;color:#94a3b8;line-height:1.5;margin-bottom:8px;">No payment recorded yet for this borrowing.</div>`; })()}
+                    ${(() => { const paidCount=(b.repayments||[]).length; return paidCount>0 ? `<div style="font-size:.68rem;color:#34d399;line-height:1.5;margin-bottom:8px;">Paid till now: <b>${paidCount} installment${paidCount>1?'s':''}</b> · Principal Paid: <b>${mfMoney(paidP)}</b> · File Charge + Interest + GST Paid: <b>${mfMoney(paidFileIntGst)}</b></div>` : `<div style="font-size:.68rem;color:#94a3b8;line-height:1.5;margin-bottom:8px;">No payment recorded yet for this borrowing.</div>`; })()}
                     <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); font-size:0.76rem;">
                         <div style="color: #94a3b8;">
                             Taken: <b style="color:#60a5fa;">₹${Number(b.amount||0).toLocaleString('en-IN')}</b> |
