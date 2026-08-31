@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MicroFinance Pro - Enterprise Suite v29</title>
+    <title>Loan Management</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -1508,6 +1508,27 @@
         </div>
     </div>
 
+    <!-- MODAL: EDIT PENALTY ON AN ALREADY-COLLECTED EMI -->
+    <div class="modal-overlay" id="modal-edit-penalty">
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-header">
+                <h5><i class="fa-solid fa-pen me-1" style="color:#fbbf24;"></i> Edit Penalty</h5>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-edit-penalty')" style="cursor: pointer; color: #94a3b8;"></i>
+            </div>
+            <form id="form-edit-penalty" onsubmit="handleEditPenaltySubmit(event)">
+                <input type="hidden" id="ep-loan-id">
+                <input type="hidden" id="ep-idx">
+                <div style="background: rgba(255,255,255,0.04); padding: 9px 11px; border-radius: 9px; margin-bottom: 14px; font-size: 0.82rem; color:#94a3b8;" id="ep-info"></div>
+                <div class="form-group">
+                    <label>Penalty Amount for this EMI (₹)</label>
+                    <input type="number" id="ep-amount" style="color:#fbbf24; font-weight:800; font-size:1.05rem;" placeholder="0">
+                </div>
+                <div style="font-size:0.66rem; color:#64748b; margin-bottom:12px;">Set to 0 to remove a penalty entered by mistake. This only changes the penalty on this already-collected EMI — never shown on the client-facing PDF.</div>
+                <button type="submit" class="btn-submit" style="background: linear-gradient(135deg, #f59e0b, #d97706);">✓ Save Penalty</button>
+            </form>
+        </div>
+    </div>
+
     <!-- MODAL 9: LEGACY / BULK EMI COLLECTION -->
     <div class="modal-overlay" id="modal-bulk-emi">
         <div class="modal-card">
@@ -2280,6 +2301,7 @@
         }
 
         document.getElementById("biz-name").value = state.bizName || "My Finance Company";
+        document.title = state.bizName || "My Finance Company";
         if (state.cloudWebhookUrl) {
             document.getElementById("cloud-webhook-url").value = state.cloudWebhookUrl;
             document.getElementById("sync-target-text").innerText = "Cloud Synced";
@@ -2298,6 +2320,7 @@
 
         function saveBizName() {
             state.bizName = document.getElementById("biz-name").value || "My Finance Company";
+            document.title = state.bizName;
             persist();
         }
 
@@ -2370,6 +2393,7 @@
 
         function renderAll(){
             renderKPIs();
+            if (state.bizName) document.title = state.bizName; // shows the business name instead of a generic app title if the browser's Print "Headers and footers" is turned on
             if(typeof renderBusinessGrowthChart==='function') renderBusinessGrowthChart();
             if(typeof renderProductFilters==='function') renderProductFilters();
             if(typeof renderFeed==='function') renderFeed();
@@ -4789,7 +4813,7 @@
                     const dDt = new Date(pay.dueDate || defaultDueIso);
                     const diff = Math.max(0, Math.ceil((pDt - dDt) / (1000 * 60 * 60 * 24)));
                     dpd = diff > 0 ? `<b style="color:#f87171;">${diff} Days Late</b>` : "On Time";
-                    actionBtn = `<button class="no-print" onclick="deleteSinglePayment('${l.id}', ${i-1})" style="background:none; border:none; color:#f87171; cursor:pointer;" title="Delete"><i class="fa-solid fa-trash"></i></button>`;
+                    actionBtn = `<button class="no-print" onclick="openEditPenaltyModal('${l.id}', ${i-1})" style="background:none; border:none; color:#fbbf24; cursor:pointer; margin-right:8px;" title="Edit Penalty for this EMI"><i class="fa-solid fa-pen"></i></button><button class="no-print" onclick="deleteSinglePayment('${l.id}', ${i-1})" style="background:none; border:none; color:#f87171; cursor:pointer;" title="Delete"><i class="fa-solid fa-trash"></i></button>`;
                 } else if (l.foreclosed) {
                     badge = `<span class="badge-foreclosed">WAIVED</span>`;
                     paidStr = "Settled Early";
@@ -4915,6 +4939,11 @@
                         <b style="color:#fff;">Total Collected</b>
                         <b style="color:#34d399; font-size:1rem;">₹${totalPaidGross.toLocaleString('en-IN')}</b>
                     </div>
+                    <div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:0.78rem; color:#cbd5e1;">
+                        <span>Total EMIs: <b style="color:#fff;">${p.tenure}</b></span>
+                        <span>Paid: <b style="color:#34d399;">${l.payments.length}</b></span>
+                        <span>Remaining: <b style="color:#f87171;">${Math.max(0, p.tenure - l.payments.length)}</b></span>
+                    </div>
                 </div>
 
                 <!-- Schedule Table -->
@@ -5006,6 +5035,31 @@
                 persist();
                 renderPassbookDetail();
             }
+        }
+
+        // Lets the operator correct a penalty amount already recorded against a paid EMI, without
+        // having to delete and re-enter the whole installment (principal/interest/date/mode untouched).
+        function openEditPenaltyModal(loanId, idx) {
+            const loan = state.loans.find(l => l.id === loanId);
+            const pay = loan && loan.payments[idx];
+            if (!pay) return;
+            document.getElementById('ep-loan-id').value = loanId;
+            document.getElementById('ep-idx').value = idx;
+            document.getElementById('ep-info').innerHTML = `EMI <b style="color:#fff;">#${idx + 1}</b> for <b style="color:#fff;">${loan.name}</b>, paid on ${formatToIndianDate(pay.date)}`;
+            document.getElementById('ep-amount').value = pay.penalty || 0;
+            document.getElementById('modal-edit-penalty').classList.add('active');
+        }
+
+        function handleEditPenaltySubmit(e) {
+            e.preventDefault();
+            const loanId = document.getElementById('ep-loan-id').value;
+            const idx = Number(document.getElementById('ep-idx').value);
+            const loan = state.loans.find(l => l.id === loanId);
+            const pay = loan && loan.payments[idx];
+            if (!pay) return;
+            pay.penalty = parseFloat(document.getElementById('ep-amount').value) || 0;
+            closeModal('modal-edit-penalty');
+            persist();
         }
 
         // NOC MODAL & GENERATION LOGIC
