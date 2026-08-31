@@ -298,7 +298,7 @@
         /* Print Styling */
         @media print {
             body { background: #ffffff !important; color: #000000 !important; padding: 0 !important; margin: 0 !important; }
-            .top-header, .tab-scroll-wrapper, .filter-strip, .search-box, .kpi-grid, .cloud-banner, .no-print, #tab-feed, #tab-expenses, #tab-borrowings, #tab-products, #tab-all { 
+            .top-header, .tab-scroll-wrapper, .filter-strip, .search-box, .kpi-grid, .cloud-banner, .no-print, #business-growth-panel, #tab-feed, #tab-expenses, #tab-borrowings, #tab-products, #tab-all { 
                 display: none !important; 
             }
             #tab-passbook { display: block !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
@@ -541,6 +541,16 @@
                     </div>
                 </div>
             </div>
+            <!-- Payment Mode Breakdown: how much moved via Cash / UPI / Bank etc., inflow and outflow -->
+            <div class="kpi-card full-width kpi-clickable" onclick="openFinanceDetail('modes')" title="Click to view Cash / UPI / Bank breakdown of everything collected and paid out">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div class="kpi-label" style="color:#a78bfa;"><i class="fa-solid fa-wallet me-1"></i> PAYMENT MODE BREAKDOWN</div>
+                        <div style="font-size:0.78rem; color:#cbd5e1; margin-top:2px;">See total Cash / UPI / Bank across collections, salaries & expenses</div>
+                    </div>
+                    <div style="text-align: right; color:#a78bfa; font-size:1.3rem;"><i class="fa-solid fa-chevron-right"></i></div>
+                </div>
+            </div>
         </div>
 
         <!-- BUSINESS GROWTH ANALYTICS -->
@@ -734,8 +744,15 @@
                     <div id="passbook-search-results" style="display:none; max-height:260px; overflow:auto; margin-bottom:6px;"></div>
                     <select id="passbook-select" onchange="renderPassbookDetail()" style="width: 100%; padding: 9px; border-radius:8px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#fff; font-weight:700; font-size:0.88rem;"></select>
                 </div>
+                <div style="min-width:210px;">
+                    <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">Document Type:</label>
+                    <select id="passbook-doc-mode" onchange="renderPassbookDetail()" style="width:100%; padding:9px; border-radius:8px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#fff; font-weight:700; font-size:0.82rem;">
+                        <option value="STATEMENT">Full Statement (Paid History + Schedule)</option>
+                        <option value="SCHEDULE">EMI Schedule Only (Loan Card — before first payment)</option>
+                    </select>
+                </div>
                 <div style="display: flex; gap: 6px;">
-                    <button class="btn-header btn-blue" onclick="window.print()" style="height: 40px; padding: 0 14px;"><i class="fa-solid fa-print"></i> Print Statement PDF</button>
+                    <button class="btn-header btn-blue" onclick="window.print()" style="height: 40px; padding: 0 14px;"><i class="fa-solid fa-print"></i> Print / Download PDF</button>
                     <button class="btn-header btn-green" id="btn-generate-noc" onclick="openNocModal()" style="height: 40px; padding: 0 14px; display: none;"><i class="fa-solid fa-certificate"></i> Generate NOC Certificate</button>
                 </div>
             </div>
@@ -815,11 +832,22 @@
                         <input type="tel" id="fc-phone2" placeholder="9876543211">
                     </div>
                 </div>
-                <div style="font-size:.66rem;color:#64748b;margin:-3px 0 10px;">Keep a second contact number for collection coordination. Existing accounts remain unchanged.</div>
+                <div style="font-size:.66rem;color:#64748b;line-height:1.4;margin-top:5px;margin-bottom:12px;">Keep a second contact number for collection coordination. Existing accounts remain unchanged.</div>
                 <div class="form-group">
                     <label>Customer Address / City</label>
                     <input type="text" id="fc-address" placeholder="e.g. Main Market, Kota, Rajasthan">
                 </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px; margin-top:10px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Guarantor Name</label>
+                        <input type="text" id="fc-guarantor-name" placeholder="e.g. Suresh Sharma">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Guarantor Mobile Number</label>
+                        <input type="tel" id="fc-guarantor-phone" placeholder="9876543212">
+                    </div>
+                </div>
+                <div style="font-size:.66rem;color:#64748b;line-height:1.4;margin-top:5px;margin-bottom:12px;">Optional — helps with recovery follow-up if the customer becomes unreachable.</div>
                 <div class="form-group">
                     <label>Select Loan Product *</label>
                     <select id="fc-product" onchange="previewProductSummary()" required></select>
@@ -1344,29 +1372,46 @@
             </div>
             <form id="form-collect" onsubmit="handleCollectSubmit(event)">
                 <input type="hidden" id="pay-loan-id">
+                <input type="hidden" id="pay-mode-type" value="FULL">
+
+                <div style="display:flex; gap:6px; margin-bottom:12px;">
+                    <button type="button" id="btn-collect-mode-full" class="btn-header btn-blue" style="flex:1; justify-content:center;" onclick="setCollectMode('FULL')"><i class="fa-solid fa-check"></i> Full EMI</button>
+                    <button type="button" id="btn-collect-mode-partial" class="btn-header" style="flex:1; justify-content:center; background:rgba(255,255,255,0.06); color:#cbd5e1;" onclick="setCollectMode('PARTIAL')"><i class="fa-solid fa-layer-group"></i> Partial / Advance</button>
+                </div>
 
                 <div style="background: rgba(255,255,255,0.04); padding: 10px; border-radius: 10px; margin-bottom: 12px; font-size: 0.85rem; border: 1px solid var(--border-subtle);">
                     <div style="display:flex; justify-content:space-between;"><span>Customer: <b id="pay-name-display" style="color:#fff;">-</b></span> <span class="loan-badge" id="pay-id-display">-</span></div>
                     <div style="display:flex; justify-content:space-between; margin-top:3px;"><span style="color:#94a3b8;">Scheduled Due Date:</span> <b id="pay-scheduled-due-disp" style="color:#fbbf24;">-</b></div>
                 </div>
 
+                <div id="collect-partial-info" style="display:none; background: rgba(96,165,250,0.08); border:1px dashed rgba(96,165,250,0.35); padding: 9px 11px; border-radius: 9px; margin-bottom: 12px; font-size: 0.78rem; color:#cbd5e1;">
+                    <i class="fa-solid fa-circle-info me-1" style="color:#60a5fa;"></i> <span id="collect-partial-status-text">No amount collected yet towards this EMI.</span>
+                </div>
+
                 <div class="form-group">
-                    <label>Collected EMI Amount (₹) *</label>
+                    <label id="pay-amount-label">Collected EMI Amount (₹) *</label>
                     <input type="number" id="pay-amount" required style="color: #34d399; font-weight: 800; font-size: 1.15rem;">
                 </div>
 
-                <!-- Late Penalty Field: BLANK (0) BY DEFAULT -->
+                <!-- Late Penalty Field: BLANK (0) BY DEFAULT — shared by Full EMI and Partial/Advance modes -->
                 <div class="form-group" style="background: rgba(245, 158, 11, 0.08); border: 1px dashed rgba(245, 158, 11, 0.3); padding: 9px; border-radius: 9px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
-                        <label style="color:#fbbf24; margin:0; font-weight:700;"><i class="fa-solid fa-triangle-exclamation me-1"></i> Late Penalty Charged (₹) [Leave 0 if Waived]</label>
+                        <label id="pay-penalty-label" style="color:#fbbf24; margin:0; font-weight:700;"><i class="fa-solid fa-triangle-exclamation me-1"></i> Late Penalty Charged (₹) [Leave 0 if Waived]</label>
                         <span style="font-size:0.65rem; color:#cbd5e1;">(Hidden from client PDF)</span>
                     </div>
-                    <div style="display:flex; gap:6px;">
-                        <input type="number" id="pay-penalty" value="0" style="color:#fbbf24; font-weight:800; font-size:1rem; flex:1;" placeholder="0">
+                    <div style="display:flex; gap:6px; margin-bottom:7px;">
+                        <input type="number" id="pay-penalty" value="0" style="color:#fbbf24; font-weight:800; font-size:1rem; flex:1;" placeholder="0" oninput="updatePenaltyModeVisibility()">
                         <button type="button" class="btn-edit-sm" style="background:#f59e0b; color:#0f172a; font-weight:800; border:none;" onclick="applySuggestedPenalty()" id="btn-suggest-pen">Apply ₹0</button>
                     </div>
+                    <div id="pay-penalty-mode-toggle" style="display:none; gap:6px;">
+                        <input type="hidden" id="pay-penalty-timing" value="NOW">
+                        <button type="button" id="btn-pen-now" class="btn-edit-sm" style="flex:1; justify-content:center; background:#f59e0b; color:#0f172a; border:none;" onclick="setPenaltyTiming('NOW')"><i class="fa-solid fa-check"></i> Collect Now</button>
+                        <button type="button" id="btn-pen-due" class="btn-edit-sm" style="flex:1; justify-content:center; background:rgba(255,255,255,0.06); color:#cbd5e1;" onclick="setPenaltyTiming('DUE')"><i class="fa-solid fa-clock"></i> Due Later</button>
+                    </div>
+                    <div id="pay-penalty-due-note" style="display:none; font-size:0.68rem; color:#94a3b8; margin-top:6px; line-height:1.4;">This won't be counted as collected revenue yet. It'll show as a pending "Penalty Due" on this customer until you mark it received.</div>
                 </div>
 
+                <div id="collect-full-only-fields">
                 <!-- Due Date -->
                 <div class="form-group">
                     <label>Scheduled / Due Date of Installment *</label>
@@ -1375,6 +1420,7 @@
                         <select id="pay-due-month" required></select>
                         <select id="pay-due-year" required></select>
                     </div>
+                </div>
                 </div>
 
                 <!-- Actual Receive Date -->
@@ -1396,13 +1442,69 @@
                     </select>
                 </div>
 
-                <div style="background: rgba(255,255,255,0.04); padding: 9px 12px; border-radius: 9px; font-size: 0.8rem; margin-bottom: 12px;">
+                <div id="collect-split-box" style="background: rgba(255,255,255,0.04); padding: 9px 12px; border-radius: 9px; font-size: 0.8rem; margin-bottom: 12px;">
                     <div style="display: flex; justify-content: space-between;"><span>Principal Share:</span> <b style="color: #60a5fa;" id="split-p">₹0</b></div>
                     <div style="display: flex; justify-content: space-between; margin-top: 3px;"><span>Interest Profit:</span> <b style="color: #fbbf24;" id="split-i">₹0</b></div>
                 </div>
 
                 <button type="submit" class="btn-submit" style="background: linear-gradient(135deg, #10b981, #059669);">✓ Confirm Payment</button>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: PARTIAL PAYMENT BREAKDOWN VIEW -->
+    <div class="modal-overlay" id="modal-payment-parts">
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-header">
+                <h5><i class="fa-solid fa-layer-group me-1" style="color:#60a5fa;"></i> Partial Payment Breakdown</h5>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-payment-parts')" style="cursor: pointer; color: #94a3b8;"></i>
+            </div>
+            <div id="payment-parts-body"></div>
+            <button type="button" class="btn-edit-sm" style="width:100%; padding:10px; margin-top:12px; justify-content:center;" onclick="closeModal('modal-payment-parts')">Close</button>
+        </div>
+    </div>
+
+    <!-- MODAL: RECEIVE DEFERRED PENALTY -->
+    <div class="modal-overlay" id="modal-receive-penalty">
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-header">
+                <h5><i class="fa-solid fa-triangle-exclamation me-1" style="color:#fbbf24;"></i> Receive Penalty</h5>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-receive-penalty')" style="cursor: pointer; color: #94a3b8;"></i>
+            </div>
+            <form id="form-receive-penalty" onsubmit="handleReceivePenaltySubmit(event)">
+                <input type="hidden" id="rp-loan-id">
+                <input type="hidden" id="rp-idx">
+                <div style="background: rgba(245, 158, 11, 0.08); border: 1px dashed rgba(245, 158, 11, 0.3); padding: 9px 11px; border-radius: 9px; margin-bottom: 14px; font-size: 0.82rem; color:#fde68a;" id="rp-info"></div>
+                <div class="form-group">
+                    <label>Date Penalty Received *</label>
+                    <div class="dmy-grid">
+                        <select id="rp-day" required></select>
+                        <select id="rp-month" required></select>
+                        <select id="rp-year" required></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Payment Mode</label>
+                    <select id="rp-mode">
+                        <option value="Cash">Cash</option>
+                        <option value="UPI">UPI / GPay / PhonePe</option>
+                        <option value="Bank">Bank Transfer</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-submit" style="background: linear-gradient(135deg, #f59e0b, #d97706);">✓ Mark Penalty Received</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: DUE PENALTIES LIST (per customer) -->
+    <div class="modal-overlay" id="modal-due-penalties-list">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header">
+                <h5><i class="fa-solid fa-triangle-exclamation me-1" style="color:#fbbf24;"></i> Penalties Due</h5>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-due-penalties-list')" style="cursor: pointer; color: #94a3b8;"></i>
+            </div>
+            <div id="due-penalties-list-body"></div>
+            <button type="button" class="btn-edit-sm" style="width:100%; padding:10px; margin-top:12px; justify-content:center;" onclick="closeModal('modal-due-penalties-list')">Close</button>
         </div>
     </div>
 
@@ -1432,6 +1534,14 @@
                     <div class="form-group"><label>From Due Date *</label><input type="date" id="bulk-from-date"></div>
                     <div class="form-group"><label>To Due Date *</label><input type="date" id="bulk-to-date"></div>
                 </div>
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+                <label>Payment Mode (applied to all EMIs marked paid here)</label>
+                <select id="bulk-emi-payment-mode">
+                    <option value="Cash">Cash</option>
+                    <option value="UPI">UPI / GPay / PhonePe</option>
+                    <option value="Bank">Bank Transfer</option>
+                </select>
             </div>
             <div id="bulk-emi-preview" class="bulk-preview">Choose an option to preview the EMIs that will be marked paid.</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
@@ -2184,6 +2294,7 @@
         initDmySelectors("st");
         initDmySelectors("ps");
         initDmySelectors("ex");
+        initDmySelectors("rp");
 
         function saveBizName() {
             state.bizName = document.getElementById("biz-name").value || "My Finance Company";
@@ -2266,6 +2377,7 @@
             if(typeof renderBorrowingsList==='function') renderBorrowingsList();
             if(typeof renderAllLoansTable==='function') renderAllLoansTable();
             if(typeof populatePassbookDropdown==='function') populatePassbookDropdown();
+            if(typeof renderPassbookDetail==='function' && document.getElementById('passbook-select')?.value) renderPassbookDetail();
             if(typeof renderLoanMasterSummary==='function') renderLoanMasterSummary();
             if(typeof renderUpcomingEmiSchedule==='function') renderUpcomingEmiSchedule();
         }
@@ -2985,9 +3097,10 @@
             filtered.forEach(loan => {
                 const prod = state.products[loan.product] || { name: "Custom", amount: 0, emi: 0, tenure: 0 };
                 const paidAmt = loan.payments.reduce((s, p) => s + p.amount, 0);
-                const pending = (prod.emi * prod.tenure) - paidAmt;
+                const pending = getLoanPending(loan);
                 const paidCount = loan.payments.length;
                 const penaltyPaid = loan.payments.reduce((s, p) => s + (p.penalty || 0), 0);
+                const partialCollected = getLoanPartialSum(loan);
 
                 const card = document.createElement("div");
                 card.className = "client-card";
@@ -3007,6 +3120,7 @@
                         <div>
                             <div style="display:flex; gap:6px; flex-wrap:wrap;">
                                 <button class="btn-collect-sm" onclick="openCollectModal('${loan.id}')"><i class="fa-solid fa-check"></i> Collect EMI</button>
+                                <button class="btn-collect-sm" style="background:#3730a3;" onclick="openCollectModal('${loan.id}','PARTIAL')"><i class="fa-solid fa-layer-group"></i> Partial / Advance</button>
                                 <button class="btn-foreclose-sm" onclick="openForecloseModal('${loan.id}')"><i class="fa-solid fa-handshake"></i> Foreclose</button>
                             </div>
                             <div class="legacy-emi-actions">
@@ -3018,6 +3132,10 @@
                 }
 
                 let penaltyInfo = penaltyPaid > 0 ? `<span style="color:#fbbf24; font-size:0.72rem; margin-left:5px;">Pen: ₹${penaltyPaid}</span>` : "";
+                let partialInfo = (!loan.foreclosed && partialCollected > 0) ? `<div style="font-size:0.72rem; color:#93c5fd; margin-top:4px;"><i class="fa-solid fa-layer-group me-1"></i> Partial collected: <b>₹${partialCollected.toLocaleString('en-IN')}</b> towards EMI #${paidCount + 1} (₹${Math.max(0, prod.emi - partialCollected).toLocaleString('en-IN')} more needed)</div>` : "";
+                const duePenalties = getDuePenalties(loan);
+                const duePenaltyTotal = duePenalties.reduce((s, x) => s + x.amount, 0);
+                let penaltyDueInfo = duePenalties.length ? `<div style="font-size:0.72rem; color:#fbbf24; margin-top:4px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;"><span><i class="fa-solid fa-triangle-exclamation me-1"></i> Total Penalty Due: <b>₹${duePenaltyTotal.toLocaleString('en-IN')}</b> (${duePenalties.length} EMI${duePenalties.length>1?'s':''} pending)</span><button type="button" class="no-print" onclick="openDuePenaltiesListModal('${loan.id}')" style="background:rgba(245,158,11,.15); border:1px solid rgba(245,158,11,.4); color:#fde68a; font-size:.65rem; font-weight:700; padding:2px 7px; border-radius:999px; cursor:pointer;">View / Receive</button></div>` : "";
 
                 card.innerHTML = `
                     <div class="client-header">
@@ -3027,6 +3145,8 @@
                             <div style="font-size: 0.76rem; color: #94a3b8; margin-top: 2px;">
                                 <i class="fa-solid fa-phone me-1"></i> ${loan.phone}${loan.phone2 ? ` · ${loan.phone2}` : ''} · <span style="color:#60a5fa; font-weight:600;">${prod.name}</span> ${penaltyInfo}
                             </div>
+                            ${partialInfo}
+                            ${penaltyDueInfo}
                         </div>
                         <div style="text-align:right;">
                             ${statusBadge}
@@ -3569,6 +3689,8 @@
             document.getElementById("fc-name").value = "";
             document.getElementById("fc-phone").value = "";
             document.getElementById("fc-phone2").value = "";
+            document.getElementById("fc-guarantor-name").value = "";
+            document.getElementById("fc-guarantor-phone").value = "";
             document.getElementById("fc-collector").value = "";
             document.getElementById("fc-address").value = "";
             setDmyValues("fc", new Date().toISOString().split('T')[0]);
@@ -3586,6 +3708,8 @@
             document.getElementById("fc-name").value = loan.name;
             document.getElementById("fc-phone").value = loan.phone || "";
             document.getElementById("fc-phone2").value = loan.phone2 || "";
+            document.getElementById("fc-guarantor-name").value = loan.guarantorName || "";
+            document.getElementById("fc-guarantor-phone").value = loan.guarantorPhone || "";
             populateLoanCollectorSelect();
             document.getElementById("fc-collector").value = loan.collectorId || "";
             document.getElementById("fc-address").value = loan.address || "";
@@ -3631,6 +3755,8 @@
             const name = document.getElementById("fc-name").value;
             const phone = document.getElementById("fc-phone").value;
             const phone2 = document.getElementById("fc-phone2").value.trim();
+            const guarantorName = document.getElementById("fc-guarantor-name").value.trim();
+            const guarantorPhone = document.getElementById("fc-guarantor-phone").value.trim();
             const collectorId = document.getElementById("fc-collector")?.value || "";
             const collector = (state.staff||[]).find(x=>x.id===collectorId);
             const address = document.getElementById("fc-address").value;
@@ -3644,6 +3770,8 @@
                     name: name,
                     phone: phone,
                     phone2: phone2,
+                    guarantorName: guarantorName,
+                    guarantorPhone: guarantorPhone,
                     collectorId: collectorId,
                     collectorName: collector ? collector.name : "",
                     address: address,
@@ -3659,6 +3787,8 @@
                 loan.name = name;
                 loan.phone = phone;
                 loan.phone2 = phone2;
+                loan.guarantorName = guarantorName;
+                loan.guarantorPhone = guarantorPhone;
                 loan.collectorId = collectorId;
                 loan.collectorName = collector ? collector.name : "";
                 loan.address = address;
@@ -4108,8 +4238,183 @@
             const p = state.products[loan.product];
             if (!p) return 0;
             if (loan.foreclosed) return 0;
-            return Math.max(0, (p.emi * p.tenure) - loan.payments.reduce((s, x) => s + (x.amount || 0), 0));
+            return Math.max(0, (p.emi * p.tenure) - loan.payments.reduce((s, x) => s + (x.amount || 0), 0) - getLoanPartialSum(loan));
         }
+
+        // ================== PARTIAL / ADVANCE EMI PAYMENTS ==================
+        // A customer may pay less than a full EMI (partial) across several visits, or more than one
+        // EMI at once (advance). Money that hasn't yet completed a full installment is held in
+        // loan.pendingParts (each entry: {date, amount, mode}) and shown as "collected so far" —
+        // it is NOT written into loan.payments (and so does not affect any existing report/total)
+        // until it actually completes a full EMI. This keeps every existing calculation elsewhere
+        // in the app (Cost Breakdown, Finance Reports, KPIs) working exactly as before.
+        function getLoanPartialSum(loan) {
+            return (loan.pendingParts || []).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+        }
+
+        // ================== DEFERRED PENALTY LEDGER ==================
+        // A penalty is only ever "due" here because the operator explicitly applied one while
+        // collecting an installment and chose "Due Later" instead of collecting it on the spot —
+        // never an automatic guess based on how late a payment is. Until it is actually marked
+        // Received, it is NOT counted anywhere in revenue/reports (loan.payments[].penalty stays 0
+        // for that installment), so Gross Revenue only ever reflects penalty money truly in hand.
+        function getDuePenalties(loan) {
+            return (loan.duePenalties || []).filter(x => x.status === 'due');
+        }
+
+        // Called when the operator picks "Due Later" for an installment that has just been paid
+        // (or just completed via partial reconciliation). Does NOT touch payment.penalty.
+        function addDuePenalty(loan, installmentNum, amount, appliedDate) {
+            if (!(amount > 0)) return;
+            if (!loan.duePenalties) loan.duePenalties = [];
+            loan.duePenalties.push({ installmentNum, amount: Number(amount), appliedDate, status: 'due' });
+        }
+
+        function openDuePenaltiesListModal(loanId) {
+            const loan = state.loans.find(l => l.id === loanId);
+            if (!loan) return;
+            const due = getDuePenalties(loan);
+            document.getElementById('due-penalties-list-body').innerHTML = `
+                <div style="font-size:0.82rem; color:#94a3b8; margin-bottom:10px;"><b style="color:#fff;">${loan.name}</b> has <b style="color:#fbbf24;">${due.length}</b> penalty amount${due.length>1?'s':''} applied but not yet received:</div>
+                ${due.map(d => {
+                    const realIdx = loan.duePenalties.indexOf(d);
+                    return `<div style="display:flex; justify-content:space-between; align-items:center; padding:9px 10px; background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.2); border-radius:8px; margin-bottom:6px; font-size:0.82rem; gap:8px; flex-wrap:wrap;">
+                        <span style="color:#fde68a;">EMI #${d.installmentNum} <span style="color:#64748b; font-size:0.72rem;">(applied ${formatToIndianDate(d.appliedDate)})</span></span>
+                        <span style="display:flex; align-items:center; gap:8px;">
+                            <b style="color:#fbbf24;">₹${d.amount.toLocaleString('en-IN')}</b>
+                            <button type="button" onclick="closeModal('modal-due-penalties-list'); openReceivePenaltyModal('${loan.id}', ${realIdx});" style="background:#f59e0b; color:#0f172a; border:none; font-size:.68rem; font-weight:700; padding:5px 9px; border-radius:999px; cursor:pointer;">Receive</button>
+                        </span>
+                    </div>`;
+                }).join('')}
+                <div style="display:flex; justify-content:space-between; padding:10px; margin-top:6px; border-top:1px dashed rgba(255,255,255,0.12); font-size:0.9rem;">
+                    <b style="color:#fff;">Total Due</b>
+                    <b style="color:#fbbf24;">₹${due.reduce((s,x)=>s+x.amount,0).toLocaleString('en-IN')}</b>
+                </div>
+            `;
+            document.getElementById('modal-due-penalties-list').classList.add('active');
+        }
+
+        function openReceivePenaltyModal(loanId, idx) {
+            const loan = state.loans.find(l => l.id === loanId);
+            const due = loan && (loan.duePenalties || [])[idx];
+            if (!due) return;
+            document.getElementById('rp-loan-id').value = loanId;
+            document.getElementById('rp-idx').value = idx;
+            document.getElementById('rp-info').innerText = `EMI #${due.installmentNum} — ₹${due.amount.toLocaleString('en-IN')} penalty applied on ${formatToIndianDate(due.appliedDate)}`;
+            document.getElementById('rp-mode').value = 'Cash';
+            setDmyValues('rp', new Date().toISOString().split('T')[0]);
+            document.getElementById('modal-receive-penalty').classList.add('active');
+        }
+
+        function handleReceivePenaltySubmit(e) {
+            e.preventDefault();
+            const loanId = document.getElementById('rp-loan-id').value;
+            const idx = Number(document.getElementById('rp-idx').value);
+            const loan = state.loans.find(l => l.id === loanId);
+            const due = loan && (loan.duePenalties || [])[idx];
+            if (!due) return;
+            const recDate = getDmyIsoString('rp');
+            const mode = document.getElementById('rp-mode').value;
+            // The installment this penalty belongs to is already paid — fold the amount into that
+            // payment's penalty field now, exactly the moment it enters revenue/reports.
+            const pay = loan.payments[due.installmentNum - 1];
+            if (pay) pay.penalty = (Number(pay.penalty) || 0) + due.amount;
+            due.status = 'received';
+            due.receivedDate = recDate;
+            due.receivedMode = mode;
+            closeModal('modal-receive-penalty');
+            persist();
+        }
+        // ================== END DEFERRED PENALTY LEDGER ==================
+
+        // Converts as many completed installments out of loan.pendingParts into loan.payments as
+        // the collected amount allows (handles a single big advance payment covering several future
+        // EMIs in one go). Each finalized payment keeps a `.parts` breakdown of exactly which partial
+        // contributions (with their own dates/amounts/modes) made it up, for a full audit trail.
+        function reconcilePartialQueue(loan, prod) {
+            if (!loan.pendingParts) loan.pendingParts = [];
+            const EPS = 0.01;
+            while (loan.pendingParts.reduce((s, x) => s + x.amount, 0) >= prod.emi - EPS && loan.pendingParts.length) {
+                let need = prod.emi;
+                const consumed = [];
+                while (need > EPS && loan.pendingParts.length) {
+                    const part = loan.pendingParts[0];
+                    if (part.amount <= need + EPS) {
+                        consumed.push({ date: part.date, amount: part.amount, mode: part.mode });
+                        need -= part.amount;
+                        loan.pendingParts.shift();
+                    } else {
+                        consumed.push({ date: part.date, amount: need, mode: part.mode });
+                        part.amount = +(part.amount - need).toFixed(2);
+                        need = 0;
+                    }
+                }
+                const instNum = loan.payments.length + 1;
+                const startDt = new Date(loan.disbursalDate);
+                const dueDt = new Date(startDt);
+                dueDt.setDate(startDt.getDate() + (instNum * prod.days));
+                const dueIso = dueDt.toISOString().split('T')[0];
+                const lastPart = consumed[consumed.length - 1];
+                loan.payments.push({
+                    date: lastPart.date,
+                    dueDate: dueIso,
+                    amount: prod.emi,
+                    penalty: loan.pendingPenalty || 0,
+                    mode: consumed.length > 1 ? `Partial Payments (${consumed.length} parts combined)` : (consumed[0].mode || 'Cash'),
+                    principal: prod.principal,
+                    interest: prod.interest,
+                    parts: consumed
+                });
+                loan.pendingPenalty = 0; // penalty collected so far applies to the installment it just completed
+                if (loan.pendingDuePenalty > 0) {
+                    addDuePenalty(loan, instNum, loan.pendingDuePenalty, lastPart.date);
+                    loan.pendingDuePenalty = 0;
+                }
+            }
+        }
+
+        // Adds one partial/advance payment amount to the queue and reconciles it immediately.
+        // `penalty`, if any, accumulates against the loan and is attached to whichever installment
+        // completes next — same as the Full EMI penalty, it is never shown on the client-facing PDF.
+        // `penaltyTiming` mirrors the Full EMI 'NOW'/'DUE' choice: 'NOW' folds it straight into that
+        // installment's penalty (counted in revenue immediately); 'DUE' logs it to the deferred
+        // penalty ledger instead, once the installment it belongs to actually completes.
+        function addPartialPayment(loanId, amount, date, mode, penalty, penaltyTiming) {
+            const loan = state.loans.find(l => l.id === loanId);
+            const prod = state.products[loan.product];
+            if (!loan || !prod || !(amount > 0)) return;
+            if (!loan.pendingParts) loan.pendingParts = [];
+            loan.pendingParts.push({ date: date, amount: Number(amount), mode: mode });
+            if (penaltyTiming === 'DUE') {
+                loan.pendingDuePenalty = (loan.pendingDuePenalty || 0) + (Number(penalty) || 0);
+            } else {
+                loan.pendingPenalty = (loan.pendingPenalty || 0) + (Number(penalty) || 0);
+            }
+            reconcilePartialQueue(loan, prod);
+        }
+
+        function showPaymentParts(loanId, idx) {
+            const loan = state.loans.find(l => l.id === loanId);
+            const pay = loan && loan.payments[idx];
+            if (!pay || !pay.parts || !pay.parts.length) return;
+            const rows = pay.parts.map((pt, i) => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 10px; background:rgba(255,255,255,0.04); border-radius:8px; margin-bottom:6px; font-size:0.85rem;">
+                    <span style="color:#94a3b8;"><b style="color:#fff;">#${i + 1}</b> · ${formatToIndianDate(pt.date)}</span>
+                    <span style="color:#64748b; font-size:0.75rem;">${pt.mode || 'Cash'}</span>
+                    <b style="color:#34d399;">₹${Number(pt.amount).toLocaleString('en-IN')}</b>
+                </div>
+            `).join('');
+            document.getElementById('payment-parts-body').innerHTML = `
+                <div style="font-size:0.82rem; color:#94a3b8; margin-bottom:10px;">Installment <b style="color:#fff;">#${idx + 1}</b> for <b style="color:#fff;">${loan.name}</b> was collected in <b style="color:#60a5fa;">${pay.parts.length} parts</b>:</div>
+                ${rows}
+                <div style="display:flex; justify-content:space-between; padding:10px; margin-top:6px; border-top:1px dashed rgba(255,255,255,0.12); font-size:0.9rem;">
+                    <b style="color:#fff;">Total Collected</b>
+                    <b style="color:#34d399;">₹${pay.amount.toLocaleString('en-IN')}</b>
+                </div>
+            `;
+            document.getElementById('modal-payment-parts').classList.add('active');
+        }
+        // ================== END PARTIAL / ADVANCE EMI PAYMENTS ==================
 
         function toggleProductClients(safeCode) {
             const box = document.getElementById('product-clients-' + safeCode);
@@ -4150,6 +4455,7 @@
             document.getElementById('bulk-emi-loan-id').value=id;
             document.getElementById('bulk-emi-name').innerText=loan.name||'-';
             document.getElementById('bulk-emi-id').innerText=loan.id||'-';
+            document.getElementById('bulk-emi-payment-mode').value='Cash';
             setBulkEmiMode(mode);
             const rows=mfLoanScheduleRows(loan);
             const next=rows.find(r=>!r.paid);
@@ -4204,10 +4510,11 @@
             const rows=getBulkEmiCandidates();
             if(!rows.length){ alert('No unpaid EMI matches the selected range.'); return; }
             const mode=document.getElementById('bulk-emi-mode')?.value||'ALL';
+            const paymentMode=document.getElementById('bulk-emi-payment-mode')?.value||'Cash';
             const label=mode==='ALL'?`all ${rows.length} remaining EMI(s)`:`${rows.length} EMI(s) in the selected date range`;
-            if(!confirm(`Mark ${label} as PAID ON TIME?\n\nEach EMI will use its scheduled due date as the payment date.`)) return;
+            if(!confirm(`Mark ${label} as PAID ON TIME (${paymentMode})?\n\nEach EMI will use its scheduled due date as the payment date.`)) return;
             rows.forEach(r=>{
-                loan.payments.push({date:r.dueDate,dueDate:r.dueDate,amount:Number(r.emi)||0,penalty:0,mode:'Historical / Bulk Entry',principal:Number(r.principal)||0,interest:Number(r.interest)||0});
+                loan.payments.push({date:r.dueDate,dueDate:r.dueDate,amount:Number(r.emi)||0,penalty:0,mode:paymentMode,principal:Number(r.principal)||0,interest:Number(r.interest)||0});
             });
             closeModal('modal-bulk-emi');
             persist();
@@ -4218,7 +4525,7 @@
 
         // Collect Modal with Dual Dates
         let currentCollectSuggestedPenalty = 0;
-        function openCollectModal(id) {
+        function openCollectModal(id, mode) {
             const loan = state.loans.find(l => l.id === id);
             const prod = state.products[loan.product];
 
@@ -4232,6 +4539,8 @@
             document.getElementById("pay-penalty").value = 0;
             currentCollectSuggestedPenalty = prod.penalty || 0;
             document.getElementById("btn-suggest-pen").innerText = `Apply ₹${currentCollectSuggestedPenalty}`;
+            setPenaltyTiming('NOW');
+            updatePenaltyModeVisibility();
 
             const paidCount = loan.payments.length;
             const startDt = new Date(loan.disbursalDate);
@@ -4243,34 +4552,126 @@
             setDmyValues("pay-due", nextDueIso);
             setDmyValues("pay-rec", new Date().toISOString().split('T')[0]);
 
+            setCollectMode(mode === 'PARTIAL' ? 'PARTIAL' : 'FULL');
             document.getElementById("modal-collect").classList.add("active");
+        }
+
+        function setCollectMode(mode) {
+            document.getElementById("pay-mode-type").value = mode;
+            const id = document.getElementById("pay-loan-id").value;
+            const loan = state.loans.find(l => l.id === id);
+            const prod = loan ? state.products[loan.product] : null;
+
+            const fullBtn = document.getElementById("btn-collect-mode-full");
+            const partialBtn = document.getElementById("btn-collect-mode-partial");
+            const fullFields = document.getElementById("collect-full-only-fields");
+            const splitBox = document.getElementById("collect-split-box");
+            const partialInfo = document.getElementById("collect-partial-info");
+            const amountLabel = document.getElementById("pay-amount-label");
+            const amountInput = document.getElementById("pay-amount");
+
+            if (mode === 'PARTIAL') {
+                fullBtn.className = "btn-header"; fullBtn.style.background = "rgba(255,255,255,0.06)"; fullBtn.style.color = "#cbd5e1";
+                partialBtn.className = "btn-header btn-blue"; partialBtn.style.background = ""; partialBtn.style.color = "";
+                fullFields.style.display = "none";
+                splitBox.style.display = "none";
+                partialInfo.style.display = "block";
+                amountLabel.innerText = "Amount Received Now (₹) — can be less or more than one EMI *";
+                document.getElementById("pay-penalty-label").innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1"></i> Late Penalty for this EMI (₹) [Leave 0 if Waived]';
+                if (prod) amountInput.value = "";
+                if (loan && prod) {
+                    const collected = getLoanPartialSum(loan);
+                    const nextNum = loan.payments.length + 1;
+                    if (collected > 0) {
+                        document.getElementById("collect-partial-status-text").innerHTML = `Towards EMI #${nextNum}: <b style="color:#34d399;">₹${collected.toLocaleString('en-IN')}</b> collected so far out of <b>₹${prod.emi}</b> (₹${Math.max(0, prod.emi - collected).toLocaleString('en-IN')} still due for this EMI).`;
+                    } else {
+                        document.getElementById("collect-partial-status-text").innerText = `No amount collected yet towards EMI #${nextNum} (₹${prod.emi}). Any amount you enter now will be saved as a partial/advance payment.`;
+                    }
+                }
+            } else {
+                fullBtn.className = "btn-header btn-blue"; fullBtn.style.background = ""; fullBtn.style.color = "";
+                partialBtn.className = "btn-header"; partialBtn.style.background = "rgba(255,255,255,0.06)"; partialBtn.style.color = "#cbd5e1";
+                fullFields.style.display = "block";
+                splitBox.style.display = "block";
+                partialInfo.style.display = "none";
+                amountLabel.innerText = "Collected EMI Amount (₹) *";
+                document.getElementById("pay-penalty-label").innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1"></i> Late Penalty Charged (₹) [Leave 0 if Waived]';
+                if (prod) amountInput.value = prod.emi;
+            }
         }
 
         function applySuggestedPenalty() {
             document.getElementById("pay-penalty").value = currentCollectSuggestedPenalty;
+            updatePenaltyModeVisibility();
+        }
+
+        // Shows the "Collect Now / Due Later" choice only once an actual penalty amount is entered —
+        // no point asking the timing question for ₹0.
+        function updatePenaltyModeVisibility() {
+            const amt = parseFloat(document.getElementById("pay-penalty")?.value) || 0;
+            const toggle = document.getElementById("pay-penalty-mode-toggle");
+            if (!toggle) return;
+            toggle.style.display = amt > 0 ? "flex" : "none";
+            if (amt <= 0) { document.getElementById("pay-penalty-due-note").style.display = "none"; setPenaltyTiming('NOW'); }
+        }
+
+        function setPenaltyTiming(mode) {
+            document.getElementById("pay-penalty-timing").value = mode;
+            const nowBtn = document.getElementById("btn-pen-now");
+            const dueBtn = document.getElementById("btn-pen-due");
+            const note = document.getElementById("pay-penalty-due-note");
+            if (!nowBtn || !dueBtn) return;
+            if (mode === 'DUE') {
+                nowBtn.style.background = "rgba(255,255,255,0.06)"; nowBtn.style.color = "#cbd5e1";
+                dueBtn.style.background = "#f59e0b"; dueBtn.style.color = "#0f172a";
+                if (note && parseFloat(document.getElementById("pay-penalty")?.value) > 0) note.style.display = "block";
+            } else {
+                nowBtn.style.background = "#f59e0b"; nowBtn.style.color = "#0f172a";
+                dueBtn.style.background = "rgba(255,255,255,0.06)"; dueBtn.style.color = "#cbd5e1";
+                if (note) note.style.display = "none";
+            }
         }
 
         function handleCollectSubmit(e) {
             e.preventDefault();
             const id = document.getElementById("pay-loan-id").value;
             const amt = parseFloat(document.getElementById("pay-amount").value);
-            const penalty = parseFloat(document.getElementById("pay-penalty").value) || 0;
-            const dueDate = getDmyIsoString("pay-due");
             const recDate = getDmyIsoString("pay-rec");
             const mode = document.getElementById("pay-mode").value;
+            const collectMode = document.getElementById("pay-mode-type").value;
+            const penaltyVal = parseFloat(document.getElementById("pay-penalty").value) || 0;
+            const penaltyTiming = document.getElementById("pay-penalty-timing").value;
 
             const loan = state.loans.find(l => l.id === id);
             const prod = state.products[loan.product];
+
+            if (collectMode === 'PARTIAL') {
+                if (!(amt > 0)) { alert('Enter an amount greater than 0.'); return; }
+                addPartialPayment(id, amt, recDate, mode, penaltyVal, penaltyTiming);
+                closeModal("modal-collect");
+                persist();
+                renderFeed();
+                if (document.getElementById("passbook-select")?.value === id) renderPassbookDetail();
+                renderUpcomingEmiSchedule();
+                return;
+            }
+
+            const dueDate = getDmyIsoString("pay-due");
+            const collectNow = penaltyTiming !== 'DUE';
 
             loan.payments.push({
                 date: recDate,
                 dueDate: dueDate,
                 amount: amt,
-                penalty: penalty,
+                penalty: collectNow ? penaltyVal : 0,
                 mode: mode,
                 principal: prod.principal,
                 interest: prod.interest
             });
+
+            if (!collectNow && penaltyVal > 0) {
+                addDuePenalty(loan, loan.payments.length, penaltyVal, recDate);
+            }
 
             closeModal("modal-collect");
             persist();
@@ -4337,12 +4738,21 @@
                 return;
             }
 
+            const docMode = document.getElementById("passbook-doc-mode")?.value || "STATEMENT";
+            if (docMode === "SCHEDULE") {
+                renderEmiScheduleOnly(id, area, nocBtn);
+                return;
+            }
+
             const l = state.loans.find(x => x.id === id);
             const p = state.products[l.product];
             const totalPaidGross = l.payments.reduce((s, x) => s + x.amount, 0) + (l.foreclosed ? l.foreclosureData.settlementAmount : 0);
-            const pending = l.foreclosed ? 0 : Math.max(0, (p.emi * p.tenure) - l.payments.reduce((s, x) => s + x.amount, 0));
+            const pending = getLoanPending(l);
             const totalPenaltyCollected = l.payments.reduce((s, x) => s + (x.penalty || 0), 0);
+            const totalPrincipalCollected = l.payments.reduce((s, x) => s + (Number(x.principal) || 0), 0) + (l.foreclosed ? (Number(l.foreclosureData.principalPaid) || 0) : 0);
+            const totalInterestCollected = l.payments.reduce((s, x) => s + (Number(x.interest) || 0), 0);
             const totalCombinedForecloseCharges = l.foreclosed ? ((l.foreclosureData.feeAmount || 0) + (l.foreclosureData.gstAmount || 0)) : 0;
+            const partialCollected = getLoanPartialSum(l);
 
             // Show NOC button only if loan is closed or foreclosed
             if (l.foreclosed || pending <= 0) {
@@ -4370,6 +4780,11 @@
                 if (pay) {
                     badge = `<span class="badge-paid">PAID</span>`;
                     paidStr = formatToIndianDate(pay.date);
+                    if (pay.parts && pay.parts.length > 1) {
+                        badge += ` <button type="button" class="no-print" onclick="showPaymentParts('${l.id}', ${i-1})" style="background:rgba(96,165,250,.15); border:1px solid rgba(96,165,250,.4); color:#93c5fd; font-size:.62rem; font-weight:700; padding:2px 6px; border-radius:999px; cursor:pointer;">${pay.parts.length} parts</button>`;
+                        const partsList = pay.parts.map(pt => `${formatToIndianDate(pt.date)}: ₹${Number(pt.amount).toLocaleString('en-IN')}`).join(' + ');
+                        paidStr += `<div style="font-size:.66rem; color:#94a3b8; margin-top:3px; font-weight:400;">(${partsList})</div>`;
+                    }
                     const pDt = new Date(pay.date);
                     const dDt = new Date(pay.dueDate || defaultDueIso);
                     const diff = Math.max(0, Math.ceil((pDt - dDt) / (1000 * 60 * 60 * 24)));
@@ -4385,6 +4800,9 @@
                         badge = `<span class="badge-overdue">OVERDUE</span>`;
                         const overdueDays = Math.ceil((today - defaultDueDt) / (1000 * 60 * 60 * 24));
                         dpd = `<b style="color:#f87171;">${overdueDays} Days Overdue</b>`;
+                    }
+                    if (i === l.payments.length + 1 && partialCollected > 0) {
+                        dpd = `<span style="color:#93c5fd; font-weight:700;">₹${partialCollected.toLocaleString('en-IN')} collected</span>`;
                     }
                 }
 
@@ -4473,6 +4891,30 @@
                         <div><span style="color:#94a3b8;">Tenure:</span> ${p.tenure} EMIs (₹${p.emi})</div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Outstanding Balance:</span> <b style="color:${pending<=0?'#34d399':'#f87171'}; font-size:1rem;">₹${pending.toLocaleString('en-IN')}</b></div>
                     </div>
+                    ${l.guarantorName ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:0.8rem;"><span style="color:#94a3b8;">Guarantor:</span> <b style="color:#fff;">${l.guarantorName}</b>${l.guarantorPhone ? ` · <b style="color:#fff;">${l.guarantorPhone}</b>` : ''}</div>` : ''}
+                </div>
+
+                <!-- Total Collected From This Client — Segregation Box (like Lender Cost Breakdown) -->
+                <div class="statement-box" style="background:var(--bg-card); padding:14px; border-radius:14px; border:1px solid var(--border-subtle); margin-bottom:12px;">
+                    <div style="font-weight:700; color:#fff; margin-bottom:10px; font-size:0.86rem;"><i class="fa-solid fa-receipt me-1" style="color:#34d399;"></i> Total Collected From This Client So Far</div>
+                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
+                        <div style="background:rgba(96,165,250,0.08); border:1px solid rgba(96,165,250,0.25); border-radius:9px; padding:9px; text-align:center;">
+                            <div style="font-size:0.66rem; color:#94a3b8;">Principal</div>
+                            <div style="font-weight:800; color:#60a5fa; font-size:0.95rem;">₹${totalPrincipalCollected.toLocaleString('en-IN')}</div>
+                        </div>
+                        <div style="background:rgba(52,211,153,0.08); border:1px solid rgba(52,211,153,0.25); border-radius:9px; padding:9px; text-align:center;">
+                            <div style="font-size:0.66rem; color:#94a3b8;">Interest</div>
+                            <div style="font-weight:800; color:#34d399; font-size:0.95rem;">₹${totalInterestCollected.toLocaleString('en-IN')}</div>
+                        </div>
+                        <div style="background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.25); border-radius:9px; padding:9px; text-align:center;">
+                            <div style="font-size:0.66rem; color:#94a3b8;">Penalty</div>
+                            <div style="font-weight:800; color:#fbbf24; font-size:0.95rem;">₹${totalPenaltyCollected.toLocaleString('en-IN')}</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.12); font-size:0.86rem;">
+                        <b style="color:#fff;">Total Collected</b>
+                        <b style="color:#34d399; font-size:1rem;">₹${totalPaidGross.toLocaleString('en-IN')}</b>
+                    </div>
                 </div>
 
                 <!-- Schedule Table -->
@@ -4487,6 +4929,73 @@
 
                 <!-- Settlement & Foreclosure Details Positioned Cleanly at Bottom -->
                 ${forecloseBottomSummaryBox}
+            `;
+        }
+
+        // Clean "EMI / Repayment Schedule" document — meant to be handed to a customer at the time
+        // the loan is disbursed, so they know every upcoming due date and amount in advance.
+        // This does NOT touch renderPassbookDetail's normal STATEMENT rendering above in any way.
+        // Pure schedule TEMPLATE — deliberately does NOT read l.payments at all, so it always shows
+        // the original plan exactly as agreed at disbursal, regardless of what has actually been
+        // paid since. Meant to be handed to the customer/kept as a paper record with blank
+        // tick/signature columns they (or the collector) fill in by hand.
+        function renderEmiScheduleOnly(id, area, nocBtn) {
+            nocBtn.style.display = "none";
+            const l = state.loans.find(x => x.id === id);
+            const p = state.products[l.product];
+            const startDt = new Date(l.disbursalDate);
+
+            let rows = "";
+            for (let i = 1; i <= p.tenure; i++) {
+                const dueDt = new Date(startDt);
+                dueDt.setDate(startDt.getDate() + (i * p.days));
+                const dueStr = formatToIndianDate(dueDt.toISOString().split('T')[0]);
+                rows += `
+                    <tr>
+                        <td><b>#${i}</b></td>
+                        <td>${dueStr}</td>
+                        <td style="font-weight:700;">₹${p.emi}</td>
+                        <td style="color:#34d399;">₹${p.principal}</td>
+                        <td style="color:#fbbf24;">₹${p.interest}</td>
+                        <td style="text-align:center; color:#64748b;">☐</td>
+                        <td style="min-width:70px;"></td>
+                    </tr>
+                `;
+            }
+
+            area.innerHTML = `
+                <div class="statement-box" style="background:var(--bg-card); padding:14px; border-radius:14px; border:1px solid var(--border-subtle); margin-bottom:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:10px; margin-bottom:10px;">
+                        <div>
+                            <h5 style="margin:0; font-weight:800; color:#fff;">${state.bizName}</h5>
+                            <small style="color:#94a3b8;">EMI / Repayment Schedule (Loan Card)</small>
+                        </div>
+                        <div style="text-align:right;">
+                            <span class="loan-badge" style="font-size:0.9rem; padding:3px 10px;">${l.id}</span>
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; font-size:0.8rem;">
+                        <div><span style="color:#94a3b8;">Customer:</span> <b style="color:#fff;">${l.name}</b></div>
+                        <div style="text-align:right;"><span style="color:#94a3b8;">Phone:</span> <b style="color:#fff;">${l.phone}${l.phone2 ? ' / ' + l.phone2 : ''}</b></div>
+                        <div><span style="color:#94a3b8;">Plan:</span> <b style="color:#60a5fa;">${p.name}</b></div>
+                        <div style="text-align:right;"><span style="color:#94a3b8;">Disbursal Date:</span> <b style="color:#fff;">${formatToIndianDate(l.disbursalDate)}</b></div>
+                        <div><span style="color:#94a3b8;">Loan Amount:</span> <b style="color:#fff;">₹${p.amount.toLocaleString('en-IN')}</b></div>
+                        <div style="text-align:right;"><span style="color:#94a3b8;">Total Payable (EMI × Tenure):</span> <b style="color:#fff;">₹${(p.emi * p.tenure).toLocaleString('en-IN')}</b></div>
+                        <div><span style="color:#94a3b8;">Tenure:</span> ${p.tenure} EMIs (₹${p.emi} each)</div>
+                        <div style="text-align:right;"><span style="color:#94a3b8;">Schedule Prepared On:</span> <b style="color:#fff;">${formatToIndianDate(new Date().toISOString().split('T')[0])}</b></div>
+                    </div>
+                    ${l.guarantorName ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:0.8rem;"><span style="color:#94a3b8;">Guarantor:</span> <b style="color:#fff;">${l.guarantorName}</b>${l.guarantorPhone ? ` · <b style="color:#fff;">${l.guarantorPhone}</b>` : ''}</div>` : ''}
+                </div>
+
+                <!-- Schedule Table -->
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Inst #</th><th>Due Date</th><th>EMI (₹)</th><th>Principal (₹)</th><th>Interest (₹)</th><th>Paid ✓</th><th>Collector Sign</th></tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
             `;
         }
 
@@ -4541,6 +5050,7 @@
                             <tr><td style="border:none; padding:4px 0;"><b>Loan Disbursal Date:</b></td><td style="border:none; padding:4px 0;">${formatToIndianDate(l.disbursalDate)}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Foreclosure Date:</b></td><td style="border:none; padding:4px 0;">${formatToIndianDate(l.foreclosureData.settlementDate)}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Final Settlement Amount:</b></td><td style="border:none; padding:4px 0;">₹${l.foreclosureData.settlementAmount.toLocaleString('en-IN')} (${l.foreclosureData.mode})</td></tr>
+                            ${l.guarantorName ? `<tr><td style="border:none; padding:4px 0;"><b>Guarantor:</b></td><td style="border:none; padding:4px 0;">${l.guarantorName}${l.guarantorPhone ? ' (' + l.guarantorPhone + ')' : ''}</td></tr>` : ''}
                         </table>
                     </div>
 
@@ -4592,6 +5102,7 @@
                             <tr><td style="border:none; padding:4px 0;"><b>Loan Disbursal Date:</b></td><td style="border:none; padding:4px 0;">${formatToIndianDate(l.disbursalDate)}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Total EMIs Serviced:</b></td><td style="border:none; padding:4px 0;">${p.tenure} Installments</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Total Amount Paid:</b></td><td style="border:none; padding:4px 0;">₹${paidGross.toLocaleString('en-IN')}</td></tr>
+                            ${l.guarantorName ? `<tr><td style="border:none; padding:4px 0;"><b>Guarantor:</b></td><td style="border:none; padding:4px 0;">${l.guarantorName}${l.guarantorPhone ? ' (' + l.guarantorPhone + ')' : ''}</td></tr>` : ''}
                         </table>
                     </div>
 
@@ -5206,6 +5717,7 @@
 
         let financeCurrentType = 'net';
         let financeFilters = { from:'', to:'', month:'', year:'' };
+        let financeDetailSearched = false; // detail tables stay collapsed until the operator taps Search/Apply
 
         function financeDateInRange(dateStr, filters=financeFilters){
             if(!dateStr) return false;
@@ -5279,25 +5791,28 @@
                     <button class="finance-action-btn" onclick="printFinanceDetailReport()"><i class="fa-solid fa-print"></i> Print</button>
                 </div>`;
         }
-        function applyFinanceFilters(){ financeFilters={from:document.getElementById('fin-from').value,to:document.getElementById('fin-to').value,month:document.getElementById('fin-month').value,year:document.getElementById('fin-year').value}; renderFinanceDetail(financeCurrentType); }
-        function resetFinanceFilters(){ financeFilters={from:'',to:'',month:'',year:''}; renderFinanceDetail(financeCurrentType); }
+        function applyFinanceFilters(){ financeFilters={from:document.getElementById('fin-from').value,to:document.getElementById('fin-to').value,month:document.getElementById('fin-month').value,year:document.getElementById('fin-year').value}; financeDetailSearched=true; renderFinanceDetail(financeCurrentType); }
+        function resetFinanceFilters(){ financeFilters={from:'',to:'',month:'',year:''}; financeDetailSearched=false; renderFinanceDetail(financeCurrentType); }
         function financePeriodLabel(){ let p=[]; if(financeFilters.from)p.push('From '+formatToIndianDate(financeFilters.from)); if(financeFilters.to)p.push('To '+formatToIndianDate(financeFilters.to)); if(financeFilters.month)p.push(MONTH_NAMES[Number(financeFilters.month)-1]); if(financeFilters.year)p.push(financeFilters.year); return p.length?p.join(' · '):'All Records'; }
 
         function renderFinanceDetail(type){
-            financeCurrentType=type; const d=getFinanceSnapshot(), area=document.getElementById('finance-detail-content'); let title='', html='';
+            financeCurrentType=type; const d=getFinanceSnapshot(), area=document.getElementById('finance-detail-content'); let title='', headerHtml='', detailHtml='';
             if(type==='disbursed'){
                 title='Market Disbursed — Capital Given Detail';
                 const rows=d.disbursed.map(x=>{const l=x.loan,p=x.p,paid=l.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((a,z)=>a+(Number(z.principal)||0),0)+(l.foreclosed?(Number(l.foreclosureData?.principalPaid)||0):0); const out=l.foreclosed?0:Math.max(0,(p.emi*p.tenure)-l.payments.reduce((a,z)=>a+(Number(z.amount)||0),0)); return `<tr><td><b>${financeEsc(l.name)}</b><br><span class="finance-pill">${financeEsc(l.id)}</span></td><td>${financeEsc(l.phone)}</td><td>${financeEsc(p.name)}</td><td>${x.includeDisb?formatToIndianDate(l.disbursalDate):'-'}</td><td>${x.includeDisb?money(p.amount):'-'}</td><td>${money(paid)}</td><td>${money(out)}</td><td>${l.foreclosed?'FORECLOSED':(out<=0?'CLOSED':'ACTIVE')}</td></tr>`});
-                html=financeHeader([['Accounts',d.disbursed.length],['Capital Given',money(d.disbursed.reduce((a,x)=>a+(x.includeDisb?x.p.amount:0),0))],['Principal Recovered',money(d.disbursed.reduce((a,x)=>a+x.loan.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((q,z)=>q+(Number(z.principal)||0),0),0))],['Current Outstanding',money(d.disbursed.reduce((a,x)=>a+(x.loan.foreclosed?0:Math.max(0,(x.p.emi*x.p.tenure)-x.loan.payments.reduce((q,z)=>q+(Number(z.amount)||0),0))),0))]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}</div><div class="finance-section"><div class="finance-section-head"><b>Loan-wise Capital Disbursement</b></div>${financeTable(['Customer','Phone','Product','Disbursed Date','Amount','Principal Recovered','Outstanding','Status'],rows)}</div>`;
+                headerHtml=financeHeader([['Accounts',d.disbursed.length],['Capital Given',money(d.disbursed.reduce((a,x)=>a+(x.includeDisb?x.p.amount:0),0))],['Principal Recovered',money(d.disbursed.reduce((a,x)=>a+x.loan.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((q,z)=>q+(Number(z.principal)||0),0),0))],['Current Outstanding',money(d.disbursed.reduce((a,x)=>a+(x.loan.foreclosed?0:Math.max(0,(x.p.emi*x.p.tenure)-x.loan.payments.reduce((q,z)=>q+(Number(z.amount)||0),0))),0))]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}</div>`;
+                detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Loan-wise Capital Disbursement</b></div>${financeTable(['Customer','Phone','Product','Disbursed Date','Amount','Principal Recovered','Outstanding','Status'],rows)}</div>`;
             } else if(type==='gross'){
                 title='Gross Revenue — Client-wise Revenue Detail';
                 const rows=d.disbursed.map(x=>`<tr><td><b>${financeEsc(x.loan.name)}</b><br><span class="finance-pill">${financeEsc(x.loan.id)}</span></td><td>${financeEsc(x.p.name)}</td><td>${money(x.includeDisb?x.p.fileCharge:0)}</td><td>${money(x.interest)}</td><td>${money(x.penalty)}</td><td>${money(x.foreclosureFee)}</td><td><b>${money(x.totalProfit)}</b></td></tr>`);
-                html=financeHeader([['File Charges',money(d.file)],['Customer Interest',money(d.interest)],['Late Penalties',money(d.penalty)],['Foreclosure Fees',money(d.foreclosureFee)]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}</div><div class="finance-section"><div class="finance-section-head"><b>Client-wise Gross Revenue</b><span class="finance-pill">Principal is excluded from revenue</span></div>${financeTable(['Customer / Loan','Product','File Charge','Interest','Penalty','Settlement Fee','Revenue'],rows)}</div>`;
-                html+=`<div class="finance-section"><div class="finance-section-head"><b>Collection Transaction Detail</b></div>${financeTable(['Date','Customer','Loan','Amount','Interest','Penalty','Mode','Type'],d.disbursed.flatMap(x=>{let r=x.filteredPayments.map(p=>`<tr><td>${formatToIndianDate(p.date)}</td><td>${financeEsc(x.loan.name)}</td><td>${financeEsc(x.loan.id)}</td><td>${money(p.amount)}</td><td>${money(p.interest)}</td><td>${money(p.penalty||0)}</td><td>${financeEsc(p.mode)}</td><td>Regular EMI</td></tr>`); if(x.loan.foreclosed && x.foreclosureFee) r.push(`<tr class="detail-row"><td>${formatToIndianDate(x.loan.foreclosureData.settlementDate)}</td><td>${financeEsc(x.loan.name)}</td><td>${financeEsc(x.loan.id)}</td><td>${money(x.loan.foreclosureData.settlementAmount)}</td><td>${money(x.foreclosureFee)}</td><td>₹0</td><td>${financeEsc(x.loan.foreclosureData.mode)}</td><td>Foreclosure Settlement</td></tr>`); return r;}))}</div>`;
+                headerHtml=financeHeader([['File Charges',money(d.file)],['Customer Interest',money(d.interest)],['Late Penalties',money(d.penalty)],['Foreclosure Fees',money(d.foreclosureFee)]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}</div>`;
+                detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Client-wise Gross Revenue</b><span class="finance-pill">Principal is excluded from revenue</span></div>${financeTable(['Customer / Loan','Product','File Charge','Interest','Penalty','Settlement Fee','Revenue'],rows)}</div>`;
+                detailHtml+=`<div class="finance-section"><div class="finance-section-head"><b>Collection Transaction Detail</b></div>${financeTable(['Date','Customer','Loan','Amount','Interest','Penalty','Mode','Type'],d.disbursed.flatMap(x=>{let r=x.filteredPayments.map(p=>`<tr><td>${formatToIndianDate(p.date)}</td><td>${financeEsc(x.loan.name)}</td><td>${financeEsc(x.loan.id)}</td><td>${money(p.amount)}</td><td>${money(p.interest)}</td><td>${money(p.penalty||0)}</td><td>${financeEsc(p.mode)}</td><td>Regular EMI</td></tr>`); if(x.loan.foreclosed && x.foreclosureFee) r.push(`<tr class="detail-row"><td>${formatToIndianDate(x.loan.foreclosureData.settlementDate)}</td><td>${financeEsc(x.loan.name)}</td><td>${financeEsc(x.loan.id)}</td><td>${money(x.loan.foreclosureData.settlementAmount)}</td><td>${money(x.foreclosureFee)}</td><td>₹0</td><td>${financeEsc(x.loan.foreclosureData.mode)}</td><td>Foreclosure Settlement</td></tr>`); return r;}))}</div>`;
             } else if(type==='lender'){
                 title='Lender Cost — Borrowing & Interest Detail';
                 mfLenderCostRows = d.lender.map(x=>({name:x.b.lenderName,category:x.b.category,html:`<tr><td style="padding:7px;"><b>${financeEsc(x.b.lenderName)}</b><br><span class="finance-pill">${financeEsc(x.b.id)}</span></td><td style="padding:7px;">${financeEsc(x.b.category)}</td><td style="padding:7px;">${money(x.b.amount)}</td><td style="padding:7px;">${money(x.prin)}</td><td style="padding:7px;">${money(x.int)}</td><td style="padding:7px;">${money(x.gst)}</td><td style="padding:7px;">${money(x.upfront)}</td><td style="padding:7px;"><b>${money(x.total)}</b></td><td style="padding:7px;">${x.filteredRepayments.length} payments</td></tr>`}));
-                html=financeHeader([['Principal Repaid',money(d.lenderPrincipal)],['Lender Interest',money(d.lenderInterest)],['Interest GST',money(d.lenderGst)],['Upfront Fees + GST',money(d.lenderUpfront)],['Total Borrowing Cost',money(d.lenderCost)]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}</div>
+                headerHtml=financeHeader([['Principal Repaid',money(d.lenderPrincipal)],['Lender Interest',money(d.lenderInterest)],['Interest GST',money(d.lenderGst)],['Upfront Fees + GST',money(d.lenderUpfront)],['Total Borrowing Cost',money(d.lenderCost)]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}</div>`;
+                detailHtml=`
                 <div class="finance-section">
                     <div class="finance-section-head" style="flex-wrap:wrap;gap:8px;">
                         <b>Lender-wise Cost</b>
@@ -5310,17 +5825,47 @@
                 </div>`;
             } else if(type==='opex'){
                 title='Expenses & Payroll — Complete Outflow Detail';
-                html=financeHeader([['Staff Salaries',money(d.salaries)],['Business Expenses',money(d.generalExp)],['Total OPEX',money(d.opex)],['Expense Entries',d.expenses.length]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}</div><div class="finance-section"><div class="finance-section-head"><b>Payroll Detail</b></div>${financeTable(['Employee','Role','Month','Date','Amount','Mode'],d.payroll.map(x=>`<tr><td>${financeEsc(x.st.name)}</td><td>${financeEsc(x.st.role)}</td><td>${financeEsc(x.sp.month)}</td><td>${formatToIndianDate(x.sp.date)}</td><td>${money(x.sp.amount)}</td><td>${financeEsc(x.sp.mode||'-')}</td></tr>`))}</div>`;
-                html+=`<div class="finance-section"><div class="finance-section-head"><b>Business Expense Detail</b></div>${financeTable(['Date','Category','Description','Amount','Mode'],d.expenses.map(x=>`<tr><td>${formatToIndianDate(x.date)}</td><td>${financeEsc(x.category)}</td><td>${financeEsc(x.desc)}</td><td>${money(x.amount)}</td><td>${financeEsc(x.mode)}</td></tr>`))}</div>`;
+                headerHtml=financeHeader([['Staff Salaries',money(d.salaries)],['Business Expenses',money(d.generalExp)],['Total OPEX',money(d.opex)],['Expense Entries',d.expenses.length]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}</div>`;
+                detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Payroll Detail</b></div>${financeTable(['Employee','Role','Month','Date','Amount','Mode'],d.payroll.map(x=>`<tr><td>${financeEsc(x.st.name)}</td><td>${financeEsc(x.st.role)}</td><td>${financeEsc(x.sp.month)}</td><td>${formatToIndianDate(x.sp.date)}</td><td>${money(x.sp.amount)}</td><td>${financeEsc(x.sp.mode||'-')}</td></tr>`))}</div>`;
+                detailHtml+=`<div class="finance-section"><div class="finance-section-head"><b>Business Expense Detail</b></div>${financeTable(['Date','Category','Description','Amount','Mode'],d.expenses.map(x=>`<tr><td>${formatToIndianDate(x.date)}</td><td>${financeEsc(x.category)}</td><td>${financeEsc(x.desc)}</td><td>${money(x.amount)}</td><td>${financeEsc(x.mode)}</td></tr>`))}</div>`;
+            } else if(type==='modes'){
+                title='Payment Mode Breakdown — Cash / UPI / Bank Across the System';
+                // INFLOW: every customer EMI collection, grouped by mode
+                const inflowByMode={};
+                d.disbursed.forEach(x=>x.filteredPayments.forEach(pay=>{
+                    const m=pay.mode||'Unspecified';
+                    if(!inflowByMode[m]) inflowByMode[m]={count:0,amount:0};
+                    inflowByMode[m].count++; inflowByMode[m].amount+=Number(pay.amount)||0;
+                }));
+                const totalInflow=Object.values(inflowByMode).reduce((a,x)=>a+x.amount,0);
+                const inflowRows=Object.keys(inflowByMode).sort((a,b)=>inflowByMode[b].amount-inflowByMode[a].amount).map(m=>`<tr><td><b>${financeEsc(m)}</b></td><td>${inflowByMode[m].count}</td><td><b>${money(inflowByMode[m].amount)}</b></td></tr>`);
+
+                // OUTFLOW: salaries + business expenses + lender repayments, grouped by mode (with category split)
+                const outflowByMode={};
+                const addOut=(mode,cat,amt)=>{ const m=mode||'Unspecified'; if(!outflowByMode[m]) outflowByMode[m]={Salary:0,Expense:0,'Lender Repayment':0,total:0}; outflowByMode[m][cat]+=Number(amt)||0; outflowByMode[m].total+=Number(amt)||0; };
+                d.payroll.forEach(x=>addOut(x.sp.mode,'Salary',x.sp.amount));
+                d.expenses.forEach(x=>addOut(x.mode,'Expense',x.amount));
+                d.lender.forEach(x=>x.filteredRepayments.forEach(r=>addOut(r.mode,'Lender Repayment',r.totalPaid||((Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0)))));
+                const totalOutflow=Object.values(outflowByMode).reduce((a,x)=>a+x.total,0);
+                const outflowRows=Object.keys(outflowByMode).sort((a,b)=>outflowByMode[b].total-outflowByMode[a].total).map(m=>`<tr><td><b>${financeEsc(m)}</b></td><td>${money(outflowByMode[m].Salary)}</td><td>${money(outflowByMode[m].Expense)}</td><td>${money(outflowByMode[m]['Lender Repayment'])}</td><td><b>${money(outflowByMode[m].total)}</b></td></tr>`);
+
+                headerHtml=financeHeader([['Total Collected (Inflow)',money(totalInflow)],['Total Paid Out (Outflow)',money(totalOutflow)],['Net Movement',money(totalInflow-totalOutflow)]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}. Inflow = customer EMI collections. Outflow = staff salaries + business expenses + lender repayments.</div>`;
+                detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Inflow — Customer Collections by Mode</b></div>${financeTable(['Payment Mode','Transactions','Total Collected'],inflowRows.length?inflowRows:['<tr><td colspan="3" style="text-align:center;padding:14px;color:#64748b;">No collections in this period.</td></tr>'])}</div>`;
+                detailHtml+=`<div class="finance-section"><div class="finance-section-head"><b>Outflow — Salaries, Expenses & Lender Repayments by Mode</b></div>${financeTable(['Payment Mode','Salary','Business Expense','Lender Repayment','Total'],outflowRows.length?outflowRows:['<tr><td colspan="5" style="text-align:center;padding:14px;color:#64748b;">No outflow in this period.</td></tr>'])}</div>`;
             } else {
                 title='TRUE IN-HAND NET SURPLUS — Complete Calculation';
-                html=financeHeader([['Gross Revenue',money(d.gross)],['Lender Cost',money(d.lenderCost)],['All OPEX',money(d.opex)],['Net Surplus',money(d.net)]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}</div><div class="finance-section"><div class="finance-section-head"><b>Profit Waterfall</b></div><div style="padding:12px"><div class="finance-waterfall"><div class="finance-line"><span>Gross Revenue — File Charges</span><b>${money(d.file)}</b></div><div class="finance-line"><span>+ Customer Interest</span><b>${money(d.interest)}</b></div><div class="finance-line"><span>+ Late Penalties</span><b>${money(d.penalty)}</b></div><div class="finance-line"><span>+ Foreclosure Fees</span><b>${money(d.foreclosureFee)}</b></div><div class="finance-line total"><span>GROSS BUSINESS EARNINGS</span><b>${money(d.gross)}</b></div><div class="finance-line"><span>− Lender Interest + GST + Upfront Charges</span><b>−${money(d.lenderCost)}</b></div><div class="finance-line"><span>− Staff Salaries</span><b>−${money(d.salaries)}</b></div><div class="finance-line"><span>− General Business Expenses</span><b>−${money(d.generalExp)}</b></div><div class="finance-line total"><span>TRUE IN-HAND NET SURPLUS</span><b>${money(d.net)}</b></div></div></div></div>`;
-                html+=`<div class="finance-section"><div class="finance-section-head"><b>Underlying Detail</b></div><div style="padding:12px;color:#cbd5e1;font-size:.76rem;line-height:1.7">Gross revenue is traceable to customer-level file charges, interest, penalties and foreclosure fees. Lender cost is traceable to lender repayment transactions. OPEX is traceable to payroll and business expense entries.</div></div>`;
+                headerHtml=financeHeader([['Gross Revenue',money(d.gross)],['Lender Cost',money(d.lenderCost)],['All OPEX',money(d.opex)],['Net Surplus',money(d.net)]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}</div>`;
+                detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Profit Waterfall</b></div><div style="padding:12px"><div class="finance-waterfall"><div class="finance-line"><span>Gross Revenue — File Charges</span><b>${money(d.file)}</b></div><div class="finance-line"><span>+ Customer Interest</span><b>${money(d.interest)}</b></div><div class="finance-line"><span>+ Late Penalties</span><b>${money(d.penalty)}</b></div><div class="finance-line"><span>+ Foreclosure Fees</span><b>${money(d.foreclosureFee)}</b></div><div class="finance-line total"><span>GROSS BUSINESS EARNINGS</span><b>${money(d.gross)}</b></div><div class="finance-line"><span>− Lender Interest + GST + Upfront Charges</span><b>−${money(d.lenderCost)}</b></div><div class="finance-line"><span>− Staff Salaries</span><b>−${money(d.salaries)}</b></div><div class="finance-line"><span>− General Business Expenses</span><b>−${money(d.generalExp)}</b></div><div class="finance-line total"><span>TRUE IN-HAND NET SURPLUS</span><b>${money(d.net)}</b></div></div></div></div>`;
+                detailHtml+=`<div class="finance-section"><div class="finance-section-head"><b>Underlying Detail</b></div><div style="padding:12px;color:#cbd5e1;font-size:.76rem;line-height:1.7">Gross revenue is traceable to customer-level file charges, interest, penalties and foreclosure fees. Lender cost is traceable to lender repayment transactions. OPEX is traceable to payroll and business expense entries.</div></div>`;
             }
             document.getElementById('finance-detail-title').innerText=title;
             document.getElementById('finance-detail-controls').innerHTML=financeControls();
-            area.innerHTML=html;
-            if(type==='lender') renderLenderCostTable();
+            if (financeDetailSearched) {
+                area.innerHTML = headerHtml + detailHtml;
+                if(type==='lender') renderLenderCostTable();
+            } else {
+                area.innerHTML = headerHtml + `<div style="padding:36px 16px;text-align:center;color:#64748b;"><i class="fa-solid fa-magnifying-glass" style="font-size:1.4rem;margin-bottom:10px;display:block;"></i>Use the filters above and tap <b style="color:#93c5fd;">Search / Apply</b> to load the detailed list, or export it straight to <b style="color:#93c5fd;">Excel</b> / <b style="color:#93c5fd;">Print</b>.</div>`;
+            }
             document.getElementById('modal-finance-detail').classList.add('active');
         }
 
@@ -5334,7 +5879,7 @@
             const headHtml=['Lender','Category','Borrowed','Principal Repaid','Interest','Interest GST','Upfront Fees + GST','Total Cost','Repayments'].map(h=>`<th style="padding:7px;text-align:left;">${h}</th>`).join('');
             wrap.innerHTML=`<div class="lender-schedule-table-wrap"><table class="lender-schedule-table"><thead><tr>${headHtml}</tr></thead><tbody>${filtered.map(r=>r.html).join('')||'<tr><td colspan="9" style="text-align:center;color:#64748b;padding:14px;">No lender matches your search.</td></tr>'}</tbody></table></div>`;
         }
-        function openFinanceDetail(type){ financeFilters={from:'',to:'',month:'',year:''}; renderFinanceDetail(type); }
+        function openFinanceDetail(type){ financeFilters={from:'',to:'',month:'',year:''}; financeDetailSearched=false; renderFinanceDetail(type); }
 
         function financeRowsForExport(type,d){
             if(type==='gross') return d.disbursed.map(x=>[x.loan.id,x.loan.name,x.loan.phone,x.p.name,x.includeDisb?x.p.fileCharge:0,x.interest,x.penalty,x.foreclosureFee,x.totalProfit]);
@@ -5349,7 +5894,13 @@
             XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_${type}_Detail_Report.xlsx`);
         }
         function printFinanceDetailReport(){
+            // Print should always include the full detail, even if the on-screen view is still
+            // collapsed behind Search/Apply — briefly expand it to build the printable body, then
+            // restore whatever the operator was actually looking at.
+            const wasSearched = financeDetailSearched;
+            if (!wasSearched) { financeDetailSearched = true; renderFinanceDetail(financeCurrentType); }
             const title=document.getElementById('finance-detail-title').innerText, body=document.getElementById('finance-detail-content').innerHTML, period=financePeriodLabel();
+            if (!wasSearched) { financeDetailSearched = false; renderFinanceDetail(financeCurrentType); }
             const w=window.open('','_blank'); if(!w){alert('Please allow pop-ups to print the report.');return;}
             w.document.write(`<html><head><title>${financeEsc(title)}</title><style>body{font-family:Arial,sans-serif;color:#111;padding:22px;font-size:11px}h1{font-size:20px;margin:0 0 5px}h3{margin:18px 0 7px}.finance-detail-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.finance-mini-card{border:1px solid #ddd;padding:8px;border-radius:6px}.finance-mini-card span{display:block;color:#666;font-size:9px}.finance-mini-card b{font-size:13px}.finance-section{margin-top:12px;border:1px solid #ddd;border-radius:6px;overflow:hidden}.finance-section-head{padding:8px;background:#f3f4f6;font-weight:bold}.finance-table{width:100%;border-collapse:collapse;font-size:9px}.finance-table th,.finance-table td{border:1px solid #ddd;padding:5px;text-align:left}.finance-table th{background:#eee}.finance-waterfall{display:grid;gap:5px;padding:8px}.finance-line{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:5px}.finance-line.total{font-weight:bold;background:#f5f5f5}.finance-pill{font-size:8px}.finance-report-note{color:#555;margin:6px 0}.no-print{display:none!important}@media print{body{padding:10px}}
 </style></head><body><h1>${financeEsc(title)}</h1><div>Period: ${financeEsc(period)} &nbsp; | &nbsp; Generated: ${new Date().toLocaleString('en-IN')}</div>${body}
