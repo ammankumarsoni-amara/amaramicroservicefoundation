@@ -4420,23 +4420,23 @@
             reconcilePartialQueue(loan, prod);
         }
 
-        // Classifies how an installment was actually paid — Online (UPI/Bank), Offline (Cash), or
-        // Both — from the mode string(s) recorded on it. Looks across all parts for a
-        // partial-collected installment so a mixed Cash+UPI history is reported correctly.
+        // Shows the ACTUAL payment mode(s) an installment was collected in — "Cash", "UPI / GPay /
+        // PhonePe", "Bank Transfer", or "Cash + UPI" etc. — never a generic Online/Offline label.
+        // Looks across all parts for a partial-collected installment so a genuinely mixed-mode
+        // history (e.g. some cash, some UPI) is shown as the combination of the real modes used.
         function getPaidViaLabel(pay) {
-            const classify = (m) => {
+            const displayMode = (m) => {
                 if (!m) return null;
-                const s = String(m).toLowerCase();
-                if (s.includes('both')) return 'both';
-                if (s.includes('upi') || s.includes('bank') || s.includes('gpay') || s.includes('phonepe')) return 'online';
-                if (s.includes('cash')) return 'offline';
-                return null;
+                if (m === 'Cash') return 'Cash';
+                if (m === 'UPI') return 'UPI / GPay / PhonePe';
+                if (m === 'Bank') return 'Bank Transfer';
+                if (m === 'Cash + UPI (Both)') return 'Cash + UPI';
+                return m; // legacy/custom mode text — show as recorded
             };
-            const modes = (pay.parts && pay.parts.length) ? pay.parts.map(p => p.mode) : [pay.mode];
-            const classes = [...new Set(modes.map(classify).filter(Boolean))];
-            if (!classes.length) return null;
-            if (classes.length > 1 || classes.includes('both')) return 'Both';
-            return classes[0] === 'online' ? 'Online' : 'Offline';
+            const rawModes = (pay.parts && pay.parts.length) ? pay.parts.map(p => p.mode) : [pay.mode];
+            const labels = [...new Set(rawModes.map(displayMode).filter(Boolean))];
+            if (!labels.length) return null;
+            return labels.join(' + ');
         }
 
         function showPaymentParts(loanId, idx) {
@@ -4885,7 +4885,7 @@
                 if (pay) {
                     badge = `<span class="badge-paid">PAID</span>`;
                     const paidVia = getPaidViaLabel(pay);
-                    if (paidVia) badge += ` <span style="font-size:.62rem; font-weight:700; padding:2px 7px; border-radius:999px; ${paidVia==='Online'?'background:rgba(96,165,250,.15); border:1px solid rgba(96,165,250,.4); color:#93c5fd;':paidVia==='Offline'?'background:rgba(52,211,153,.15); border:1px solid rgba(52,211,153,.4); color:#6ee7b7;':'background:rgba(192,132,252,.15); border:1px solid rgba(192,132,252,.4); color:#d8b4fe;'}">${paidVia}</span>`;
+                    if (paidVia) badge += ` <span style="font-size:.62rem; font-weight:700; padding:2px 7px; border-radius:999px; background:rgba(148,163,184,.15); border:1px solid rgba(148,163,184,.4); color:#cbd5e1; white-space:nowrap;">${paidVia}</span>`;
                     paidStr = formatToIndianDate(pay.date);
                     if (pay.parts && pay.parts.length > 1) {
                         badge += ` <button type="button" class="no-print" onclick="showPaymentParts('${l.id}', ${i-1})" style="background:rgba(96,165,250,.15); border:1px solid rgba(96,165,250,.4); color:#93c5fd; font-size:.62rem; font-weight:700; padding:2px 6px; border-radius:999px; cursor:pointer;">${pay.parts.length} parts</button>`;
