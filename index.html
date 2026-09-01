@@ -1367,14 +1367,15 @@
     <div class="modal-overlay" id="modal-collect">
         <div class="modal-card">
             <div class="modal-title">
-                <span>Collect Installment & Penalty</span>
+                <span id="collect-modal-title">Collect Installment & Penalty</span>
                 <i class="fa-solid fa-xmark" onclick="closeModal('modal-collect')" style="cursor: pointer; color: #94a3b8;"></i>
             </div>
             <form id="form-collect" onsubmit="handleCollectSubmit(event)">
                 <input type="hidden" id="pay-loan-id">
                 <input type="hidden" id="pay-mode-type" value="FULL">
+                <input type="hidden" id="pay-edit-idx" value="">
 
-                <div style="display:flex; gap:6px; margin-bottom:12px;">
+                <div id="collect-mode-toggle-row" style="display:flex; gap:6px; margin-bottom:12px;">
                     <button type="button" id="btn-collect-mode-full" class="btn-header btn-blue" style="flex:1; justify-content:center;" onclick="setCollectMode('FULL')"><i class="fa-solid fa-check"></i> Full EMI</button>
                     <button type="button" id="btn-collect-mode-partial" class="btn-header" style="flex:1; justify-content:center; background:rgba(255,255,255,0.06); color:#cbd5e1;" onclick="setCollectMode('PARTIAL')"><i class="fa-solid fa-layer-group"></i> Partial / Advance</button>
                 </div>
@@ -1439,6 +1440,7 @@
                         <option value="Cash">Cash</option>
                         <option value="UPI">UPI / GPay / PhonePe</option>
                         <option value="Bank">Bank Transfer</option>
+                        <option value="Cash + UPI (Both)">Cash + UPI (Both)</option>
                     </select>
                 </div>
 
@@ -1447,7 +1449,7 @@
                     <div style="display: flex; justify-content: space-between; margin-top: 3px;"><span>Interest Profit:</span> <b style="color: #fbbf24;" id="split-i">₹0</b></div>
                 </div>
 
-                <button type="submit" class="btn-submit" style="background: linear-gradient(135deg, #10b981, #059669);">✓ Confirm Payment</button>
+                <button type="submit" class="btn-submit" id="collect-submit-btn" style="background: linear-gradient(135deg, #10b981, #059669);">✓ Confirm Payment</button>
             </form>
         </div>
     </div>
@@ -1562,6 +1564,7 @@
                     <option value="Cash">Cash</option>
                     <option value="UPI">UPI / GPay / PhonePe</option>
                     <option value="Bank">Bank Transfer</option>
+                    <option value="Cash + UPI (Both)">Cash + UPI (Both)</option>
                 </select>
             </div>
             <div id="bulk-emi-preview" class="bulk-preview">Choose an option to preview the EMIs that will be marked paid.</div>
@@ -4417,6 +4420,25 @@
             reconcilePartialQueue(loan, prod);
         }
 
+        // Classifies how an installment was actually paid — Online (UPI/Bank), Offline (Cash), or
+        // Both — from the mode string(s) recorded on it. Looks across all parts for a
+        // partial-collected installment so a mixed Cash+UPI history is reported correctly.
+        function getPaidViaLabel(pay) {
+            const classify = (m) => {
+                if (!m) return null;
+                const s = String(m).toLowerCase();
+                if (s.includes('both')) return 'both';
+                if (s.includes('upi') || s.includes('bank') || s.includes('gpay') || s.includes('phonepe')) return 'online';
+                if (s.includes('cash')) return 'offline';
+                return null;
+            };
+            const modes = (pay.parts && pay.parts.length) ? pay.parts.map(p => p.mode) : [pay.mode];
+            const classes = [...new Set(modes.map(classify).filter(Boolean))];
+            if (!classes.length) return null;
+            if (classes.length > 1 || classes.includes('both')) return 'Both';
+            return classes[0] === 'online' ? 'Online' : 'Offline';
+        }
+
         function showPaymentParts(loanId, idx) {
             const loan = state.loans.find(l => l.id === loanId);
             const pay = loan && loan.payments[idx];
@@ -4554,6 +4576,10 @@
             const prod = state.products[loan.product];
 
             document.getElementById("pay-loan-id").value = loan.id;
+            document.getElementById("pay-edit-idx").value = "";
+            document.getElementById("collect-modal-title").innerText = "Collect Installment & Penalty";
+            document.getElementById("collect-submit-btn").innerText = "✓ Confirm Payment";
+            document.getElementById("collect-mode-toggle-row").style.display = "flex";
             document.getElementById("pay-name-display").innerText = loan.name;
             document.getElementById("pay-id-display").innerText = loan.id;
             document.getElementById("pay-amount").value = prod.emi;
@@ -4577,6 +4603,41 @@
             setDmyValues("pay-rec", new Date().toISOString().split('T')[0]);
 
             setCollectMode(mode === 'PARTIAL' ? 'PARTIAL' : 'FULL');
+            document.getElementById("modal-collect").classList.add("active");
+        }
+
+        // Opens the SAME collect window, pre-filled with an already-recorded installment's data, so
+        // the operator can correct anything about it (amount, dates, mode, penalty) in one place —
+        // not just the penalty. Saving updates that installment in place; it does not add a new one.
+        function openEditEmiModal(loanId, idx) {
+            const loan = state.loans.find(l => l.id === loanId);
+            const pay = loan && loan.payments[idx];
+            if (!pay) return;
+            const prod = state.products[loan.product];
+
+            document.getElementById("pay-loan-id").value = loanId;
+            document.getElementById("pay-edit-idx").value = idx;
+            document.getElementById("collect-modal-title").innerText = `Edit Installment #${idx + 1}`;
+            document.getElementById("collect-submit-btn").innerText = "✓ Save Changes";
+            document.getElementById("collect-mode-toggle-row").style.display = "none";
+            document.getElementById("pay-name-display").innerText = loan.name;
+            document.getElementById("pay-id-display").innerText = loan.id;
+            document.getElementById("pay-amount").value = pay.amount;
+            document.getElementById("split-p").innerText = "₹" + (pay.principal ?? prod.principal);
+            document.getElementById("split-i").innerText = "₹" + (pay.interest ?? prod.interest);
+
+            document.getElementById("pay-penalty").value = pay.penalty || 0;
+            currentCollectSuggestedPenalty = prod.penalty || 0;
+            document.getElementById("btn-suggest-pen").innerText = `Apply ₹${currentCollectSuggestedPenalty}`;
+            setPenaltyTiming('NOW');
+
+            document.getElementById("pay-scheduled-due-disp").innerText = formatToIndianDate(pay.dueDate) + ` (EMI #${idx + 1})`;
+            setDmyValues("pay-due", pay.dueDate);
+            setDmyValues("pay-rec", pay.date);
+            document.getElementById("pay-mode").value = pay.mode && ['Cash','UPI','Bank','Cash + UPI (Both)'].includes(pay.mode) ? pay.mode : 'Cash';
+
+            setCollectMode('FULL');
+            updatePenaltyModeVisibility();
             document.getElementById("modal-collect").classList.add("active");
         }
 
@@ -4665,9 +4726,29 @@
             const collectMode = document.getElementById("pay-mode-type").value;
             const penaltyVal = parseFloat(document.getElementById("pay-penalty").value) || 0;
             const penaltyTiming = document.getElementById("pay-penalty-timing").value;
+            const editIdx = document.getElementById("pay-edit-idx").value;
 
             const loan = state.loans.find(l => l.id === id);
             const prod = state.products[loan.product];
+
+            if (editIdx !== "") {
+                // Editing an already-recorded installment in place — amount, dates, mode, penalty can
+                // all be corrected here; principal/interest split is left as originally recorded.
+                const idx = Number(editIdx);
+                const pay = loan.payments[idx];
+                if (!pay) { closeModal("modal-collect"); return; }
+                pay.amount = amt;
+                pay.dueDate = getDmyIsoString("pay-due");
+                pay.date = recDate;
+                pay.mode = mode;
+                pay.penalty = penaltyVal;
+                closeModal("modal-collect");
+                persist();
+                renderFeed();
+                if (document.getElementById("passbook-select")?.value === id) renderPassbookDetail();
+                renderUpcomingEmiSchedule();
+                return;
+            }
 
             if (collectMode === 'PARTIAL') {
                 if (!(amt > 0)) { alert('Enter an amount greater than 0.'); return; }
@@ -4803,6 +4884,8 @@
 
                 if (pay) {
                     badge = `<span class="badge-paid">PAID</span>`;
+                    const paidVia = getPaidViaLabel(pay);
+                    if (paidVia) badge += ` <span style="font-size:.62rem; font-weight:700; padding:2px 7px; border-radius:999px; ${paidVia==='Online'?'background:rgba(96,165,250,.15); border:1px solid rgba(96,165,250,.4); color:#93c5fd;':paidVia==='Offline'?'background:rgba(52,211,153,.15); border:1px solid rgba(52,211,153,.4); color:#6ee7b7;':'background:rgba(192,132,252,.15); border:1px solid rgba(192,132,252,.4); color:#d8b4fe;'}">${paidVia}</span>`;
                     paidStr = formatToIndianDate(pay.date);
                     if (pay.parts && pay.parts.length > 1) {
                         badge += ` <button type="button" class="no-print" onclick="showPaymentParts('${l.id}', ${i-1})" style="background:rgba(96,165,250,.15); border:1px solid rgba(96,165,250,.4); color:#93c5fd; font-size:.62rem; font-weight:700; padding:2px 6px; border-radius:999px; cursor:pointer;">${pay.parts.length} parts</button>`;
@@ -4813,7 +4896,7 @@
                     const dDt = new Date(pay.dueDate || defaultDueIso);
                     const diff = Math.max(0, Math.ceil((pDt - dDt) / (1000 * 60 * 60 * 24)));
                     dpd = diff > 0 ? `<b style="color:#f87171;">${diff} Days Late</b>` : "On Time";
-                    actionBtn = `<button class="no-print" onclick="openEditPenaltyModal('${l.id}', ${i-1})" style="background:none; border:none; color:#fbbf24; cursor:pointer; margin-right:8px;" title="Edit Penalty for this EMI"><i class="fa-solid fa-pen"></i></button><button class="no-print" onclick="deleteSinglePayment('${l.id}', ${i-1})" style="background:none; border:none; color:#f87171; cursor:pointer;" title="Delete"><i class="fa-solid fa-trash"></i></button>`;
+                    actionBtn = `<button class="no-print" onclick="openEditEmiModal('${l.id}', ${i-1})" style="background:none; border:none; color:#fbbf24; cursor:pointer; margin-right:8px;" title="Edit this Installment"><i class="fa-solid fa-pen"></i></button><button class="no-print" onclick="deleteSinglePayment('${l.id}', ${i-1})" style="background:none; border:none; color:#f87171; cursor:pointer;" title="Delete"><i class="fa-solid fa-trash"></i></button>`;
                 } else if (l.foreclosed) {
                     badge = `<span class="badge-foreclosed">WAIVED</span>`;
                     paidStr = "Settled Early";
@@ -4835,8 +4918,6 @@
                         <td><b>#${i}</b></td>
                         <td>${dueStr}</td>
                         <td style="font-weight:700;">₹${p.emi}</td>
-                        <td style="color:#34d399;">₹${p.principal}</td>
-                        <td style="color:#fbbf24;">₹${p.interest}</td>
                         <td>${badge}</td>
                         <td>${paidStr}</td>
                         <td>${dpd}</td>
@@ -4851,9 +4932,7 @@
                     <tr style="background: rgba(168, 85, 247, 0.15); font-weight: 700; border: 1px solid rgba(168, 85, 247, 0.4);">
                         <td style="color:#c084fc;"><b>SETTLE</b></td>
                         <td style="color:#c084fc;">${formatToIndianDate(l.foreclosureData.settlementDate)}</td>
-                        <td style="color:#fff; font-weight:800;">₹${l.foreclosureData.settlementAmount.toLocaleString('en-IN')}</td>
-                        <td style="color:#34d399;">₹${l.foreclosureData.principalPaid.toLocaleString('en-IN')} (Prin)</td>
-                        <td style="color:#fbbf24;">₹${totalCombinedForecloseCharges.toLocaleString('en-IN')} (Charges)</td>
+                        <td style="color:#fff; font-weight:800;">₹${l.foreclosureData.settlementAmount.toLocaleString('en-IN')}<div style="font-size:.62rem; color:#94a3b8; font-weight:400;">(Prin ₹${l.foreclosureData.principalPaid.toLocaleString('en-IN')} + Charges ₹${totalCombinedForecloseCharges.toLocaleString('en-IN')})</div></td>
                         <td><span class="badge-foreclosed">FORECLOSED</span></td>
                         <td style="color:#34d399;">${formatToIndianDate(l.foreclosureData.settlementDate)}</td>
                         <td style="color:#34d399;">Settled Early</td>
@@ -4950,7 +5029,7 @@
                 <div class="table-wrap">
                     <table>
                         <thead>
-                            <tr><th>Inst #</th><th>Due Date</th><th>EMI (₹)</th><th>Principal (₹)</th><th>Interest (₹)</th><th>Status</th><th>Actual Paid Date</th><th>Delay (DPD)</th><th class="no-print">Action</th></tr>
+                            <tr><th>Inst #</th><th>Due Date</th><th>EMI (₹)</th><th>Status</th><th>Actual Paid Date</th><th>Delay (DPD)</th><th class="no-print">Action</th></tr>
                         </thead>
                         <tbody>${rows}${forecloseTableRow}</tbody>
                     </table>
@@ -4984,8 +5063,6 @@
                         <td><b>#${i}</b></td>
                         <td>${dueStr}</td>
                         <td style="font-weight:700;">₹${p.emi}</td>
-                        <td style="color:#34d399;">₹${p.principal}</td>
-                        <td style="color:#fbbf24;">₹${p.interest}</td>
                         <td style="text-align:center; color:#64748b;">☐</td>
                         <td style="min-width:70px;"></td>
                     </tr>
@@ -5020,7 +5097,7 @@
                 <div class="table-wrap">
                     <table>
                         <thead>
-                            <tr><th>Inst #</th><th>Due Date</th><th>EMI (₹)</th><th>Principal (₹)</th><th>Interest (₹)</th><th>Paid ✓</th><th>Collector Sign</th></tr>
+                            <tr><th>Inst #</th><th>Due Date</th><th>EMI (₹)</th><th>Paid ✓</th><th>Collector Sign</th></tr>
                         </thead>
                         <tbody>${rows}</tbody>
                     </table>
