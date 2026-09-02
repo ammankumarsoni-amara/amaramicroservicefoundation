@@ -3090,7 +3090,7 @@
             const status=document.getElementById('emi-schedule-status')?.value||'UPCOMING', q=(document.getElementById('emi-schedule-search')?.value||'').trim().toLowerCase(), collector=document.getElementById('emi-collector-filter')?.value||'ALL', today=mfIsoToday();
             populateUpcomingCollectorFilter();
             let rows=[];
-            state.loans.forEach(loan=>{ if(loan.foreclosed || !collectorMatches(loan,collector))return; mfLoanScheduleRows(loan).forEach(r=>{ if(r.dueDate<from||r.dueDate>to)return; const rowStatus=mfUpcomingStatus(r,today); if(status!=='ALL'&&rowStatus!==status)return; const hay=[loan.id,loan.name,loan.phone,loan.phone2,loanCollectorName(loan),state.products[loan.product]?.name].filter(Boolean).join(' ').toLowerCase(); if(q&&!hay.includes(q))return; rows.push({...r,upcomingStatus:rowStatus,overdueDays:mfUpcomingOverdueDays(r.dueDate,today)}); }); });
+            state.loans.forEach(loan=>{ if(loan.foreclosed || loan.recoveryData?.status === 'SETTLED' || !collectorMatches(loan,collector))return; mfLoanScheduleRows(loan).forEach(r=>{ if(r.dueDate<from||r.dueDate>to)return; const rowStatus=mfUpcomingStatus(r,today); if(status!=='ALL'&&rowStatus!==status)return; const hay=[loan.id,loan.name,loan.phone,loan.phone2,loanCollectorName(loan),state.products[loan.product]?.name].filter(Boolean).join(' ').toLowerCase(); if(q&&!hay.includes(q))return; rows.push({...r,upcomingStatus:rowStatus,overdueDays:mfUpcomingOverdueDays(r.dueDate,today)}); }); });
             rows.sort((a,b)=>a.dueDate.localeCompare(b.dueDate)||a.loan.name.localeCompare(b.loan.name));
             const summary=document.getElementById('upcoming-emi-summary'), area=document.getElementById('upcoming-emi-results');
             const total=rows.reduce((s,r)=>s+r.emi,0), clients=new Set(rows.map(r=>r.loan.id)).size, due=rows.filter(r=>r.upcomingStatus==='DUE'), upcoming=rows.filter(r=>r.upcomingStatus==='UPCOMING'), paid=rows.filter(r=>r.upcomingStatus==='PAID');
@@ -3112,7 +3112,7 @@
 
         function getCollectionPriorityRows(){
             const today=mfIsoToday(), rows=[];
-            state.loans.forEach(loan=>{ if(loan.foreclosed)return; mfLoanScheduleRows(loan).forEach(r=>{ if(r.paid||r.dueDate>today)return; rows.push({...r,overdueDays:mfUpcomingOverdueDays(r.dueDate,today),priorityStatus:r.dueDate<today?'OVERDUE':'DUE TODAY'}); }); });
+            state.loans.forEach(loan=>{ if(loan.foreclosed || loan.recoveryData?.status === 'SETTLED')return; mfLoanScheduleRows(loan).forEach(r=>{ if(r.paid||r.dueDate>today)return; rows.push({...r,overdueDays:mfUpcomingOverdueDays(r.dueDate,today),priorityStatus:r.dueDate<today?'OVERDUE':'DUE TODAY'}); }); });
             return rows.sort((a,b)=>b.overdueDays-a.overdueDays||a.dueDate.localeCompare(b.dueDate)||a.loan.name.localeCompare(b.loan.name));
         }
         function showCollectionPriority(silent=false){
@@ -3125,7 +3125,7 @@
 
         function getUpcomingExportRows(){
             const from=getUpcomingDateIso('from')||mfIsoToday(), to=getUpcomingDateIso('to')||from, status=document.getElementById('emi-schedule-status')?.value||'UPCOMING', q=(document.getElementById('emi-schedule-search')?.value||'').trim().toLowerCase(), collector=document.getElementById('emi-collector-filter')?.value||'ALL', today=mfIsoToday(), rows=[];
-            state.loans.forEach(loan=>{ if(loan.foreclosed || !collectorMatches(loan,collector))return; mfLoanScheduleRows(loan).forEach(r=>{ if(r.dueDate<from||r.dueDate>to)return; const rs=mfUpcomingStatus(r,today); if(status!=='ALL'&&rs!==status)return; const hay=[loan.id,loan.name,loan.phone,loan.phone2,loanCollectorName(loan),state.products[loan.product]?.name].filter(Boolean).join(' ').toLowerCase(); if(q&&!hay.includes(q))return; rows.push({...r,upcomingStatus:rs,overdueDays:mfUpcomingOverdueDays(r.dueDate,today)}); }); });
+            state.loans.forEach(loan=>{ if(loan.foreclosed || loan.recoveryData?.status === 'SETTLED' || !collectorMatches(loan,collector))return; mfLoanScheduleRows(loan).forEach(r=>{ if(r.dueDate<from||r.dueDate>to)return; const rs=mfUpcomingStatus(r,today); if(status!=='ALL'&&rs!==status)return; const hay=[loan.id,loan.name,loan.phone,loan.phone2,loanCollectorName(loan),state.products[loan.product]?.name].filter(Boolean).join(' ').toLowerCase(); if(q&&!hay.includes(q))return; rows.push({...r,upcomingStatus:rs,overdueDays:mfUpcomingOverdueDays(r.dueDate,today)}); }); });
             return rows.sort((a,b)=>a.dueDate.localeCompare(b.dueDate)||a.loan.name.localeCompare(b.loan.name));
         }
         function exportUpcomingEmiExcel(){
@@ -3135,7 +3135,7 @@
         }
         function getCollectionPriorityForPrint(from,to,collector){
             const rows=[], seen=new Set();
-            state.loans.forEach(loan=>{ if(loan.foreclosed || !collectorMatches(loan,collector))return; mfLoanScheduleRows(loan).forEach(r=>{ if(r.paid)return; if(r.dueDate>to)return; const key=loan.id+'|'+r.no; if(seen.has(key))return; seen.add(key); if(r.dueDate<from || (r.dueDate>=from && r.dueDate<=to)) rows.push({...r,priorityStatus:r.dueDate<from?'OVERDUE':'DUE IN RANGE',overdueDays:mfUpcomingOverdueDays(r.dueDate,mfIsoToday())}); }); });
+            state.loans.forEach(loan=>{ if(loan.foreclosed || loan.recoveryData?.status === 'SETTLED' || !collectorMatches(loan,collector))return; mfLoanScheduleRows(loan).forEach(r=>{ if(r.paid)return; if(r.dueDate>to)return; const key=loan.id+'|'+r.no; if(seen.has(key))return; seen.add(key); if(r.dueDate<from || (r.dueDate>=from && r.dueDate<=to)) rows.push({...r,priorityStatus:r.dueDate<from?'OVERDUE':'DUE IN RANGE',overdueDays:mfUpcomingOverdueDays(r.dueDate,mfIsoToday())}); }); });
             return rows.filter(r=>r.dueDate<from || (r.dueDate>=from && r.dueDate<=to)).sort((a,b)=>b.overdueDays-a.overdueDays||a.dueDate.localeCompare(b.dueDate)||a.loan.name.localeCompare(b.loan.name));
         }
         function printUpcomingEmiSchedule(){
