@@ -2941,32 +2941,35 @@
         function mfIsoToday(){ return new Date().toISOString().slice(0,10); }
         function mfIsoAddDays(iso, days){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+Number(days||0)); return d.toISOString().slice(0,10); }
         function mfDaysBetween(a,b){ const x=new Date(a+'T00:00:00'), y=new Date(b+'T00:00:00'); return Math.round((y-x)/86400000); }
-
-        // Range collection can pay any scheduled EMI first. Therefore payment records
-        // are matched to their installment number/due date, never by array position.
+        // Central EMI schedule mapping. The scheduled due date is ALWAYS calculated from the
+        // loan disbursal date and the product's configured EMI interval. Payment-array position
+        // is never used to decide which installment is paid; this is essential when a date-range
+        // collection pays EMI #2/#3 before EMI #1.
         function mfGetPaymentForInstallment(loan, installmentNo, dueDate){
             const payments=Array.isArray(loan?.payments)?loan.payments:[];
-            const no=Number(installmentNo);
-            let index=payments.findIndex(pay=>Number(pay?.emiNo)===no);
-            if(index<0 && dueDate){
-                index=payments.findIndex(pay=>!pay?.emiNo && String(pay?.dueDate||'')===String(dueDate));
+            let pay=payments.find(p=>Number(p?.emiNo)===Number(installmentNo));
+            if(pay) return {pay,index:payments.indexOf(pay)};
+            if(dueDate) {
+                pay=payments.find(p=>String(p?.dueDate||'').slice(0,10)===String(dueDate).slice(0,10));
+                if(pay) return {pay,index:payments.indexOf(pay)};
             }
-            // Legacy fallback for old sequential data only.
-            if(index<0 && !payments.some(pay=>Number(pay?.emiNo)>0)) index=no-1;
-            const pay=payments[index];
-            return pay ? {pay,index} : {pay:null,index:-1};
+            // Backward compatibility for old sequential records that have neither emiNo nor dueDate.
+            const hasInstallmentMetadata=payments.some(p=>p && (p.emiNo!=null || p.dueDate));
+            if(!hasInstallmentMetadata){
+                const index=Number(installmentNo)-1;
+                return index>=0 && index<payments.length ? {pay:payments[index],index} : {pay:null,index:-1};
+            }
+            return {pay:null,index:-1};
         }
-
         function mfGetNextUnpaidScheduleRow(loan){
             return mfLoanScheduleRows(loan).find(r=>!r.paid)||null;
         }
-
         function mfLoanScheduleRows(loan){
             const p=state.products[loan.product];
             if(!p || !p.tenure || !loan.disbursalDate) return [];
             const rows=[];
             for(let i=1;i<=Number(p.tenure);i++){
-                const due=mfIsoAddDays(loan.disbursalDate, i*Number(p.days||30));
+                const due=mfIsoAddDays(String(loan.disbursalDate).slice(0,10), i*Number(p.days||30));
                 const match=mfGetPaymentForInstallment(loan,i,due);
                 rows.push({loan,product:p,no:i,dueDate:due,emi:Number(p.emi)||0,principal:Number(p.principal)||0,interest:Number(p.interest)||0,paid:!!match.pay,paidRecord:match.pay||null,paymentIndex:match.index});
             }
@@ -4363,7 +4366,8 @@
             const mode = document.getElementById('rp-mode').value;
             // The installment this penalty belongs to is already paid — fold the amount into that
             // payment's penalty field now, exactly the moment it enters revenue/reports.
-            const pay = mfGetPaymentForInstallment(loan, due.installmentNum, null).pay;
+            const payMatch = mfGetPaymentForInstallment(loan, due.installmentNum, null);
+            const pay = payMatch.pay;
             if (pay) pay.penalty = (Number(pay.penalty) || 0) + due.amount;
             due.status = 'received';
             due.receivedDate = recDate;
@@ -4396,7 +4400,7 @@
                     }
                 }
                 const nextRow = mfGetNextUnpaidScheduleRow(loan);
-                if(!nextRow) break;
+                if (!nextRow) return;
                 const instNum = nextRow.no;
                 const dueIso = nextRow.dueDate;
                 const lastPart = consumed[consumed.length - 1];
@@ -4611,13 +4615,10 @@
             updatePenaltyModeVisibility();
 
             const nextRow = mfGetNextUnpaidScheduleRow(loan);
-            if(!nextRow){
-                alert('All scheduled EMIs for this loan are already paid.');
-                return;
-            }
-            const nextDueIso = nextRow.dueDate;
+            const nextDueIso = nextRow ? nextRow.dueDate : '';
+            const nextEmiNo = nextRow ? nextRow.no : Math.min(Number(prod.tenure)||1, Number(loan.payments.length)+1);
 
-            document.getElementById("pay-scheduled-due-disp").innerText = formatToIndianDate(nextDueIso) + ` (EMI #${nextRow.no})`;
+            document.getElementById("pay-scheduled-due-disp").innerText = nextDueIso ? (formatToIndianDate(nextDueIso) + ` (EMI #${nextEmiNo})`) : `No unpaid EMI remaining`;
             setDmyValues("pay-due", nextDueIso);
             setDmyValues("pay-rec", new Date().toISOString().split('T')[0]);
 
@@ -4636,7 +4637,7 @@
 
             document.getElementById("pay-loan-id").value = loanId;
             document.getElementById("pay-edit-idx").value = idx;
-            document.getElementById("collect-modal-title").innerText = `Edit Installment #${Number(pay.emiNo) || (idx + 1)}`;
+            document.getElementById("collect-modal-title").innerText = `Edit Installment #${idx + 1}`;
             document.getElementById("collect-submit-btn").innerText = "✓ Save Changes";
             document.getElementById("collect-mode-toggle-row").style.display = "none";
             document.getElementById("pay-name-display").innerText = loan.name;
@@ -4650,7 +4651,7 @@
             document.getElementById("btn-suggest-pen").innerText = `Apply ₹${currentCollectSuggestedPenalty}`;
             setPenaltyTiming('NOW');
 
-            document.getElementById("pay-scheduled-due-disp").innerText = formatToIndianDate(pay.dueDate) + ` (EMI #${Number(pay.emiNo) || (idx + 1)})`;
+            document.getElementById("pay-scheduled-due-disp").innerText = formatToIndianDate(pay.dueDate) + ` (EMI #${idx + 1})`;
             setDmyValues("pay-due", pay.dueDate);
             setDmyValues("pay-rec", pay.date);
             document.getElementById("pay-mode").value = pay.mode && ['Cash','UPI','Bank','Cash + UPI (Both)'].includes(pay.mode) ? pay.mode : 'Cash';
@@ -4686,7 +4687,7 @@
                 if (loan && prod) {
                     const collected = getLoanPartialSum(loan);
                     const nextRow = mfGetNextUnpaidScheduleRow(loan);
-                    const nextNum = nextRow ? nextRow.no : loan.payments.length + 1;
+                    const nextNum = nextRow ? nextRow.no : Math.min(Number(prod.tenure)||1, Number(loan.payments.length)+1);
                     if (collected > 0) {
                         document.getElementById("collect-partial-status-text").innerHTML = `Towards EMI #${nextNum}: <b style="color:#34d399;">₹${collected.toLocaleString('en-IN')}</b> collected so far out of <b>₹${prod.emi}</b> (₹${Math.max(0, prod.emi - collected).toLocaleString('en-IN')} still due for this EMI).`;
                     } else {
@@ -4782,7 +4783,9 @@
             }
 
             const nextRow = mfGetNextUnpaidScheduleRow(loan);
-            if(!nextRow){ alert('All scheduled EMIs for this loan are already paid.'); return; }
+            if (!nextRow) { alert('All scheduled EMIs are already paid.'); return; }
+            // The scheduled due date comes from the loan schedule, not from the operator's
+            // collection date. The actual receive date remains the date the client paid.
             const dueDate = nextRow.dueDate;
             const collectNow = penaltyTiming !== 'DUE';
 
@@ -4902,7 +4905,6 @@
                 const pay = payMatch.pay;
                 const payIndex = payMatch.index;
                 let badge = `<span class="badge-pending">Pending</span>`;
-                // Due Date is the scheduled date; Actual Paid Date remains pay.date.
                 let dueStr = formatToIndianDate(defaultDueIso);
                 let paidStr = "-";
                 let dpd = "-";
@@ -4919,7 +4921,7 @@
                         paidStr += `<div style="font-size:.66rem; color:#94a3b8; margin-top:3px; font-weight:400;">(${partsList})</div>`;
                     }
                     const pDt = new Date(pay.date);
-                    const dDt = new Date(defaultDueIso);
+                    const dDt = new Date(pay.dueDate || defaultDueIso);
                     const diff = Math.max(0, Math.ceil((pDt - dDt) / (1000 * 60 * 60 * 24)));
                     dpd = diff > 0 ? `<b style="color:#f87171;">${diff} Days Late</b>` : "On Time";
                     actionBtn = `<button class="no-print" onclick="openEditEmiModal('${l.id}', ${payIndex})" style="background:none; border:none; color:#fbbf24; cursor:pointer; margin-right:8px;" title="Edit this Installment"><i class="fa-solid fa-pen"></i></button><button class="no-print" onclick="deleteSinglePayment('${l.id}', ${payIndex})" style="background:none; border:none; color:#f87171; cursor:pointer;" title="Delete"><i class="fa-solid fa-trash"></i></button>`;
@@ -4934,7 +4936,7 @@
                         const overdueDays = Math.ceil((today - defaultDueDt) / (1000 * 60 * 60 * 24));
                         dpd = `<b style="color:#f87171;">${overdueDays} Days Overdue</b>`;
                     }
-                    if (i === (mfGetNextUnpaidScheduleRow(l)?.no || (l.payments.length + 1)) && partialCollected > 0) {
+                    if (i === l.payments.length + 1 && partialCollected > 0) {
                         dpd = `<span style="color:#93c5fd; font-weight:700;">₹${partialCollected.toLocaleString('en-IN')} collected</span>`;
                     }
                 }
@@ -5148,7 +5150,7 @@
             if (!pay) return;
             document.getElementById('ep-loan-id').value = loanId;
             document.getElementById('ep-idx').value = idx;
-            document.getElementById('ep-info').innerHTML = `EMI <b style="color:#fff;">#${Number(pay.emiNo) || (idx + 1)}</b> for <b style="color:#fff;">${loan.name}</b>, paid on ${formatToIndianDate(pay.date)}`;
+            document.getElementById('ep-info').innerHTML = `EMI <b style="color:#fff;">#${idx + 1}</b> for <b style="color:#fff;">${loan.name}</b>, paid on ${formatToIndianDate(pay.date)}`;
             document.getElementById('ep-amount').value = pay.penalty || 0;
             document.getElementById('modal-edit-penalty').classList.add('active');
         }
