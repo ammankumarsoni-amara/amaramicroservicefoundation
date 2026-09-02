@@ -2373,12 +2373,16 @@
         }
 
         function setTab(tab) {
+            // NOTE: NPA tab wiring lives directly in this core function (not as a
+            // separate end-of-file patch) precisely so it can never be lost again if
+            // this file is ever partially copied/pasted between devices or platforms.
             document.getElementById("tab-feed").style.display = tab === 'feed' ? 'block' : 'none';
             document.getElementById("tab-expenses").style.display = tab === 'expenses' ? 'block' : 'none';
             document.getElementById("tab-borrowings").style.display = tab === 'borrowings' ? 'block' : 'none';
             document.getElementById("tab-passbook").style.display = tab === 'passbook' ? 'block' : 'none';
             document.getElementById("tab-products").style.display = tab === 'products' ? 'block' : 'none';
             document.getElementById("tab-all").style.display = tab === 'all' ? 'block' : 'none';
+            document.getElementById("tab-npa").style.display = tab === 'npa' ? 'block' : 'none';
 
             document.getElementById("tab-btn-feed").classList.toggle("active", tab === 'feed');
             document.getElementById("tab-btn-expenses").classList.toggle("active", tab === 'expenses');
@@ -2386,11 +2390,13 @@
             document.getElementById("tab-btn-passbook").classList.toggle("active", tab === 'passbook');
             document.getElementById("tab-btn-products").classList.toggle("active", tab === 'products');
             document.getElementById("tab-btn-all").classList.toggle("active", tab === 'all');
+            document.getElementById("tab-btn-npa").classList.toggle("active", tab === 'npa');
 
             if (tab === 'expenses') renderExpensesAndStaff();
             if (tab === 'borrowings') renderBorrowingsList();
             if (tab === 'passbook') populatePassbookDropdown();
             if (tab === 'products') renderProductsList();
+            if (tab === 'npa' && typeof renderNpaRecovery === 'function') renderNpaRecovery();
         }
 
         // ================= DASHBOARD RENDER + KPI RESTORE FIX =================
@@ -5871,20 +5877,15 @@ window.addEventListener('load',()=>{ initializeSecureStorage(); });
     <div style="margin-top:16px;font-size:.72rem;color:#60a5fa;cursor:pointer;text-decoration:underline;" onclick="startForgotPinFlow()">Forgot PIN?</div>
 </div>
 
-
-<script>
-(function(){
-  const oldSetTab=window.setTab;
-  window.setTab=function(tab){
-    if(typeof oldSetTab==='function') oldSetTab(tab);
-    const n=document.getElementById('tab-npa'), nb=document.getElementById('tab-btn-npa');
-    if(n) n.style.display=tab==='npa'?'block':'none';
-    if(nb) nb.classList.toggle('active',tab==='npa');
-    if(tab==='npa' && typeof renderNpaRecovery==='function') renderNpaRecovery();
-  };
-  const oldRenderAll=window.renderAll;
-  window.renderAll=function(){ if(typeof oldRenderAll==='function') oldRenderAll(); if(typeof renderNpaRecovery==='function') renderNpaRecovery(); };
-})();
-</script>
+<!--
+    NPA tab wiring was previously patched in here as a separate end-of-file script that
+    wrapped window.setTab / window.renderAll. That patch has now been merged directly into
+    the main setTab() (around line ~2375) and renderAll() already called renderNpaRecovery()
+    on its own. This trailing block is intentionally removed: keeping critical tab logic only
+    at the very end of a ~6000-line file is what caused the NPA tab to silently stop working
+    whenever the file got copied/pasted somewhere and the tail end was cut off (this is almost
+    certainly why it worked on the device where the full file was intact, but not on the
+    system where only part of the file made it across).
+-->
 </body>
 </html>
