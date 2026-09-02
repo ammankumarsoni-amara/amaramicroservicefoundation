@@ -2941,11 +2941,9 @@
         function mfIsoToday(){ return new Date().toISOString().slice(0,10); }
         function mfIsoAddDays(iso, days){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+Number(days||0)); return d.toISOString().slice(0,10); }
         function mfDaysBetween(a,b){ const x=new Date(a+'T00:00:00'), y=new Date(b+'T00:00:00'); return Math.round((y-x)/86400000); }
-        /*
-         * EMI schedule/payment matching — a payment belongs to an installment by
-         * EMI number/due date, not by its position in loan.payments. This is what
-         * makes arbitrary "Collect EMI Range" selections safe.
-         */
+
+        // Range collection can pay any scheduled EMI first. Therefore payment records
+        // are matched to their installment number/due date, never by array position.
         function mfGetPaymentForInstallment(loan, installmentNo, dueDate){
             const payments=Array.isArray(loan?.payments)?loan.payments:[];
             const no=Number(installmentNo);
@@ -2953,9 +2951,7 @@
             if(index<0 && dueDate){
                 index=payments.findIndex(pay=>!pay?.emiNo && String(pay?.dueDate||'')===String(dueDate));
             }
-            // Only use the old array-position convention when the loan contains
-            // no EMI-numbered records at all. Once a range payment has emiNo=2,
-            // it must NEVER be mistaken for EMI #1 merely because it is array[0].
+            // Legacy fallback for old sequential data only.
             if(index<0 && !payments.some(pay=>Number(pay?.emiNo)>0)) index=no-1;
             const pay=payments[index];
             return pay ? {pay,index} : {pay:null,index:-1};
@@ -3182,8 +3178,7 @@
                 }
 
                 let penaltyInfo = penaltyPaid > 0 ? `<span style="color:#fbbf24; font-size:0.72rem; margin-left:5px;">Pen: ₹${penaltyPaid}</span>` : "";
-                const nextUnpaid = mfGetNextUnpaidScheduleRow(loan);
-                let partialInfo = (!loan.foreclosed && partialCollected > 0) ? `<div style="font-size:0.72rem; color:#93c5fd; margin-top:4px;"><i class="fa-solid fa-layer-group me-1"></i> Partial collected: <b>₹${partialCollected.toLocaleString('en-IN')}</b> towards EMI #${nextUnpaid ? nextUnpaid.no : paidCount + 1} (₹${Math.max(0, prod.emi - partialCollected).toLocaleString('en-IN')} more needed)</div>` : "";
+                let partialInfo = (!loan.foreclosed && partialCollected > 0) ? `<div style="font-size:0.72rem; color:#93c5fd; margin-top:4px;"><i class="fa-solid fa-layer-group me-1"></i> Partial collected: <b>₹${partialCollected.toLocaleString('en-IN')}</b> towards EMI #${paidCount + 1} (₹${Math.max(0, prod.emi - partialCollected).toLocaleString('en-IN')} more needed)</div>` : "";
                 const duePenalties = getDuePenalties(loan);
                 const duePenaltyTotal = duePenalties.reduce((s, x) => s + x.amount, 0);
                 let penaltyDueInfo = duePenalties.length ? `<div style="font-size:0.72rem; color:#fbbf24; margin-top:4px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;"><span><i class="fa-solid fa-triangle-exclamation me-1"></i> Total Penalty Due: <b>₹${duePenaltyTotal.toLocaleString('en-IN')}</b> (${duePenalties.length} EMI${duePenalties.length>1?'s':''} pending)</span><button type="button" class="no-print" onclick="openDuePenaltiesListModal('${loan.id}')" style="background:rgba(245,158,11,.15); border:1px solid rgba(245,158,11,.4); color:#fde68a; font-size:.65rem; font-weight:700; padding:2px 7px; border-radius:999px; cursor:pointer;">View / Receive</button></div>` : "";
@@ -4368,8 +4363,7 @@
             const mode = document.getElementById('rp-mode').value;
             // The installment this penalty belongs to is already paid — fold the amount into that
             // payment's penalty field now, exactly the moment it enters revenue/reports.
-            const payMatch = mfGetPaymentForInstallment(loan, due.installmentNum);
-            const pay = payMatch.pay;
+            const pay = mfGetPaymentForInstallment(loan, due.installmentNum, null).pay;
             if (pay) pay.penalty = (Number(pay.penalty) || 0) + due.amount;
             due.status = 'received';
             due.receivedDate = recDate;
@@ -4407,7 +4401,6 @@
                 const dueIso = nextRow.dueDate;
                 const lastPart = consumed[consumed.length - 1];
                 loan.payments.push({
-                    emiNo: instNum,
                     date: lastPart.date,
                     dueDate: dueIso,
                     amount: prod.emi,
@@ -4529,7 +4522,7 @@
             document.getElementById('bulk-emi-payment-mode').value='Cash';
             setBulkEmiMode(mode);
             const rows=mfLoanScheduleRows(loan);
-            const next=mfGetNextUnpaidScheduleRow(loan);
+            const next=rows.find(r=>!r.paid);
             const from=document.getElementById('bulk-from-date'), to=document.getElementById('bulk-to-date');
             if(next){ from.value=next.dueDate; to.value=rows[rows.length-1]?.dueDate||next.dueDate; }
             else { from.value=''; to.value=''; }
@@ -4623,6 +4616,7 @@
                 return;
             }
             const nextDueIso = nextRow.dueDate;
+
             document.getElementById("pay-scheduled-due-disp").innerText = formatToIndianDate(nextDueIso) + ` (EMI #${nextRow.no})`;
             setDmyValues("pay-due", nextDueIso);
             setDmyValues("pay-rec", new Date().toISOString().split('T')[0]);
@@ -4642,7 +4636,7 @@
 
             document.getElementById("pay-loan-id").value = loanId;
             document.getElementById("pay-edit-idx").value = idx;
-            document.getElementById("collect-modal-title").innerText = `Edit Installment #${idx + 1}`;
+            document.getElementById("collect-modal-title").innerText = `Edit Installment #${Number(pay.emiNo) || (idx + 1)}`;
             document.getElementById("collect-submit-btn").innerText = "✓ Save Changes";
             document.getElementById("collect-mode-toggle-row").style.display = "none";
             document.getElementById("pay-name-display").innerText = loan.name;
@@ -4656,7 +4650,7 @@
             document.getElementById("btn-suggest-pen").innerText = `Apply ₹${currentCollectSuggestedPenalty}`;
             setPenaltyTiming('NOW');
 
-            document.getElementById("pay-scheduled-due-disp").innerText = formatToIndianDate(pay.dueDate) + ` (EMI #${idx + 1})`;
+            document.getElementById("pay-scheduled-due-disp").innerText = formatToIndianDate(pay.dueDate) + ` (EMI #${Number(pay.emiNo) || (idx + 1)})`;
             setDmyValues("pay-due", pay.dueDate);
             setDmyValues("pay-rec", pay.date);
             document.getElementById("pay-mode").value = pay.mode && ['Cash','UPI','Bank','Cash + UPI (Both)'].includes(pay.mode) ? pay.mode : 'Cash';
@@ -4692,7 +4686,7 @@
                 if (loan && prod) {
                     const collected = getLoanPartialSum(loan);
                     const nextRow = mfGetNextUnpaidScheduleRow(loan);
-                    const nextNum = nextRow ? nextRow.no : (loan.payments.length + 1);
+                    const nextNum = nextRow ? nextRow.no : loan.payments.length + 1;
                     if (collected > 0) {
                         document.getElementById("collect-partial-status-text").innerHTML = `Towards EMI #${nextNum}: <b style="color:#34d399;">₹${collected.toLocaleString('en-IN')}</b> collected so far out of <b>₹${prod.emi}</b> (₹${Math.max(0, prod.emi - collected).toLocaleString('en-IN')} still due for this EMI).`;
                     } else {
@@ -4764,8 +4758,7 @@
                 const pay = loan.payments[idx];
                 if (!pay) { closeModal("modal-collect"); return; }
                 pay.amount = amt;
-                if(!pay.emiNo) pay.emiNo = idx + 1;
-                pay.dueDate = pay.dueDate || getDmyIsoString("pay-due");
+                pay.dueDate = getDmyIsoString("pay-due");
                 pay.date = recDate;
                 pay.mode = mode;
                 pay.penalty = penaltyVal;
@@ -4805,7 +4798,7 @@
             });
 
             if (!collectNow && penaltyVal > 0) {
-                addDuePenalty(loan, loan.payments.length, penaltyVal, recDate);
+                addDuePenalty(loan, nextRow.no, penaltyVal, recDate);
             }
 
             closeModal("modal-collect");
@@ -4909,7 +4902,8 @@
                 const pay = payMatch.pay;
                 const payIndex = payMatch.index;
                 let badge = `<span class="badge-pending">Pending</span>`;
-                let dueStr = formatToIndianDate(pay && pay.dueDate ? pay.dueDate : defaultDueIso);
+                // Due Date is the scheduled date; Actual Paid Date remains pay.date.
+                let dueStr = formatToIndianDate(defaultDueIso);
                 let paidStr = "-";
                 let dpd = "-";
                 let actionBtn = "";
@@ -4925,7 +4919,7 @@
                         paidStr += `<div style="font-size:.66rem; color:#94a3b8; margin-top:3px; font-weight:400;">(${partsList})</div>`;
                     }
                     const pDt = new Date(pay.date);
-                    const dDt = new Date(pay.dueDate || defaultDueIso);
+                    const dDt = new Date(defaultDueIso);
                     const diff = Math.max(0, Math.ceil((pDt - dDt) / (1000 * 60 * 60 * 24)));
                     dpd = diff > 0 ? `<b style="color:#f87171;">${diff} Days Late</b>` : "On Time";
                     actionBtn = `<button class="no-print" onclick="openEditEmiModal('${l.id}', ${payIndex})" style="background:none; border:none; color:#fbbf24; cursor:pointer; margin-right:8px;" title="Edit this Installment"><i class="fa-solid fa-pen"></i></button><button class="no-print" onclick="deleteSinglePayment('${l.id}', ${payIndex})" style="background:none; border:none; color:#f87171; cursor:pointer;" title="Delete"><i class="fa-solid fa-trash"></i></button>`;
@@ -4940,7 +4934,7 @@
                         const overdueDays = Math.ceil((today - defaultDueDt) / (1000 * 60 * 60 * 24));
                         dpd = `<b style="color:#f87171;">${overdueDays} Days Overdue</b>`;
                     }
-                    if (i === l.payments.length + 1 && partialCollected > 0) {
+                    if (i === (mfGetNextUnpaidScheduleRow(l)?.no || (l.payments.length + 1)) && partialCollected > 0) {
                         dpd = `<span style="color:#93c5fd; font-weight:700;">₹${partialCollected.toLocaleString('en-IN')} collected</span>`;
                     }
                 }
@@ -5052,8 +5046,8 @@
                     </div>
                     <div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:0.78rem; color:#cbd5e1;">
                         <span>Total EMIs: <b style="color:#fff;">${p.tenure}</b></span>
-                        <span>Paid: <b style="color:#34d399;">${l.payments.length}</b></span>
-                        <span>Remaining: <b style="color:#f87171;">${Math.max(0, p.tenure - l.payments.length)}</b></span>
+                        <span>Paid: <b style="color:#34d399;">${mfLoanScheduleRows(l).filter(r=>r.paid).length}</b></span>
+                        <span>Remaining: <b style="color:#f87171;">${Math.max(0, p.tenure - mfLoanScheduleRows(l).filter(r=>r.paid).length)}</b></span>
                     </div>
                 </div>
 
@@ -5154,7 +5148,7 @@
             if (!pay) return;
             document.getElementById('ep-loan-id').value = loanId;
             document.getElementById('ep-idx').value = idx;
-            document.getElementById('ep-info').innerHTML = `EMI <b style="color:#fff;">#${idx + 1}</b> for <b style="color:#fff;">${loan.name}</b>, paid on ${formatToIndianDate(pay.date)}`;
+            document.getElementById('ep-info').innerHTML = `EMI <b style="color:#fff;">#${Number(pay.emiNo) || (idx + 1)}</b> for <b style="color:#fff;">${loan.name}</b>, paid on ${formatToIndianDate(pay.date)}`;
             document.getElementById('ep-amount').value = pay.penalty || 0;
             document.getElementById('modal-edit-penalty').classList.add('active');
         }
