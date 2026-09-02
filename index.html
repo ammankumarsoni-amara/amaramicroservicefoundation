@@ -116,21 +116,23 @@
 
         /* Tab Navigation */
         .tab-scroll-wrapper {
-            overflow-x: auto;
-            scrollbar-width: none;
+            overflow-x: visible;
             margin-bottom: 14px;
-            -webkit-overflow-scrolling: touch;
         }
-        .tab-scroll-wrapper::-webkit-scrollbar { display: none; }
         
         .tab-bar {
-            display: inline-flex;
+            display: flex;
+            flex-wrap: wrap;
             background: rgba(19, 27, 46, 0.95);
             border: 1px solid var(--border-subtle);
             border-radius: 12px;
             padding: 4px;
             gap: 4px;
-            min-width: 100%;
+            width: 100%;
+        }
+        .tab-bar .tab-btn {
+            flex: 1 1 auto;
+            white-space: nowrap;
         }
         .tab-btn {
             border: none;
