@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MicroFinance Pro - Enterprise Suite v29</title>
+    <title>MicroFinance Pro - Enterprise Suite v30</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -5515,6 +5515,19 @@
             const waived=settled.reduce((a,x)=>a+Number(x.l.recoveryData?.waiver||0),0);
             const npa=list.filter(x=>x.st==='NPA').length;
             if(k)k.innerHTML=`<div class="npa-card-mini"><small>Recovery Accounts</small><b>${list.length}</b></div><div class="npa-card-mini"><small>NPA 90+ Accounts</small><b style="color:#f87171;">${npa}</b></div><div class="npa-card-mini"><small>Gross Recoverable</small><b>₹${gross.toLocaleString('en-IN')}</b></div><div class="npa-card-mini"><small>Settlement Received</small><b style="color:#34d399;">₹${received.toLocaleString('en-IN')}</b></div><div class="npa-card-mini"><small>Approved Waiver</small><b style="color:#fbbf24;">₹${waived.toLocaleString('en-IN')}</b></div>`;
+            // Only render the (potentially long) row list once the user has actually
+            // narrowed it down — by typing a search term or picking a Status/Year filter.
+            // With no active filter we show a short prompt + the total count instead of
+            // dumping every matured/NPA/recovery/settled account at once.
+            const hasActiveFilter = q!=='' || sf!=='ALL' || yf!=='ALL';
+            if(!hasActiveFilter){
+                table.innerHTML=`<div class="npa-table-wrap" style="border:1px dashed var(--border-subtle);border-radius:10px;padding:26px 16px;text-align:center;color:#94a3b8;font-size:.78rem;">
+                    <i class="fa-solid fa-magnifying-glass" style="font-size:1.3rem;color:#60a5fa;margin-bottom:8px;display:block;"></i>
+                    ${list.length} account${list.length===1?'':'s'} in Matured / NPA / Recovery / Settled right now.<br>
+                    Search a customer name, Loan ID or phone above — or pick a Status / Year filter — to view them.
+                </div>`;
+                return;
+            }
             const rows=list.map(x=>{
                 const rd=x.l.recoveryData, settled=rd?.status==='SETTLED';
                 const split=settled?mfRecoveryRevenueSplit(rd):{scheduledInterest:0,postMaturityInterest:0,penalty:0,total:0};
