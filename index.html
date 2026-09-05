@@ -2295,6 +2295,7 @@
         let cloudSyncBusy = false;
         let googleAccessToken = null;
         let googleTokenClient = null;
+        let googleTokenClientId = '';
         let googleDriveFileId = null;
         let googleDriveFolderId = null;
 
@@ -6730,17 +6731,33 @@
         async function getGoogleToken(interactive=true){
             const clientId=(document.getElementById("google-client-id")?.value||localStorage.getItem("MF_GOOGLE_CLIENT_ID")||"").trim();
             if(!clientId) throw new Error("Enter your Google OAuth Web Client ID first.");
+            if(!/^[0-9A-Za-z_-]+\.apps\.googleusercontent\.com$/.test(clientId)) throw new Error("Invalid Google OAuth Client ID. Use the Web application Client ID ending with .apps.googleusercontent.com.");
             if(location.protocol==='file:') throw new Error("Direct Google OAuth needs an HTTPS web origin. Host this HTML as a secure web app first.");
             if(!window.google || !google.accounts || !google.accounts.oauth2) throw new Error("Google Identity Services has not loaded yet. Check your internet connection and try again.");
-            if(!googleTokenClient){
+            // Re-create the GIS token client when the operator changes the Client ID.
+            // This prevents a failed/old Client ID from being reused on the same page.
+            if(!googleTokenClient || googleTokenClientId!==clientId){
+                googleAccessToken=null;
                 googleTokenClient=google.accounts.oauth2.initTokenClient({
                     client_id:clientId,
                     scope:'https://www.googleapis.com/auth/drive.file',
                     callback:(resp)=>{}
                 });
+                googleTokenClientId=clientId;
             }
             return await new Promise((resolve,reject)=>{
-                googleTokenClient.callback=(resp)=>{ if(resp.error) reject(new Error(resp.error)); else {googleAccessToken=resp.access_token;localStorage.setItem("MF_GOOGLE_CLIENT_ID",clientId);resolve(googleAccessToken);} };
+                googleTokenClient.callback=(resp)=>{
+                    if(resp.error){
+                        const code=resp.error;
+                        if(code==='invalid_client'||code==='deleted_client'||code==='disabled_client') reject(new Error("Google rejected this OAuth Client ID ("+code+"). In Google Cloud, make sure this is a Web application client and add your exact HTTPS GitHub Pages origin under Authorized JavaScript origins."));
+                        else if(code==='origin_mismatch'||code==='redirect_uri_mismatch') reject(new Error("Google rejected the website origin. In Google Cloud, add this exact HTTPS origin under Authorized JavaScript origins: "+location.origin));
+                        else reject(new Error(code));
+                    } else {
+                        googleAccessToken=resp.access_token;
+                        localStorage.setItem("MF_GOOGLE_CLIENT_ID",clientId);
+                        resolve(googleAccessToken);
+                    }
+                };
                 googleTokenClient.requestAccessToken({prompt:interactive?'consent':''});
             });
         }
