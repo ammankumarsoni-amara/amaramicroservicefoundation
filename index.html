@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script>document.documentElement.classList.add('mf-storage-loading');</script>
+    <script>document.documentElement.classList.add('mf-storage-loading');if(new URLSearchParams(location.search).get('mfqa')==='1')document.documentElement.classList.add('mf-qa-preview');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Loan Management</title>
@@ -49,7 +49,6 @@
         .biz-input {
             flex:1;
             min-width:0;
-            max-width:none;
             box-sizing:border-box;
             background: rgba(255, 255, 255, 0.06);
             border: 1px solid rgba(255, 255, 255, 0.12);
@@ -58,8 +57,8 @@
             font-weight: 800;
             padding: 6px 12px;
             border-radius: 10px;
-            width: 100%;
-            max-width: 260px;
+            width: min(520px,100%);
+            max-width: 520px;
         }
         .biz-input:focus { background: rgba(255, 255, 255, 0.12); outline: none; border-color: var(--primary); }
 
@@ -305,7 +304,13 @@
             overflow-y: auto;
         }
         .modal-title { font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
-        .bulk-emi-checklist{display:grid;gap:8px;max-height:48vh;overflow:auto;padding-right:2px;}
+        #modal-bulk-emi .modal-card{width:min(1100px,96vw);max-width:1100px;}
+#modal-bulk-emi .modal-card .modal-title{min-width:0;}
+#modal-bulk-emi .bulk-emi-check-row{grid-template-columns:minmax(250px,1.25fr) minmax(145px,.75fr) minmax(220px,1.05fr) minmax(165px,.85fr);}
+#modal-bulk-emi .bulk-emi-check-main{min-width:0;}
+#modal-bulk-emi .bulk-emi-check-main label{overflow-wrap:anywhere;line-height:1.25;}
+#modal-bulk-emi .bulk-emi-check-amount{white-space:normal;text-align:right;}
+.bulk-emi-checklist{display:grid;gap:8px;max-height:48vh;overflow:auto;padding-right:2px;}
         .bulk-emi-check-row{display:grid;grid-template-columns:minmax(0,1fr) 150px 210px 220px;gap:8px;align-items:end;padding:10px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.035);border-radius:10px;}
         .bulk-emi-cell{min-width:0;}
         .bulk-emi-cell-label{display:block;font-size:.62rem;color:#64748b;font-weight:800;text-transform:uppercase;margin-bottom:4px;}
@@ -321,7 +326,7 @@
         .bulk-emi-dmy-grid select option{background:#111827;color:#fff;}
         .bulk-emi-row-mode{padding:8px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.72rem;font-weight:700;min-height:38px;}
         .bulk-emi-row-mode:disabled,.bulk-emi-dmy-grid select:disabled{opacity:.55;cursor:not-allowed;}
-        @media(max-width:900px){.bulk-emi-check-row{grid-template-columns:1fr 1fr;}.bulk-emi-check-row .bulk-emi-check-main{grid-column:1/-1;}.bulk-emi-row-mode{min-height:38px;}.bulk-emi-checklist{max-height:42vh;}}
+        @media(max-width:900px){#modal-bulk-emi .modal-card{width:100%;max-width:520px;}#modal-bulk-emi .bulk-emi-check-row{grid-template-columns:1fr 1fr;}.bulk-emi-check-row .bulk-emi-check-main{grid-column:1/-1;}.bulk-emi-row-mode{min-height:38px;}.bulk-emi-checklist{max-height:42vh;}}
         @media(max-width:560px){.bulk-emi-check-row{grid-template-columns:1fr;}.bulk-emi-check-row .bulk-emi-check-main{grid-column:auto;}.bulk-emi-checklist{max-height:45vh;}.bulk-emi-dmy-grid{grid-template-columns:.8fr 1.35fr 1fr;}}
 
         .lender-repay-actions{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
@@ -347,10 +352,14 @@
         /* Passbook controls: keep the search, document selector and action buttons aligned on both mobile and desktop. */
         .passbook-toolbar{background:var(--bg-card);padding:12px;border-radius:12px;border:1px solid var(--border-subtle);margin-bottom:12px;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,.9fr) minmax(0,1.2fr);gap:8px;align-items:end;}
         .passbook-toolbar>div{min-width:0;}
-        .passbook-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%;}
-        .passbook-actions .btn-header{width:100%;justify-content:center;min-width:0;overflow:hidden;text-overflow:ellipsis;}
-        @media(max-width:900px){.passbook-toolbar{grid-template-columns:1fr 1fr;}.passbook-actions{grid-column:1/-1;grid-template-columns:repeat(3,minmax(0,1fr));}.passbook-actions .btn-header{padding-left:9px;padding-right:9px;font-size:.72rem;}}
-        @media(max-width:640px){.passbook-toolbar{grid-template-columns:1fr;gap:9px;}.passbook-actions{grid-column:auto;grid-template-columns:1fr;}.passbook-actions .btn-header{justify-content:flex-start;min-height:42px;}.passbook-toolbar>div{width:100%;}}
+        .statement-internal-company-header,.loan-card-internal-company-header{min-width:0;gap:10px;}
+        .statement-internal-company-header>div:first-child,.loan-card-internal-company-header>div:first-child{min-width:0;max-width:100%;overflow-wrap:anywhere;}
+        .statement-internal-company-header h5,.loan-card-internal-company-header h5{overflow-wrap:anywhere;word-break:break-word;line-height:1.2;}
+         .passbook-actions{display:flex;flex-wrap:wrap;gap:6px;width:100%;align-items:stretch;}
+        .passbook-actions .btn-header{flex:1 1 150px;white-space:nowrap;overflow:visible;text-overflow:clip;}
+        .passbook-actions .btn-header{width:auto;min-width:0;justify-content:center;}
+        @media(max-width:900px){.passbook-toolbar{grid-template-columns:1fr 1fr;}.passbook-actions{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));}.passbook-actions .btn-header{padding-left:9px;padding-right:9px;font-size:.72rem;}}
+        @media(max-width:640px){.passbook-toolbar{grid-template-columns:1fr;gap:9px;}.passbook-actions{grid-column:auto;display:grid;grid-template-columns:1fr;}.passbook-actions .btn-header{justify-content:flex-start;min-height:42px;}.passbook-toolbar>div{width:100%;}}
 
         .btn-submit { width: 100%; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; padding: 11px; border-radius: 9px; font-weight: 800; font-size: 0.92rem; cursor: pointer; }
         .btn-delete { width: 100%; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 9px; border-radius: 9px; font-weight: 700; margin-top: 8px; cursor: pointer; }
@@ -592,6 +601,34 @@
 .compact-recovery-row .collection-client-actions{display:flex;gap:5px;justify-content:flex-end;margin-top:6px;}
 .compact-recovery-row .collection-client-actions button{font-size:.62rem;padding:5px 8px;}
 @media(max-width:520px){.collection-recovery-line{grid-template-columns:1fr 1fr;}.collection-recovery-total{text-align:left;}}
+
+<style id="mf-advanced-maintenance-css">
+.mf-advanced-tool-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px;}
+.mf-advanced-tool{padding:10px;border:1px solid rgba(148,163,184,.16);border-radius:10px;background:rgba(255,255,255,.025);min-width:0;}
+.mf-advanced-tool b{display:block;color:#fff;font-size:.76rem;margin-bottom:3px;}
+.mf-advanced-tool span{display:block;color:#94a3b8;font-size:.62rem;line-height:1.4;min-height:34px;}
+.mf-advanced-tool button{width:100%;margin-top:7px;justify-content:center;}
+.mf-audit-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-bottom:10px;}
+.mf-audit-stat{padding:9px;border-radius:9px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);text-align:center;}
+.mf-audit-stat small{display:block;color:#94a3b8;font-size:.58rem;}
+.mf-audit-stat b{display:block;font-size:1.05rem;margin-top:2px;color:#fff;}
+.mf-audit-row{display:grid;grid-template-columns:76px 90px 1fr auto;gap:7px;align-items:start;padding:8px 9px;border:1px solid rgba(255,255,255,.07);border-radius:8px;margin-bottom:5px;background:rgba(255,255,255,.02);font-size:.68rem;}
+.mf-audit-row.critical{border-color:rgba(248,113,113,.25);background:rgba(248,113,113,.05);}.mf-audit-row.warning{border-color:rgba(251,191,36,.22);background:rgba(251,191,36,.045);}.mf-audit-row.info{border-color:rgba(96,165,250,.20);background:rgba(96,165,250,.04);}
+.mf-audit-pill{font-size:.55rem;font-weight:900;padding:3px 6px;border-radius:999px;text-align:center;white-space:nowrap;}
+.mf-audit-pill.critical{color:#fecaca;background:rgba(248,113,113,.12);}.mf-audit-pill.warning{color:#fde68a;background:rgba(251,191,36,.12);}.mf-audit-pill.info{color:#bfdbfe;background:rgba(96,165,250,.12);}
+.mf-version-list{display:grid;gap:6px;max-height:390px;overflow:auto;}
+.mf-version-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 9px;border:1px solid rgba(255,255,255,.07);border-radius:9px;background:rgba(255,255,255,.025);}
+.mf-version-meta{min-width:0;font-size:.68rem;color:#cbd5e1;}.mf-version-meta small{display:block;color:#64748b;font-size:.58rem;margin-top:2px;}
+.mf-version-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;}.mf-version-actions button{font-size:.62rem;padding:5px 7px;}
+.mf-qa-shell{background:#070b13;border:1px solid rgba(96,165,250,.25);border-radius:12px;padding:10px;}
+.mf-qa-controls{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:9px;}.mf-qa-controls button{font-size:.68rem;padding:6px 9px;}
+.mf-qa-preview-wrap{overflow:auto;border:1px solid rgba(148,163,184,.18);border-radius:10px;background:#111827;padding:8px;min-height:180px;}
+#mf-qa-preview-frame{display:block;width:100%;height:680px;border:1px solid rgba(255,255,255,.12);border-radius:7px;background:#fff;transform-origin:top left;}
+.mf-qa-result{margin-top:8px;font-size:.68rem;line-height:1.45;color:#cbd5e1;}
+.mf-qa-result .ok{color:#34d399;font-weight:800;}.mf-qa-result .bad{color:#f87171;font-weight:800;}.mf-qa-result .warn{color:#fbbf24;font-weight:800;}
+html.mf-qa-preview .top-header,html.mf-qa-preview .main-wrap{pointer-events:none;}
+html.mf-qa-preview #app-lock-overlay{display:none!important;}
+@media(max-width:760px){.mf-advanced-tool-grid{grid-template-columns:1fr;}.mf-audit-summary{grid-template-columns:1fr 1fr;}.mf-audit-row{grid-template-columns:68px 76px 1fr;}.mf-audit-row>div:last-child{grid-column:1/-1;text-align:right;}.mf-version-row{grid-template-columns:1fr;}.mf-version-actions{justify-content:flex-start;}.mf-qa-preview-wrap{padding:5px;}}
 </style>
 </head>
 <body>
@@ -2008,12 +2045,60 @@
             </div>
 
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
+                <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:4px;"><i class="fa-solid fa-screwdriver-wrench" style="color:#60a5fa;"></i> Advanced Maintenance & QA</div>
+                <div style="font-size:.64rem;color:#94a3b8;line-height:1.4;">Read-only integrity checks, automatic local version history, and a real responsive preview. These tools do not change loan math or existing records unless you explicitly restore a backup.</div>
+                <div class="mf-advanced-tool-grid">
+                    <div class="mf-advanced-tool"><b><i class="fa-solid fa-shield-check" style="color:#34d399;"></i> Loan Audit</b><span>Check schedules, payments, partials, penalties and settlement/foreclosure totals for internal inconsistencies.</span><button class="btn-header btn-blue" type="button" onclick="openLoanAuditModal()">Run Integrity Check</button></div>
+                    <div class="mf-advanced-tool"><b><i class="fa-solid fa-clock-rotate-left" style="color:#fbbf24;"></i> Backup Versions</b><span>Automatic local snapshots are kept in IndexedDB so you can safely review or restore an earlier version.</span><button class="btn-header btn-blue" type="button" onclick="openBackupVersionsModal()">Version History</button></div>
+                    <div class="mf-advanced-tool"><b><i class="fa-solid fa-mobile-screen-button" style="color:#93c5fd;"></i> Responsive QA</b><span>Preview this exact app at mobile, tablet and laptop widths and run overflow/clipping diagnostics.</span><button class="btn-header btn-blue" type="button" onclick="openResponsiveQAModal()">Open QA Mode</button></div>
+                </div>
+            </div>
+
+            <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
                 <div style="font-size:.82rem;font-weight:700;color:#fff;margin-bottom:6px;">1-Click Manual Backup & Restore</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
                     <button class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="downloadJsonBackup()"><i class="fa-solid fa-download"></i> Save Backup</button>
                     <button class="btn-header btn-blue" style="background:#1e293b;color:#34d399;border:1px solid var(--border-subtle);justify-content:center;" onclick="document.getElementById('restore-file-input').click()"><i class="fa-solid fa-upload"></i> Restore</button>
                 </div>
                 <input type="file" id="restore-file-input" accept=".json" style="display:none" onchange="handleRestoreFile(event)">
+            </div>
+        </div>
+    </div>
+
+    <!-- ADVANCED MAINTENANCE: LOAN AUDIT -->
+    <div class="modal-overlay" id="modal-loan-audit">
+        <div class="modal-card" style="max-width:1080px;width:96%;">
+            <div class="modal-title"><span><i class="fa-solid fa-shield-check" style="color:#34d399;"></i> Loan Audit & Integrity Checker</span><i class="fa-solid fa-xmark" onclick="closeModal('modal-loan-audit')" style="cursor:pointer;color:#94a3b8;"></i></div>
+            <div style="padding:9px 10px;border-radius:9px;background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.16);font-size:.66rem;color:#cbd5e1;line-height:1.45;margin-bottom:10px;">Read-only diagnostic. It does not rewrite accounts, payments, settlement figures, penalties or product settings. A clean audit means no internal inconsistency was detected by the checks below.</div>
+            <div id="mf-loan-audit-summary"></div>
+            <div id="mf-loan-audit-results" style="max-height:54vh;overflow:auto;"></div>
+            <div style="display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px;"><button class="btn-header btn-blue" onclick="runLoanIntegrityAudit(true)"><i class="fa-solid fa-rotate"></i> Re-run Audit</button><button class="btn-header btn-purple" onclick="exportLoanAuditReport()"><i class="fa-solid fa-download"></i> Export Audit</button></div>
+        </div>
+    </div>
+
+    <!-- ADVANCED MAINTENANCE: VERSION HISTORY -->
+    <div class="modal-overlay" id="modal-backup-versions">
+        <div class="modal-card" style="max-width:900px;width:96%;">
+            <div class="modal-title"><span><i class="fa-solid fa-clock-rotate-left" style="color:#fbbf24;"></i> Automatic Backup Versioning</span><i class="fa-solid fa-xmark" onclick="closeModal('modal-backup-versions')" style="cursor:pointer;color:#94a3b8;"></i></div>
+            <div style="padding:9px 10px;border-radius:9px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.16);font-size:.66rem;color:#cbd5e1;line-height:1.45;margin-bottom:10px;">The app automatically keeps recent local versions in IndexedDB. Restoring a version first creates a safety snapshot of your current data. Google Drive versioned snapshots remain separate and are not deleted by this local history.</div>
+            <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px;"><button class="btn-header btn-green" onclick="createManualVersionedBackup()"><i class="fa-solid fa-camera"></i> Create Snapshot Now</button><button class="btn-header btn-blue" onclick="renderBackupVersionList()"><i class="fa-solid fa-rotate"></i> Refresh</button></div>
+            <div id="mf-backup-version-status" style="font-size:.66rem;color:#94a3b8;margin-bottom:8px;"></div>
+            <div id="mf-backup-version-list" class="mf-version-list"></div>
+        </div>
+    </div>
+
+    <!-- ADVANCED MAINTENANCE: RESPONSIVE QA -->
+    <div class="modal-overlay" id="modal-responsive-qa">
+        <div class="modal-card" style="max-width:1100px;width:96%;">
+            <div class="modal-title"><span><i class="fa-solid fa-mobile-screen-button" style="color:#93c5fd;"></i> Responsive QA Mode</span><i class="fa-solid fa-xmark" onclick="closeResponsiveQAModal()" style="cursor:pointer;color:#94a3b8;"></i></div>
+            <div class="mf-qa-shell">
+                <div style="font-size:.67rem;color:#cbd5e1;line-height:1.45;margin-bottom:8px;">This is a read-only preview of the same HTML file at controlled viewport widths. Use it to inspect the actual responsive breakpoints without changing your live app data.</div>
+                <div class="mf-qa-controls">
+                    <button class="btn-header btn-blue" onclick="setQaPreviewWidth(360)">Mobile 360</button><button class="btn-header btn-blue" onclick="setQaPreviewWidth(412)">Mobile 412</button><button class="btn-header btn-blue" onclick="setQaPreviewWidth(768)">Tablet 768</button><button class="btn-header btn-blue" onclick="setQaPreviewWidth(1024)">Laptop 1024</button><button class="btn-header btn-blue" onclick="setQaPreviewWidth(1366)">Desktop 1366</button><button class="btn-header btn-green" onclick="runResponsiveQA()"><i class="fa-solid fa-stethoscope"></i> Run QA</button>
+                </div>
+                <div style="font-size:.64rem;color:#94a3b8;margin-bottom:7px;">Preview width: <b id="mf-qa-width-label" style="color:#fff;">360px</b></div>
+                <div class="mf-qa-preview-wrap"><iframe id="mf-qa-preview-frame" title="Responsive QA Preview" loading="eager"></iframe></div>
+                <div id="mf-qa-result" class="mf-qa-result">Loading responsive preview…</div>
             </div>
         </div>
     </div>
@@ -2287,8 +2372,9 @@
 
         // ================= SECURE STORAGE FOUNDATION =================
         const MF_IDB_NAME = "MF_ENTERPRISE_SECURE_DB";
-        const MF_IDB_VERSION = 1;
+        const MF_IDB_VERSION = 2;
         const MF_IDB_STORE = "snapshots";
+        const MF_IDB_HISTORY_STORE = "history";
         let mfDb = null;
         let mfDbReady = false;
         let cloudSyncTimer = null;
@@ -2297,12 +2383,15 @@
         let googleTokenClient = null;
         let googleDriveFileId = null;
         let googleDriveFolderId = null;
+        let mfVersionBackupTimer = null;
+        let mfLastVersionFingerprint = "";
+        const MF_VERSION_BACKUP_LIMIT = 30;
 
         function openMfDb(){
             return new Promise((resolve,reject)=>{
                 if(mfDb) return resolve(mfDb);
                 const req=indexedDB.open(MF_IDB_NAME, MF_IDB_VERSION);
-                req.onupgradeneeded=()=>{ const db=req.result; if(!db.objectStoreNames.contains(MF_IDB_STORE)) db.createObjectStore(MF_IDB_STORE,{keyPath:"id"}); };
+                req.onupgradeneeded=()=>{ const db=req.result; if(!db.objectStoreNames.contains(MF_IDB_STORE)) db.createObjectStore(MF_IDB_STORE,{keyPath:"id"}); if(!db.objectStoreNames.contains(MF_IDB_HISTORY_STORE)){ const hs=db.createObjectStore(MF_IDB_HISTORY_STORE,{keyPath:"id"}); hs.createIndex("createdAt","createdAt",{unique:false}); } };
                 req.onsuccess=()=>{ mfDb=req.result; resolve(mfDb); };
                 req.onerror=()=>reject(req.error||new Error("IndexedDB unavailable"));
             });
@@ -2318,6 +2407,43 @@
         async function idbGetSnapshot(){
             const db=await openMfDb();
             return await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,"readonly");const r=tx.objectStore(MF_IDB_STORE).get("current");r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);});
+        }
+
+        function mfCloneStateForBackup(){
+            return (typeof structuredClone==='function') ? structuredClone(state) : JSON.parse(JSON.stringify(state));
+        }
+        function mfStateFingerprint(obj){
+            try{return JSON.stringify(obj);}catch(e){return String(Date.now());}
+        }
+        async function idbPutVersionedBackup(reason='AUTO',force=false){
+            const db=await openMfDb();
+            const fingerprint=mfStateFingerprint(state);
+            if(!force && fingerprint===mfLastVersionFingerprint) return null;
+            const now=new Date();
+            const rec={id:'v-'+now.getTime()+'-'+Math.random().toString(36).slice(2,8),version:1,createdAt:now.toISOString(),reason:String(reason||'AUTO'),state:mfCloneStateForBackup()};
+            await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_HISTORY_STORE,'readwrite');tx.objectStore(MF_IDB_HISTORY_STORE).put(rec);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Backup version save failed'));});
+            mfLastVersionFingerprint=fingerprint;
+            const all=await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_HISTORY_STORE,'readonly');const r=tx.objectStore(MF_IDB_HISTORY_STORE).getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error||new Error('Backup history read failed'));});
+            all.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+            const remove=all.slice(MF_VERSION_BACKUP_LIMIT);
+            if(remove.length){ await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_HISTORY_STORE,'readwrite');remove.forEach(x=>tx.objectStore(MF_IDB_HISTORY_STORE).delete(x.id));tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Backup cleanup failed'));}); }
+            return rec;
+        }
+        async function idbListVersionedBackups(){
+            const db=await openMfDb();
+            const all=await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_HISTORY_STORE,'readonly');const r=tx.objectStore(MF_IDB_HISTORY_STORE).getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error||new Error('Backup history unavailable'));});
+            return all.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+        }
+        async function ensureInitialVersionedBackup(){
+            try{
+                const all=await idbListVersionedBackups();
+                if(!all.length){ const rec=await idbPutVersionedBackup('BASELINE',true); mfLastVersionFingerprint=mfStateFingerprint(rec?.state||state); }
+                else mfLastVersionFingerprint=mfStateFingerprint(all[0].state||state);
+            }catch(e){ console.warn('Version history initialization skipped',e); }
+        }
+        function queueAutomaticVersionedBackup(){
+            clearTimeout(mfVersionBackupTimer);
+            mfVersionBackupTimer=setTimeout(()=>{ idbPutVersionedBackup('AUTO').then(()=>{ if(document.getElementById('modal-backup-versions')?.classList.contains('active')) renderBackupVersionList(); }).catch(e=>console.warn('Automatic backup version failed',e)); },900);
         }
 
         async function initializeSecureStorage(){
@@ -2346,6 +2472,7 @@
                 if(el) el.innerHTML=`<i class="fa-solid fa-database text-success me-1"></i> Local Saved: ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
                 renderAll();
                 updateSecureCloudStatus();
+                ensureInitialVersionedBackup();
             }catch(err){
                 console.error("IndexedDB initialization failed",err);
                 mfDbReady=false;
@@ -2620,7 +2747,7 @@
 
         // Show the PIN screen immediately if a lock is set for this device, before anything else is usable.
         document.addEventListener('DOMContentLoaded', () => {
-            maybeShowAppLockScreen();
+            if(document.documentElement.classList.contains('mf-qa-preview')){ const ov=document.getElementById('app-lock-overlay'); if(ov)ov.style.display='none'; } else maybeShowAppLockScreen();
             restoreSavedCloudPin();
             const inp = document.getElementById('app-lock-input');
             if (inp) inp.addEventListener('keyup', e => { if (e.key === 'Enter') attemptAppUnlock(); });
@@ -2635,6 +2762,7 @@
                 const el=document.getElementById("last-sync-time");
                 if(el) el.innerHTML=`<i class="fa-solid fa-check text-success me-1"></i> Saved: ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
                 renderAll();
+                queueAutomaticVersionedBackup();
                 scheduleAutomaticCloudSync();
             }).catch(err=>{
                 console.error("IndexedDB save failed",err);
@@ -2728,7 +2856,7 @@
                 .mf-print-company-header{text-align:center;border-bottom:1.4px solid #111;padding:0 0 8px;margin:0 0 12px;}
                 .mf-print-company-name{font-size:18pt;font-weight:800;letter-spacing:.2px;}
                 .mf-print-company-tagline{font-size:9pt;color:#444;margin-top:1px;}
-                .mf-print-company-line{font-size:8.3pt;color:#333;white-space:nowrap;overflow:hidden;text-overflow:clip;}.mf-print-company-line.address-line{font-size:8.2pt;}.mf-print-company-line.reg-line{font-size:7.8pt;}
+                .mf-print-company-line{font-size:8.3pt;color:#333;white-space:normal;overflow-wrap:anywhere;word-break:break-word;}.mf-print-company-line.address-line{font-size:8.2pt;}.mf-print-company-line.reg-line{font-size:7.8pt;}
                 .mf-print-doc-title{font-size:12pt;font-weight:800;text-transform:uppercase;margin-top:7px;letter-spacing:.3px;}
                 table{width:100%;border-collapse:collapse;table-layout:fixed;}
                 th,td{border:1px solid #aaa;padding:5px 6px;vertical-align:top;word-break:normal;overflow-wrap:anywhere;}
@@ -3696,7 +3824,7 @@
                 rangeTotal+=snap.selectedRangeEmiTotal; unpaidRangeCount+=current.length; previousTotal+=snap.earlierBalance; penaltyTotal+=snap.earlierPenalty;
                 const currentText=current.length===1?`#${current[0].no} · ${formatToIndianDate(current[0].dueDate)} · ₹${Number(current[0].totalDue??current[0].emi).toLocaleString('en-IN')}`:current.length?`${current.length} EMIs (#${current[0].no}–#${current[current.length-1].no}) · ₹${snap.selectedRangeEmiTotal.toLocaleString('en-IN')}`:'No unpaid EMI';
                 const prevText=a?`${snap.earlierItems.length} EMI${snap.earlierItems.length>1?'s':''} · ₹${snap.earlierBalance.toLocaleString('en-IN')} · ${formatToIndianDate(snap.earlierItems[0].dueDate)} → ${formatToIndianDate(snap.earlierItems[snap.earlierItems.length-1].dueDate)}`:'None';
-                return `<tr class="${a?'attention-row':''}"><td><b>${financeEsc(l.name)}</b><br><span class="muted">${financeEsc(l.id)} · ${financeEsc(loanCollectorName(l))}</span><br><span class="muted">${financeEsc(l.phone||'-')}${l.phone2?' / '+financeEsc(l.phone2):''}</span></td><td>${currentText}<br><span class="muted">Disbursed ${formatToIndianDate(l.disbursalDate)} · Maturity ${formatToIndianDate(mfLoanScheduleDueIso(l,Number(p.tenure)||0))}</span></td><td>${prevText}</td><td>${snap.earlierPenalty?'₹'+snap.earlierPenalty.toLocaleString('en-IN'):'₹0'}</td><td class="money">₹${snap.combinedTotal.toLocaleString('en-IN')}</td></tr>`;
+                return `<tr class="${a?'attention-row':''}"><td><b>${financeEsc(l.name)}</b><br><span class="muted">${financeEsc(l.id)} · ${financeEsc(loanCollectorName(l))}</span><br><span class="muted">Mob: ${financeEsc(l.phone||'-')}${(l.guarantorPhone||l.phone2)?' · G: '+financeEsc(l.guarantorPhone||l.phone2):''}</span></td><td>${currentText}<br><span class="muted">Disbursed ${formatToIndianDate(l.disbursalDate)} · Maturity ${formatToIndianDate(mfLoanScheduleDueIso(l,Number(p.tenure)||0))}</span></td><td>${prevText}</td><td>${snap.earlierPenalty?'₹'+snap.earlierPenalty.toLocaleString('en-IN'):'₹0'}</td><td class="money">₹${snap.combinedTotal.toLocaleString('en-IN')}</td></tr>`;
             }).join('');
             const summary=`<div class="mf-print-summary-grid"><div><span>Period</span><b>${formatToIndianDate(from)} to ${formatToIndianDate(to)}</b></div><div><span>Collector</span><b>${financeEsc(collectorLabel)}</b></div><div><span>Unpaid EMIs in Range</span><b>${unpaidRangeCount} · ₹${rangeTotal.toLocaleString('en-IN')}</b></div><div><span>Previous Arrears</span><b>₹${previousTotal.toLocaleString('en-IN')}</b></div><div><span>Penalty Due</span><b>₹${penaltyTotal.toLocaleString('en-IN')}</b></div></div>`;
             const note=`<div class="mf-print-note"><b>Staff collection rule:</b> Previous unpaid EMIs are shown separately from the selected-range EMI(s). Clear the oldest previous EMI first. “Collect Now” = previous EMI balance + previous penalty due + unpaid EMI(s) in the selected range.</div>`;
@@ -5346,7 +5474,7 @@
             if(!rows.length){
                 (loan.payments||[]).forEach((pay,i)=>{
                     const amt=Number(pay.penalty)||0;
-                    if(amt>0) rows.push({installmentNum:i+1,amount:amt,appliedDate:mfPenaltyAppliedDueDate(loan,i+1,pay.penaltyAppliedDate||pay.date),receivedDate:pay.penaltyReceivedDate||pay.date,mode:pay.penaltyReceivedMode||pay.mode||'Cash',status:'received',_source:'payment',_idx:i});
+                    if(amt>0) rows.push({installmentNum:i+1,amount:amt,appliedDate:mfPenaltyAppliedDueDate(loan,idx+1,pay.penaltyAppliedDate||pay.date),receivedDate:pay.penaltyReceivedDate||pay.date,mode:pay.penaltyReceivedMode||pay.mode||'Cash',status:'received',_source:'payment',_idx:i});
                 });
             }
             return rows.sort((a,b)=>String(a.receivedDate||a.appliedDate||'').localeCompare(String(b.receivedDate||b.appliedDate||'')));
@@ -5775,7 +5903,7 @@
             // the selected rows, due dates, editable received dates and payment modes are already visible.
             rows.sort((a,b)=>a.no-b.no).forEach(r=>{
                 const paymentDate=r.collectionPaymentDate || r.dueDate;
-                loan.payments.push({date:paymentDate,dueDate:r.dueDate,amount:Number(r.emi)||0,penalty:0,mode:r.collectionMode||'Cash',principal:Number(r.principal)||0,interest:Number(r.interest)||0});
+                loan.payments.push({date:paymentDate,dueDate:r.dueDate,amount:Number(r.totalDue)||Number(r.emi)||0,penalty:0,mode:r.collectionMode||'Cash',principal:Number(r.principal)||0,interest:Number(r.interest)||0,preEmiInterest:Number(r.preEmiInterest)||0});
             });
             closeModal('modal-bulk-emi');
             persist();
@@ -6458,7 +6586,7 @@
                     matches[matches.length-1].amount=Math.max(0,Number(matches[matches.length-1].amount||0)+diff);
                     if(matches[matches.length-1].amount<=0) loan.penaltyReceipts=loan.penaltyReceipts.filter(r=>r!==matches[matches.length-1]);
                 } else if(newAmt>0){
-                    loan.penaltyReceipts.push({installmentNum:idx+1,amount:newAmt,appliedDate:mfPenaltyAppliedDueDate(loan,i+1,pay.penaltyAppliedDate||pay.date),receivedDate:pay.penaltyReceivedDate||pay.date,mode:pay.penaltyReceivedMode||pay.mode||'Cash',status:'received'});
+                    loan.penaltyReceipts.push({installmentNum:idx+1,amount:newAmt,appliedDate:mfPenaltyAppliedDueDate(loan,idx+1,pay.penaltyAppliedDate||pay.date),receivedDate:pay.penaltyReceivedDate||pay.date,mode:pay.penaltyReceivedMode||pay.mode||'Cash',status:'received'});
                 }
             }
             closeModal('modal-edit-penalty');
@@ -7007,6 +7135,162 @@
             }catch(err){if(!background) alert('Webhook sync failed: '+err.message);}
         }
 
+        // ================= ADVANCED MAINTENANCE TOOLS =================
+        function mfValidIsoDate(v){
+            const s=String(v||'').slice(0,10);
+            if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+            const [y,m,d]=s.split('-').map(Number), dt=new Date(y,m-1,d);
+            return dt.getFullYear()===y&&dt.getMonth()===m-1&&dt.getDate()===d;
+        }
+        function mfAuditAdd(list,severity,loan,message,detail=''){
+            list.push({severity,loanId:loan?.id||'-',customer:loan?.name||'-',message,detail});
+        }
+        function runLoanIntegrityAudit(showAlert=false){
+            const issues=[], loans=Array.isArray(state.loans)?state.loans:[], products=state.products||{};
+            let checkedPayments=0,checkedParts=0,checkedPenalties=0,checkedClosures=0;
+            loans.forEach(loan=>{
+                const p=products[loan.product];
+                if(!loan.id) mfAuditAdd(issues,'critical',loan,'Missing Loan ID.');
+                if(!String(loan.name||'').trim()) mfAuditAdd(issues,'critical',loan,'Customer name is missing.');
+                if(!mfValidIsoDate(loan.disbursalDate)) mfAuditAdd(issues,'critical',loan,'Invalid or missing disbursal date.',String(loan.disbursalDate||''));
+                if(!p){ mfAuditAdd(issues,'critical',loan,'Loan points to a missing product.',String(loan.product||'')); return; }
+                if(!(Number(p.amount)>0)||!(Number(p.tenure)>0)||!(Number(p.emi)>=0)) mfAuditAdd(issues,'critical',loan,'Product has invalid amount, tenure or EMI configuration.');
+                const firstDue=mfLoanFirstDueIso(loan);
+                if(!mfValidIsoDate(firstDue)) mfAuditAdd(issues,'critical',loan,'First EMI date is missing or invalid.');
+                else if(mfValidIsoDate(loan.disbursalDate)&&firstDue<loan.disbursalDate) mfAuditAdd(issues,'critical',loan,'First EMI date is before disbursal date.');
+                const tenure=Math.max(0,Number(p.tenure)||0), payments=Array.isArray(loan.payments)?loan.payments:[];
+                if(payments.length>tenure) mfAuditAdd(issues,'critical',loan,`Recorded payments (${payments.length}) exceed product tenure (${tenure}).`);
+                let prevDue='';
+                for(let i=1;i<=tenure;i++){
+                    const due=mfLoanScheduleDueIso(loan,i);
+                    if(!mfValidIsoDate(due)) mfAuditAdd(issues,'critical',loan,`EMI #${i} has an invalid contractual due date.`);
+                    if(prevDue&&due<=prevDue) mfAuditAdd(issues,'critical',loan,`EMI schedule is not strictly increasing at EMI #${i}.`);
+                    prevDue=due;
+                }
+                payments.forEach((pay,idx)=>{
+                    checkedPayments++; const no=idx+1, expected=mfLoanInstallmentAmount(loan,no), pre=Number(pay.preEmiInterest)||0;
+                    const due=mfLoanScheduleDueIso(loan,no);
+                    if(!mfValidIsoDate(pay.date)) mfAuditAdd(issues,'critical',loan,`EMI #${no} has an invalid actual paid date.`,String(pay.date||''));
+                    if(pay.dueDate && due && String(pay.dueDate).slice(0,10)!==due) mfAuditAdd(issues,'critical',loan,`EMI #${no} stored due date differs from the contractual schedule.`,`Stored ${pay.dueDate} · Expected ${due}`);
+                    if(!pay.dueDate) mfAuditAdd(issues,'warning',loan,`EMI #${no} has no stored dueDate.`,`The contractual schedule remains ${due||'-'}.`);
+                    const amt=Number(pay.amount)||0, penalty=Number(pay.penalty)||0, prin=Number(pay.principal)||0, interest=Number(pay.interest)||0;
+                    if(!(amt>0)) mfAuditAdd(issues,'critical',loan,`EMI #${no} has a zero/invalid payment amount.`);
+                    if(Math.abs(amt-expected)>0.01) mfAuditAdd(issues,'warning',loan,`EMI #${no} payment amount does not match its scheduled installment.`,`Recorded ₹${amt.toFixed(2)} · Expected ₹${expected.toFixed(2)}`);
+                    const expectedPre=no===1?mfLoanPreEmiDue(loan):0;
+                    const accountingPre=Math.abs(pre)>0.01?pre:((no===1&&Math.abs((prin+interest+expectedPre)-amt)<=0.01)?expectedPre:0);
+                    if(Math.abs((prin+interest+accountingPre)-amt)>0.01) mfAuditAdd(issues,'critical',loan,`EMI #${no} accounting split does not reconcile to the recorded payment.`,`Principal ₹${prin.toFixed(2)} + Interest ₹${interest.toFixed(2)} + Pre-EMI ₹${accountingPre.toFixed(2)} ≠ Payment ₹${amt.toFixed(2)}`);
+                    if(no===1&&expectedPre>0&&Math.abs(pre)<=0.01&&Math.abs((prin+interest+expectedPre)-amt)<=0.01) mfAuditAdd(issues,'info',loan,'EMI #1 contains the expected Pre-EMI amount but the legacy payment record does not carry a separate preEmiInterest marker.','No revenue is changed by this audit; the first EMI amount remains the source of truth.');
+                    if(no!==1 && Math.abs(pre)>0.01) mfAuditAdd(issues,'warning',loan,`EMI #${no} contains Pre-EMI Interest.`,`Pre-EMI should only be attached to EMI #1.`);
+                    if(Array.isArray(pay.parts)){
+                        const partSum=pay.parts.reduce((s,x)=>s+(Number(x.amount)||0),0); checkedParts+=pay.parts.length;
+                        if(Math.abs(partSum-amt)>0.01) mfAuditAdd(issues,'critical',loan,`EMI #${no} partial-payment parts do not reconcile to the payment amount.`,`Parts ₹${partSum.toFixed(2)} · Payment ₹${amt.toFixed(2)}`);
+                        const lastPart=pay.parts[pay.parts.length-1];
+                        if(lastPart?.date && String(pay.date).slice(0,10)!==String(lastPart.date).slice(0,10)) mfAuditAdd(issues,'warning',loan,`EMI #${no} final paid date differs from its last partial-payment date.`);
+                    }
+                });
+                const partials=Array.isArray(loan.pendingParts)?loan.pendingParts:[];
+                partials.forEach(pt=>{checkedParts++;if(!(Number(pt.amount)>0)||!mfValidIsoDate(pt.date))mfAuditAdd(issues,'warning',loan,'A pending partial-payment entry has an invalid amount/date.');});
+                const partialSum=getLoanPartialSum(loan);
+                const nextExpected=mfLoanInstallmentAmount(loan,payments.length+1);
+                if(partialSum>0 && partialSum>=nextExpected-0.01) mfAuditAdd(issues,'warning',loan,'Pending partial balance is already enough to complete the next EMI.','The next collection/reconciliation should normally complete it.');
+                (loan.duePenalties||[]).forEach(d=>{checkedPenalties++;if(d.status==='due'){const expectedDue=mfPenaltyAppliedDueDate(loan,d.installmentNum,d.appliedDate);if(Math.abs(Number(d.amount)||0)<=0)mfAuditAdd(issues,'warning',loan,`Due penalty for EMI #${d.installmentNum} has no positive amount.`);if(String(d.appliedDate||'').slice(0,10)!==expectedDue)mfAuditAdd(issues,'critical',loan,`Due penalty for EMI #${d.installmentNum} has an incorrect applied date.`,`Stored ${d.appliedDate||'-'} · Expected ${expectedDue}`);}});
+                (loan.penaltyReceipts||[]).forEach(r=>{checkedPenalties++;const expectedDue=mfPenaltyAppliedDueDate(loan,r.installmentNum,r.appliedDate);if(!(Number(r.amount)>0))mfAuditAdd(issues,'warning',loan,`Penalty receipt for EMI #${r.installmentNum} has no positive amount.`);if(String(r.appliedDate||'').slice(0,10)!==expectedDue)mfAuditAdd(issues,'critical',loan,`Penalty receipt for EMI #${r.installmentNum} has an incorrect applied date.`,`Stored ${r.appliedDate||'-'} · Expected ${expectedDue}`);if(!mfValidIsoDate(r.receivedDate))mfAuditAdd(issues,'warning',loan,`Penalty receipt for EMI #${r.installmentNum} has an invalid received date.`);});
+                if(loan.foreclosed){
+                    checkedClosures++; const fd=loan.foreclosureData||{};
+                    if(!fd.settlementDate||!mfValidIsoDate(fd.settlementDate)) mfAuditAdd(issues,'critical',loan,'Foreclosed loan has an invalid settlement date.');
+                    const principal=Number(fd.principalPaid)||0, preClose=Number(fd.preClosureInterest)||0, fee=Number(fd.feeAmount)||0, gst=Number(fd.gstAmount)||0, total=Number(fd.settlementAmount)||0;
+                    if(Math.abs(total-(principal+preClose+fee+gst))>0.01) mfAuditAdd(issues,'critical',loan,'Foreclosure settlement total does not reconcile.','Principal + pre-closure interest + fee + GST differs from stored settlement amount.');
+                    if(Number(fd.preClosureDays||0)>0 && fd.preClosureFromDate && mfValidIsoDate(fd.settlementDate)){const days=Math.max(0,mfDaysBetween(String(fd.preClosureFromDate).slice(0,10),String(fd.settlementDate).slice(0,10)));if(days!==Number(fd.preClosureDays))mfAuditAdd(issues,'warning',loan,'Stored pre-closure day count does not match its dates.',`Stored ${fd.preClosureDays} · Calculated ${days}`);}
+                }
+                if(loan.postMaturitySettlement){
+                    checkedClosures++; const pm=loan.postMaturitySettlement;
+                    if(!mfValidIsoDate(pm.settlementDate)) mfAuditAdd(issues,'critical',loan,'Post-maturity settlement has an invalid settlement date.');
+                    if(!(Number(pm.actualReceived)>0)) mfAuditAdd(issues,'critical',loan,'Post-maturity settlement has no positive actual received amount.');
+                    if(Number(pm.waiverAmount||0)<-0.01) mfAuditAdd(issues,'critical',loan,'Post-maturity settlement waiver is negative.');
+                    const calc=pm.calculatedSettlement!==undefined?Number(pm.calculatedSettlement):null, actual=Number(pm.actualReceived)||0, waiver=Number(pm.waiverAmount)||0;
+                    if(calc!==null && Math.abs((calc-actual)-waiver)>0.01) mfAuditAdd(issues,'critical',loan,'Settlement amount + waiver does not reconcile to the calculated settlement.');
+                }
+            });
+            const critical=issues.filter(x=>x.severity==='critical').length, warning=issues.filter(x=>x.severity==='warning').length, info=issues.filter(x=>x.severity==='info').length;
+            const summary=document.getElementById('mf-loan-audit-summary');
+            if(summary) summary.innerHTML=`<div class="mf-audit-summary"><div class="mf-audit-stat"><small>Loan Accounts</small><b>${loans.length}</b></div><div class="mf-audit-stat"><small>Critical</small><b style="color:#f87171;">${critical}</b></div><div class="mf-audit-stat"><small>Warnings</small><b style="color:#fbbf24;">${warning}</b></div><div class="mf-audit-stat"><small>Checks</small><b style="color:#34d399;">${checkedPayments+checkedParts+checkedPenalties+checkedClosures}</b></div></div>`;
+            const box=document.getElementById('mf-loan-audit-results');
+            if(box){
+                if(!issues.length) box.innerHTML=`<div style="padding:22px;text-align:center;border:1px solid rgba(52,211,153,.2);background:rgba(52,211,153,.05);border-radius:10px;color:#34d399;font-weight:800;"><i class="fa-solid fa-circle-check" style="font-size:1.4rem;display:block;margin-bottom:6px;"></i>No integrity issues detected in ${loans.length} loan account(s).</div>`;
+                else box.innerHTML=issues.map(x=>`<div class="mf-audit-row ${x.severity}"><span class="mf-audit-pill ${x.severity}">${x.severity.toUpperCase()}</span><b style="color:#fff;">${financeEsc(x.loanId)}</b><div><div style="color:#fff;font-weight:750;">${financeEsc(x.message)}</div>${x.detail?`<div style="color:#94a3b8;margin-top:2px;">${financeEsc(x.detail)}</div>`:''}</div><span style="color:#64748b;font-size:.58rem;">${financeEsc(x.customer)}</span></div>`).join('');
+            }
+            window.__mfLastAudit={at:new Date().toISOString(),issues,counts:{loans:loans.length,critical,warning,info,checkedPayments,checkedParts,checkedPenalties,checkedClosures}};
+            if(showAlert) alert(critical||warning?`Audit complete: ${critical} critical issue(s), ${warning} warning(s).`:`Audit complete: no integrity issues detected.`);
+            return window.__mfLastAudit;
+        }
+        function openLoanAuditModal(){closeModal('modal-cloud');document.getElementById('modal-loan-audit')?.classList.add('active');runLoanIntegrityAudit(false);}
+        function exportLoanAuditReport(){
+            const report=window.__mfLastAudit||runLoanIntegrityAudit(false), rows=report.issues||[];
+            const data=[['Loan Audit & Integrity Report'],['Generated',new Date().toLocaleString('en-IN')],['Loan Accounts',report.counts.loans],['Critical',report.counts.critical],['Warnings',report.counts.warning],[],['Severity','Loan ID','Customer','Issue','Detail'],...rows.map(x=>[x.severity,x.loanId,x.customer,x.message,x.detail])];
+            if(typeof XLSX!=='undefined'){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(data),'Loan_Audit');XLSX.writeFile(wb,`${(state.bizName||'MicroFinance').replace(/\s+/g,'_')}_Loan_Audit.xlsx`);}else{const blob=new Blob([data.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Loan_Audit.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+        }
+
+        async function openBackupVersionsModal(){
+            closeModal('modal-cloud');
+            document.getElementById('modal-backup-versions')?.classList.add('active');
+            await ensureInitialVersionedBackup();
+            await renderBackupVersionList();
+        }
+        async function renderBackupVersionList(){
+            const box=document.getElementById('mf-backup-version-list'), status=document.getElementById('mf-backup-version-status'); if(!box)return;
+            box.innerHTML='<div style="padding:14px;text-align:center;color:#94a3b8;">Loading version history…</div>';
+            try{const list=await idbListVersionedBackups();if(status)status.textContent=`${list.length} local version${list.length===1?'':'s'} kept · newest first.`;if(!list.length){box.innerHTML='<div style="padding:18px;text-align:center;color:#64748b;">No versioned snapshots yet. A baseline will be created automatically.</div>';return;}
+                box.innerHTML=list.map((v,i)=>{const st=v.state||{},loans=Array.isArray(st.loans)?st.loans.length:0;return `<div class="mf-version-row"><div class="mf-version-meta"><b>${i===0?'Latest · ':''}${financeEsc(v.reason||'AUTO')}</b> · ${new Date(v.createdAt).toLocaleString('en-IN')}<small>${loans} loan account(s) · Version ID ${financeEsc(v.id)}</small></div><div class="mf-version-actions"><button class="btn-header btn-blue" onclick="restoreVersionedBackup('${v.id}')"><i class="fa-solid fa-clock-rotate-left"></i> Restore</button></div></div>`;}).join('');
+            }catch(e){box.innerHTML=`<div style="padding:14px;color:#f87171;">Version history could not be loaded: ${financeEsc(e.message)}</div>`;if(status)status.textContent='';}
+        }
+        async function createManualVersionedBackup(){
+            try{const rec=await idbPutVersionedBackup('MANUAL',true);await renderBackupVersionList();alert(`Backup snapshot created successfully at ${new Date(rec.createdAt).toLocaleString('en-IN')}.`);}catch(e){alert('Could not create backup snapshot: '+e.message);}
+        }
+        async function restoreVersionedBackup(id){
+            try{
+                const list=await idbListVersionedBackups(), rec=list.find(x=>x.id===id);
+                if(!rec||!rec.state)throw new Error('Backup version not found or invalid.');
+                if(!confirm(`Restore the backup from ${new Date(rec.createdAt).toLocaleString('en-IN')} (${rec.reason||'AUTO'})? The current data will first be saved as a safety snapshot.`))return;
+                await idbPutVersionedBackup('BEFORE RESTORE',true);
+                state=(typeof structuredClone==='function')?structuredClone(rec.state):JSON.parse(JSON.stringify(rec.state));
+                normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();
+                await idbPutSnapshot();
+                try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));localStorage.setItem('MF_LOCAL_DIRTY_AT',new Date().toISOString());}catch(e){}
+                mfLastVersionFingerprint=mfStateFingerprint(state);
+                renderAll();
+                await renderBackupVersionList();
+                updateSecureCloudStatus('🟡 Local backup version restored. Cloud sync was not triggered automatically; review the data first.',true);
+                alert('Backup version restored successfully. Review the app before manually syncing to cloud.');
+            }catch(e){alert('Backup restore failed: '+e.message);}
+        }
+
+        function openResponsiveQAModal(){
+            closeModal('modal-cloud');
+            document.getElementById('modal-responsive-qa')?.classList.add('active');
+            const frame=document.getElementById('mf-qa-preview-frame');
+            if(frame&&!frame.src){try{const u=new URL(location.href);u.searchParams.set('mfqa','1');frame.src=u.toString();}catch(e){frame.src=location.href;}}
+            setQaPreviewWidth(360);
+        }
+        function closeResponsiveQAModal(){document.getElementById('modal-responsive-qa')?.classList.remove('active');}
+        function setQaPreviewWidth(width){
+            const frame=document.getElementById('mf-qa-preview-frame'),label=document.getElementById('mf-qa-width-label');if(!frame)return;
+            frame.style.width=Math.max(320,Number(width)||360)+'px';if(label)label.textContent=Math.max(320,Number(width)||360)+'px';
+            setTimeout(runResponsiveQA,650);
+        }
+        function runResponsiveQA(){
+            const frame=document.getElementById('mf-qa-preview-frame'),out=document.getElementById('mf-qa-result');if(!frame||!out)return;
+            let doc;try{doc=frame.contentDocument||frame.contentWindow.document;}catch(e){out.innerHTML='<span class="bad">QA preview is not accessible in this browser context.</span>';return;}
+            if(!doc||!doc.body){out.textContent='Preview is still loading…';return;}
+            const width=frame.clientWidth, body=doc.body, root=doc.documentElement;
+            const overflow=Math.max(body.scrollWidth,root.scrollWidth)-Math.min(root.clientWidth||width,width);
+            const clipped=[];
+            doc.querySelectorAll('body *').forEach(el=>{if(clipped.length>=12)return;const cs=doc.defaultView.getComputedStyle(el),r=el.getBoundingClientRect();if(!r.width||!r.height)return;if(r.right>width+2||el.scrollWidth>el.clientWidth+2){if(cs.overflow==='hidden'||cs.textOverflow==='ellipsis'||cs.whiteSpace==='nowrap')clipped.push(el.id||el.className?.toString().split(' ').slice(0,2).join('.')||el.tagName);}});
+            const key=['.biz-brand-box','.passbook-toolbar','.passbook-actions','.statement-internal-company-header','.loan-card-internal-company-header','#modal-bulk-emi .modal-card','.upcoming-emi-wrap','.collection-client-sheet'];
+            const missing=[];key.forEach(sel=>{if(!doc.querySelector(sel))missing.push(sel);});
+            const checks=[];checks.push(overflow<=2?`<span class="ok">✓ No page-level horizontal overflow (${Math.max(0,Math.round(overflow))}px).</span>`:`<span class="bad">✗ Page-level horizontal overflow: ${Math.round(overflow)}px.</span>`);checks.push(clipped.length?`<span class="warn">⚠ ${clipped.length} potentially clipped element(s): ${clipped.join(', ')}</span>`:`<span class="ok">✓ No obvious clipped/ellipsis overflow detected in visible preview.</span>`);checks.push(missing.length?`<span class="warn">⚠ Key selector(s) not rendered in this view: ${missing.join(', ')}</span>`:`<span class="ok">✓ Key layout targets are present.</span>`);out.innerHTML=`<b>QA @ ${width}px</b><br>${checks.join('<br>')}<br><span style="color:#64748b;">This diagnostic is intentionally non-destructive and checks the rendered preview only.</span>`;
+        }
+
+        // ================= END ADVANCED MAINTENANCE TOOLS =================
         function downloadJsonBackup(){
             const dataStr='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(state,null,2));
             const a=document.createElement('a'); a.href=dataStr;
