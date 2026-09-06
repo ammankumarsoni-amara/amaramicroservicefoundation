@@ -669,6 +669,86 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
   .mf-schedule-design-note b{color:#dbeafe}
 }
 </style>
+<style id="mf-morning-glory-theme">
+@media screen {
+  /* Morning Glory = a premium blue-hour / sunrise theme: colorful, not white, high-contrast and calm. */
+  html.mf-morning-glory{
+    --bg-body:#0b1d2b;--bg-card:#12334a;--bg-card-hover:#17435d;--primary:#57b8e8;--primary-glow:rgba(87,184,232,.24);
+    --accent:#e9b85c;--success:#35c7a0;--danger:#f07b86;--purple:#a78bfa;--pink:#ef8fc3;--text-main:#f4f8fb;--text-muted:#a8c0cf;
+    --border-subtle:rgba(148,211,236,.18);
+    color-scheme:dark;
+  }
+  html.mf-morning-glory body{
+    background:
+      radial-gradient(900px 520px at 8% -12%,rgba(87,184,232,.25),transparent 62%),
+      radial-gradient(700px 420px at 96% 2%,rgba(233,184,92,.16),transparent 60%),
+      radial-gradient(620px 420px at 48% 110%,rgba(112,91,196,.12),transparent 66%),
+      linear-gradient(160deg,#092033 0%,#0d2639 48%,#102a3e 100%);
+    color:var(--text-main);
+  }
+  html.mf-morning-glory .top-header{
+    background:linear-gradient(120deg,rgba(7,28,43,.97),rgba(16,54,74,.94) 58%,rgba(49,61,70,.92));
+    border-bottom-color:rgba(233,184,92,.24);box-shadow:0 12px 34px rgba(0,0,0,.24);
+  }
+  html.mf-morning-glory .cloud-banner,html.mf-morning-glory .tab-shell,html.mf-morning-glory .tab-bar,
+  html.mf-morning-glory .kpi-card,html.mf-morning-glory .client-card,html.mf-morning-glory .statement-box,
+  html.mf-morning-glory .table-wrap,html.mf-morning-glory .modal-card{
+    background:linear-gradient(145deg,rgba(19,55,77,.97),rgba(13,39,56,.97))!important;
+    border-color:rgba(148,211,236,.17);box-shadow:0 12px 32px rgba(0,0,0,.20),inset 0 1px 0 rgba(255,255,255,.035);
+  }
+  html.mf-morning-glory .tab-shell{background:linear-gradient(135deg,rgba(13,43,61,.98),rgba(20,56,75,.96))!important;}
+  html.mf-morning-glory .tab-btn{color:#b9cfdb;}
+  html.mf-morning-glory .tab-btn.active{background:linear-gradient(135deg,#319bd0,#236f9d);box-shadow:0 8px 20px rgba(49,155,208,.25);color:#fff;}
+  html.mf-morning-glory .biz-input,html.mf-morning-glory input,html.mf-morning-glory select,html.mf-morning-glory textarea{
+    background:rgba(6,25,39,.72)!important;color:#f5f9fc!important;border-color:rgba(148,211,236,.20)!important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+  }
+  html.mf-morning-glory input:focus,html.mf-morning-glory select:focus,html.mf-morning-glory textarea:focus{
+    border-color:rgba(87,184,232,.82)!important;box-shadow:0 0 0 3px rgba(87,184,232,.12),0 0 18px rgba(87,184,232,.08)!important;
+  }
+  html.mf-morning-glory select{color-scheme:dark;}
+  html.mf-morning-glory .form-group label,html.mf-morning-glory .kpi-label,html.mf-morning-glory .upcoming-emi-sub,
+  html.mf-morning-glory .upcoming-priority-sub,html.mf-morning-glory .collection-client-meta,html.mf-morning-glory .collection-client-dates{color:#a9c0cf!important;}
+  html.mf-morning-glory .kpi-card .kpi-val,html.mf-morning-glory .modal-title,html.mf-morning-glory .upcoming-emi-title,
+  html.mf-morning-glory .collection-client-name,html.mf-morning-glory .collection-recovery-line b{color:#f4f8fb!important;}
+  html.mf-morning-glory th{background:rgba(7,31,47,.88)!important;color:#c8dce7!important;border-bottom-color:rgba(148,211,236,.15)}
+  html.mf-morning-glory td{color:#e1edf3!important;border-bottom-color:rgba(148,211,236,.08)}
+  html.mf-morning-glory .upcoming-emi-wrap{background:linear-gradient(135deg,rgba(87,184,232,.10),rgba(233,184,92,.045));border-color:rgba(87,184,232,.22)}
+  html.mf-morning-glory .collection-recovery-line>div,html.mf-morning-glory .collection-upcoming-grid>div,
+  html.mf-morning-glory .collection-brief-grid>div{background:rgba(87,184,232,.045);border-color:rgba(148,211,236,.10)}
+  html.mf-morning-glory .btn-blue{background:linear-gradient(135deg,#3da9dc,#236f9d)}
+  html.mf-morning-glory .btn-green{background:linear-gradient(135deg,#2fbea0,#16836d)}
+  html.mf-morning-glory .btn-purple{background:linear-gradient(135deg,#9b83ee,#6954bb)}
+  html.mf-morning-glory .btn-daynight{background:linear-gradient(135deg,#e9b85c,#b97b2e);color:#102335;border-color:rgba(255,231,175,.45);box-shadow:0 7px 18px rgba(233,184,92,.16)}
+  html.mf-morning-glory .btn-daynight i{color:#fff7df}
+  html.mf-morning-glory .mf-schedule-design-note{background:linear-gradient(180deg,rgba(87,184,232,.09),rgba(12,39,56,.40));border-color:rgba(87,184,232,.22);color:#b5cad7}
+  html.mf-morning-glory .mf-schedule-design-note b{color:#e2f5ff}
+  html.mf-morning-glory .secure-cloud-card,html.mf-morning-glory .bulk-preview{background:rgba(6,27,42,.40);border-color:rgba(148,211,236,.12)}
+  html.mf-morning-glory .growth-title,html.mf-morning-glory .upcoming-priority-title{color:#f4f8fb}
+  html.mf-morning-glory .growth-sub{color:#9fb8c8}
+  html.mf-morning-glory .recovery-filter-btn,html.mf-morning-glory .legacy-emi-btn{background:rgba(255,255,255,.045);border-color:rgba(148,211,236,.17);color:#c8dce7}
+  html.mf-morning-glory .upcoming-date-btn{background:rgba(87,184,232,.10);border-color:rgba(87,184,232,.35);color:#8ed7f5}
+  html.mf-morning-glory .collection-brief-title{color:#f1c86d}
+  html.mf-morning-glory .modal-title{background:linear-gradient(180deg,#12334a,#12334a)!important}
+}
+</style>
+<style id="mf-theme-toggle-css">
+@media screen {.btn-daynight{background:linear-gradient(135deg,#243b64,#0f2344);color:#fff;border:1px solid rgba(148,163,184,.20)}.btn-daynight i{color:#fbbf24}}
+</style>
+<script>
+(function(){
+  function mfApplyTheme(){
+    var saved=localStorage.getItem('MF_SCREEN_THEME');
+    if(saved==='DAY'){ saved='NIGHT'; localStorage.setItem('MF_SCREEN_THEME','NIGHT'); }
+    var morning=saved==='MORNING';
+    document.documentElement.classList.toggle('mf-morning-glory',morning);
+    var b=document.getElementById('mf-theme-toggle');
+    if(b){b.innerHTML=morning?'<i class="fa-solid fa-moon"></i> Night Mode':'<i class="fa-solid fa-sun"></i> Morning Glory';b.title=morning?'Switch to Night theme':'Switch to Morning Glory theme';}
+  }
+  window.mfToggleTheme=function(){localStorage.setItem('MF_SCREEN_THEME',document.documentElement.classList.contains('mf-morning-glory')?'NIGHT':'MORNING');mfApplyTheme();};
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',mfApplyTheme); else mfApplyTheme();
+})();
+</script>
 </head>
 <body>
 
@@ -685,6 +765,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 <button class="btn-header btn-green" onclick="openCloudModal()"><i class="fa-solid fa-cloud-arrow-up"></i> Cloud Sync</button>
                 <button class="btn-header btn-blue" onclick="openCompanyProfileModal()"><i class="fa-solid fa-building"></i> Company Profile</button>
                 <button class="btn-header btn-blue" onclick="exportFullEnterpriseExcel()"><i class="fa-solid fa-file-excel"></i> Excel Export</button>
+                <button class="btn-header btn-daynight" id="mf-theme-toggle" onclick="mfToggleTheme()" title="Switch Morning Glory / Night theme"><i class="fa-solid fa-sun"></i> Morning Glory</button>
                 <button class="btn-header btn-purple" onclick="openAddClientModal()"><i class="fa-solid fa-user-plus"></i> + New Loan</button>
             </div>
         </div>
@@ -1078,11 +1159,15 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                         <input type="text" id="fc-guarantor-name" placeholder="e.g. Suresh Sharma">
                     </div>
                     <div class="form-group" style="margin-bottom:0;">
-                        <label>Guarantor Mobile Number</label>
+                        <label>Guarantor Primary Mobile</label>
                         <input type="tel" id="fc-guarantor-phone" placeholder="9876543212">
                     </div>
                 </div>
-                <div style="font-size:.66rem;color:#64748b;line-height:1.4;margin-top:5px;margin-bottom:12px;">Optional — helps with recovery follow-up if the customer becomes unreachable.</div>
+                <div class="form-group" style="margin-top:8px;margin-bottom:10px;">
+                    <label>Guarantor Secondary Mobile</label>
+                    <input type="tel" id="fc-guarantor-phone2" placeholder="9876543213">
+                </div>
+                <div style="font-size:.66rem;color:#64748b;line-height:1.4;margin-top:5px;margin-bottom:12px;">Optional — store one or two guarantor contacts for recovery follow-up. Existing accounts remain unchanged.</div>
                 <div class="form-group">
                     <label>Select Loan Product *</label>
                     <select id="fc-product" onchange="syncClientFixedDateFromDisbursal(); previewProductSummary()" required></select>
@@ -1099,6 +1184,17 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                         <select id="fc-month" required onchange="syncClientFixedDateFromDisbursal(); previewProductSummary()"></select>
                         <select id="fc-year" required onchange="syncClientFixedDateFromDisbursal(); previewProductSummary()"></select>
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Disbursal Payment Mode *</label>
+                    <select id="fc-disbursal-mode" required onchange="previewProductSummary()">
+                        <option value="Cash">Cash</option>
+                        <option value="UPI">UPI (GPay / PhonePe / Other Payment Bank)</option>
+                        <option value="Bank Transfer">Bank Transfer / Cheque</option>
+                        <option value="Cash + UPI (Both)">Cash + UPI / Bank Transfer / Cheque (Mixed)</option>
+                    </select>
+                    <small style="display:block;color:#64748b;font-size:.63rem;line-height:1.4;margin-top:4px;">Records how the loan amount was actually disbursed to the customer. This does not change EMI or interest calculations.</small>
                 </div>
 
                 <div class="form-group" id="fc-fixed-date-group" style="display:block; background:rgba(59,130,246,.08); padding:10px; border-radius:10px; border:1px solid rgba(59,130,246,.22);">
@@ -2254,7 +2350,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         };
 
         // Normalize legacy loan contact/collector fields without disturbing existing data.
-        (state.loans || []).forEach(l => { l.phone2 = String(l.phone2 || l.secondaryPhone || l.husbandPhone || "").trim(); l.collectorId = String(l.collectorId || "").trim(); l.collectorName = String(l.collectorName || "").trim(); });
+        (state.loans || []).forEach(l => { l.phone2 = String(l.phone2 || l.secondaryPhone || l.husbandPhone || "").trim(); l.guarantorPhone2 = String(l.guarantorPhone2 || l.guarantorSecondaryPhone || "").trim(); l.disbursalMode = String(l.disbursalMode || "Cash").trim() || "Cash"; l.collectorId = String(l.collectorId || "").trim(); l.collectorName = String(l.collectorName || "").trim(); });
 
         // Normalize legacy product records without disturbing existing EMI amounts.
         Object.keys(state.products || {}).forEach(code => {
@@ -3726,7 +3822,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             const oldest=snap.earlierItems[0];
             const previousLabel=snap.earlierItems.length ? `${snap.earlierItems.length} EMI${snap.earlierItems.length>1?'s':''} · ₹${snap.earlierBalance.toLocaleString('en-IN')} · ${formatToIndianDate(snap.earlierItems[0].dueDate)} → ${formatToIndianDate(snap.earlierItems[snap.earlierItems.length-1].dueDate)}` : 'None';
             return `<article class="collection-client-sheet compact-recovery-row ${a?'has-pending':''}">
-                <div class="collection-client-head"><div class="collection-client-identity"><div class="collection-client-name">${financeEsc(l.name)}</div><div class="collection-client-meta">${financeEsc(l.id)} · ${financeEsc(p.name||l.product)} · ${financeEsc(loanCollectorName(l))} · ${financeEsc(l.phone||'-')}${l.phone2?` / ${financeEsc(l.phone2)}`:''}</div><div class="collection-client-dates">Disbursed ${formatToIndianDate(l.disbursalDate)} · Maturity ${formatToIndianDate(mfLoanScheduleDueIso(l,Number(p.tenure)||0))}</div></div><span class="collection-status ${a?'attention':'ready'}">${a?'PREVIOUS DUES':'CURRENT COLLECTION'}</span></div>
+                <div class="collection-client-head"><div class="collection-client-identity"><div class="collection-client-name">${financeEsc(l.name)}</div><div class="collection-client-meta">${financeEsc(l.id)} · ${financeEsc(p.name||l.product)} · ${financeEsc(loanCollectorName(l))} · <span title="Customer contacts">C: ${financeEsc(mfContactText(l.phone,l.phone2))}</span>${mfGuarantorContactText(l)?` · <span title="Guarantor contacts">G: ${financeEsc(mfGuarantorContactText(l))}</span>`:''}</div><div class="collection-client-dates">Disbursed ${formatToIndianDate(l.disbursalDate)} · Maturity ${formatToIndianDate(mfLoanScheduleDueIso(l,Number(p.tenure)||0))} · Mode ${financeEsc(mfDisbursalModeLabel(l.disbursalMode))}</div></div><span class="collection-status ${a?'attention':'ready'}">${a?'PREVIOUS DUES':'CURRENT COLLECTION'}</span></div>
                 <div class="collection-recovery-line"><div><small>Current / Selected Range</small><b>${currentLabel}</b></div><div><small>Previous Pending</small><b>${previousLabel}</b></div><div><small>Penalty Due</small><b>₹${snap.earlierPenalty.toLocaleString('en-IN')}</b></div><div class="collection-recovery-total"><small>Collect Now</small><strong>₹${snap.combinedTotal.toLocaleString('en-IN')}</strong></div></div>
                 <div class="collection-recovery-note">${a?`<b>Clear previous dues first:</b> ${snap.earlierItems.length} unpaid EMI${snap.earlierItems.length>1?'s':''} before the selected range${snap.earlierPenalty>0?` · penalty due ₹${snap.earlierPenalty.toLocaleString('en-IN')}`:''}.`:'Ready for current collection in the selected range.'}</div>
                 <div class="collection-client-actions"><button class="btn-edit-sm" onclick="openLoanFromProduct('${l.id}')">Statement</button>${currentUnpaid.length?`<button class="btn-collect-sm" onclick="openCollectModal('${l.id}')">Collect EMI</button>`:''}</div>
@@ -3748,7 +3844,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                     if(r.dueDate<from||r.dueDate>to)return;
                     const rowStatus=mfUpcomingStatus(r,today);
                     if(status!=='ALL'&&rowStatus!==status)return;
-                    const hay=[loan.id,loan.name,loan.phone,loan.phone2,loanCollectorName(loan),product.name].filter(Boolean).join(' ').toLowerCase();
+                    const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.guarantorPhone,loan.guarantorPhone2,loan.guarantorSecondaryPhone,loanCollectorName(loan),product.name].filter(Boolean).join(' ').toLowerCase();
                     if(q&&!hay.includes(q))return;
                     rows.push({...r,upcomingStatus:rowStatus,overdueDays:mfUpcomingOverdueDays(r.dueDate,today)});
                 });
@@ -3804,7 +3900,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             if(!box){ const sec=document.getElementById('upcoming-emi-section'); if(!sec)return; box=document.createElement('div'); box.id='upcoming-collection-priority'; box.className='upcoming-priority compact'; sec.insertBefore(box,document.getElementById('upcoming-emi-summary')); }
             const rows=getCollectionPriorityRows(), overdue=rows.filter(r=>r.priorityStatus==='OVERDUE'), todayRows=rows.filter(r=>r.priorityStatus==='DUE TODAY');
             const top=rows.slice(0,5);
-            box.innerHTML=`<div class="upcoming-priority-head"><div><div class="upcoming-priority-title"><i class="fa-solid fa-bolt" style="color:#fbbf24;margin-right:5px;"></i> Collection Priority</div><div class="upcoming-priority-sub">Oldest overdue first · then today's dues</div></div><div class="upcoming-priority-counts"><span class="priority-pill overdue">${overdue.length} overdue</span><span class="priority-pill today">${todayRows.length} today</span></div></div>${top.length?`<div class="upcoming-priority-list compact-list">${top.map(r=>{const l=r.loan;const label=r.priorityStatus==='OVERDUE'?`${r.overdueDays}d overdue`:'Due today';const color=r.priorityStatus==='OVERDUE'?'#f87171':'#fbbf24';return `<div class="upcoming-priority-row compact-row"><div><div class="p-name">${l.name}</div><div class="p-meta">${l.id} · EMI #${r.no}</div></div><div class="p-date" style="color:${color};">${label}</div><div class="p-amt">₹${Number(r.totalDue ?? r.emi).toLocaleString('en-IN')}</div><div class="p-phone">${l.phone||'-'}</div><button class="btn-collect-sm" onclick="openCollectModal('${l.id}')">Collect</button></div>`;}).join('')}</div>`:'<div class="upcoming-empty compact-empty">No due or overdue EMI today.</div>'}${rows.length>5?`<div class="upcoming-priority-more">Showing 5 highest-priority cases of ${rows.length}. The selected schedule/print includes the complete collection list.</div>`:''}`;
+            box.innerHTML=`<div class="upcoming-priority-head"><div><div class="upcoming-priority-title"><i class="fa-solid fa-bolt" style="color:#fbbf24;margin-right:5px;"></i> Collection Priority</div><div class="upcoming-priority-sub">Oldest overdue first · then today's dues</div></div><div class="upcoming-priority-counts"><span class="priority-pill overdue">${overdue.length} overdue</span><span class="priority-pill today">${todayRows.length} today</span></div></div>${top.length?`<div class="upcoming-priority-list compact-list">${top.map(r=>{const l=r.loan;const label=r.priorityStatus==='OVERDUE'?`${r.overdueDays}d overdue`:'Due today';const color=r.priorityStatus==='OVERDUE'?'#f87171':'#fbbf24';return `<div class="upcoming-priority-row compact-row"><div><div class="p-name">${l.name}</div><div class="p-meta">${l.id} · EMI #${r.no}</div></div><div class="p-date" style="color:${color};">${label}</div><div class="p-amt">₹${Number(r.totalDue ?? r.emi).toLocaleString('en-IN')}</div><div class="p-phone">${financeEsc(mfContactText(l.phone,l.phone2))}${mfGuarantorContactText(l)?` · G: ${financeEsc(mfGuarantorContactText(l))}`:''}</div><button class="btn-collect-sm" onclick="openCollectModal('${l.id}')">Collect</button></div>`;}).join('')}</div>`:'<div class="upcoming-empty compact-empty">No due or overdue EMI today.</div>'}${rows.length>5?`<div class="upcoming-priority-more">Showing 5 highest-priority cases of ${rows.length}. The selected schedule/print includes the complete collection list.</div>`:''}`;
         }
 
         function getUpcomingExportRows(){
@@ -3818,7 +3914,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 mfLoanScheduleRows(loan).forEach(r=>{
                     if(r.dueDate<from||r.dueDate>to)return;
                     const rs=mfUpcomingStatus(r,today); if(status!=='ALL'&&rs!==status)return;
-                    const hay=[loan.id,loan.name,loan.phone,loan.phone2,loanCollectorName(loan),product.name].filter(Boolean).join(' ').toLowerCase();
+                    const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.guarantorPhone,loan.guarantorPhone2,loan.guarantorSecondaryPhone,loanCollectorName(loan),product.name].filter(Boolean).join(' ').toLowerCase();
                     if(q&&!hay.includes(q))return;
                     rows.push({...r,upcomingStatus:rs,overdueDays:mfUpcomingOverdueDays(r.dueDate,today)});
                 });
@@ -3834,7 +3930,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}
             const rows=getUpcomingExportRows();
             const data=[[
-                'Customer','Loan ID','Collector','Mobile 1','Mobile 2','Product','Disbursal Date','Maturity Date',
+                'Customer','Loan ID','Collector','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Disbursal Mode','Product','Disbursal Date','Maturity Date',
                 'Current EMI No.','Current Due Date','Current EMI Amount','Status','Overdue Days',
                 'Previous Pending EMI Nos.','Previous Pending Balance','Previous Penalty Due','Previous Total Outstanding',
                 'Selected-Range EMI Total','Total to Clear Previous + Selected Range'
@@ -3847,14 +3943,14 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                       prevBalance=prev.reduce((s,x)=>s+x.balance,0), prevPenalty=prev.reduce((s,x)=>s+x.penaltyDue,0),
                       rangeTotal=group.reduce((s,r)=>s+(Number(r.totalDue??r.emi)||0),0);
                 group.forEach(r=>data.push([
-                    l.name,l.id,loanCollectorName(l),l.phone||'',l.phone2||'',p.name||l.product,
+                    l.name,l.id,loanCollectorName(l),l.phone||'',l.phone2||'',l.guarantorPhone||'',l.guarantorPhone2||l.guarantorSecondaryPhone||'',mfDisbursalModeLabel(l.disbursalMode),p.name||l.product,
                     l.disbursalDate,mfLoanScheduleDueIso(l,Number(p.tenure)||0),r.no,r.dueDate,Number(r.totalDue??r.emi)||0,
                     r.upcomingStatus,r.overdueDays,prev.map(x=>`#${x.no}`).join(', '),prevBalance,prevPenalty,prevBalance+prevPenalty,
                     rangeTotal,prevBalance+prevPenalty+rangeTotal
                 ]));
             });
             const wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet(data);
-            ws['!cols']=[18,12,18,14,14,24,13,13,10,13,15,14,12,24,18,16,22,20,28].map(w=>({wch:w}));
+            ws['!cols']=[18,12,18,15,15,16,16,28,24,13,13,10,13,15,14,12,24,18,16,22,20,28].map(w=>({wch:w}));
             XLSX.utils.book_append_sheet(wb,ws,'Collection_Sheet');
             XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_Upcoming_EMI_Collection.xlsx`);
         }
@@ -3875,7 +3971,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 rangeTotal+=snap.selectedRangeEmiTotal; unpaidRangeCount+=current.length; previousTotal+=snap.earlierBalance; penaltyTotal+=snap.earlierPenalty;
                 const currentText=current.length===1?`#${current[0].no} · ${formatToIndianDate(current[0].dueDate)} · ₹${Number(current[0].totalDue??current[0].emi).toLocaleString('en-IN')}`:current.length?`${current.length} EMIs (#${current[0].no}–#${current[current.length-1].no}) · ₹${snap.selectedRangeEmiTotal.toLocaleString('en-IN')}`:'No unpaid EMI';
                 const prevText=a?`${snap.earlierItems.length} EMI${snap.earlierItems.length>1?'s':''} · ₹${snap.earlierBalance.toLocaleString('en-IN')} · ${formatToIndianDate(snap.earlierItems[0].dueDate)} → ${formatToIndianDate(snap.earlierItems[snap.earlierItems.length-1].dueDate)}`:'None';
-                return `<tr class="${a?'attention-row':''}"><td><b>${financeEsc(l.name)}</b><br><span class="muted">${financeEsc(l.id)} · ${financeEsc(loanCollectorName(l))}</span><br><span class="muted">Mob: ${financeEsc(l.phone||'-')}${(l.guarantorPhone||l.phone2)?' · G: '+financeEsc(l.guarantorPhone||l.phone2):''}</span></td><td>${currentText}<br><span class="muted">Disbursed ${formatToIndianDate(l.disbursalDate)} · Maturity ${formatToIndianDate(mfLoanScheduleDueIso(l,Number(p.tenure)||0))}</span></td><td>${prevText}</td><td>${snap.earlierPenalty?'₹'+snap.earlierPenalty.toLocaleString('en-IN'):'₹0'}</td><td class="money">₹${snap.combinedTotal.toLocaleString('en-IN')}</td></tr>`;
+                return `<tr class="${a?'attention-row':''}"><td><b>${financeEsc(l.name)}</b><br><span class="muted">${financeEsc(l.id)} · ${financeEsc(loanCollectorName(l))}</span><br><span class="muted">Customer: ${financeEsc(mfContactText(l.phone,l.phone2))}${mfGuarantorContactText(l)?' · Guarantor: '+financeEsc(mfGuarantorContactText(l)):''}<br>Disbursal Mode: ${financeEsc(mfDisbursalModeLabel(l.disbursalMode))}</span></td><td>${currentText}<br><span class="muted">Disbursed ${formatToIndianDate(l.disbursalDate)} · Maturity ${formatToIndianDate(mfLoanScheduleDueIso(l,Number(p.tenure)||0))}</span></td><td>${prevText}</td><td>${snap.earlierPenalty?'₹'+snap.earlierPenalty.toLocaleString('en-IN'):'₹0'}</td><td class="money">₹${snap.combinedTotal.toLocaleString('en-IN')}</td></tr>`;
             }).join('');
             const summary=`<div class="mf-print-summary-grid"><div><span>Period</span><b>${formatToIndianDate(from)} to ${formatToIndianDate(to)}</b></div><div><span>Collector</span><b>${financeEsc(collectorLabel)}</b></div><div><span>Unpaid EMIs in Range</span><b>${unpaidRangeCount} · ₹${rangeTotal.toLocaleString('en-IN')}</b></div><div><span>Previous Arrears</span><b>₹${previousTotal.toLocaleString('en-IN')}</b></div><div><span>Penalty Due</span><b>₹${penaltyTotal.toLocaleString('en-IN')}</b></div></div>`;
             const note=`<div class="mf-print-note"><b>Staff collection rule:</b> Previous unpaid EMIs are shown separately from the selected-range EMI(s). Clear the oldest previous EMI first. “Collect Now” = previous EMI balance + previous penalty due + unpaid EMI(s) in the selected range.</div>`;
@@ -4753,6 +4849,8 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             document.getElementById("fc-phone2").value = "";
             document.getElementById("fc-guarantor-name").value = "";
             document.getElementById("fc-guarantor-phone").value = "";
+            document.getElementById("fc-guarantor-phone2").value = "";
+            document.getElementById("fc-disbursal-mode").value = "Cash";
             document.getElementById("fc-collector").value = "";
             document.getElementById("fc-address").value = "";
             const today=new Date().toISOString().split('T')[0];
@@ -4775,6 +4873,8 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             document.getElementById("fc-phone2").value = loan.phone2 || "";
             document.getElementById("fc-guarantor-name").value = loan.guarantorName || "";
             document.getElementById("fc-guarantor-phone").value = loan.guarantorPhone || "";
+            document.getElementById("fc-guarantor-phone2").value = loan.guarantorPhone2 || loan.guarantorSecondaryPhone || "";
+            document.getElementById("fc-disbursal-mode").value = loan.disbursalMode || "Cash";
             populateLoanCollectorSelect();
             document.getElementById("fc-collector").value = loan.collectorId || "";
             document.getElementById("fc-address").value = loan.address || "";
@@ -4855,12 +4955,30 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 document.getElementById("fc-preview-box").innerHTML = `
                     <div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;"><span>Loan: <b style="color:#fff;">₹${p.amount.toLocaleString('en-IN')}</b></span> <span>File: <b style="color:#fbbf24;">₹${p.fileCharge}</b></span></div>
                     <div style="display:flex; justify-content:space-between; margin-top:3px; gap:8px; flex-wrap:wrap;"><span>Disbursed: <b style="color:#60a5fa;">₹${(p.amount-p.fileCharge).toLocaleString('en-IN')}</b></span> <span>Penalty: <b style="color:#fbbf24;">₹${p.penalty || 0}</b></span></div>
+                    <div style="margin-top:3px;color:#cbd5e1;">Disbursal Mode: <b style="color:#a7f3d0;">${mfDisbursalModeLabel(document.getElementById("fc-disbursal-mode")?.value || "Cash")}</b></div>
                     ${extra}
                 `;
             }
         }
 
         function closeModal(id) { document.getElementById(id).classList.remove("active"); }
+
+        // Contact helpers: keep 1 or 2 customer/guarantor numbers consistent across collection outputs.
+        function mfContactText(primary, secondary) {
+            const a=String(primary||'').trim(), b=String(secondary||'').trim();
+            return [a,b].filter(Boolean).join(' / ') || '-';
+        }
+        function mfGuarantorContactText(loan) {
+            const g=mfContactText(loan?.guarantorPhone, loan?.guarantorPhone2 || loan?.guarantorSecondaryPhone);
+            return g==='-' ? '' : g;
+        }
+        function mfDisbursalModeLabel(mode) {
+            const m=String(mode||'').trim();
+            if(m==='UPI') return 'UPI (GPay / PhonePe / Other Payment Bank)';
+            if(m==='Bank Transfer') return 'Bank Transfer / Cheque';
+            if(m==='Cash + UPI (Both)') return 'Mixed (Cash + UPI / Bank Transfer / Cheque)';
+            return m || 'Cash';
+        }
 
         function handleClientSubmit(e) {
             e.preventDefault();
@@ -4870,6 +4988,8 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             const phone2 = document.getElementById("fc-phone2").value.trim();
             const guarantorName = document.getElementById("fc-guarantor-name").value.trim();
             const guarantorPhone = document.getElementById("fc-guarantor-phone").value.trim();
+            const guarantorPhone2 = document.getElementById("fc-guarantor-phone2")?.value.trim() || "";
+            const disbursalMode = document.getElementById("fc-disbursal-mode")?.value || "Cash";
             const collectorId = document.getElementById("fc-collector")?.value || "";
             const collector = (state.staff||[]).find(x=>x.id===collectorId);
             const address = document.getElementById("fc-address").value.trim();
@@ -4884,11 +5004,11 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             preEmiInterest=details.interest; preEmiDays=details.days;
             if (mode === "ADD") {
                 const newId = "L-" + (1000 + state.loans.length + 1);
-                state.loans.push({id:newId,name,phone,phone2,guarantorName,guarantorPhone,collectorId,collectorName:collector?collector.name:"",address,product:prod,disbursalDate:date,payments:[],foreclosed:false,foreclosureData:null,firstDueDate:firstDueDate||null,fixedDueDate:firstDueDate||null,preEmiDays,preEmiInterest,preEmiInterestReceived:0,preEmiDate:null});
+                state.loans.push({id:newId,name,phone,phone2,guarantorName,guarantorPhone,guarantorPhone2,collectorId,collectorName:collector?collector.name:"",address,product:prod,disbursalDate:date,disbursalMode,payments:[],foreclosed:false,foreclosureData:null,firstDueDate:firstDueDate||null,fixedDueDate:firstDueDate||null,preEmiDays,preEmiInterest,preEmiInterestReceived:0,preEmiDate:null});
             } else {
                 const id = document.getElementById("fc-id").value;
                 const loan = state.loans.find(l => l.id === id); if(!loan)return;
-                loan.name=name; loan.phone=phone; loan.phone2=phone2; loan.guarantorName=guarantorName; loan.guarantorPhone=guarantorPhone; loan.collectorId=collectorId; loan.collectorName=collector?collector.name:""; loan.address=address; loan.product=prod; loan.disbursalDate=date;
+                loan.name=name; loan.phone=phone; loan.phone2=phone2; loan.guarantorName=guarantorName; loan.guarantorPhone=guarantorPhone; loan.guarantorPhone2=guarantorPhone2; loan.collectorId=collectorId; loan.collectorName=collector?collector.name:""; loan.address=address; loan.product=prod; loan.disbursalDate=date; loan.disbursalMode=disbursalMode;
                 loan.firstDueDate=firstDueDate||null; loan.fixedDueDate=firstDueDate||null; loan.preEmiDays=preEmiDays; loan.preEmiInterest=preEmiInterest; loan.preEmiInterestReceived=0; loan.preEmiDate=null;
             }
             closeModal("modal-client"); persist();
@@ -6460,16 +6580,17 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                     </div>
                     <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; font-size:0.8rem;">
                         <div><span style="color:#94a3b8;">Customer:</span> <b style="color:#fff;">${l.name}</b></div>
-                        <div style="text-align:right;"><span style="color:#94a3b8;">Phone:</span> <b style="color:#fff;">${l.phone}</b></div>
+                        <div style="text-align:right;"><span style="color:#94a3b8;">Customer Mobile:</span> <b style="color:#fff;">${mfContactText(l.phone,l.phone2)}</b></div>
                         <div><span style="color:#94a3b8;">Plan:</span> <b style="color:#60a5fa;">${p.name}</b></div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Disbursal Date:</span> <b style="color:#fff;">${formatToIndianDate(l.disbursalDate)}</b></div>
                         <div><span style="color:#94a3b8;">Loan Amount:</span> <b style="color:#fff;">₹${p.amount.toLocaleString('en-IN')}</b></div>
+                        <div style="text-align:right;"><span style="color:#94a3b8;">Disbursal Mode:</span> <b style="color:#34d399;">${mfDisbursalModeLabel(l.disbursalMode)}</b></div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Total Recovered:</span> <b style="color:#34d399;">₹${totalPaidGross.toLocaleString('en-IN')}</b></div>
                         ${l.foreclosed ? `<div><span style="color:#94a3b8;">Pre-Closure Interest:</span> <b style="color:#34d399;">₹${preClosureInterest.toLocaleString('en-IN',{maximumFractionDigits:2})}</b></div>` : ''}
                         <div><span style="color:#94a3b8;">Tenure:</span> ${p.tenure} EMIs (₹${p.emi})</div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Outstanding Balance:</span> <b style="color:${pending<=0?'#34d399':'#f87171'}; font-size:1rem;">₹${pending.toLocaleString('en-IN')}</b></div>
                     </div>
-                    ${l.guarantorName ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:0.8rem;"><span style="color:#94a3b8;">Guarantor:</span> <b style="color:#fff;">${l.guarantorName}</b>${l.guarantorPhone ? ` · <b style="color:#fff;">${l.guarantorPhone}</b>` : ''}</div>` : ''}
+                    ${l.guarantorName ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:0.8rem;"><span style="color:#94a3b8;">Guarantor:</span> <b style="color:#fff;">${l.guarantorName}</b>${mfGuarantorContactText(l) ? ` · <b style="color:#fff;">${mfGuarantorContactText(l)}</b>` : ''}</div>` : ''}
                 </div>
 
                 <!-- Total Collected From This Client — Segregation Box (like Lender Cost Breakdown) -->
@@ -6576,9 +6697,10 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                     </div>
                     <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; font-size:0.8rem;">
                         <div><span style="color:#94a3b8;">Customer:</span> <b style="color:#fff;">${l.name}</b></div>
-                        <div style="text-align:right;"><span style="color:#94a3b8;">Phone:</span> <b style="color:#fff;">${l.phone}${l.phone2 ? ' / ' + l.phone2 : ''}</b></div>
+                        <div style="text-align:right;"><span style="color:#94a3b8;">Customer Mobile:</span> <b style="color:#fff;">${mfContactText(l.phone,l.phone2)}</b></div>
                         <div><span style="color:#94a3b8;">Plan:</span> <b style="color:#60a5fa;">${p.name}</b></div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Disbursal Date:</span> <b style="color:#fff;">${formatToIndianDate(l.disbursalDate)}</b></div>
+                        <div><span style="color:#94a3b8;">Disbursal Mode:</span> <b style="color:#34d399;">${mfDisbursalModeLabel(l.disbursalMode)}</b></div>
                         <div><span style="color:#94a3b8;">Loan Amount:</span> <b style="color:#fff;">₹${p.amount.toLocaleString('en-IN')}</b></div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Total Scheduled Payable (EMIs + applicable Pre-EMI Interest):</span> <b style="color:#fff;">₹${(p.emi * p.tenure + mfLoanPreEmiDue(l)).toLocaleString('en-IN')}</b></div>
                         <div><span style="color:#94a3b8;">Tenure:</span> ${p.tenure} EMIs (₹${p.emi} each)</div>
@@ -6700,6 +6822,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                             <tr><td style="border:none; padding:4px 0;"><b>Loan Account No:</b></td><td style="border:none; padding:4px 0;">${l.id}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Sanctioned Loan Amount:</b></td><td style="border:none; padding:4px 0;">₹${p.amount.toLocaleString('en-IN')}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Loan Disbursal Date:</b></td><td style="border:none; padding:4px 0;">${formatToIndianDate(l.disbursalDate)}</td></tr>
+                            <tr><td style="border:none; padding:4px 0;"><b>Disbursal Payment Mode:</b></td><td style="border:none; padding:4px 0;">${mfDisbursalModeLabel(l.disbursalMode)}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Foreclosure Date:</b></td><td style="border:none; padding:4px 0;">${formatToIndianDate(l.foreclosureData.settlementDate)}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Remaining Principal:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.principalPaid||0).toLocaleString('en-IN')}</td></tr>
                             ${Number(l.foreclosureData.partialAmountAlreadyCollected||0)>0 ? `<tr><td style="border:none; padding:4px 0;"><b>Partial Amount Already Collected:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.partialAmountAlreadyCollected).toLocaleString('en-IN')}</td></tr>` : ''}
@@ -6707,7 +6830,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                             <tr><td style="border:none; padding:4px 0;"><b>Foreclosure Fee:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.feeAmount||0).toLocaleString('en-IN')}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>GST on Foreclosure Fee:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.gstAmount||0).toLocaleString('en-IN')}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Final Settlement Amount:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.settlementAmount||0).toLocaleString('en-IN')} (${l.foreclosureData.mode})</td></tr>
-                            ${l.guarantorName ? `<tr><td style="border:none; padding:4px 0;"><b>Guarantor:</b></td><td style="border:none; padding:4px 0;">${l.guarantorName}${l.guarantorPhone ? ' (' + l.guarantorPhone + ')' : ''}</td></tr>` : ''}
+                            ${l.guarantorName ? `<tr><td style="border:none; padding:4px 0;"><b>Guarantor:</b></td><td style="border:none; padding:4px 0;">${l.guarantorName}${mfGuarantorContactText(l) ? ' (' + mfGuarantorContactText(l) + ')' : ''}</td></tr>` : ''}
                         </table>
                     </div>
 
@@ -6770,6 +6893,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                             <tr><td style="border:none; padding:4px 0;"><b>Loan Account No:</b></td><td style="border:none; padding:4px 0;">${l.id}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Sanctioned Loan Amount:</b></td><td style="border:none; padding:4px 0;">₹${p.amount.toLocaleString('en-IN')}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Loan Disbursal Date:</b></td><td style="border:none; padding:4px 0;">${formatToIndianDate(l.disbursalDate)}</td></tr>
+                            <tr><td style="border:none; padding:4px 0;"><b>Disbursal Payment Mode:</b></td><td style="border:none; padding:4px 0;">${mfDisbursalModeLabel(l.disbursalMode)}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Total EMIs Serviced:</b></td><td style="border:none; padding:4px 0;">${p.tenure} Installments</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Pre-EMI Interest:</b></td><td style="border:none; padding:4px 0;">₹${preEmiInterest.toLocaleString('en-IN',{maximumFractionDigits:2})}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Total Amount Paid:</b></td><td style="border:none; padding:4px 0;">₹${paidGross.toLocaleString('en-IN')}</td></tr>
@@ -7694,6 +7818,15 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 });
                 const totalInflow=Object.values(inflowByMode).reduce((a,x)=>a+x.amount,0);
                 const inflowRows=Object.keys(inflowByMode).sort((a,b)=>inflowByMode[b].amount-inflowByMode[a].amount).map(m=>`<tr><td><b>${financeEsc(m)}</b></td><td>${inflowByMode[m].count}</td><td><b>${money(inflowByMode[m].amount)}</b></td></tr>`);
+                // DISBURSAL: separate capital-deployment view by actual disbursal mode.
+                // Kept separate from inflow/outflow totals so profit math is unchanged.
+                const disbursalByMode={};
+                d.disbursed.forEach(x=>{
+                    const m=x.loan.disbursalMode||'Cash';
+                    if(!disbursalByMode[m]) disbursalByMode[m]={count:0,amount:0};
+                    if(x.includeDisb){ disbursalByMode[m].count++; disbursalByMode[m].amount+=Number(x.p.amount)||0; }
+                });
+                const disbursalRows=Object.keys(disbursalByMode).sort((a,b)=>disbursalByMode[b].amount-disbursalByMode[a].amount).map(m=>`<tr><td><b>${financeEsc(mfDisbursalModeLabel(m))}</b></td><td>${disbursalByMode[m].count}</td><td><b>${money(disbursalByMode[m].amount)}</b></td></tr>`);
 
                 // OUTFLOW: salaries + business expenses + lender repayments, grouped by mode (with category split)
                 const outflowByMode={};
@@ -7706,6 +7839,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
 
                 headerHtml=financeHeader([['Total Collected (Inflow)',money(totalInflow)],['Total Paid Out (Outflow)',money(totalOutflow)],['Net Movement',money(totalInflow-totalOutflow)]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}. Inflow = customer EMI collections. Outflow = staff salaries + business expenses + lender repayments.</div>`;
                 detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Inflow — Customer Collections by Mode</b></div>${financeTable(['Payment Mode','Transactions','Total Collected'],inflowRows.length?inflowRows:['<tr><td colspan="3" style="text-align:center;padding:14px;color:#64748b;">No collections in this period.</td></tr>'])}</div>`;
+                detailHtml+=`<div class="finance-section"><div class="finance-section-head"><b>Disbursal — Capital Deployed by Mode</b></div>${financeTable(['Disbursal Mode','Loans','Loan Amount Deployed'],disbursalRows.length?disbursalRows:['<tr><td colspan="3" style="text-align:center;padding:14px;color:#64748b;">No disbursals in this period.</td></tr>'])}</div>`;
                 detailHtml+=`<div class="finance-section"><div class="finance-section-head"><b>Outflow — Salaries, Expenses & Lender Repayments by Mode</b></div>${financeTable(['Payment Mode','Salary','Business Expense','Lender Repayment','Total'],outflowRows.length?outflowRows:['<tr><td colspan="5" style="text-align:center;padding:14px;color:#64748b;">No outflow in this period.</td></tr>'])}</div>`;
             } else {
                 title='TRUE IN-HAND NET SURPLUS — Complete Calculation';
@@ -7740,11 +7874,11 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             if(type==='gross') return d.disbursed.map(x=>[x.loan.id,x.loan.name,x.loan.phone,x.p.name,x.includeDisb?x.p.fileCharge:0,x.interest,x.preEmiInterest,x.penalty,x.foreclosureFee,x.preClosureInterest,x.postMaturityInterest,x.settlementWaiver||0,x.totalProfit]);
             if(type==='lender') return d.lender.flatMap(x=>x.filteredRepayments.map(r=>[r.date,x.b.lenderName,r.principal,r.interest,r.gst||0,(Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0),r.mode||'']));
             if(type==='opex') return [...d.payroll.map(x=>[x.sp.date,x.st.name,'Payroll',x.sp.amount,x.sp.mode||'']),...d.expenses.map(x=>[x.date,x.category,x.desc,x.amount,x.mode||''])];
-            if(type==='disbursed') return d.disbursed.map(x=>[x.loan.id,x.loan.name,x.loan.phone,x.p.name,x.loan.disbursalDate,x.p.amount,x.loan.foreclosed?'FORECLOSED':(x.loan.postMaturitySettlement?'SETTLED':(x.loan.payments.length?'ACTIVE':'ACTIVE'))]);
+            if(type==='disbursed') return d.disbursed.map(x=>[x.loan.id,x.loan.name,mfContactText(x.loan.phone,x.loan.phone2),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode),x.p.amount,x.loan.foreclosed?'FORECLOSED':(x.loan.postMaturitySettlement?'SETTLED':(x.loan.payments.length?'ACTIVE':'ACTIVE'))]);
             return [['Gross Revenue',d.gross],['Lender Cost',d.lenderCost],['Staff Salaries',d.salaries],['General Expenses',d.generalExp],['TRUE IN-HAND NET SURPLUS',d.net]];
         }
         function exportFinanceDetailReport(){
-            const d=getFinanceSnapshot(), wb=XLSX.utils.book_new(), type=financeCurrentType, rows=financeRowsForExport(type,d), headers=type==='gross'?['Loan ID','Customer','Phone','Product','File Charge','Contractual Interest','Pre-EMI Interest','Penalty','Foreclosure Fee','Pre-Closure Interest','Post-Maturity Recovery Interest','Settlement Waiver (Not Revenue)','Revenue']:type==='lender'?['Date','Lender','Principal','Interest','GST','Total','Mode']:type==='opex'?['Date','Payee / Category','Type / Description','Amount','Mode']:type==='disbursed'?['Loan ID','Customer','Phone','Product','Disbursal Date','Loan Amount','Status']:['Metric','Amount'];
+            const d=getFinanceSnapshot(), wb=XLSX.utils.book_new(), type=financeCurrentType, rows=financeRowsForExport(type,d), headers=type==='gross'?['Loan ID','Customer','Phone','Product','File Charge','Contractual Interest','Pre-EMI Interest','Penalty','Foreclosure Fee','Pre-Closure Interest','Post-Maturity Recovery Interest','Settlement Waiver (Not Revenue)','Revenue']:type==='lender'?['Date','Lender','Principal','Interest','GST','Total','Mode']:type==='opex'?['Date','Payee / Category','Type / Description','Amount','Mode']:type==='disbursed'?['Loan ID','Customer','Customer Mobile(s)','Product','Disbursal Date','Disbursal Mode','Loan Amount','Status']:['Metric','Amount'];
             XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['MicroFinance Financial Detail Report'],['Report Period',financePeriodLabel()],[],headers,...rows]),'Detail_Report');
             XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_${type}_Detail_Report.xlsx`);
         }
