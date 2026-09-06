@@ -630,6 +630,45 @@ html.mf-qa-preview .top-header,html.mf-qa-preview .main-wrap{pointer-events:none
 html.mf-qa-preview #app-lock-overlay{display:none!important;}
 @media(max-width:760px){.mf-advanced-tool-grid{grid-template-columns:1fr;}.mf-audit-summary{grid-template-columns:1fr 1fr;}.mf-audit-row{grid-template-columns:68px 76px 1fr;}.mf-audit-row>div:last-child{grid-column:1/-1;text-align:right;}.mf-version-row{grid-template-columns:1fr;}.mf-version-actions{justify-content:flex-start;}.mf-qa-preview-wrap{padding:5px;}}
 </style>
+
+<style id="mf-premium-banking-theme">
+@media screen {
+  :root{
+    --bg-body:#07111f;
+    --bg-card:#0f1c2d;
+    --bg-card-hover:#15263c;
+    --primary:#2f7cf6;
+    --primary-glow:rgba(47,124,246,.30);
+    --accent:#d8a84e;
+    --success:#19b889;
+    --danger:#e45b68;
+    --purple:#8f73e8;
+    --pink:#d66bb0;
+    --text-main:#f4f7fb;
+    --text-muted:#9aa9bb;
+    --border-subtle:rgba(164,190,220,.13);
+  }
+  body{
+    background:
+      radial-gradient(900px 420px at 50% -160px,rgba(47,124,246,.16),transparent 70%),
+      radial-gradient(700px 360px at 100% 20%,rgba(216,168,78,.055),transparent 72%),
+      var(--bg-body);
+  }
+  .top-header{background:linear-gradient(180deg,rgba(8,18,32,.97),rgba(10,23,39,.92));border-bottom-color:rgba(148,163,184,.15);box-shadow:0 10px 30px rgba(0,0,0,.18)}
+  .cloud-banner,.tab-shell,.tab-bar,.kpi-card,.client-card,.statement-box,.table-wrap,.modal-card{box-shadow:0 10px 30px rgba(0,0,0,.16);border-color:rgba(164,190,220,.13)}
+  .kpi-card,.client-card,.statement-box,.table-wrap{background:linear-gradient(180deg,rgba(18,31,49,.98),rgba(12,24,40,.98));}
+  .modal-card{background:linear-gradient(180deg,#101d2f,#0b1727);}
+  input,select,textarea{background:rgba(8,20,34,.76)!important;border-color:rgba(148,163,184,.19)!important;color:#f5f7fb!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}
+  input:focus,select:focus,textarea:focus{border-color:rgba(47,124,246,.72)!important;box-shadow:0 0 0 3px rgba(47,124,246,.11)!important}
+  .tab-btn.active{background:linear-gradient(135deg,#2f7cf6,#1d56bb);box-shadow:0 7px 18px rgba(47,124,246,.23)}
+  .btn-blue{background:linear-gradient(135deg,#2f7cf6,#1d56bb)}
+  .btn-green{background:linear-gradient(135deg,#19b889,#087d60)}
+  .btn-purple{background:linear-gradient(135deg,#8f73e8,#6549bf)}
+  .biz-input{background:rgba(255,255,255,.045);border-color:rgba(164,190,220,.18)}
+  .mf-schedule-design-note{margin-top:6px;padding:8px 9px;border:1px solid rgba(47,124,246,.20);background:linear-gradient(180deg,rgba(47,124,246,.07),rgba(15,23,42,.35));border-radius:9px;color:#a9bad0;font-size:.64rem;line-height:1.5}
+  .mf-schedule-design-note b{color:#dbeafe}
+}
+</style>
 </head>
 <body>
 
@@ -1069,7 +1108,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                         <select id="fc-fixed-month" onchange="previewProductSummary()"></select>
                         <select id="fc-fixed-year" onchange="previewProductSummary()"></select>
                     </div>
-                    <small id="fc-fixed-date-note" style="display:block;color:#94a3b8;font-size:.64rem;line-height:1.45;margin-top:5px;">Default: Disbursal Date + the product cycle. You may choose the first EMI date; if it is later than the default, Pre-EMI Interest is calculated for the extra days. Later EMIs follow the selected frequency.</small>
+                    <small id="fc-fixed-date-note" style="display:block;color:#94a3b8;font-size:.64rem;line-height:1.45;margin-top:5px;">The default first EMI follows the selected product schedule. You may choose another valid first EMI date for this customer; if it is later than the product default, Pre-EMI Interest is calculated for the extra days. Later EMIs follow the selected schedule rule.</small>
                 </div>
 
                 <div id="fc-preview-box" style="background: rgba(255,255,255,0.04); padding: 10px; border-radius: 10px; font-size: 0.78rem; margin-bottom: 14px; border: 1px solid var(--border-subtle);"></div>
@@ -1531,11 +1570,13 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                             <option value="7">Weekly (7 Days)</option>
                             <option value="15">Fortnightly (15 Days)</option>
                             <option value="30">Monthly (30 Days)</option>
+                            <option value="MONTHLY_CALENDAR">Monthly (Calendar Date)</option>
                             <option value="M15FIXED">Monthly (15-Day Start → Fixed Date)</option>
                             <option value="CUSTOM">Custom Cycle (Days)</option>
                         </select>
                         <input type="number" id="fp-custom-days" min="1" step="1" placeholder="e.g. 10" style="display:none;margin-top:6px;" oninput="productFrequencyChanged()">
                         <small id="fp-frequency-note" style="display:block;color:#94a3b8;font-size:.64rem;line-height:1.45;margin-top:5px;"></small>
+                        <div class="mf-schedule-design-note"><b>Schedule control:</b> The product defines the repayment pattern; at loan creation the <b>First EMI Date</b> can be adjusted for the individual customer. This supports 10-day / 15-day alignment, fixed-date monthly schedules, and calendar-month schedules without changing the EMI interest calculation.</div>
                     </div>
                 </div>
                 <div style="background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.16);padding:8px;border-radius:9px;margin-bottom:8px;">
@@ -2237,6 +2278,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             if(!p) return 'MONTHLY_30';
             const mode=String(p.frequencyMode||p.repaymentFrequency||'').toUpperCase();
             if(mode==='M15FIXED' || mode==='MONTHLY_15_FIXED' || mode==='MONTHLY_15_DAY_FIXED') return 'M15FIXED';
+            if(mode==='MONTHLY_CALENDAR' || mode==='CALENDAR_MONTHLY' || mode==='MONTHLY_DATE') return 'MONTHLY_CALENDAR';
             if(mode==='CUSTOM') return 'CUSTOM';
             const d=Number(p.days);
             if(d===7) return 'WEEKLY';
@@ -2248,11 +2290,12 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             const mode=mfProductFrequencyMode(p);
             if(mode==='WEEKLY') return 7;
             if(mode==='FORTNIGHTLY') return 15;
-            if(mode==='M15FIXED' || mode==='MONTHLY_30') return 30;
+            if(mode==='M15FIXED' || mode==='MONTHLY_30' || mode==='MONTHLY_CALENDAR') return 30;
             const d=Number(p?.days)||30;
             return d>0 ? d : 30;
         }
         function mfIsMonthly15Fixed(p){ return mfProductFrequencyMode(p)==='M15FIXED'; }
+        function mfIsMonthlyCalendar(p){ return mfProductFrequencyMode(p)==='MONTHLY_CALENDAR'; }
         function mfIsoFromLocalDate(d){
             if(!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
             return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -2268,7 +2311,15 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             return mfIsoFromLocalDate(new Date(targetYear,targetMonth,Math.min(day,lastDay)));
         }
         function mfDefaultFirstDueIso(loan){
-            return loan && loan.disbursalDate ? mfIsoAddDays(loan.disbursalDate,15) : '';
+            if(!loan || !loan.disbursalDate) return '';
+            const p=state.products[loan.product];
+            const mode=mfProductFrequencyMode(p);
+            // New calendar-month products use the same day in the next calendar month.
+            if(mode==='MONTHLY_CALENDAR') return mfAddMonthsClamped(loan.disbursalDate,1);
+            // Custom-cycle products default to their configured cycle length.
+            if(mode==='CUSTOM') return mfIsoAddDays(loan.disbursalDate,mfProductCycleDays(p));
+            // Preserve the established legacy/default behaviour for existing standard modes.
+            return mfIsoAddDays(loan.disbursalDate,15);
         }
         function mfLoanFirstDueIso(loan){
             const p=loan ? state.products[loan.product] : null;
@@ -2280,7 +2331,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             const p=loan ? state.products[loan.product] : null;
             const n=Math.max(1,Number(installmentNo)||1);
             if(!loan || !p || !loan.disbursalDate) return '';
-            if(mfIsMonthly15Fixed(p)) return mfAddMonthsClamped(mfLoanFirstDueIso(loan), n-1);
+            if(mfIsMonthly15Fixed(p) || mfIsMonthlyCalendar(p)) return mfAddMonthsClamped(mfLoanFirstDueIso(loan), n-1);
             return mfIsoAddDays(mfLoanFirstDueIso(loan), (n-1)*mfProductCycleDays(p));
         }
         function mfMonthlyInterestForPreEmi(p){
@@ -4766,7 +4817,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         function syncClientFixedDateFromDisbursal(){
             const p=state.products[document.getElementById("fc-product")?.value];
             const disb=getClientDisbursalIso();
-            if(disb && p)setDmyValues("fc-fixed",mfIsoAddDays(disb,mfProductCycleDays(p)));
+            if(disb && p)setDmyValues("fc-fixed",mfDefaultFirstDueIso({product:document.getElementById("fc-product")?.value,disbursalDate:disb}));
         }
         function updateClientFixedDateControls(preferredIso=''){
             const group=document.getElementById("fc-fixed-date-group"), note=document.getElementById("fc-fixed-date-note"), p=state.products[document.getElementById("fc-product")?.value];
@@ -4785,7 +4836,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 const extra=details.interest>0
                     ? ` Pre-EMI Interest: ${details.days} day(s) × ₹${details.monthlyInterest.toLocaleString('en-IN',{maximumFractionDigits:2})} ÷ 30 = ₹${details.interest.toLocaleString('en-IN',{maximumFractionDigits:2})}.`
                     : ` No Pre-EMI Interest applies when the selected first EMI date is on/before the default due date.`;
-                const later=mfIsMonthly15Fixed(p) ? 'Subsequent EMIs repeat monthly on the selected calendar date.' : `Subsequent EMIs repeat every ${cycle} days from the selected first EMI date.`;
+                const later=(mfIsMonthly15Fixed(p) || mfIsMonthlyCalendar(p)) ? 'Subsequent EMIs repeat monthly on the selected calendar date.' : `Subsequent EMIs repeat every ${cycle} days from the selected first EMI date.`;
                 note.innerHTML=`Default first due: <b>${formatToIndianDate(defaultFirst)}</b>. Selected first due: <b>${formatToIndianDate(finalChosen)}</b>. ${later}${extra}`;
             }
         }
@@ -5086,7 +5137,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         }
         function getProductFrequencyDays(){
             const raw=String(document.getElementById("fp-frequency")?.value||"30");
-            if(raw==="M15FIXED") return 30;
+            if(raw==="M15FIXED" || raw==="MONTHLY_CALENDAR") return 30;
             if(raw==="CUSTOM") return parseInt(document.getElementById("fp-custom-days")?.value,10)||0;
             return parseInt(raw,10)||30;
         }
@@ -5101,8 +5152,9 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             const custom=document.getElementById("fp-custom-days");
             if(custom) custom.style.display=mode==="CUSTOM"?'block':'none';
             if(note){
-                if(mode==="M15FIXED") note.innerHTML="<b>Monthly (15-Day Start → Fixed Date):</b> EMI calculation remains monthly (30-day basis). At loan disbursal, the first contractual due date defaults to +15 days; the client may choose a different first date. Later EMIs repeat monthly on that chosen calendar date.";
-                else if(mode==="CUSTOM") note.innerHTML="<b>Custom Cycle:</b> enter the number of days between EMIs (for example 10). The first EMI date can be chosen at loan creation; Pre-EMI Interest uses the product's configured interest on a 30-day pro-rata basis, and later EMIs repeat by the selected cycle.";
+                    if(mode==="M15FIXED") note.innerHTML="<b>Monthly (15-Day Start → Fixed Date):</b> EMI calculation remains monthly (30-day basis). The first contractual due date defaults to +15 days; the client may choose a different first date. Later EMIs repeat monthly on that chosen calendar date.";
+                else if(mode==="MONTHLY_CALENDAR") note.innerHTML="<b>Monthly (Calendar Date):</b> the default first EMI is one calendar month after disbursal (e.g. 01 Sep → 01 Oct). At loan creation you may choose any valid first EMI date; later EMIs repeat monthly on that chosen calendar date. Pre-EMI Interest applies only when the selected first date is later than the product's default first date.";
+                else if(mode==="CUSTOM") note.innerHTML="<b>Custom Cycle:</b> enter the number of days between EMIs (for example 10). The default first EMI uses that cycle. At loan creation you may choose a different first EMI date; Pre-EMI Interest uses the product's configured interest on a 30-day pro-rata basis, and later EMIs repeat by the selected cycle.";
                 else note.innerHTML=`<b>${mode==="7"?'Weekly (7 Days)':mode==="15"?'Fortnightly (15 Days)':'Monthly (30 Days)'}</b>: the first EMI date can be chosen at loan creation; the normal cycle starts from that selected first date.`;
             }
         }
@@ -5225,7 +5277,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             document.getElementById("fp-tenure").value = p.tenure ?? "";
             document.getElementById("fp-rate").value = p.rate ?? "";
             document.getElementById("fp-interest-basis").value = p.interestBasis || "Reducing Basis";
-            const editFreq=(p.frequencyMode==='M15FIXED')?'M15FIXED':(['7','15','30'].includes(String(p.days||''))?String(p.days):'CUSTOM');
+            const editFreq=(p.frequencyMode==='M15FIXED')?'M15FIXED':(p.frequencyMode==='MONTHLY_CALENDAR'?'MONTHLY_CALENDAR':(['7','15','30'].includes(String(p.days||''))?String(p.days):'CUSTOM'));
             document.getElementById("fp-frequency").value = editFreq;
             document.getElementById("fp-custom-days").value = editFreq==='CUSTOM' ? (p.days||'') : '';
             updateProductFrequencyUi();
@@ -5256,7 +5308,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             let rate = parseFloat(document.getElementById("fp-rate").value);
             const basis = document.getElementById("fp-interest-basis").value || "Reducing Basis";
             const frequencyMode = String(document.getElementById("fp-frequency").value || "30");
-            const days = frequencyMode === "M15FIXED" ? 30 : (frequencyMode === "CUSTOM" ? parseInt(document.getElementById("fp-custom-days")?.value,10) : parseInt(frequencyMode, 10));
+            const days = (frequencyMode === "M15FIXED" || frequencyMode === "MONTHLY_CALENDAR") ? 30 : (frequencyMode === "CUSTOM" ? parseInt(document.getElementById("fp-custom-days")?.value,10) : parseInt(frequencyMode, 10));
             const penalty = parseFloat(document.getElementById("fp-penalty").value) || 0;
             const postMaturityInterest = parseFloat(document.getElementById("fp-post-maturity-interest").value) || 0;
             let emi = parseFloat(document.getElementById("fp-emi").value);
@@ -5283,7 +5335,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 interest = Number(calc.firstInterest.toFixed(2));
             }
 
-            const storedFrequencyMode = frequencyMode === "M15FIXED" ? "M15FIXED" : (days===7 ? "WEEKLY" : (days===15 ? "FORTNIGHTLY" : (days===30 ? "MONTHLY_30" : "CUSTOM")));
+            const storedFrequencyMode = frequencyMode === "M15FIXED" ? "M15FIXED" : (frequencyMode === "MONTHLY_CALENDAR" ? "MONTHLY_CALENDAR" : (days===7 ? "WEEKLY" : (days===15 ? "FORTNIGHTLY" : (days===30 ? "MONTHLY_30" : "CUSTOM"))));
             const productData = { name, amount, fileCharge, tenure, emi, days, penalty, postMaturityInterest, principal, interest, rate, interestBasis: basis, frequencyMode: storedFrequencyMode, _legacyEmiLocked: false };
             const targetCode = code || ("P-" + Math.round(amount/1000) + "K_" + Date.now().toString().slice(-4));
             state.products[targetCode] = { ...(existing || {}), ...productData };
@@ -5295,7 +5347,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
 
         function mfProductFrequencyLabel(p){
             const mode=mfProductFrequencyMode(p);
-            return mode==='WEEKLY' ? 'Weekly (7 Days)' : mode==='FORTNIGHTLY' ? 'Fortnightly (15 Days)' : mode==='M15FIXED' ? 'Monthly (15-Day Start → Fixed Date)' : mode==='CUSTOM' ? `Custom (${mfProductCycleDays(p)} Days)` : 'Monthly (30 Days)';
+            return mode==='WEEKLY' ? 'Weekly (7 Days)' : mode==='FORTNIGHTLY' ? 'Fortnightly (15 Days)' : mode==='MONTHLY_CALENDAR' ? 'Monthly (Calendar Date)' : mode==='M15FIXED' ? 'Monthly (15-Day Start → Fixed Date)' : mode==='CUSTOM' ? `Custom (${mfProductCycleDays(p)} Days)` : 'Monthly (30 Days)';
         }
         function renderProductsList() {
             refreshLoanMasterProductFilter();
