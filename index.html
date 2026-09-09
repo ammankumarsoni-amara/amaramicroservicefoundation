@@ -2690,7 +2690,10 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                     mfFirestoreDb = firebase.firestore();
                 }
                 mfFirebaseSyncCode = syncCode;
-                try{ mfFirebaseAuth = firebase.auth(); }catch(e){}
+                try{
+                    mfFirebaseAuth = firebase.auth();
+                    if(typeof mfInitAuth==='function') mfInitAuth();
+                }catch(e){ console.warn('Firebase Auth initialization skipped:',e); }
                 setFirebaseStatus('🟢 Firebase connected — Secure Sync is active.');
                 if(!mfFirebaseUser){
                     setFirebaseStatus('🔒 Secure Sync is waiting for Firebase sign-in.',true);
@@ -2781,6 +2784,13 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             if(!mfFirebaseUser) { setFirebaseStatus('🔒 Secure Sync requires Firebase sign-in.',true); return false; }
             return true;
         }
+        function mfShowTransientNotice(message){
+            try{
+                let el=document.getElementById('mf-transient-notice');
+                if(!el){ el=document.createElement('div'); el.id='mf-transient-notice'; el.style.cssText='position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483646;background:#0f172a;color:#fff;border:1px solid rgba(52,211,153,.45);padding:10px 14px;border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.35);font-size:.78rem;font-weight:800;max-width:min(92vw,520px);text-align:center;'; document.body.appendChild(el); }
+                el.textContent=message; el.style.display='block'; clearTimeout(window.__mfNoticeTimer); window.__mfNoticeTimer=setTimeout(()=>{el.style.display='none';},2600);
+            }catch(e){}
+        }
         function mfKnownCloudVersion(){ return Number(localStorage.getItem('MF_SECURE_CLOUD_VERSION')||0); }
         function mfSetKnownCloudVersion(v){ try{localStorage.setItem('MF_SECURE_CLOUD_VERSION',String(Number(v)||0));}catch(e){} }
         function mfSecureEnvelope(version){
@@ -2788,8 +2798,9 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         }
 
         function pushStateToFirebase(silent) {
-            if (!mfFirestoreDb || !mfFirebaseSyncCode) { if (!silent) alert('Connect Firebase first.'); return; }
-            if (!mfFirebaseUser) { if (!silent) alert('Secure Sync requires Firebase sign-in first.'); return; }
+            if (!mfFirestoreDb || !mfFirebaseSyncCode) { if (!silent) { setFirebaseStatus('⚠️ Connect Firebase first.',true); alert('Connect Firebase first.'); } return; }
+            if (!mfFirebaseUser) { if (!silent) { setFirebaseStatus('🔒 Secure Sync requires Firebase sign-in first.',true); alert('Secure Sync requires Firebase sign-in first.'); } return; }
+            if(!silent) setFirebaseStatus('⏳ Uploading this device data to secure Firebase…');
             mfIgnoreNextSnapshot = true;
             const ref = mfSecureFirebaseDoc();
             const known = mfKnownCloudVersion();
@@ -2809,6 +2820,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 try{ localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint()); localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString()); }catch(e){}
                 mfLocalAudit('CLOUD_PUSH','Secure Firestore snapshot written');
                 setFirebaseStatus('🟢 Securely synced to Firebase — ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+                if(!silent) mfShowTransientNotice('🟢 Firebase sync completed successfully.');
             }).catch(err=>{
                 console.error(err); mfIgnoreNextSnapshot=false;
                 setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Push'), true);
@@ -2866,6 +2878,19 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         function mfInitAuth(){
             try{
                 if(typeof firebase==='undefined' || !firebase.auth) return;
+                // Cold-start fix: bootstrap the saved Firebase app before Auth persistence is attached.
+                if(!mfFirebaseApp){
+                    try{
+                        if(firebase.apps && firebase.apps.length){
+                            mfFirebaseApp=firebase.app();
+                            mfFirestoreDb=mfFirestoreDb||firebase.firestore();
+                        }else{
+                            const raw=(document.getElementById('firebase-config-input')?.value||localStorage.getItem('MF_FIREBASE_CONFIG')||'').trim();
+                            if(raw){ mfFirebaseApp=firebase.initializeApp(JSON.parse(raw)); mfFirestoreDb=firebase.firestore(); }
+                        }
+                    }catch(e){ console.warn('Firebase app bootstrap during Auth init skipped',e); }
+                }
+                if(!mfFirebaseApp) return;
                 mfFirebaseAuth=firebase.auth();
                 // Explicitly request browser-local Firebase Auth persistence so a normal
                 // page refresh restores the existing signed-in identity without storing
@@ -3135,7 +3160,10 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             clearTimeout(cloudSyncTimer);
             cloudSyncTimer=setTimeout(()=>{
                 if(!navigator.onLine){ updateSecureCloudStatus("🟡 Local save complete — waiting for internet connection to back up.",true); return; }
-                if(googleAccessToken) syncNowToGoogleDrive(true);
+                const hasClient=!!(localStorage.getItem('MF_GOOGLE_CLIENT_ID')||document.getElementById('google-client-id')?.value);
+                const hasPin=!!getCloudPin();
+                if(googleAccessToken || (hasClient && hasPin)) syncNowToGoogleDrive(true);
+                else if(hasClient && !hasPin) updateSecureCloudStatus("🟡 Local save is safe — Cloud Encryption PIN is session-only and must be entered again after a fresh session to resume Drive backup.",true);
                 else updateSecureCloudStatus("🟡 Local save is safe — connect Google Drive to enable automatic off-device backup.",true);
             },4000);
         }
