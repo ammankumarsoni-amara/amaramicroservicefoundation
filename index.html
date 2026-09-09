@@ -5,11 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Loan Management</title>
+    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-09-09">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Firebase Real-Time Sync (fast, no re-login needed, works across mobile + laptop) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
     <style>
         :root {
@@ -2127,9 +2129,26 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 <div class="secure-cloud-card"><b>📊 Excel & JSON Export</b><span>Your existing reports/export and one-click JSON backup remain available.</span></div>
             </div>
 
+            <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
+                <div style="font-size:.84rem;font-weight:800;color:#fbbf24;margin-bottom:4px;"><i class="fa-solid fa-user-shield"></i> Secure Account (new security layer)</div>
+                <div style="font-size:.66rem;color:#94a3b8;line-height:1.4;margin-bottom:8px;">Sign-in is the identity layer for the Secure Edition. It does not replace your App Lock PIN. Production Secure Sync is the default. Existing local data is preserved until you explicitly choose the cloud/local direction.</div>
+                <div id="mf-auth-status" style="font-size:.68rem;color:#94a3b8;margin-bottom:7px;">Not signed in.</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+                    <input id="mf-auth-email" type="email" placeholder="Account email" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;">
+                    <input id="mf-auth-password" type="password" placeholder="Password (Firebase Auth)" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:7px;">
+                    <button type="button" class="btn-header btn-green" style="justify-content:center;" onclick="mfAuthSignIn()"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
+                    <button type="button" class="btn-header btn-blue" style="justify-content:center;" onclick="mfAuthCreateAccount()"><i class="fa-solid fa-user-plus"></i> Create Account</button>
+                    <button type="button" class="btn-header btn-blue" style="justify-content:center;" onclick="mfAuthSignOut()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+                </div>
+                <label style="display:flex;align-items:center;gap:6px;font-size:.65rem;color:#94a3b8;margin-top:8px;cursor:pointer;"><input type="checkbox" id="mf-secure-sync-enabled" checked disabled style="accent-color:#22c55e;"> Secure Firebase Sync (required for production)</label>
+                <div id="mf-secure-sync-note" style="font-size:.62rem;color:#64748b;margin-top:5px;line-height:1.35;">Secure Sync is the production mode. Firebase Authentication + the production Firestore Rules are required for cloud reads/writes.</div>
+            </div>
+
             <div style="margin-top:12px;border-top:2px solid #34d399;padding-top:12px;">
-                <div style="font-size:.84rem;font-weight:800;color:#34d399;margin-bottom:3px;"><i class="fa-solid fa-bolt"></i> Firebase Fast Sync (Recommended — one-time setup)</div>
-                <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;line-height:1.4;">No re-login every few days, no size limits for your data, works instantly on mobile and laptop with the same Sync Code. This is the primary, most reliable sync method — use it as your main cloud connection.</div>
+                <div style="font-size:.84rem;font-weight:800;color:#34d399;margin-bottom:3px;"><i class="fa-solid fa-bolt"></i> Secure Firebase Fast Sync (Production)</div>
+                <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;line-height:1.4;">Authenticated secure sync for your production Firebase. The same signed-in account + Sync Code can be used on mobile and laptop.</div>
 
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Firebase Config (paste the whole firebaseConfig object here)</label>
                 <textarea id="firebase-config-input" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}' style="width:100%;min-height:70px;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.72rem;font-family:monospace;margin-bottom:7px;"></textarea>
@@ -2144,44 +2163,37 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                     <button class="btn-header btn-blue" style="justify-content:center;" onclick="pushStateToFirebase(false)"><i class="fa-solid fa-cloud-arrow-up"></i> Push Now</button>
                     <button class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="pullStateFromFirebase(true)"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Latest</button>
                 </div>
-                <div style="font-size:.62rem;color:#64748b;margin-top:6px;line-height:1.35;"><b>Note:</b> Keep your Sync Code private — anyone with this exact code can read/write this business data. Treat it like a password.</div>
+                <div style="font-size:.62rem;color:#64748b;margin-top:6px;line-height:1.35;"><b>Note:</b> Keep your Sync Code private. Secure Sync also requires your signed-in Firebase account.</div>
             </div>
 
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
-                <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Google Drive Connection (secondary backup, optional)</div>
+                <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Google Drive Backup & Recovery</div>
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Google OAuth Web Client ID</label>
                 <input type="text" id="google-client-id" placeholder="xxxx.apps.googleusercontent.com" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;margin-bottom:7px;">
                 <button class="btn-header btn-green" style="width:100%;justify-content:center;" onclick="connectGoogleDrive()"><i class="fa-brands fa-google-drive"></i> Connect My Google Drive</button>
-                <div style="font-size:.66rem;color:#94a3b8;margin-top:6px;line-height:1.4;">The app never asks for or stores your Gmail password. Google OAuth gives this app access only to Drive files created/used by this app (<b>drive.file</b> scope).</div>
-                <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, use the existing Google Apps Script webhook option or host this app on your HTTPS domain.</div>
-                <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (recommended)</label>
+                <div style="font-size:.66rem;color:#94a3b8;margin-top:6px;line-height:1.4;">The app never asks for or stores your Gmail password. Google OAuth grants the app the limited <b>drive.file</b> Drive scope needed for its own backup files.</div>
+                <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, host this app on your HTTPS domain.</div>
+                <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required)</label>
                 <input type="password" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for cloud backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
                 <label style="display:flex;align-items:center;gap:6px;font-size:.66rem;color:#94a3b8;margin-top:7px;cursor:pointer;">
-                    <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Remember this PIN on this device (saved only in this browser)
+                    <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Keep PIN active during this app session (never saved to browser storage)
                 </label>
                 <div style="display:flex;gap:7px;margin-top:7px;">
                     <button type="button" class="btn-header btn-blue" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;" onclick="saveCloudPinNow()"><i class="fa-solid fa-floppy-disk"></i> Save PIN</button>
                     <button type="button" class="btn-header" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;background:#3f1d2e;color:#fb7185;border:1px solid rgba(251,113,133,.25);" onclick="resetCloudPin()"><i class="fa-solid fa-rotate-left"></i> Reset PIN</button>
                 </div>
-                <div style="font-size:.64rem;color:#94a3b8;margin-top:5px;line-height:1.35;">When set, the database sent to Google Drive is AES-GCM encrypted in the browser. Keep this PIN safe; without it, an encrypted cloud backup cannot be restored. <b>Save PIN</b> remembers it on this device/browser so it auto-fills next time. <b>Reset PIN</b> forgets the saved PIN here and clears the box — do this if you're changing the PIN or using a shared device. If the box is ever empty during a sync, this app will now warn you instead of silently uploading an unencrypted backup.</div>
+                <div style="font-size:.64rem;color:#94a3b8;margin-top:5px;line-height:1.35;">When set, the database sent to Google Drive is AES-GCM encrypted in the browser. Keep this PIN safe; without it, an encrypted cloud backup cannot be restored. <b>The PIN is kept only in this open app session and is not saved to browser storage. <b>Reset PIN</b> clears it from the current session — do this if you're changing the PIN or using a shared device. If the box is ever empty during a sync, this app will now warn you instead of silently uploading an unencrypted backup.</div>
             </div>
 
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
-                <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Automatic Sync Controls</div>
+                <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Automatic Backup Controls</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
                     <button class="btn-header btn-blue" style="justify-content:center;" onclick="syncNowToGoogleDrive()"><i class="fa-solid fa-cloud-arrow-up"></i> Sync Now</button>
                     <button class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="restoreLatestFromGoogleDrive()"><i class="fa-solid fa-cloud-arrow-down"></i> Restore Latest</button>
                 </div>
-                <div id="drive-last-sync" style="font-size:.67rem;color:#94a3b8;margin-top:7px;">No Google Drive sync in this browser session yet. Cross-device changes are reconciled before overwrite.</div>
-            </div>
-
-            <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
-                <div style="font-size:.82rem;font-weight:700;color:#fff;margin-bottom:6px;">Existing Google Apps Script fallback</div>
-                <input type="url" id="cloud-webhook-url" placeholder="Optional Apps Script Web App URL" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;margin-bottom:7px;">
-                <button class="btn-header btn-blue" style="width:100%;justify-content:center;" onclick="syncNowToCloud()"><i class="fa-solid fa-arrows-rotate"></i> Sync Via Webhook</button>
-            </div>
-
-            <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
+                <button class="btn-header btn-blue" style="width:100%;margin-top:7px;justify-content:center;background:#334155;" onclick="restoreLatestRecoverySnapshotFromGoogleDrive()"><i class="fa-solid fa-clock-rotate-left"></i> Restore Recovery Snapshot</button>
+                <div id="drive-last-sync" style="font-size:.67rem;color:#94a3b8;margin-top:7px;">Encrypted backups run automatically after changes when Google Drive is connected. Cross-device changes are reconciled before overwrite.</div>
+            </div><div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
                 <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:4px;"><i class="fa-solid fa-screwdriver-wrench" style="color:#60a5fa;"></i> Advanced Maintenance & QA</div>
                 <div style="font-size:.64rem;color:#94a3b8;line-height:1.4;">Read-only integrity checks, automatic local version history, and a real responsive preview. These tools do not change loan math or existing records unless you explicitly restore a backup.</div>
                 <div class="mf-advanced-tool-grid">
@@ -2546,7 +2558,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
 
         async function idbPutSnapshot(){
             const db=await openMfDb();
-            const payload={id:"current",version:1,updatedAt:new Date().toISOString(),state:structuredClone?structuredClone(state):JSON.parse(JSON.stringify(state))};
+            const payload={id:"current",version:1,updatedAt:new Date().toISOString(),state:(typeof structuredClone==='function'?structuredClone(state):JSON.parse(JSON.stringify(state)))};
             await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,"readwrite");tx.objectStore(MF_IDB_STORE).put(payload);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
             return payload;
         }
@@ -2657,6 +2669,20 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             }
         }
 
+        function mfFirebaseErrorLabel(err, action='Firebase operation') {
+            const code = String(err?.code || '').toLowerCase();
+            const msg = String(err?.message || '').toLowerCase();
+            if (code === 'permission-denied' || code === 'permission_denied' || msg.includes('missing or insufficient permissions')) {
+                return mfSecureSyncEnabled
+                    ? '🔐 Access denied — this secure business belongs to another account or you do not have permission.'
+                    : '🔐 Firebase permission denied. Check the Firestore Rules.';
+            }
+            if (code === 'unavailable' || code === 'deadline-exceeded' || msg.includes('network')) {
+                return '⚠️ Could not reach Firebase. Check your internet connection.';
+            }
+            return '⚠️ ' + action + ' failed: ' + (err?.message || 'Unknown Firebase error.');
+        }
+
         function initFirebaseSync(cfg, syncCode, showAlerts) {
             try {
                 if (!mfFirebaseApp) {
@@ -2664,20 +2690,51 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                     mfFirestoreDb = firebase.firestore();
                 }
                 mfFirebaseSyncCode = syncCode;
-                setFirebaseStatus('🟢 Connected — fast sync is active for Sync Code: ' + syncCode);
+                try{ mfFirebaseAuth = firebase.auth(); }catch(e){}
+                setFirebaseStatus('🟢 Firebase connected — Secure Sync is active.');
+                if(!mfFirebaseUser){
+                    setFirebaseStatus('🔒 Secure Sync is waiting for Firebase sign-in.',true);
+                    return;
+                }
                 startFirebaseListener();
-                // First time connecting: pull whatever is already on the cloud (if any), else push current data.
-                mfFirestoreDb.collection('microfinance_business').doc(syncCode).get().then(doc => {
-                    if (doc.exists && showAlerts) {
-                        if (confirm('Cloud already has data saved under this Sync Code. Load that data now? (Choose Cancel to keep what is on THIS device and overwrite the cloud instead.)')) {
-                            pullStateFromFirebase(false);
-                        } else {
-                            pushStateToFirebase(true);
+                const ref = mfSecureFirebaseDoc();
+                ref.get().then(doc => {
+                    if(doc.exists){
+                        const data=doc.data()||{};
+                        if(data.ownerUid && data.ownerUid!==mfFirebaseUser.uid){
+                            setFirebaseStatus('🔒 This secure business belongs to another account.',true); return;
                         }
-                    } else if (showAlerts) {
-                        pushStateToFirebase(true);
+                        const cloudVersion=Number(data.version||0);
+                        const localVersion=mfKnownCloudVersion();
+                        const localFp=mfLocalStateFingerprint();
+                        const lastPushedFp=localStorage.getItem('MF_SECURE_LAST_PUSH_FINGERPRINT')||'';
+                        const hasLocalData=Array.isArray(state?.loans)&&state.loans.length>0 || (state?.products && Object.keys(state.products).length>0);
+                        if(showAlerts){
+                            if(confirm('Secure cloud data already exists for this account. Load it onto THIS device now? Choose Cancel to keep this device data and upload it as the new secure cloud version.')) pullStateFromFirebase(false);
+                            else pushStateToFirebase(false);
+                        }else if(cloudVersion>localVersion && (!hasLocalData || !lastPushedFp || localFp===lastPushedFp)){
+                            // Safe automatic cross-device convergence: only replace local data when this device has no
+                            // unpushed local edits (or is effectively empty). A locally changed, unsynced database is never silently overwritten.
+                            pullStateFromFirebase(false);
+                        }else if(cloudVersion>localVersion){
+                            setFirebaseStatus('🟡 Newer secure cloud data found, but this device has local changes. Cloud copy was NOT overwritten and local data was NOT replaced; review Pull Latest/Push Now.',true);
+                        }else if(cloudVersion===localVersion){
+                            setFirebaseStatus('🟢 Secure Firebase is up to date.',false);
+                        }else{
+                            // Local device is ahead of the remembered cloud version; push automatically.
+                            scheduleFirebasePush();
+                        }
+                    }else{
+                        const hasLocalData=Array.isArray(state?.loans)&&state.loans.length>0 || (state?.products && Object.keys(state.products).length>0);
+                        if(showAlerts){
+                            if(confirm('No secure cloud record exists yet for this account. Upload the data currently on THIS device to the new secure production record?')) pushStateToFirebase(false);
+                        }else if(hasLocalData){
+                            scheduleFirebasePush();
+                        }else{
+                            setFirebaseStatus('🟡 Secure Firebase is connected. No cloud record exists yet and this device has no business data to upload.',false);
+                        }
                     }
-                }).catch(err => { console.error(err); setFirebaseStatus('⚠️ Could not reach Firebase. Check your internet and config.', true); });
+                }).catch(err => { console.error(err); setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Firebase connection check'), true); });
             } catch (e) {
                 console.error(e);
                 setFirebaseStatus('⚠️ Firebase connection failed: ' + e.message, true);
@@ -2686,15 +2743,20 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
 
         function startFirebaseListener() {
             if (mfFirebaseListenerUnsub) { mfFirebaseListenerUnsub(); mfFirebaseListenerUnsub = null; }
-            if (!mfFirestoreDb || !mfFirebaseSyncCode) return;
-            mfFirebaseListenerUnsub = mfFirestoreDb.collection('microfinance_business').doc(mfFirebaseSyncCode)
-                .onSnapshot(doc => {
-                    if (!doc.exists) return;
-                    const data = doc.data();
-                    if (!data || !data.payload) return;
-                    if (data.updatedByDevice === mfFirebaseDeviceId) return; // ignore our own write
-                    showFirebaseUpdateBanner(data.updatedAtLabel || '');
-                }, err => { console.error('Firebase listen error', err); });
+            if (!mfFirestoreDb || !mfFirebaseSyncCode || !mfFirebaseUser) return;
+            const ref = mfSecureFirebaseDoc();
+            mfFirebaseListenerUnsub = ref.onSnapshot(doc => {
+                if (!doc.exists) return;
+                const data = doc.data()||{};
+                if (!data.payload) return;
+                if (data.ownerUid && data.ownerUid!==mfFirebaseUser.uid) { setFirebaseStatus('🔒 Cloud record belongs to another account.',true); return; }
+                if (data.updatedByDevice === mfFirebaseDeviceId) return;
+                if(Number(data.version||0)>mfKnownCloudVersion()) setFirebaseStatus('🟡 Newer secure cloud version detected — Pull Latest before editing.',true);
+                showFirebaseUpdateBanner(data.updatedAtLabel || '');
+            }, err => {
+                console.error('Firebase secure listener error', err);
+                setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Firebase listener'), true);
+            });
         }
 
         function showFirebaseUpdateBanner(whenLabel) {
@@ -2712,32 +2774,65 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 </span>`;
         }
 
+        function mfSecureFirebaseCollection(){ return mfFirestoreDb.collection('secure_microfinance_business'); }
+        function mfSecureFirebaseDoc(){ return mfSecureFirebaseCollection().doc(mfFirebaseSyncCode); }
+        function mfRequireSecureAuth(){
+            if(!mfSecureSyncEnabled) return true;
+            if(!mfFirebaseUser) { setFirebaseStatus('🔒 Secure Sync requires Firebase sign-in.',true); return false; }
+            return true;
+        }
+        function mfKnownCloudVersion(){ return Number(localStorage.getItem('MF_SECURE_CLOUD_VERSION')||0); }
+        function mfSetKnownCloudVersion(v){ try{localStorage.setItem('MF_SECURE_CLOUD_VERSION',String(Number(v)||0));}catch(e){} }
+        function mfSecureEnvelope(version){
+            return {payload:JSON.stringify(state),ownerUid:mfFirebaseUser?.uid||null,updatedByDevice:mfFirebaseDeviceId,updatedAtLabel:new Date().toLocaleString('en-IN'),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),version:Number(version)||1,schemaVersion:'MF-SECURE-EDITION-1',stateFingerprint:mfLocalStateFingerprint()};
+        }
+
         function pushStateToFirebase(silent) {
-            if (!mfFirestoreDb || !mfFirebaseSyncCode) { if (!silent) alert('Connect Fast Sync first.'); return; }
+            if (!mfFirestoreDb || !mfFirebaseSyncCode) { if (!silent) alert('Connect Firebase first.'); return; }
+            if (!mfFirebaseUser) { if (!silent) alert('Secure Sync requires Firebase sign-in first.'); return; }
             mfIgnoreNextSnapshot = true;
-            mfFirestoreDb.collection('microfinance_business').doc(mfFirebaseSyncCode).set({
-                payload: JSON.stringify(state),
-                updatedByDevice: mfFirebaseDeviceId,
-                updatedAtLabel: new Date().toLocaleString('en-IN'),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }).then(() => {
-                setFirebaseStatus('🟢 Synced to cloud — ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
-            }).catch(err => {
-                console.error(err);
-                setFirebaseStatus('⚠️ Push failed: ' + err.message, true);
+            const ref = mfSecureFirebaseDoc();
+            const known = mfKnownCloudVersion();
+            const write = mfFirestoreDb.runTransaction(async tx=>{
+                const snap=await tx.get(ref);
+                const data=snap.exists?(snap.data()||{}):{};
+                const cloudVersion=Number(data.version||0);
+                const cloudOwner=data.ownerUid||null;
+                if(snap.exists && cloudOwner && cloudOwner!==mfFirebaseUser.uid) throw new Error('SECURITY_DENIED: this business belongs to another account.');
+                if(snap.exists && cloudVersion>known && data.updatedByDevice!==mfFirebaseDeviceId) throw new Error('SYNC_CONFLICT: cloud has a newer version. Pull Latest before saving again.');
+                const next=cloudVersion+1||1;
+                tx.set(ref,mfSecureEnvelope(next),{merge:false});
+                return next;
+            });
+            write.then(version=>{
+                mfSetKnownCloudVersion(version);
+                try{ localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint()); localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString()); }catch(e){}
+                mfLocalAudit('CLOUD_PUSH','Secure Firestore snapshot written');
+                setFirebaseStatus('🟢 Securely synced to Firebase — ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+            }).catch(err=>{
+                console.error(err); mfIgnoreNextSnapshot=false;
+                setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Push'), true);
             });
         }
 
         function pullStateFromFirebase(showConfirm) {
-            if (!mfFirestoreDb || !mfFirebaseSyncCode) { alert('Connect Fast Sync first.'); return; }
-            if (showConfirm && !confirm('This will replace the data on THIS device with the latest cloud data. Continue?')) return;
-            mfFirestoreDb.collection('microfinance_business').doc(mfFirebaseSyncCode).get().then(doc => {
-                if (!doc.exists) { alert('No cloud data found yet for this Sync Code.'); return; }
-                const data = doc.data();
-                state = JSON.parse(data.payload);
-                localStorage.setItem("MF_OPEX_PRO_DB", JSON.stringify(state));
-                idbPutSnapshot().finally(() => { renderAll(); setFirebaseStatus('🟢 Loaded latest cloud data — ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})); });
-            }).catch(err => { console.error(err); setFirebaseStatus('⚠️ Pull failed: ' + err.message, true); });
+            if (!mfFirestoreDb || !mfFirebaseSyncCode) { alert('Connect Firebase first.'); return; }
+            if (!mfFirebaseUser) { alert('Secure Sync requires Firebase sign-in first.'); return; }
+            if (showConfirm && !confirm('This will replace the data on THIS device with the latest secure cloud data. Continue?')) return;
+            const ref = mfSecureFirebaseDoc();
+            ref.get().then(doc => {
+                if (!doc.exists) { alert('No secure cloud data found yet for this Sync Code.'); return; }
+                const data = doc.data()||{};
+                if(data.ownerUid && data.ownerUid!==mfFirebaseUser.uid) throw new Error('SECURITY_DENIED: this business belongs to another account.');
+                const incoming = JSON.parse(data.payload||'null');
+                if(!incoming || !Array.isArray(incoming.loans) || !incoming.products) throw new Error('Cloud payload failed integrity validation.');
+                state = incoming;
+                mfSetKnownCloudVersion(Number(data.version||0));
+                try{ localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint()); localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString()); }catch(e){}
+                mfLocalAudit('CLOUD_PULL','Secure cloud snapshot loaded after schema and ownership validation');
+                localStorage.setItem('MF_OPEX_PRO_DB', JSON.stringify(state));
+                idbPutSnapshot().finally(() => { renderAll(); setFirebaseStatus('🟢 Loaded latest secure cloud data — ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})); });
+            }).catch(err => { console.error(err); setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Pull'), true); });
         }
 
         function scheduleFirebasePush() {
@@ -2746,20 +2841,93 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             mfFirebasePushTimer = setTimeout(() => { pushStateToFirebase(true); }, 1500);
         }
 
-        // Auto-connect on page load if previously configured, so the user never has to redo this.
-        (function autoConnectFirebase() {
-            try {
-                const cfgRaw = localStorage.getItem('MF_FIREBASE_CONFIG');
-                const syncCode = localStorage.getItem('MF_FIREBASE_SYNC_CODE');
-                if (cfgRaw && syncCode) {
-                    const cfg = JSON.parse(cfgRaw);
-                    const doInit = () => initFirebaseSync(cfg, syncCode, false);
-                    if (typeof firebase !== 'undefined') doInit();
-                    else window.addEventListener('load', doInit);
-                }
-            } catch (e) { console.warn('Firebase auto-connect skipped', e); }
-        })();
         // ================== END FIREBASE FAST SYNC ==================
+
+// ================== SECURE EDITION CORE ==================
+        // Staged security architecture: authentication, secure-sync flag, version/conflict metadata and local audit.
+        // Production Secure Sync is mandatory; legacy compatibility mode is disabled.
+        let mfFirebaseAuth = null;
+        let mfFirebaseUser = null;
+        let mfSecureSyncEnabled = true;
+        let mfCloudPinSession = '';
+        window.mfCloudPinSession = '';
+
+        function mfAuthStatus(msg, warning=false){
+            const el=document.getElementById('mf-auth-status');
+            if(el){el.textContent=msg;el.style.color=warning?'#fde68a':'#a7f3d0';}
+        }
+        function mfSetSecureSyncEnabled(on){
+            mfSecureSyncEnabled=true;
+            try{localStorage.setItem('MF_SECURE_SYNC_ENABLED','1');}catch(e){}
+            const note=document.getElementById('mf-secure-sync-note');
+            if(note) note.textContent='Secure Sync is mandatory in the production build. Firebase Authentication + the production Firestore Rules are required for cloud reads/writes.';
+            const cb=document.getElementById('mf-secure-sync-enabled'); if(cb) cb.checked=true;
+        }
+        function mfInitAuth(){
+            try{
+                if(typeof firebase==='undefined' || !firebase.auth) return;
+                mfFirebaseAuth=firebase.auth();
+                mfFirebaseAuth.onAuthStateChanged(user=>{
+                    mfFirebaseUser=user||null;
+                    if(user) {
+                        mfAuthStatus('🟢 Signed in: '+(user.email||user.uid));
+                        if(mfSecureSyncEnabled && mfFirestoreDb && mfFirebaseSyncCode) {
+                            const cfgRaw=localStorage.getItem('MF_FIREBASE_CONFIG');
+                            try{ if(cfgRaw) initFirebaseSync(JSON.parse(cfgRaw),mfFirebaseSyncCode,true); }catch(e){console.warn('Secure Firebase reconnect skipped',e);}
+                        }
+                    }
+                    else mfAuthStatus('Not signed in.');
+                    const cb=document.getElementById('mf-secure-sync-enabled'); if(cb) cb.checked=mfSecureSyncEnabled;
+                });
+            }catch(e){console.warn('Firebase Auth init skipped',e);}
+        }
+        async function mfAuthSignIn(){
+            try{
+                if(!mfFirebaseAuth) throw new Error('Connect Firebase first so Firebase Authentication can initialize.');
+                const email=(document.getElementById('mf-auth-email')?.value||'').trim();
+                const password=document.getElementById('mf-auth-password')?.value||'';
+                if(!email||!password){alert('Enter your account email and password.');return;}
+                await mfFirebaseAuth.signInWithEmailAndPassword(email,password);
+            }catch(e){console.error(e);mfAuthStatus('⚠️ Sign-in failed: '+(e.message||e),true);}
+        }
+        async function mfAuthCreateAccount(){
+            try{
+                if(!mfFirebaseAuth) throw new Error('Connect Firebase first so Firebase Authentication can initialize.');
+                const email=(document.getElementById('mf-auth-email')?.value||'').trim();
+                const password=document.getElementById('mf-auth-password')?.value||'';
+                if(!email||!password){alert('Enter an email and a strong password.');return;}
+                if(password.length<8){alert('Use at least 8 characters for the Firebase account password.');return;}
+                await mfFirebaseAuth.createUserWithEmailAndPassword(email,password);
+                alert('Firebase account created and signed in. If your Firebase project requires email verification, verify it before using Secure Sync.');
+            }catch(e){console.error(e);mfAuthStatus('⚠️ Account creation failed: '+(e.message||e),true);}
+        }
+        async function mfAuthSignOut(){try{if(mfFirebaseAuth) await mfFirebaseAuth.signOut();}catch(e){console.error(e);}}
+        function mfCurrentCloudIdentity(){return mfFirebaseUser?{uid:mfFirebaseUser.uid,email:mfFirebaseUser.email||''}:null;}
+        function mfSecurityStamp(){return {schema:'MF-SECURE-EDITION-1',clientVersion:'secure-edition-1',updatedByUid:mfFirebaseUser?.uid||null,updatedByDevice:mfFirebaseDeviceId,updatedAt:firebase?.firestore?.Timestamp?.now?firebase.firestore.Timestamp.now():new Date()};}
+        function mfLocalAudit(action,detail){
+            try{
+                const key='MF_SECURITY_AUDIT_LOCAL'; const a=JSON.parse(localStorage.getItem(key)||'[]');
+                a.push({at:new Date().toISOString(),action:String(action||''),detail:detail||'',uid:mfFirebaseUser?.uid||null,device:mfFirebaseDeviceId});
+                while(a.length>200) a.shift(); localStorage.setItem(key,JSON.stringify(a));
+            }catch(e){}
+        }
+        function mfLocalStateFingerprint(){
+            try{const raw=JSON.stringify(state);let h=2166136261;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(16);}catch(e){return '';}
+        }
+        function mfRecordLocalVersion(){
+            try{localStorage.setItem('MF_LOCAL_STATE_VERSION',JSON.stringify({at:new Date().toISOString(),fingerprint:mfLocalStateFingerprint()}));}catch(e){}
+        }
+        // Initialize Firebase Auth after the existing Firebase app has been created.
+        window.addEventListener('load',()=>setTimeout(mfInitAuth,0));
+        // Safe production auto-connect: wait until secure core variables are initialized.
+        window.addEventListener('load',()=>setTimeout(()=>{
+            try{
+                const cfgRaw=localStorage.getItem('MF_FIREBASE_CONFIG');
+                const syncCode=localStorage.getItem('MF_FIREBASE_SYNC_CODE');
+                if(cfgRaw && syncCode && typeof firebase!=='undefined') initFirebaseSync(JSON.parse(cfgRaw),syncCode,false);
+            }catch(e){console.warn('Production Firebase auto-connect skipped',e);}
+        },80));
+        // ================== END SECURE EDITION CORE ==================
 
         // ================== APP LOCK PIN ==================
         // NOTE: the "unlocked" state is kept ONLY in this in-memory variable (not sessionStorage/localStorage).
@@ -2910,6 +3078,9 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 if(el) el.innerHTML=`<i class="fa-solid fa-check text-success me-1"></i> Saved: ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
                 renderAll();
                 queueAutomaticVersionedBackup();
+                // PRIMARY OPERATIONAL CLOUD COPY: Firebase Secure Sync is automatic after every local save.
+                // Google Drive remains the encrypted secondary backup/recovery layer.
+                try{ scheduleFirebasePush(); }catch(e){ console.warn('Automatic Secure Firebase sync scheduling skipped:',e); }
                 scheduleAutomaticCloudSync();
             }).catch(err=>{
                 console.error("IndexedDB save failed",err);
@@ -2920,13 +3091,11 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         }
 
         function scheduleAutomaticCloudSync(){
-            scheduleFirebasePush();
             clearTimeout(cloudSyncTimer);
-            // Debounce rapid changes so a batch of edits becomes one cloud snapshot.
             cloudSyncTimer=setTimeout(()=>{
-                if(!navigator.onLine) { updateSecureCloudStatus("🟡 Local save complete — waiting for internet connection to sync to cloud.",true); return; }
+                if(!navigator.onLine){ updateSecureCloudStatus("🟡 Local save complete — waiting for internet connection to back up.",true); return; }
                 if(googleAccessToken) syncNowToGoogleDrive(true);
-                else if((document.getElementById("cloud-webhook-url")?.value||state.cloudWebhookUrl||"").trim()) syncNowToCloud(true);
+                else updateSecureCloudStatus("🟡 Local save is safe — connect Google Drive to enable automatic off-device backup.",true);
             },4000);
         }
 
@@ -2938,7 +3107,6 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             const el=document.getElementById("secure-cloud-status"); if(!el) return;
             if(message){el.textContent=message;el.style.color=warning?'#fde68a':'#a7f3d0';return;}
             if(googleAccessToken) el.textContent="🟢 Google Drive connected — automatic background sync is enabled.";
-            else if(state.cloudWebhookUrl) el.textContent="🟡 Webhook backup configured — automatic background sync will retry when available.";
             else el.textContent="🟢 IndexedDB local database active. Connect Google Drive for automatic off-device backup.";
         }
 
@@ -3041,10 +3209,6 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
 
         document.getElementById("biz-name").value = state.bizName || "My Finance Company";
         document.title = state.bizName || "My Finance Company";
-        if (state.cloudWebhookUrl) {
-            document.getElementById("cloud-webhook-url").value = state.cloudWebhookUrl;
-            document.getElementById("sync-target-text").innerText = "Cloud Synced";
-        }
         initDmySelectors("fc");
         initDmySelectors("fc-fixed");
         initDmySelectors("pay-due");
@@ -7072,94 +7236,134 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         async function deriveCloudKey(pin,salt){
             const enc=new TextEncoder();
             const base=await crypto.subtle.importKey('raw',enc.encode(pin),'PBKDF2',false,['deriveKey']);
-            return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+            return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:250000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
         }
 
         function bytesToB64(bytes){let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s);}
         function b64ToBytes(b64){const s=atob(b64);const a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return a;}
-
-        function cloudPinStorageKey(){ return 'MF_CLOUD_ENC_PIN'; }
-        function cloudPinRememberKey(){ return 'MF_CLOUD_ENC_PIN_REMEMBER'; }
         function cloudLastSyncEncryptedKey(){ return 'MF_CLOUD_LAST_SYNC_ENCRYPTED'; }
+        let mfCloudPinMemory='';
 
         function restoreSavedCloudPin(){
-            const remember = localStorage.getItem(cloudPinRememberKey()) === '1';
-            const input = document.getElementById('cloud-encryption-pin');
-            const cb = document.getElementById('cloud-pin-remember');
-            if (input) input.value = remember ? (localStorage.getItem(cloudPinStorageKey()) || '') : '';
-            if (cb) cb.checked = remember;
+            const input=document.getElementById('cloud-encryption-pin');
+            const cb=document.getElementById('cloud-pin-remember');
+            if(input) input.value=mfCloudPinMemory||'';
+            if(cb) cb.checked=!!mfCloudPinMemory;
         }
-
         function saveCloudPinNow(){
-            const pin = (document.getElementById('cloud-encryption-pin')?.value || '').trim();
-            if (!pin) { alert('Type the PIN in the box first, then tap Save PIN.'); return; }
-            localStorage.setItem(cloudPinStorageKey(), pin);
-            localStorage.setItem(cloudPinRememberKey(), '1');
-            const cb = document.getElementById('cloud-pin-remember'); if (cb) cb.checked = true;
-            alert('PIN saved on this device. It will auto-fill here next time, so you don\'t have to retype it before every sync/restore.');
-        }
-
-        function resetCloudPin(){
-            if (!confirm('This forgets the PIN saved on this device and clears the box. You will need to remember and re-enter the exact PIN yourself to restore any existing encrypted backup. Continue?')) return;
-            localStorage.removeItem(cloudPinStorageKey());
-            localStorage.removeItem(cloudPinRememberKey());
-            const input = document.getElementById('cloud-encryption-pin'); if (input) input.value = '';
-            const cb = document.getElementById('cloud-pin-remember'); if (cb) cb.checked = false;
-        }
-
-        function onCloudPinRememberChange(){
-            const cb = document.getElementById('cloud-pin-remember');
-            if (cb && cb.checked) saveCloudPinNow();
-            else { localStorage.removeItem(cloudPinStorageKey()); localStorage.removeItem(cloudPinRememberKey()); }
-        }
-
-        async function makeCloudBackupBlob(){
             const pin=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
-            const plain=JSON.stringify({format:'MF-SECURE-CLOUD-V2',business:state.bizName||'MicroFinance',updatedAt:new Date().toISOString(),state:state});
-            if(!pin) return new Blob([plain],{type:'application/json'});
+            if(!pin) return alert('Type the Cloud Encryption PIN first.');
+            mfCloudPinMemory=pin;
+            const cb=document.getElementById('cloud-pin-remember'); if(cb) cb.checked=true;
+            alert('Cloud Encryption PIN is active for this open app session. It is not saved to browser storage.');
+        }
+        function resetCloudPin(){
+            mfCloudPinMemory='';
+            const input=document.getElementById('cloud-encryption-pin'); if(input) input.value='';
+            const cb=document.getElementById('cloud-pin-remember'); if(cb) cb.checked=false;
+        }
+        function onCloudPinRememberChange(){
+            const cb=document.getElementById('cloud-pin-remember');
+            if(cb?.checked) saveCloudPinNow(); else resetCloudPin();
+        }
+        function getCloudPin(){
+            const input=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
+            if(input) mfCloudPinMemory=input;
+            return mfCloudPinMemory;
+        }
+        async function sha256Hex(text){
+            const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
+            return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,'0')).join('');
+        }
+        function backupLooksValid(x){
+            return !!(x && x.products && typeof x.products==='object' && Array.isArray(x.loans));
+        }
+        function normalizeRecoveredState(x){
+            const out=(typeof structuredClone==='function'?structuredClone(x):JSON.parse(JSON.stringify(x)));
+            if(!out.products || typeof out.products!=='object') out.products={};
+            if(!Array.isArray(out.loans)) out.loans=[];
+            if(!Array.isArray(out.borrowings)) out.borrowings=[];
+            if(!Array.isArray(out.staff)) out.staff=[];
+            if(!Array.isArray(out.expenses)) out.expenses=[];
+            if(!Array.isArray(out.companyExpenses)) out.companyExpenses=[];
+            return out;
+        }
+        async function makeCloudBackupBlob(){
+            const pin=getCloudPin();
+            if(!pin) throw new Error('Cloud Encryption PIN is required for Google Drive backup.');
+            const plainObj={format:'MF-SECURE-CLOUD-V3',business:state.bizName||'MicroFinance',updatedAt:new Date().toISOString(),state:state};
+            const plain=JSON.stringify(plainObj);
+            const checksum=await sha256Hex(plain);
+            const envelopePlain=JSON.stringify({...plainObj,checksum});
             const salt=crypto.getRandomValues(new Uint8Array(16));
             const iv=crypto.getRandomValues(new Uint8Array(12));
             const key=await deriveCloudKey(pin,salt);
-            const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(plain));
-            const env={format:'MF-SECURE-CLOUD-ENCRYPTED-V1',kdf:'PBKDF2-SHA256',iterations:150000,salt:bytesToB64(salt),iv:bytesToB64(iv),ciphertext:bytesToB64(new Uint8Array(cipher))};
+            const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(envelopePlain));
+            const env={format:'MF-SECURE-CLOUD-ENCRYPTED-V2',kdf:'PBKDF2-SHA256',iterations:250000,ciphertextHash:await sha256Hex(envelopePlain),salt:bytesToB64(salt),iv:bytesToB64(iv),ciphertext:bytesToB64(new Uint8Array(cipher))};
             return new Blob([JSON.stringify(env)],{type:'application/json'});
         }
-
         async function parseCloudBackup(raw){
-            if(raw.format!=='MF-SECURE-CLOUD-ENCRYPTED-V1') return raw.state||raw;
-            const pin=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
+            // Final Recovery parser: accept only authenticated encrypted Drive envelopes.
+            // Supports the current hardened V2 envelope and the earlier TEST V1 envelope.
+            // No plaintext/unverified backup is ever accepted.
+            if(!raw || (raw.format!=='MF-SECURE-CLOUD-ENCRYPTED-V2' && raw.format!=='MF-SECURE-CLOUD-ENCRYPTED-V1')){
+                throw new Error('Unsupported or unencrypted Google Drive backup.');
+            }
+            if(!raw.salt || !raw.iv || !raw.ciphertext) throw new Error('Encrypted backup is incomplete.');
+            if(raw.kdf && raw.kdf!=='PBKDF2-SHA256') throw new Error('Unsupported backup key-derivation format.');
+            const pin=getCloudPin();
             if(!pin) throw new Error('Enter the Cloud Encryption PIN used for this backup.');
-            const key=await deriveCloudKey(pin,b64ToBytes(raw.salt));
-            try{
-                const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64ToBytes(raw.iv)},key,b64ToBytes(raw.ciphertext));
-                const env=JSON.parse(new TextDecoder().decode(plain));
-                return env.state;
-            }catch(e){throw new Error('Cloud Encryption PIN is incorrect or the backup is damaged.');}
-        }
 
+            const declared=Number(raw.iterations);
+            const candidates=[];
+            if(Number.isInteger(declared) && declared>=100000 && declared<=500000) candidates.push(declared);
+            [250000,150000].forEach(n=>{if(!candidates.includes(n)) candidates.push(n);});
+            let lastReason='Authentication failed.';
+
+            for(const iterations of candidates){
+                try{
+                    const baseKey=await crypto.subtle.importKey('raw',new TextEncoder().encode(pin),'PBKDF2',false,['deriveKey']);
+                    const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64ToBytes(raw.salt),iterations,hash:'SHA-256'},baseKey,{name:'AES-GCM',length:256},false,['decrypt']);
+                    const plainBytes=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64ToBytes(raw.iv)},key,b64ToBytes(raw.ciphertext));
+                    const text=new TextDecoder().decode(plainBytes);
+                    if(raw.ciphertextHash && raw.ciphertextHash!==await sha256Hex(text)) throw new Error('Outer ciphertext integrity check failed.');
+                    const env=JSON.parse(text);
+                    if(!env || !env.state) throw new Error('Encrypted payload has no database state.');
+                    if(env.format!=='MF-SECURE-CLOUD-V3' && env.format!=='MF-SECURE-CLOUD-V2' && env.format!=='MF-SECURE-CLOUD-V1') throw new Error('Unsupported encrypted payload format.');
+                    if(env.format==='MF-SECURE-CLOUD-V3'){
+                        if(!env.checksum) throw new Error('V3 backup checksum is missing.');
+                        const verifyObj={format:env.format,business:env.business,updatedAt:env.updatedAt,state:env.state};
+                        if(env.checksum!==await sha256Hex(JSON.stringify(verifyObj))) throw new Error('V3 backup checksum failed.');
+                    }
+                    if(!backupLooksValid(env.state)) throw new Error('Backup database structure is invalid.');
+                    return normalizeRecoveredState(env.state);
+                }catch(e){ lastReason=e?.message||lastReason; }
+            }
+            throw new Error('PIN/encryption validation failed: '+lastReason);
+        }
+        async function driveListCurrent(){
+            const folder=await ensureDriveFolder();
+            const q=encodeURIComponent("name='Current Database.mfbackup.json' and trashed=false and '"+folder+"' in parents");
+            const list=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=10');
+            return {folder,files:(await list.json()).files||[]};
+        }
         async function syncNowToGoogleDrive(background=false){
             if(cloudSyncBusy) return; cloudSyncBusy=true;
             try{
-                const pinNow=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
-                const wasEncrypted=localStorage.getItem(cloudLastSyncEncryptedKey())==='1';
-                if(wasEncrypted && !pinNow){
-                    if(background){
-                        updateSecureCloudStatus('🟡 Skipped auto cloud sync: your Cloud Encryption PIN box is empty, and the last backup was encrypted. Open Cloud Settings, enter/Save your PIN, then Sync Now — this avoids silently saving an unencrypted backup.',true);
-                        cloudSyncBusy=false; return;
-                    }
-                    if(!confirm('Your last Google Drive backup was PIN-encrypted, but the PIN box is empty right now. Continuing will upload this backup WITHOUT encryption. Continue anyway?')){ cloudSyncBusy=false; return; }
+                const pin=getCloudPin();
+                if(!pin){
+                    updateSecureCloudStatus('🟡 Google Drive backup skipped — Cloud Encryption PIN is required.',true);
+                    if(!background) alert('Enter your Cloud Encryption PIN before creating a Google Drive backup.');
+                    return;
                 }
                 if(!googleAccessToken) await getGoogleToken(!background);
                 if(!googleAccessToken) throw new Error('Google Drive is not connected.');
-                const folder=await ensureDriveFolder();
-                const q=encodeURIComponent("name='Current Database.mfbackup.json' and trashed=false and '"+folder+"' in parents");
-                const list=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime)&pageSize=10');
-                const existing=(await list.json()).files||[];
+                const {folder,files}=await driveListCurrent();
                 const blob=await makeCloudBackupBlob();
                 const metadata={name:'Current Database.mfbackup.json',mimeType:'application/json',parents:[folder]};
                 let resp;
-                if(existing.length){
-                    googleDriveFileId=existing[0].id;
+                if(files.length){
+                    googleDriveFileId=files[0].id;
                     const form=new FormData(); form.append('metadata',new Blob([JSON.stringify({name:metadata.name,mimeType:metadata.mimeType})],{type:'application/json'})); form.append('file',blob);
                     resp=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+googleDriveFileId+'?uploadType=multipart&fields=id,modifiedTime',{method:'PATCH',headers:{Authorization:'Bearer '+googleAccessToken},body:form});
                 }else{
@@ -7168,128 +7372,170 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 }
                 if(!resp.ok) throw new Error('Drive upload '+resp.status);
                 const result=await resp.json(); googleDriveFileId=result.id||googleDriveFileId;
-                localStorage.setItem(cloudLastSyncEncryptedKey(), pinNow ? '1' : '0');
-                // Keep one recovery snapshot per calendar day in addition to the live current database.
+                localStorage.setItem(cloudLastSyncEncryptedKey(),'1');
+
+                // Immutable recovery snapshot: keep a valid snapshot for the current UTC day.
+                // If an older snapshot with the same day/name exists but cannot be decrypted with
+                // the current Cloud Encryption PIN, do NOT trust its mere existence. Create a new
+                // uniquely timestamped snapshot instead. Never overwrite an old snapshot.
                 const day=new Date().toISOString().slice(0,10);
-                const lastDay=localStorage.getItem('MF_LAST_DRIVE_SNAPSHOT_DAY');
-                if(lastDay!==day){
-                    const snapBlob=await makeCloudBackupBlob();
+                const snapQ=encodeURIComponent("name contains 'Snapshot_"+day+"_' and trashed=false and '"+folder+"' in parents");
+                const snapList=await driveApi('files?q='+snapQ+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=100');
+                const snapFiles=(await snapList.json()).files||[];
+                let usableSnapshot=false;
+                for(const snap of snapFiles){
+                    try{
+                        const sr=await driveApi('files/'+snap.id+'?alt=media');
+                        const raw=await sr.json();
+                        await parseCloudBackup(raw);
+                        usableSnapshot=true;
+                        break;
+                    }catch(e){
+                        // An invalid/legacy snapshot is left untouched; a fresh one is created below.
+                    }
+                }
+                if(!usableSnapshot){
+                    // Reuse the exact encrypted blob just uploaded to Current Database so the
+                    // immutable snapshot is guaranteed to use the same current PIN/KDF/format.
                     const snapMeta={name:`Snapshot_${day}_${Date.now()}.mfbackup.json`,mimeType:'application/json',parents:[folder]};
-                    const sf=new FormData(); sf.append('metadata',new Blob([JSON.stringify(snapMeta)],{type:'application/json'})); sf.append('file',snapBlob);
+                    const sf=new FormData(); sf.append('metadata',new Blob([JSON.stringify(snapMeta)],{type:'application/json'})); sf.append('file',blob);
                     const sr=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime',{method:'POST',headers:{Authorization:'Bearer '+googleAccessToken},body:sf});
-                    if(sr.ok) localStorage.setItem('MF_LAST_DRIVE_SNAPSHOT_DAY',day);
+                    if(!sr.ok) throw new Error('Daily recovery snapshot upload '+sr.status);
                 }
                 markCloudSynced();
-                document.getElementById('sync-target-text').innerText='Google Drive Synced';
-                const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Last cloud sync: '+new Date().toLocaleString('en-IN');
-                updateSecureCloudStatus();
-                if(!background) alert('Google Drive backup completed successfully.');
+                document.getElementById('sync-target-text').innerText='Google Drive Backup Secured';
+                const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Last encrypted backup: '+new Date().toLocaleString('en-IN');
+                updateSecureCloudStatus('🟢 Google Drive encrypted backup is up to date.');
+                if(!background) alert('Encrypted Google Drive backup completed successfully.');
             }catch(err){
-                console.error(err);
-                if(!background) alert('Google Drive sync could not complete: '+err.message);
-                updateSecureCloudStatus('🟡 Local save is safe, but cloud sync is pending: '+err.message,true);
+                console.error(err); if(!background) alert('Google Drive backup could not complete: '+err.message);
+                updateSecureCloudStatus('🟡 Local save is safe, but Google Drive backup is pending: '+err.message,true);
             }finally{cloudSyncBusy=false;}
         }
-
         async function reconcileGoogleDrive(background=false){
-            if(!googleAccessToken) await getGoogleToken(!background);
-            const folder=await ensureDriveFolder();
-            const q=encodeURIComponent("name='Current Database.mfbackup.json' and trashed=false and '"+folder+"' in parents");
-            const list=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=10');
-            const files=(await list.json()).files||[];
-            if(!files.length){
-                await syncNowToGoogleDrive(background);
+            const holdUntil=Number(localStorage.getItem('MF_RECOVERY_RESTORE_HOLD_UNTIL')||0);
+            if(holdUntil && Date.now()<holdUntil){
+                updateSecureCloudStatus('🟢 Recovery restore is being held locally; Google Drive Current Database will not overwrite it during this safety window.',true);
                 return;
             }
-            const remote=files[0];
-            googleDriveFileId=remote.id;
+            if(holdUntil) localStorage.removeItem('MF_RECOVERY_RESTORE_HOLD_UNTIL');
+            if(!googleAccessToken) await getGoogleToken(!background);
+            const {files}=await driveListCurrent();
+            if(!files.length){ await syncNowToGoogleDrive(background); return; }
+            const remote=files[0]; googleDriveFileId=remote.id;
             const snap=await idbGetSnapshot();
             const localUpdated=snap?.updatedAt ? new Date(snap.updatedAt).getTime() : 0;
             const remoteUpdated=new Date(remote.modifiedTime||0).getTime();
             const dirty=!!localStorage.getItem('MF_LOCAL_DIRTY_AT');
             if(remoteUpdated > localUpdated + 2000){
-                // Never silently overwrite newer data from another device. Preserve the current local state first.
-                try{
-                    const conflict={id:'conflict-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:structuredClone?structuredClone(state):JSON.parse(JSON.stringify(state))};
-                    const db=await openMfDb();
-                    await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(conflict);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
-                    localStorage.setItem('MF_LAST_LOCAL_CONFLICT_AT',conflict.updatedAt);
-                }catch(e){}
-                const r=await driveApi('files/'+remote.id+'?alt=media');
-                const env=await r.json();
-                const parsed=await parseCloudBackup(env);
-                if(!parsed || !parsed.loans || !parsed.products) throw new Error('Cloud database format is invalid.');
-                state=parsed; normalizeOperationalPeriods(); normalizeBorrowingCosts();
-                await idbPutSnapshot();
-                try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));}catch(e){}
-                markCloudSynced(); renderAll();
-                const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Latest cloud data loaded: '+new Date(remoteUpdated).toLocaleString('en-IN');
-                updateSecureCloudStatus('🟢 Latest Google Drive data loaded on this device.');
-                return;
+                try{ const conflict={id:'conflict-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:(typeof structuredClone==='function'?structuredClone(state):JSON.parse(JSON.stringify(state)))}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(conflict);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); localStorage.setItem('MF_LAST_LOCAL_CONFLICT_AT',conflict.updatedAt); }catch(e){}
+                const r=await driveApi('files/'+remote.id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
+                state=parsed; normalizeOperationalPeriods(); normalizeBorrowingCosts(); await idbPutSnapshot(); try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));}catch(e){}
+                markCloudSynced(); renderAll(); updateSecureCloudStatus('🟢 Latest encrypted Google Drive data loaded on this device.'); return;
             }
-            if(localUpdated > remoteUpdated + 2000 || dirty){
-                await syncNowToGoogleDrive(background);
-                return;
-            }
-            markCloudSynced();
-            const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Cloud and this device are already up to date.';
-            updateSecureCloudStatus();
+            if(localUpdated > remoteUpdated + 2000 || dirty){ await syncNowToGoogleDrive(background); return; }
+            markCloudSynced(); updateSecureCloudStatus('🟢 Google Drive and this device are up to date.');
         }
-
         async function connectGoogleDrive(){
             try{
                 const clientId=(document.getElementById('google-client-id').value||'').trim();
                 if(!clientId) return alert('Please enter your Google OAuth Web Client ID.');
+                const pin=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
+                if(!pin) return alert('Enter your Cloud Encryption PIN before connecting Google Drive.');
+                mfCloudPinMemory=pin;
+                const cb=document.getElementById('cloud-pin-remember'); if(cb) cb.checked=true;
+                // CONNECT ONLY: after PIN validation, connect OAuth but do not read, decrypt, reconcile, restore, or upload Drive data.
                 localStorage.setItem('MF_GOOGLE_CLIENT_ID',clientId);
                 await getGoogleToken(true);
-                updateSecureCloudStatus();
+                googleDriveFolderId=null; googleDriveFileId=null;
+                updateSecureCloudStatus('🟢 Google Drive connected. No cloud data was read or changed. Use Sync Now when you want to create/refresh the encrypted backup.');
                 document.getElementById('sync-target-text').innerText='Google Drive Connected';
-                // If this device currently has no business data, check the cloud FIRST and ask —
-                // exactly like Firebase Fast Sync does — instead of silently deciding in the background.
-                const looksEmpty = (!state.loans || state.loans.length===0) && (!state.borrowings || state.borrowings.length===0) && (!state.expenses || state.expenses.length===0);
-                if(looksEmpty){
-                    const folder=await ensureDriveFolder();
-                    const q=encodeURIComponent("name='Current Database.mfbackup.json' and trashed=false and '"+folder+"' in parents");
-                    const list=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime)&pageSize=10');
-                    const files=(await list.json()).files||[];
-                    if(files.length){
-                        if(confirm('Cloud already has a backup saved for this Google account, and this device currently has no data. Load the cloud backup now?')){
-                            await restoreLatestFromGoogleDrive();
-                            return;
-                        }
-                    }
-                }
-                // Reconcile first so connecting a second device cannot blindly overwrite newer cloud data.
-                await reconcileGoogleDrive(false);
-            }catch(err){ alert(err.message); }
+                alert('Google Drive connected successfully. No cloud data was read or changed. Your Cloud Encryption PIN is active for this app session.');
+            }catch(err){ alert('Google Drive connection failed: '+err.message); }
         }
-
         async function restoreLatestFromGoogleDrive(){
             try{
+                const pin=getCloudPin(); if(!pin) return alert('Enter the Cloud Encryption PIN before restoring a Google Drive backup.');
+                if(!googleAccessToken) await getGoogleToken(true);
+                const {files}=await driveListCurrent();
+                if(!files.length) return alert('No encrypted cloud database backup found in Google Drive.');
+                if(!confirm('Restore the latest encrypted Google Drive database? Your current device data will first be preserved in local version history.')) return;
+                try{ const safety={id:'pre-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:(typeof structuredClone==='function'?structuredClone(state):JSON.parse(JSON.stringify(state)))}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
+                const r=await driveApi('files/'+files[0].id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
+                state=parsed; normalizeOperationalPeriods(); normalizeBorrowingCosts(); await idbPutSnapshot(); try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));}catch(e){}
+                renderAll(); updateSecureCloudStatus('🟢 Encrypted Google Drive backup restored and validated.'); alert('Latest encrypted Google Drive backup restored successfully.'); closeModal('modal-cloud'); setTab('feed');
+            }catch(err){alert('Cloud restore failed: '+err.message);}
+        }
+
+        async function restoreLatestRecoverySnapshotFromGoogleDrive(){
+            try{
+                const pin=getCloudPin();
+                if(!pin) return alert('Enter the Cloud Encryption PIN before restoring a Google Drive recovery snapshot.');
                 if(!googleAccessToken) await getGoogleToken(true);
                 const folder=await ensureDriveFolder();
-                const q=encodeURIComponent("name='Current Database.mfbackup.json' and trashed=false and '"+folder+"' in parents");
-                const list=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime)&pageSize=10');
-                const files=(await list.json()).files||[];
-                if(!files.length) return alert('No cloud database backup found in Google Drive.');
-                if(!confirm('Restore the latest Google Drive database? This will replace the current local data.')) return;
-                const r=await driveApi('files/'+files[0].id+'?alt=media');
-                const env=await r.json();
-                const parsed=await parseCloudBackup(env);
-                if(!parsed || !parsed.loans || !parsed.products) throw new Error('Cloud backup format is invalid.');
-                state=parsed; normalizeOperationalPeriods(); normalizeBorrowingCosts();
+                const q=encodeURIComponent("name contains 'Snapshot_' and trashed=false and '"+folder+"' in parents");
+                const listResp=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=100');
+                const files=(await listResp.json()).files||[];
+                if(!files.length) return alert('No immutable recovery snapshot was found in Google Drive.');
+
+                // Prefer the timestamp embedded in the immutable filename, with Drive modifiedTime
+                // as a secondary key. This avoids relying on Drive's metadata ordering alone.
+                const stampOf=(name)=>{ const m=String(name||'').match(/^Snapshot_(\d{4}-\d{2}-\d{2})_(\d{10,})\.mfbackup\.json$/); return m?Number(m[2]):0; };
+                files.sort((a,b)=>{
+                    const sa=stampOf(a.name), sb=stampOf(b.name);
+                    if(sb!==sa) return sb-sa;
+                    return new Date(b.modifiedTime||0).getTime()-new Date(a.modifiedTime||0).getTime();
+                });
+
+                // Validate first, then ask for confirmation. A broken old snapshot must never
+                // produce a restore prompt or block a newer valid snapshot.
+                let parsed=null, used=null, failures=[];
+                for(const snap of files){
+                    try{
+                        const r=await driveApi('files/'+snap.id+'?alt=media');
+                        const raw=await r.json();
+                        parsed=await parseCloudBackup(raw);
+                        used=snap;
+                        break;
+                    }catch(e){ failures.push((snap.name||'snapshot')+': '+(e?.message||'validation failed')); }
+                }
+                if(!parsed){
+                    throw new Error('No usable encrypted recovery snapshot could be validated. '+failures.slice(0,3).join(' | '));
+                }
+
+                const when=used.modifiedTime?new Date(used.modifiedTime).toLocaleString('en-IN'):used.name;
+                if(!confirm('Restore the latest valid immutable recovery snapshot from '+when+'? Your current device data will first be preserved locally. This restore will NOT upload or overwrite the Google Drive Current Database file.')) return;
+
+                // Preserve the exact current device state before changing anything.
+                try{
+                    const safety={id:'pre-recovery-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:(typeof structuredClone==='function'?structuredClone(state):JSON.parse(JSON.stringify(state)))};
+                    const db=await openMfDb();
+                    await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
+                }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
+
+                state=parsed;
+                normalizeOperationalPeriods();
+                normalizeBorrowingCosts();
+                normalizeCompanyProfile();
                 await idbPutSnapshot();
-                try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));}catch(e){}
-                renderAll(); updateSecureCloudStatus();
-                alert('Latest Google Drive database restored successfully.');
-                closeModal('modal-cloud'); setTab('feed');
-            }catch(err){alert('Cloud restore failed: '+err.message);}
+                try{
+                    localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));
+                    localStorage.removeItem('MF_LOCAL_DIRTY_AT');
+                    // Hold cloud reconciliation long enough for the restored local state to settle.
+                    localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));
+                }catch(e){}
+                renderAll();
+                updateSecureCloudStatus('🟢 Immutable Google Drive recovery snapshot restored locally. Cloud Current Database was not changed.',true);
+                alert('Recovery snapshot restored successfully.\n\nSnapshot: '+(used.name||when)+'\n\nYour Google Drive Current Database was NOT changed.');
+            }catch(err){
+                console.error('Recovery restore failed',err);
+                alert('Recovery snapshot restore failed: '+err.message);
+            }
         }
 
         function openCloudModal(){
             const savedId=localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'';
             const input=document.getElementById('google-client-id'); if(input) input.value=savedId;
-            const wh=document.getElementById('cloud-webhook-url'); if(wh) wh.value=state.cloudWebhookUrl||'';
             const fbCfg=document.getElementById('firebase-config-input'); if(fbCfg) fbCfg.value=localStorage.getItem('MF_FIREBASE_CONFIG')||'';
             const fbCode=document.getElementById('firebase-sync-code'); if(fbCode) fbCode.value=localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'';
             restoreSavedCloudPin();
@@ -7297,18 +7543,6 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             renderAppLockSection();
             updateSecureCloudStatus();
             document.getElementById('modal-cloud').classList.add('active');
-        }
-
-        async function syncNowToCloud(background=false){
-            const url=(document.getElementById('cloud-webhook-url')?.value||'').trim();
-            state.cloudWebhookUrl=url;
-            try{await idbPutSnapshot();}catch(e){}
-            if(!url){if(!background) alert('Please paste your Google Apps Script Web App URL or connect Google Drive directly.');return;}
-            try{
-                await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)});
-                document.getElementById('sync-target-text').innerText='Cloud Synced';
-                if(!background){alert('Backup transmitted to your Google Apps Script cloud endpoint.');closeModal('modal-cloud');}
-            }catch(err){if(!background) alert('Webhook sync failed: '+err.message);}
         }
 
         // ================= ADVANCED MAINTENANCE TOOLS =================
@@ -8030,5 +8264,12 @@ window.addEventListener('load',()=>{ initializeSecureStorage(); });
     <div style="margin-top:16px;font-size:.72rem;color:#60a5fa;cursor:pointer;text-decoration:underline;" onclick="startForgotPinFlow()">Forgot PIN?</div>
 </div>
 
+<script>
+// Secure automatic retry: local IndexedDB remains authoritative while offline; cloud copies retry when online.
+window.addEventListener('online',()=>{
+  try{ if(typeof scheduleFirebasePush==='function') scheduleFirebasePush(); }catch(e){}
+  try{ if(typeof scheduleAutomaticCloudSync==='function') scheduleAutomaticCloudSync(); }catch(e){}
+});
+</script>
 </body>
 </html>
