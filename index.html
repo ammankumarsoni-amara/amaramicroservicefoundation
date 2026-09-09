@@ -2704,14 +2704,35 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                         if(data.ownerUid && data.ownerUid!==mfFirebaseUser.uid){
                             setFirebaseStatus('🔒 This secure business belongs to another account.',true); return;
                         }
+                        const cloudVersion=Number(data.version||0);
+                        const localVersion=mfKnownCloudVersion();
+                        const localFp=mfLocalStateFingerprint();
+                        const lastPushedFp=localStorage.getItem('MF_SECURE_LAST_PUSH_FINGERPRINT')||'';
+                        const hasLocalData=Array.isArray(state?.loans)&&state.loans.length>0 || (state?.products && Object.keys(state.products).length>0);
                         if(showAlerts){
                             if(confirm('Secure cloud data already exists for this account. Load it onto THIS device now? Choose Cancel to keep this device data and upload it as the new secure cloud version.')) pullStateFromFirebase(false);
                             else pushStateToFirebase(false);
+                        }else if(cloudVersion>localVersion && (!hasLocalData || !lastPushedFp || localFp===lastPushedFp)){
+                            // Safe automatic cross-device convergence: only replace local data when this device has no
+                            // unpushed local edits (or is effectively empty). A locally changed, unsynced database is never silently overwritten.
+                            pullStateFromFirebase(false);
+                        }else if(cloudVersion>localVersion){
+                            setFirebaseStatus('🟡 Newer secure cloud data found, but this device has local changes. Cloud copy was NOT overwritten and local data was NOT replaced; review Pull Latest/Push Now.',true);
+                        }else if(cloudVersion===localVersion){
+                            setFirebaseStatus('🟢 Secure Firebase is up to date.',false);
+                        }else{
+                            // Local device is ahead of the remembered cloud version; push automatically.
+                            scheduleFirebasePush();
                         }
-                    }else if(showAlerts){
-                        if(confirm('No secure cloud record exists yet for this account. Upload the data currently on THIS device to the new secure production record?')) pushStateToFirebase(false);
                     }else{
-                        setFirebaseStatus('🟡 Secure Firebase is connected. Review this device data, then use Push Now to create the first secure cloud record.',false);
+                        const hasLocalData=Array.isArray(state?.loans)&&state.loans.length>0 || (state?.products && Object.keys(state.products).length>0);
+                        if(showAlerts){
+                            if(confirm('No secure cloud record exists yet for this account. Upload the data currently on THIS device to the new secure production record?')) pushStateToFirebase(false);
+                        }else if(hasLocalData){
+                            scheduleFirebasePush();
+                        }else{
+                            setFirebaseStatus('🟡 Secure Firebase is connected. No cloud record exists yet and this device has no business data to upload.',false);
+                        }
                     }
                 }).catch(err => { console.error(err); setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Firebase connection check'), true); });
             } catch (e) {
@@ -2785,6 +2806,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             });
             write.then(version=>{
                 mfSetKnownCloudVersion(version);
+                try{ localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint()); localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString()); }catch(e){}
                 mfLocalAudit('CLOUD_PUSH','Secure Firestore snapshot written');
                 setFirebaseStatus('🟢 Securely synced to Firebase — ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
             }).catch(err=>{
@@ -2806,6 +2828,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 if(!incoming || !Array.isArray(incoming.loans) || !incoming.products) throw new Error('Cloud payload failed integrity validation.');
                 state = incoming;
                 mfSetKnownCloudVersion(Number(data.version||0));
+                try{ localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint()); localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString()); }catch(e){}
                 mfLocalAudit('CLOUD_PULL','Secure cloud snapshot loaded after schema and ownership validation');
                 localStorage.setItem('MF_OPEX_PRO_DB', JSON.stringify(state));
                 idbPutSnapshot().finally(() => { renderAll(); setFirebaseStatus('🟢 Loaded latest secure cloud data — ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})); });
@@ -2844,24 +2867,36 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             try{
                 if(typeof firebase==='undefined' || !firebase.auth) return;
                 mfFirebaseAuth=firebase.auth();
-                mfFirebaseAuth.onAuthStateChanged(user=>{
-                    mfFirebaseUser=user||null;
-                    if(user) {
-                        mfAuthStatus('🟢 Signed in: '+(user.email||user.uid));
-                        if(mfSecureSyncEnabled && mfFirestoreDb && mfFirebaseSyncCode) {
-                            const cfgRaw=localStorage.getItem('MF_FIREBASE_CONFIG');
-                            try{ if(cfgRaw) initFirebaseSync(JSON.parse(cfgRaw),mfFirebaseSyncCode,true); }catch(e){console.warn('Secure Firebase reconnect skipped',e);}
-                        }
-                    }
-                    else mfAuthStatus('Not signed in.');
-                    const cb=document.getElementById('mf-secure-sync-enabled'); if(cb) cb.checked=mfSecureSyncEnabled;
-                });
+                // Explicitly request browser-local Firebase Auth persistence so a normal
+                // page refresh restores the existing signed-in identity without storing
+                // the Firebase password in the app.
+                const persistence = (firebase.auth.Auth && firebase.auth.Auth.Persistence)
+                    ? firebase.auth.Auth.Persistence.LOCAL : 'local';
+                const attachListener = ()=>{
+                    mfFirebaseAuth.onAuthStateChanged(user=>{
+                        mfFirebaseUser=user||null;
+                        if(user) {
+                            mfAuthStatus('🟢 Signed in: '+(user.email||user.uid));
+                            if(mfSecureSyncEnabled && mfFirestoreDb && mfFirebaseSyncCode) {
+                                const cfgRaw=localStorage.getItem('MF_FIREBASE_CONFIG');
+                                try{ if(cfgRaw) initFirebaseSync(JSON.parse(cfgRaw),mfFirebaseSyncCode,false); }catch(e){console.warn('Secure Firebase reconnect skipped',e);}
+                            }
+                        } else mfAuthStatus('Not signed in.');
+                        const cb=document.getElementById('mf-secure-sync-enabled'); if(cb) cb.checked=mfSecureSyncEnabled;
+                    });
+                };
+                try{
+                    const p=mfFirebaseAuth.setPersistence ? mfFirebaseAuth.setPersistence(persistence) : null;
+                    if(p && typeof p.then==='function') p.then(attachListener).catch(e=>{console.warn('Firebase Auth persistence setup skipped',e);attachListener();});
+                    else attachListener();
+                }catch(e){ console.warn('Firebase Auth persistence setup skipped',e); attachListener(); }
             }catch(e){console.warn('Firebase Auth init skipped',e);}
         }
         async function mfAuthSignIn(){
             try{
                 mfAuthStatus('⏳ Signing in to Firebase…');
-                // Self-heal Auth initialization after a hard refresh.
+                // Self-heal Auth initialization after a hard refresh if the Firebase
+                // app was not ready when the Auth controls were first rendered.
                 if(!mfFirebaseAuth){
                     if(typeof firebase==='undefined' || !firebase.auth) throw new Error('Firebase Authentication SDK is not loaded.');
                     try{ mfFirebaseAuth=firebase.auth(); }catch(e){
@@ -2873,13 +2908,18 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                         mfFirebaseAuth=firebase.auth();
                     }
                 }
+                try{
+                    const persistence=(firebase.auth.Auth && firebase.auth.Auth.Persistence)
+                        ? firebase.auth.Auth.Persistence.LOCAL : 'local';
+                    if(mfFirebaseAuth.setPersistence) await mfFirebaseAuth.setPersistence(persistence);
+                }catch(e){ console.warn('Firebase Auth persistence setup during sign-in skipped',e); }
                 const email=(document.getElementById('mf-auth-email')?.value||'').trim();
                 const password=document.getElementById('mf-auth-password')?.value||'';
                 if(!email||!password){alert('Enter your account email and password.');mfAuthStatus('Not signed in.');return;}
                 const cred=await mfFirebaseAuth.signInWithEmailAndPassword(email,password);
                 mfFirebaseUser=cred.user||null;
                 mfAuthStatus('🟢 Signed in: '+(mfFirebaseUser?.email||mfFirebaseUser?.uid||email));
-                // If the saved production Firebase config + Sync Code are present, resume Secure Sync automatically.
+                // Resume Secure Sync using the saved production config + Sync Code.
                 try{
                     const cfgRaw=localStorage.getItem('MF_FIREBASE_CONFIG')||(document.getElementById('firebase-config-input')?.value||'').trim();
                     const code=localStorage.getItem('MF_FIREBASE_SYNC_CODE')||(document.getElementById('firebase-sync-code')?.value||'').trim();
@@ -3079,6 +3119,9 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 if(el) el.innerHTML=`<i class="fa-solid fa-check text-success me-1"></i> Saved: ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
                 renderAll();
                 queueAutomaticVersionedBackup();
+                // PRIMARY OPERATIONAL CLOUD COPY: Firebase Secure Sync is automatic after every local save.
+                // Google Drive remains the encrypted secondary backup/recovery layer.
+                try{ scheduleFirebasePush(); }catch(e){ console.warn('Automatic Secure Firebase sync scheduling skipped:',e); }
                 scheduleAutomaticCloudSync();
             }).catch(err=>{
                 console.error("IndexedDB save failed",err);
@@ -8262,5 +8305,12 @@ window.addEventListener('load',()=>{ initializeSecureStorage(); });
     <div style="margin-top:16px;font-size:.72rem;color:#60a5fa;cursor:pointer;text-decoration:underline;" onclick="startForgotPinFlow()">Forgot PIN?</div>
 </div>
 
+<script>
+// Secure automatic retry: local IndexedDB remains authoritative while offline; cloud copies retry when online.
+window.addEventListener('online',()=>{
+  try{ if(typeof scheduleFirebasePush==='function') scheduleFirebasePush(); }catch(e){}
+  try{ if(typeof scheduleAutomaticCloudSync==='function') scheduleAutomaticCloudSync(); }catch(e){}
+});
+</script>
 </body>
 </html>
