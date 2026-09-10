@@ -2179,7 +2179,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                     <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Keep PIN active during this app session (never saved to browser storage)
                 </label>
                 <div style="display:flex;gap:7px;margin-top:7px;">
-                    <button type="button" class="btn-header btn-blue" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;" onclick="saveCloudPinNow()"><i class="fa-solid fa-floppy-disk"></i> Save PIN</button>
+                    <button type="button" class="btn-header btn-blue" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;" onclick="saveCloudPinNow()"><i class="fa-solid fa-floppy-disk"></i> Activate PIN</button>
                     <button type="button" class="btn-header" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;background:#3f1d2e;color:#fb7185;border:1px solid rgba(251,113,133,.25);" onclick="resetCloudPin()"><i class="fa-solid fa-rotate-left"></i> Reset PIN</button>
                 </div>
                 <div style="font-size:.64rem;color:#94a3b8;margin-top:5px;line-height:1.35;">When set, the database sent to Google Drive is AES-GCM encrypted in the browser. Keep this PIN safe; without it, an encrypted cloud backup cannot be restored. <b>The PIN is kept only in this open app session and is not saved to browser storage. <b>Reset PIN</b> clears it from the current session — do this if you're changing the PIN or using a shared device. If the box is ever empty during a sync, this app will now warn you instead of silently uploading an unencrypted backup.</div>
@@ -2191,8 +2191,8 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                     <button class="btn-header btn-blue" style="justify-content:center;" onclick="syncNowToGoogleDrive()"><i class="fa-solid fa-cloud-arrow-up"></i> Sync Now</button>
                     <button class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="restoreLatestFromGoogleDrive()"><i class="fa-solid fa-cloud-arrow-down"></i> Restore Latest</button>
                 </div>
-                <button class="btn-header btn-blue" style="width:100%;margin-top:7px;justify-content:center;background:#334155;" onclick="restoreLatestRecoverySnapshotFromGoogleDrive()"><i class="fa-solid fa-clock-rotate-left"></i> Restore Recovery Snapshot</button>
-                <div id="drive-last-sync" style="font-size:.67rem;color:#94a3b8;margin-top:7px;">Encrypted backups run automatically after changes when Google Drive is connected. Cross-device changes are reconciled before overwrite.</div>
+                <button class="btn-header btn-blue" style="width:100%;margin-top:7px;justify-content:center;background:#334155;" onclick="openDriveRestorePointPicker()"><i class="fa-solid fa-clock-rotate-left"></i> Restore Timestamped Backup</button>
+                <div id="drive-last-sync" style="font-size:.67rem;color:#94a3b8;margin-top:7px;">Encrypted backups run automatically after changes. Each successful Drive backup creates a timestamped restore point; Current Database remains the latest copy.</div>
             </div><div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
                 <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:4px;"><i class="fa-solid fa-screwdriver-wrench" style="color:#60a5fa;"></i> Advanced Maintenance & QA</div>
                 <div style="font-size:.64rem;color:#94a3b8;line-height:1.4;">Read-only integrity checks, automatic local version history, and a real responsive preview. These tools do not change loan math or existing records unless you explicitly restore a backup.</div>
@@ -3023,6 +3023,44 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             if (overlay) { overlay.style.display = 'flex'; setTimeout(() => document.getElementById('app-lock-input')?.focus(), 200); }
         }
 
+        // Secure device convenience: persist only an encrypted Drive PIN. The raw PIN is never stored.
+        // A non-exportable AES-GCM CryptoKey is kept in IndexedDB on this device/browser. This allows
+        // automatic Drive backup after a fresh page load without storing the Drive PIN itself.
+        async function mfGetDriveWrapKey(createIfMissing=true){
+            try{
+                const db=await openMfDb();
+                const existing=await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readonly');const r=tx.objectStore(MF_IDB_STORE).get('drive-wrap-key');r.onsuccess=()=>resolve(r.result?.key||null);r.onerror=()=>reject(r.error);});
+                if(existing) return existing;
+                if(!createIfMissing) return null;
+                const key=await crypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+                await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put({id:'drive-wrap-key',key});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
+                return key;
+            }catch(e){ console.warn('Drive PIN device-key storage unavailable:',e); return null; }
+        }
+        async function persistCloudPinWrapped(cloudPin){
+            if(!cloudPin) return;
+            try{
+                const key=await mfGetDriveWrapKey(true); if(!key) return;
+                const iv=crypto.getRandomValues(new Uint8Array(12));
+                const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(cloudPin)));
+                localStorage.setItem('MF_CLOUD_PIN_WRAPPED', JSON.stringify({v:2,iv:mfBytesToB64(iv),ct:mfBytesToB64(ct)}));
+            }catch(e){ console.warn('Encrypted Drive PIN persistence skipped:',e); }
+        }
+        async function restoreCloudPinWrapped(){
+            const raw=localStorage.getItem('MF_CLOUD_PIN_WRAPPED');
+            if(!raw) return false;
+            try{
+                const x=JSON.parse(raw); if(x.v!==2) return false;
+                const key=await mfGetDriveWrapKey(false); if(!key) return false;
+                const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:mfB64ToBytes(x.iv)},key,mfB64ToBytes(x.ct));
+                const pin=new TextDecoder().decode(pt).trim(); if(!pin) return false;
+                mfCloudPinMemory=pin;
+                const input=document.getElementById('cloud-encryption-pin'); if(input) input.value=pin;
+                const cb=document.getElementById('cloud-pin-remember'); if(cb) cb.checked=true;
+                return true;
+            }catch(e){ return false; }
+        }
+
         async function attemptAppUnlock() {
             const val = document.getElementById('app-lock-input')?.value || '';
             const stored = localStorage.getItem('MF_APP_PIN_HASH');
@@ -3030,6 +3068,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             const err = document.getElementById('app-lock-error');
             if (hash === stored) {
                 mfAppUnlockedThisSession = true;
+                await restoreCloudPinWrapped();
                 document.getElementById('app-lock-overlay').style.display = 'none';
             } else {
                 if (err) err.innerText = 'Incorrect PIN. Please try again.';
@@ -3067,11 +3106,13 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             if (!/^\d{4,8}$/.test(np)) { alert('PIN must be 4 to 8 digits.'); return; }
             if (np !== cp) { alert('PIN and Confirm PIN do not match.'); return; }
             const cur = localStorage.getItem('MF_APP_PIN_HASH');
-            const doSet = () => {
-                mfHashPin(np).then(h => {
+            const doSet = async () => {
+                mfHashPin(np).then(async h => {
                     localStorage.setItem('MF_APP_PIN_HASH', h);
                     mfAppUnlockedThisSession = true;
-                    alert('App Lock PIN saved. From now on, this PIN will be required every time this app is opened.');
+                    const currentCloudPin = getCloudPin();
+                    if(currentCloudPin) await persistCloudPinWrapped(currentCloudPin);
+                    alert('App Lock PIN saved. The Cloud Encryption PIN will also be restored automatically on this device without storing it in plain text.');
                     renderAppLockSection();
                 });
             };
@@ -3163,7 +3204,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 const hasClient=!!(localStorage.getItem('MF_GOOGLE_CLIENT_ID')||document.getElementById('google-client-id')?.value);
                 const hasPin=!!getCloudPin();
                 if(googleAccessToken || (hasClient && hasPin)) syncNowToGoogleDrive(true);
-                else if(hasClient && !hasPin) updateSecureCloudStatus("🟡 Local save is safe — Cloud Encryption PIN is session-only and must be entered again after a fresh session to resume Drive backup.",true);
+                else if(hasClient && !hasPin) updateSecureCloudStatus("🟡 Local save is safe — unlock this device with App Lock and complete Drive setup once to resume automatic backup.",true);
                 else updateSecureCloudStatus("🟡 Local save is safe — connect Google Drive to enable automatic off-device backup.",true);
             },4000);
         }
@@ -7313,25 +7354,32 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         function cloudLastSyncEncryptedKey(){ return 'MF_CLOUD_LAST_SYNC_ENCRYPTED'; }
         let mfCloudPinMemory='';
 
-        function restoreSavedCloudPin(){
+        async function restoreSavedCloudPin(){
             const input=document.getElementById('cloud-encryption-pin');
             const cb=document.getElementById('cloud-pin-remember');
             if(input) input.value=mfCloudPinMemory||'';
             if(cb) cb.checked=!!mfCloudPinMemory;
+            // If App Lock has already been unlocked, recover the encrypted Drive PIN automatically.
+            if(!mfCloudPinMemory && mfAppUnlockedThisSession){
+                // The actual App PIN is intentionally not retained after unlock, so recovery is
+                // performed by attemptAppUnlock(), which receives the typed PIN.
+            }
         }
-        function saveCloudPinNow(){
+        async function saveCloudPinNow(){
             const pin=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
             if(!pin) return alert('Type the Cloud Encryption PIN first.');
             mfCloudPinMemory=pin;
             const cb=document.getElementById('cloud-pin-remember'); if(cb) cb.checked=true;
-            alert('Cloud Encryption PIN is active for this open app session. It is not saved to browser storage.');
+            if(mfAppUnlockedThisSession) await persistCloudPinWrapped(pin);
+            alert('Cloud Encryption PIN is active. Automatic Google Drive backup will continue on this device after refresh; the raw PIN is not saved.');
         }
         function resetCloudPin(){
             mfCloudPinMemory='';
+            try{ localStorage.removeItem('MF_CLOUD_PIN_WRAPPED'); }catch(e){}
             const input=document.getElementById('cloud-encryption-pin'); if(input) input.value='';
             const cb=document.getElementById('cloud-pin-remember'); if(cb) cb.checked=false;
         }
-        function onCloudPinRememberChange(){
+        async function onCloudPinRememberChange(){
             const cb=document.getElementById('cloud-pin-remember');
             if(cb?.checked) saveCloudPinNow(); else resetCloudPin();
         }
@@ -7443,34 +7491,21 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 const result=await resp.json(); googleDriveFileId=result.id||googleDriveFileId;
                 localStorage.setItem(cloudLastSyncEncryptedKey(),'1');
 
-                // Immutable recovery snapshot: keep a valid snapshot for the current UTC day.
-                // If an older snapshot with the same day/name exists but cannot be decrypted with
-                // the current Cloud Encryption PIN, do NOT trust its mere existence. Create a new
-                // uniquely timestamped snapshot instead. Never overwrite an old snapshot.
-                const day=new Date().toISOString().slice(0,10);
-                const snapQ=encodeURIComponent("name contains 'Snapshot_"+day+"_' and trashed=false and '"+folder+"' in parents");
-                const snapList=await driveApi('files?q='+snapQ+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=100');
-                const snapFiles=(await snapList.json()).files||[];
-                let usableSnapshot=false;
-                for(const snap of snapFiles){
-                    try{
-                        const sr=await driveApi('files/'+snap.id+'?alt=media');
-                        const raw=await sr.json();
-                        await parseCloudBackup(raw);
-                        usableSnapshot=true;
-                        break;
-                    }catch(e){
-                        // An invalid/legacy snapshot is left untouched; a fresh one is created below.
-                    }
-                }
-                if(!usableSnapshot){
-                    // Reuse the exact encrypted blob just uploaded to Current Database so the
-                    // immutable snapshot is guaranteed to use the same current PIN/KDF/format.
-                    const snapMeta={name:`Snapshot_${day}_${Date.now()}.mfbackup.json`,mimeType:'application/json',parents:[folder]};
-                    const sf=new FormData(); sf.append('metadata',new Blob([JSON.stringify(snapMeta)],{type:'application/json'})); sf.append('file',blob);
-                    const sr=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime',{method:'POST',headers:{Authorization:'Bearer '+googleAccessToken},body:sf});
-                    if(!sr.ok) throw new Error('Daily recovery snapshot upload '+sr.status);
-                }
+                // Timestamped immutable restore point: every successful Drive backup gets its own
+                // encrypted, immutable file. The exact blob uploaded to Current Database is reused,
+                // so the restore point is guaranteed to match the same PIN/KDF/backup format.
+                const stamp=new Date();
+                const stampDay=stamp.toISOString().slice(0,10);
+                const stampName=`Backup_${stampDay}_${stamp.getTime()}.mfbackup.json`;
+                const stampMeta={name:stampName,mimeType:'application/json',parents:[folder]};
+                const sf=new FormData();
+                sf.append('metadata',new Blob([JSON.stringify(stampMeta)],{type:'application/json'}));
+                sf.append('file',blob);
+                const sr=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime',{method:'POST',headers:{Authorization:'Bearer '+googleAccessToken},body:sf});
+                if(!sr.ok) throw new Error('Timestamped recovery point upload '+sr.status);
+                const stampResult=await sr.json();
+                localStorage.setItem('MF_LAST_DRIVE_RESTORE_POINT', JSON.stringify({id:stampResult.id,name:stampName,modifiedTime:stampResult.modifiedTime||stamp.toISOString()}));
+
                 markCloudSynced();
                 document.getElementById('sync-target-text').innerText='Google Drive Backup Secured';
                 const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Last encrypted backup: '+new Date().toLocaleString('en-IN');
@@ -7534,6 +7569,115 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 state=parsed; normalizeOperationalPeriods(); normalizeBorrowingCosts(); await idbPutSnapshot(); try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));}catch(e){}
                 renderAll(); updateSecureCloudStatus('🟢 Encrypted Google Drive backup restored and validated.'); alert('Latest encrypted Google Drive backup restored successfully.'); closeModal('modal-cloud'); setTab('feed');
             }catch(err){alert('Cloud restore failed: '+err.message);}
+        }
+
+
+        async function listDriveTimestampedRestorePoints(){
+            const folder=await ensureDriveFolder();
+            const q=encodeURIComponent("name contains 'Backup_' and trashed=false and '"+folder+"' in parents");
+            const listResp=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=1000');
+            const files=(await listResp.json()).files||[];
+            const stampOf=(name)=>{ const m=String(name||'').match(/^Backup_(\d{4}-\d{2}-\d{2})_(\d{10,})\.mfbackup\.json$/); return m?Number(m[2]):0; };
+            files.sort((a,b)=>{
+                const sa=stampOf(a.name), sb=stampOf(b.name);
+                if(sb!==sa) return sb-sa;
+                return new Date(b.modifiedTime||0).getTime()-new Date(a.modifiedTime||0).getTime();
+            });
+            return {folder,files};
+        }
+
+        function closeDriveRestorePointPicker(){
+            const el=document.getElementById('mf-drive-restore-picker');
+            if(el) el.remove();
+        }
+
+        function formatDriveRestorePointTime(file){
+            const m=String(file?.name||'').match(/^Backup_(\d{4}-\d{2}-\d{2})_(\d{10,})\.mfbackup\.json$/);
+            const ts=m?Number(m[2]):new Date(file?.modifiedTime||0).getTime();
+            const d=new Date(ts||file?.modifiedTime||0);
+            return isNaN(d.getTime())?'Unknown time':d.toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'medium'});
+        }
+
+        async function openDriveRestorePointPicker(){
+            try{
+                if(!googleAccessToken) await getGoogleToken(true);
+                const {files}=await listDriveTimestampedRestorePoints();
+                closeDriveRestorePointPicker();
+                const overlay=document.createElement('div');
+                overlay.id='mf-drive-restore-picker';
+                overlay.className='modal-overlay';
+                overlay.style.zIndex='10050';
+                const card=document.createElement('div');
+                card.className='modal-card';
+                card.style.cssText='max-width:720px;max-height:88vh;overflow:hidden;';
+                const rows=files.length?files.map((f,i)=>`
+                    <button type="button" data-drive-restore-id="${String(f.id).replace(/"/g,'&quot;')}" style="display:flex;width:100%;text-align:left;gap:10px;align-items:center;padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.035);color:#fff;margin-bottom:7px;cursor:pointer;">
+                        <span style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(96,165,250,.12);color:#93c5fd;font-weight:800;font-size:.72rem;">${i+1}</span>
+                        <span style="flex:1;min-width:0;">
+                            <span style="display:block;font-size:.76rem;font-weight:800;">${formatDriveRestorePointTime(f)}</span>
+                            <span style="display:block;color:#64748b;font-size:.61rem;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${String(f.name||'')}</span>
+                        </span>
+                        <i class="fa-solid fa-clock-rotate-left" style="color:#60a5fa;"></i>
+                    </button>`).join('') :
+                    `<div style="padding:28px 12px;text-align:center;color:#94a3b8;font-size:.76rem;">No timestamped Drive restore points found yet.<br><span style="font-size:.65rem;color:#64748b;">They will appear here after successful automatic Drive backups.</span></div>`;
+                card.innerHTML=`
+                    <div class="modal-title">
+                        <span><i class="fa-solid fa-clock-rotate-left text-primary me-2"></i> Google Drive Restore Points</span>
+                        <i class="fa-solid fa-xmark" id="mf-drive-restore-close" style="cursor:pointer;color:#94a3b8;"></i>
+                    </div>
+                    <div style="font-size:.68rem;color:#94a3b8;line-height:1.4;margin-bottom:10px;">
+                        Select the exact timestamp you want to restore. The current device data will first be preserved locally. Google Drive files are never overwritten by a restore.
+                    </div>
+                    <div style="max-height:58vh;overflow:auto;padding-right:3px;">${rows}</div>
+                    <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+                        <button type="button" class="btn-header btn-blue" id="mf-drive-restore-cancel">Cancel</button>
+                    </div>`;
+                overlay.appendChild(card);
+                document.body.appendChild(overlay);
+                document.getElementById('mf-drive-restore-close').onclick=closeDriveRestorePointPicker;
+                document.getElementById('mf-drive-restore-cancel').onclick=closeDriveRestorePointPicker;
+                card.querySelectorAll('[data-drive-restore-id]').forEach(btn=>{
+                    btn.addEventListener('click',()=>restoreSelectedDriveTimestamp(btn.getAttribute('data-drive-restore-id'),files));
+                });
+            }catch(err){
+                alert('Could not load Google Drive restore points: '+(err?.message||err));
+            }
+        }
+
+        async function restoreSelectedDriveTimestamp(fileId,files){
+            const file=(files||[]).find(f=>String(f.id)===String(fileId));
+            if(!file) return alert('Restore point not found.');
+            try{
+                closeDriveRestorePointPicker();
+                const when=formatDriveRestorePointTime(file);
+                if(!confirm('Restore the Google Drive backup from '+when+'? Your current device data will first be preserved locally. This will NOT overwrite any Drive backup file.')) return;
+                const r=await driveApi('files/'+file.id+'?alt=media');
+                const raw=await r.json();
+                const parsed=await parseCloudBackup(raw);
+                try{
+                    const safety={id:'pre-timestamp-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:(typeof structuredClone==='function'?structuredClone(state):JSON.parse(JSON.stringify(state)))};
+                    const db=await openMfDb();
+                    await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
+                }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
+                state=parsed;
+                normalizeOperationalPeriods();
+                normalizeBorrowingCosts();
+                normalizeCompanyProfile();
+                await idbPutSnapshot();
+                try{
+                    localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));
+                    localStorage.removeItem('MF_LOCAL_DIRTY_AT');
+                    localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));
+                }catch(e){}
+                renderAll();
+                updateSecureCloudStatus('🟢 Timestamped Google Drive backup restored and validated.');
+                const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Restored backup: '+when;
+                alert('Timestamped Google Drive backup restored successfully:\\n\\n'+when);
+                closeModal('modal-cloud');
+                setTab('feed');
+            }catch(err){
+                alert('Timestamped cloud restore failed: '+(err?.message||err));
+            }
         }
 
         async function restoreLatestRecoverySnapshotFromGoogleDrive(){
