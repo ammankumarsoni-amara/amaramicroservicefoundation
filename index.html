@@ -3024,36 +3024,100 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         }
 
         // Secure device convenience: persist only an encrypted Drive PIN. The raw PIN is never stored.
-        // A non-exportable AES-GCM CryptoKey is kept in IndexedDB on this device/browser. This allows
-        // automatic Drive backup after a fresh page load without storing the Drive PIN itself.
+        // IMPORTANT: use a dedicated IndexedDB database for the non-exportable wrapper key. Keeping the
+        // key beside the business snapshot DB made persistence fragile when older app versions/schema
+        // changes were present. The dedicated DB is intentionally isolated from all business data.
+        const MF_PIN_DB_NAME = "MF_DEVICE_SECURITY_DB";
+        const MF_PIN_DB_VERSION = 1;
+        const MF_PIN_STORE = "keys";
+        let mfPinDb = null;
+        async function openMfPinDb(){
+            if(mfPinDb) return mfPinDb;
+            return await new Promise((resolve,reject)=>{
+                const req=indexedDB.open(MF_PIN_DB_NAME,MF_PIN_DB_VERSION);
+                req.onupgradeneeded=()=>{
+                    const db=req.result;
+                    if(!db.objectStoreNames.contains(MF_PIN_STORE)) db.createObjectStore(MF_PIN_STORE,{keyPath:"id"});
+                };
+                req.onsuccess=()=>{ mfPinDb=req.result; resolve(mfPinDb); };
+                req.onerror=()=>reject(req.error||new Error("Device security storage unavailable"));
+            });
+        }
         async function mfGetDriveWrapKey(createIfMissing=true){
+            const db=await openMfPinDb();
+            const existing=await new Promise((resolve,reject)=>{
+                const tx=db.transaction(MF_PIN_STORE,'readonly');
+                const r=tx.objectStore(MF_PIN_STORE).get('drive-wrap-key');
+                r.onsuccess=()=>resolve(r.result?.key||null);
+                r.onerror=()=>reject(r.error);
+            });
+            if(existing) return existing;
+            if(!createIfMissing) return null;
+            const key=await crypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+            await new Promise((resolve,reject)=>{
+                const tx=db.transaction(MF_PIN_STORE,'readwrite');
+                tx.objectStore(MF_PIN_STORE).put({id:'drive-wrap-key',key});
+                tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error||new Error('Device key save failed'));
+            });
+            return key;
+        }
+        // Migration helper for the previous build, which stored the wrapper key in the business DB.
+        // This is read-only compatibility logic; it never changes or deletes business records.
+        async function mfGetLegacyDriveWrapKey(){
             try{
-                const db=await openMfDb();
-                const existing=await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readonly');const r=tx.objectStore(MF_IDB_STORE).get('drive-wrap-key');r.onsuccess=()=>resolve(r.result?.key||null);r.onerror=()=>reject(r.error);});
-                if(existing) return existing;
-                if(!createIfMissing) return null;
-                const key=await crypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);
-                await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put({id:'drive-wrap-key',key});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
-                return key;
-            }catch(e){ console.warn('Drive PIN device-key storage unavailable:',e); return null; }
+                const db=await new Promise((resolve,reject)=>{
+                    const req=indexedDB.open(MF_IDB_NAME,MF_IDB_VERSION);
+                    req.onsuccess=()=>resolve(req.result);
+                    req.onerror=()=>reject(req.error);
+                });
+                if(!db.objectStoreNames.contains(MF_IDB_STORE)) return null;
+                return await new Promise((resolve,reject)=>{
+                    const tx=db.transaction(MF_IDB_STORE,'readonly');
+                    const r=tx.objectStore(MF_IDB_STORE).get('drive-wrap-key');
+                    r.onsuccess=()=>resolve(r.result?.key||null);
+                    r.onerror=()=>reject(r.error);
+                });
+            }catch(e){ return null; }
         }
         async function persistCloudPinWrapped(cloudPin){
-            if(!cloudPin) return;
-            try{
-                const key=await mfGetDriveWrapKey(true); if(!key) return;
-                const iv=crypto.getRandomValues(new Uint8Array(12));
-                const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(cloudPin)));
-                localStorage.setItem('MF_CLOUD_PIN_WRAPPED', JSON.stringify({v:2,iv:mfBytesToB64(iv),ct:mfBytesToB64(ct)}));
-            }catch(e){ console.warn('Encrypted Drive PIN persistence skipped:',e); }
+            if(!cloudPin) return false;
+            const key=await mfGetDriveWrapKey(true);
+            if(!key) throw new Error('Secure device PIN storage is unavailable.');
+            const iv=crypto.getRandomValues(new Uint8Array(12));
+            const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(cloudPin)));
+            const wrapped={v:3,iv:mfBytesToB64(iv),ct:mfBytesToB64(ct)};
+            localStorage.setItem('MF_CLOUD_PIN_WRAPPED', JSON.stringify(wrapped));
+            // Mandatory round-trip verification: do not report success unless the encrypted
+            // wrapper can immediately be decrypted with the device key we just stored.
+            const check=await crypto.subtle.decrypt({name:'AES-GCM',iv:mfB64ToBytes(wrapped.iv)},key,mfB64ToBytes(wrapped.ct));
+            const verified=new TextDecoder().decode(check).trim();
+            if(verified!==cloudPin) throw new Error('Cloud PIN persistence verification failed.');
+            return true;
         }
         async function restoreCloudPinWrapped(){
             const raw=localStorage.getItem('MF_CLOUD_PIN_WRAPPED');
             if(!raw) return false;
             try{
-                const x=JSON.parse(raw); if(x.v!==2) return false;
-                const key=await mfGetDriveWrapKey(false); if(!key) return false;
-                const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:mfB64ToBytes(x.iv)},key,mfB64ToBytes(x.ct));
-                const pin=new TextDecoder().decode(pt).trim(); if(!pin) return false;
+                const x=JSON.parse(raw);
+                if(!x || ![2,3].includes(Number(x.v))) return false;
+                const decryptWith=async(key)=>{
+                    if(!key) return null;
+                    const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:mfB64ToBytes(x.iv)},key,mfB64ToBytes(x.ct));
+                    const pin=new TextDecoder().decode(pt).trim();
+                    return pin||null;
+                };
+                let pin=null;
+                // New dedicated device-key storage.
+                try{ pin=await decryptWith(await mfGetDriveWrapKey(false)); }catch(e){}
+                // One-time migration path for users of the immediately previous build.
+                if(!pin){
+                    try{
+                        const legacyKey=await mfGetLegacyDriveWrapKey();
+                        pin=await decryptWith(legacyKey);
+                        if(pin) await persistCloudPinWrapped(pin);
+                    }catch(e){}
+                }
+                if(!pin) return false;
                 mfCloudPinMemory=pin;
                 const input=document.getElementById('cloud-encryption-pin'); if(input) input.value=pin;
                 const cb=document.getElementById('cloud-pin-remember'); if(cb) cb.checked=true;
@@ -7378,8 +7442,15 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             const cb=document.getElementById('cloud-pin-remember'); if(cb) cb.checked=true;
             // Persist an encrypted wrapper on this device/browser even when App Lock is not used.
             // The raw Cloud Encryption PIN is never written to localStorage.
-            await persistCloudPinWrapped(pin);
-            alert('Cloud Encryption PIN is active. Automatic Google Drive backup will continue on this device after refresh/reopen; the raw PIN is not saved.');
+            try{
+                const ok=await persistCloudPinWrapped(pin);
+                if(!ok) throw new Error('Secure device storage unavailable.');
+            }catch(e){
+                mfCloudPinMemory='';
+                if(cb) cb.checked=false;
+                return alert('Cloud Encryption PIN could not be securely persisted on this device. Your PIN was not saved. Please keep this page open and try again.');
+            }
+            alert('Cloud Encryption PIN is securely saved for this device. Automatic Google Drive backup will continue after refresh/reopen; the raw PIN is not stored.');
         }
         function resetCloudPin(){
             mfCloudPinMemory='';
@@ -7754,12 +7825,12 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             }
         }
 
-        function openCloudModal(){
+        async function openCloudModal(){
             const savedId=localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'';
             const input=document.getElementById('google-client-id'); if(input) input.value=savedId;
             const fbCfg=document.getElementById('firebase-config-input'); if(fbCfg) fbCfg.value=localStorage.getItem('MF_FIREBASE_CONFIG')||'';
             const fbCode=document.getElementById('firebase-sync-code'); if(fbCode) fbCode.value=localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'';
-            restoreSavedCloudPin();
+            await restoreSavedCloudPin();
             if(mfFirestoreDb && mfFirebaseSyncCode) setFirebaseStatus('🟢 Connected — fast sync is active for Sync Code: '+mfFirebaseSyncCode);
             renderAppLockSection();
             updateSecureCloudStatus();
