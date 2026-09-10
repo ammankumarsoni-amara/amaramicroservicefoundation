@@ -3058,8 +3058,18 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 const tx=db.transaction(MF_PIN_STORE,'readwrite');
                 tx.objectStore(MF_PIN_STORE).put({id:'drive-wrap-key',key});
                 tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error||new Error('Device key save failed'));
+                tx.onabort=()=>reject(tx.error||new Error('Device key save transaction aborted'));
             });
-            return key;
+            // Read it back from IndexedDB before returning. This catches browsers/storage
+            // modes that appear writable but do not actually persist CryptoKey objects.
+            const persisted=await new Promise((resolve,reject)=>{
+                const tx=db.transaction(MF_PIN_STORE,'readonly');
+                const r=tx.objectStore(MF_PIN_STORE).get('drive-wrap-key');
+                r.onsuccess=()=>resolve(r.result?.key||null);
+                r.onerror=()=>reject(r.error||new Error('Device key read-back failed'));
+            });
+            if(!persisted) throw new Error('Device key was not persisted.');
+            return persisted;
         }
         // Migration helper for the previous build, which stored the wrapper key in the business DB.
         // This is read-only compatibility logic; it never changes or deletes business records.
@@ -7419,6 +7429,10 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
 
         function bytesToB64(bytes){let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s);}
         function b64ToBytes(b64){const s=atob(b64);const a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return a;}
+        // Stable aliases used by the device-PIN wrapper. Keep these aliases local to the
+        // security layer so persistence does not depend on legacy helper names/order.
+        const mfBytesToB64 = bytesToB64;
+        const mfB64ToBytes = b64ToBytes;
         function cloudLastSyncEncryptedKey(){ return 'MF_CLOUD_LAST_SYNC_ENCRYPTED'; }
         let mfCloudPinMemory='';
 
