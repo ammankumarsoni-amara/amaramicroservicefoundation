@@ -3168,9 +3168,13 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         // ================== END APP LOCK PIN ==================
 
         // Show the PIN screen immediately if a lock is set for this device, before anything else is usable.
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             if(document.documentElement.classList.contains('mf-qa-preview')){ const ov=document.getElementById('app-lock-overlay'); if(ov)ov.style.display='none'; } else maybeShowAppLockScreen();
-            restoreSavedCloudPin();
+            // Restore the encrypted Drive PIN on every fresh page load/reopen when the device
+            // is already unlocked (or App Lock is not configured), then let the normal automatic
+            // backup scheduler use it. With App Lock enabled, the PIN is restored after unlock.
+            await restoreSavedCloudPin();
+            try{ if(getCloudPin()) scheduleAutomaticCloudSync(); }catch(e){}
             const inp = document.getElementById('app-lock-input');
             if (inp) inp.addEventListener('keyup', e => { if (e.key === 'Enter') attemptAppUnlock(); });
         });
@@ -7357,21 +7361,25 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         async function restoreSavedCloudPin(){
             const input=document.getElementById('cloud-encryption-pin');
             const cb=document.getElementById('cloud-pin-remember');
+            // On a normal reload/reopen, recover the encrypted Drive PIN from the device-local
+            // AES-GCM wrapper. The raw PIN is never stored. If App Lock is enabled and still
+            // locked, do NOT expose the PIN in the form; attemptAppUnlock() restores it only
+            // after the correct App Lock PIN is entered.
+            if(!mfCloudPinMemory && (!isAppLockSet() || mfAppUnlockedThisSession)){
+                try{ await restoreCloudPinWrapped(); }catch(e){}
+            }
             if(input) input.value=mfCloudPinMemory||'';
             if(cb) cb.checked=!!mfCloudPinMemory;
-            // If App Lock has already been unlocked, recover the encrypted Drive PIN automatically.
-            if(!mfCloudPinMemory && mfAppUnlockedThisSession){
-                // The actual App PIN is intentionally not retained after unlock, so recovery is
-                // performed by attemptAppUnlock(), which receives the typed PIN.
-            }
         }
         async function saveCloudPinNow(){
             const pin=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
             if(!pin) return alert('Type the Cloud Encryption PIN first.');
             mfCloudPinMemory=pin;
             const cb=document.getElementById('cloud-pin-remember'); if(cb) cb.checked=true;
-            if(mfAppUnlockedThisSession) await persistCloudPinWrapped(pin);
-            alert('Cloud Encryption PIN is active. Automatic Google Drive backup will continue on this device after refresh; the raw PIN is not saved.');
+            // Persist an encrypted wrapper on this device/browser even when App Lock is not used.
+            // The raw Cloud Encryption PIN is never written to localStorage.
+            await persistCloudPinWrapped(pin);
+            alert('Cloud Encryption PIN is active. Automatic Google Drive backup will continue on this device after refresh/reopen; the raw PIN is not saved.');
         }
         function resetCloudPin(){
             mfCloudPinMemory='';
