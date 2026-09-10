@@ -65,6 +65,11 @@
         .biz-input:focus { background: rgba(255, 255, 255, 0.12); outline: none; border-color: var(--primary); }
 
         .btn-action-group { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        /* Mobile interaction hardening: taps should resolve on the first touch without
+           changing desktop click behavior. */
+        button, [role="button"], input, select, textarea, label { touch-action: manipulation; }
+        button { -webkit-tap-highlight-color: transparent; }
+
         .btn-header {
             border: none;
             padding: 7px 12px;
@@ -295,6 +300,8 @@
         }
         .modal-overlay.active { display: flex; }
         .modal-card {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
             background: #111827;
             border-radius: 18px;
             width: 100%;
@@ -764,11 +771,11 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 </div>
             </div>
             <div class="btn-action-group">
-                <button class="btn-header btn-green" onclick="openCloudModal()"><i class="fa-solid fa-cloud-arrow-up"></i> Cloud Sync</button>
-                <button class="btn-header btn-blue" onclick="openCompanyProfileModal()"><i class="fa-solid fa-building"></i> Company Profile</button>
-                <button class="btn-header btn-blue" onclick="exportFullEnterpriseExcel()"><i class="fa-solid fa-file-excel"></i> Excel Export</button>
-                <button class="btn-header btn-daynight" id="mf-theme-toggle" onclick="mfToggleTheme()" title="Switch Morning Glory / Night theme"><i class="fa-solid fa-sun"></i> Morning Glory</button>
-                <button class="btn-header btn-purple" onclick="openAddClientModal()"><i class="fa-solid fa-user-plus"></i> + New Loan</button>
+                <button type="button" class="btn-header btn-green" onclick="openCloudModal()"><i class="fa-solid fa-cloud-arrow-up"></i> Cloud Sync</button>
+                <button type="button" class="btn-header btn-blue" onclick="openCompanyProfileModal()"><i class="fa-solid fa-building"></i> Company Profile</button>
+                <button type="button" class="btn-header btn-blue" onclick="exportFullEnterpriseExcel()"><i class="fa-solid fa-file-excel"></i> Excel Export</button>
+                <button type="button" class="btn-header btn-daynight" id="mf-theme-toggle" onclick="mfToggleTheme()" title="Switch Morning Glory / Night theme"><i class="fa-solid fa-sun"></i> Morning Glory</button>
+                <button type="button" class="btn-header btn-purple" onclick="openAddClientModal()"><i class="fa-solid fa-user-plus"></i> + New Loan</button>
             </div>
         </div>
     </div>
@@ -889,8 +896,8 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                     <select id="npa-agent-filter" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;"><option value="ALL">All Collection Agents</option></select>
                 </div>
                 <div class="npa-actions">
-                    <button class="btn-header btn-green" onclick="applyNpaFilters()"><i class="fa-solid fa-filter"></i> Apply Filters</button>
-                    <button class="btn-header btn-blue" onclick="resetNpaFilters()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+                    <button type="button" class="btn-header btn-green" onclick="applyNpaFilters()"><i class="fa-solid fa-filter"></i> Apply Filters</button>
+                    <button type="button" class="btn-header btn-blue" onclick="resetNpaFilters()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
                     <button class="btn-header btn-purple" onclick="exportNpaReportExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
                     <button class="btn-header btn-blue" onclick="printNpaReport()"><i class="fa-solid fa-print"></i> PDF / Print</button>
                 </div>
@@ -2156,12 +2163,12 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Sync Code (create one secret code — use the SAME code on mobile and laptop)</label>
                 <input type="text" id="firebase-sync-code" placeholder="e.g. amma-loan-2026-secure" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;margin-bottom:7px;">
 
-                <button class="btn-header btn-green" style="width:100%;justify-content:center;" onclick="connectFirebaseSync()"><i class="fa-solid fa-bolt"></i> Connect Fast Sync</button>
+                <button type="button" class="btn-header btn-green" style="width:100%;justify-content:center;" onclick="connectFirebaseSync()"><i class="fa-solid fa-bolt"></i> Connect Fast Sync</button>
                 <div id="firebase-sync-status" style="font-size:.68rem;color:#94a3b8;margin-top:7px;">Not connected yet.</div>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px;">
-                    <button class="btn-header btn-blue" style="justify-content:center;" onclick="pushStateToFirebase(false)"><i class="fa-solid fa-cloud-arrow-up"></i> Push Now</button>
-                    <button class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="pullStateFromFirebase(true)"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Latest</button>
+                    <button type="button" class="btn-header btn-blue" style="justify-content:center;" onclick="pushStateToFirebase(false)"><i class="fa-solid fa-cloud-arrow-up"></i> Push Now</button>
+                    <button type="button" class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="pullStateFromFirebase(true)"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Latest</button>
                 </div>
                 <div style="font-size:.62rem;color:#64748b;margin-top:6px;line-height:1.35;"><b>Note:</b> Keep your Sync Code private. Secure Sync also requires your signed-in Firebase account.</div>
             </div>
@@ -2170,7 +2177,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Google Drive Backup & Recovery</div>
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Google OAuth Web Client ID</label>
                 <input type="text" id="google-client-id" placeholder="xxxx.apps.googleusercontent.com" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;margin-bottom:7px;">
-                <button class="btn-header btn-green" style="width:100%;justify-content:center;" onclick="connectGoogleDrive()"><i class="fa-brands fa-google-drive"></i> Connect My Google Drive</button>
+                <button type="button" class="btn-header btn-green" style="width:100%;justify-content:center;" onclick="connectGoogleDrive()"><i class="fa-brands fa-google-drive"></i> Connect My Google Drive</button>
                 <div style="font-size:.66rem;color:#94a3b8;margin-top:6px;line-height:1.4;">The app never asks for or stores your Gmail password. Google OAuth grants the app the limited <b>drive.file</b> Drive scope needed for its own backup files.</div>
                 <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, host this app on your HTTPS domain.</div>
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required)</label>
@@ -2188,10 +2195,10 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
                 <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Automatic Backup Controls</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-                    <button class="btn-header btn-blue" style="justify-content:center;" onclick="syncNowToGoogleDrive()"><i class="fa-solid fa-cloud-arrow-up"></i> Sync Now</button>
-                    <button class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="restoreLatestFromGoogleDrive()"><i class="fa-solid fa-cloud-arrow-down"></i> Restore Latest</button>
+                    <button type="button" class="btn-header btn-blue" style="justify-content:center;" onclick="syncNowToGoogleDrive()"><i class="fa-solid fa-cloud-arrow-up"></i> Sync Now</button>
+                    <button type="button" class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="restoreLatestFromGoogleDrive()"><i class="fa-solid fa-cloud-arrow-down"></i> Restore Latest</button>
                 </div>
-                <button class="btn-header btn-blue" style="width:100%;margin-top:7px;justify-content:center;background:#334155;" onclick="openDriveRestorePointPicker()"><i class="fa-solid fa-clock-rotate-left"></i> Restore Timestamped Backup</button>
+                <button type="button" class="btn-header btn-blue" style="width:100%;margin-top:7px;justify-content:center;background:#334155;" onclick="openDriveRestorePointPicker()"><i class="fa-solid fa-clock-rotate-left"></i> Restore Timestamped Backup</button>
                 <div id="drive-last-sync" style="font-size:.67rem;color:#94a3b8;margin-top:7px;">Encrypted backups run automatically after changes. Each successful Drive backup creates a timestamped restore point; Current Database remains the latest copy.</div>
             </div><div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
                 <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:4px;"><i class="fa-solid fa-screwdriver-wrench" style="color:#60a5fa;"></i> Advanced Maintenance & QA</div>
@@ -2755,14 +2762,19 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 if (data.ownerUid && data.ownerUid!==mfFirebaseUser.uid) { setFirebaseStatus('🔒 Cloud record belongs to another account.',true); return; }
                 if (data.updatedByDevice === mfFirebaseDeviceId) return;
                 if(Number(data.version||0)>mfKnownCloudVersion()) setFirebaseStatus('🟡 Newer secure cloud version detected — Pull Latest before editing.',true);
-                showFirebaseUpdateBanner(data.updatedAtLabel || '');
+                showFirebaseUpdateBanner(data.updatedAtLabel || '', Number(data.version||0));
             }, err => {
                 console.error('Firebase secure listener error', err);
                 setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Firebase listener'), true);
             });
         }
 
-        function showFirebaseUpdateBanner(whenLabel) {
+        function showFirebaseUpdateBanner(whenLabel, cloudVersion) {
+            // One notification per cloud version. Firestore listeners can deliver the same
+            // snapshot again after a local pull; that must not recreate the same banner.
+            const version = Number(cloudVersion || 0);
+            const acknowledged = Number(localStorage.getItem('MF_SECURE_BANNER_ACK_VERSION') || 0);
+            if (version > 0 && version <= acknowledged) return;
             let bar = document.getElementById('firebase-update-banner');
             if (!bar) {
                 bar = document.createElement('div');
@@ -2770,11 +2782,26 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#0f766e;color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-size:.78rem;gap:10px;box-shadow:0 -4px 14px rgba(0,0,0,.35);';
                 document.body.appendChild(bar);
             }
+            bar.dataset.cloudVersion = String(version);
             bar.innerHTML = `<span><i class="fa-solid fa-cloud-arrow-down me-1"></i> New data synced from another device${whenLabel ? ' (' + whenLabel + ')' : ''}.</span>
                 <span>
-                    <button style="background:#fff;color:#0f766e;border:none;padding:6px 12px;border-radius:8px;font-weight:800;cursor:pointer;margin-right:6px;" onclick="pullStateFromFirebase(false);document.getElementById('firebase-update-banner').remove();">Load It</button>
-                    <button style="background:transparent;color:#fff;border:1px solid #fff;padding:6px 12px;border-radius:8px;font-weight:700;cursor:pointer;" onclick="document.getElementById('firebase-update-banner').remove();">Dismiss</button>
+                    <button type="button" id="firebase-banner-load" style="background:#fff;color:#0f766e;border:none;padding:6px 12px;border-radius:8px;font-weight:800;cursor:pointer;margin-right:6px;touch-action:manipulation;">Load It</button>
+                    <button type="button" id="firebase-banner-dismiss" style="background:transparent;color:#fff;border:1px solid #fff;padding:6px 12px;border-radius:8px;font-weight:700;cursor:pointer;touch-action:manipulation;">Dismiss</button>
                 </span>`;
+            const markAck = () => {
+                try { if(version > 0) localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION', String(version)); } catch(e) {}
+                const current=document.getElementById('firebase-update-banner'); if(current) current.remove();
+            };
+            const loadBtn=document.getElementById('firebase-banner-load');
+            const dismissBtn=document.getElementById('firebase-banner-dismiss');
+            if(loadBtn) loadBtn.onclick=async()=>{
+                // Acknowledge immediately so the listener cannot recreate the same banner
+                // while the network pull is in progress. The pull itself still validates and
+                // updates the known cloud version before replacing local data.
+                markAck();
+                await pullStateFromFirebase(false);
+            };
+            if(dismissBtn) dismissBtn.onclick=markAck;
         }
 
         function mfSecureFirebaseCollection(){ return mfFirestoreDb.collection('secure_microfinance_business'); }
@@ -2839,8 +2866,9 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 const incoming = JSON.parse(data.payload||'null');
                 if(!incoming || !Array.isArray(incoming.loans) || !incoming.products) throw new Error('Cloud payload failed integrity validation.');
                 state = incoming;
-                mfSetKnownCloudVersion(Number(data.version||0));
-                try{ localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint()); localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString()); }catch(e){}
+                const pulledVersion=Number(data.version||0);
+                mfSetKnownCloudVersion(pulledVersion);
+                try{ localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(pulledVersion)); localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint()); localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString()); }catch(e){}
                 mfLocalAudit('CLOUD_PULL','Secure cloud snapshot loaded after schema and ownership validation');
                 localStorage.setItem('MF_OPEX_PRO_DB', JSON.stringify(state));
                 idbPutSnapshot().finally(() => { renderAll(); setFirebaseStatus('🟢 Loaded latest secure cloud data — ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})); });
@@ -7694,7 +7722,10 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             return isNaN(d.getTime())?'Unknown time':d.toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'medium'});
         }
 
+        let mfDriveRestorePickerBusy=false;
         async function openDriveRestorePointPicker(){
+            if(mfDriveRestorePickerBusy) return;
+            mfDriveRestorePickerBusy=true;
             try{
                 const pin=getCloudPin();
                 if(!pin) return alert('Enter the Cloud Encryption PIN before viewing Google Drive timestamped restore points.');
@@ -7742,6 +7773,8 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 });
             }catch(err){
                 alert('Could not load Google Drive restore points: '+(err?.message||err));
+            }finally{
+                mfDriveRestorePickerBusy=false;
             }
         }
 
@@ -7848,15 +7881,24 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         }
 
         async function openCloudModal(){
+            // Open synchronously on the first tap. Previously this function awaited encrypted
+            // PIN recovery before adding the .active class, which can feel like a dead tap on
+            // mobile Chrome while WebCrypto is deriving/unwrapping the device key.
+            const modal=document.getElementById('modal-cloud');
+            if(modal) modal.classList.add('active');
             const savedId=localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'';
             const input=document.getElementById('google-client-id'); if(input) input.value=savedId;
             const fbCfg=document.getElementById('firebase-config-input'); if(fbCfg) fbCfg.value=localStorage.getItem('MF_FIREBASE_CONFIG')||'';
             const fbCode=document.getElementById('firebase-sync-code'); if(fbCode) fbCode.value=localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'';
-            await restoreSavedCloudPin();
-            if(mfFirestoreDb && mfFirebaseSyncCode) setFirebaseStatus('🟢 Connected — fast sync is active for Sync Code: '+mfFirebaseSyncCode);
             renderAppLockSection();
             updateSecureCloudStatus();
-            document.getElementById('modal-cloud').classList.add('active');
+            try{
+                await restoreSavedCloudPin();
+                if(mfFirestoreDb && mfFirebaseSyncCode) setFirebaseStatus('🟢 Connected — fast sync is active for Sync Code: '+mfFirebaseSyncCode);
+                updateSecureCloudStatus();
+            }catch(e){
+                console.warn('Cloud PIN hydration after modal open failed:',e);
+            }
         }
 
         // ================= ADVANCED MAINTENANCE TOOLS =================
