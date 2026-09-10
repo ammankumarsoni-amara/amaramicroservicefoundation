@@ -7647,7 +7647,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 googleDriveFolderId=null; googleDriveFileId=null;
                 updateSecureCloudStatus('🟢 Google Drive connected. No cloud data was read or changed. Use Sync Now when you want to create/refresh the encrypted backup.');
                 document.getElementById('sync-target-text').innerText='Google Drive Connected';
-                alert('Google Drive connected successfully. No cloud data was read or changed. Your Cloud Encryption PIN is active for this app session.');
+                alert('Google Drive connected successfully. No cloud data was read or changed. Your Cloud Encryption PIN is securely persisted on this device.');
             }catch(err){ alert('Google Drive connection failed: '+err.message); }
         }
         async function restoreLatestFromGoogleDrive(){
