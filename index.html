@@ -2176,13 +2176,13 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required)</label>
                 <input type="password" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for cloud backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
                 <label style="display:flex;align-items:center;gap:6px;font-size:.66rem;color:#94a3b8;margin-top:7px;cursor:pointer;">
-                    <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Keep PIN active during this app session (never saved to browser storage)
+                    <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Keep PIN active on this device (encrypted storage; raw PIN is never stored)
                 </label>
                 <div style="display:flex;gap:7px;margin-top:7px;">
                     <button type="button" class="btn-header btn-blue" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;" onclick="saveCloudPinNow()"><i class="fa-solid fa-floppy-disk"></i> Activate PIN</button>
                     <button type="button" class="btn-header" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;background:#3f1d2e;color:#fb7185;border:1px solid rgba(251,113,133,.25);" onclick="resetCloudPin()"><i class="fa-solid fa-rotate-left"></i> Reset PIN</button>
                 </div>
-                <div style="font-size:.64rem;color:#94a3b8;margin-top:5px;line-height:1.35;">When set, the database sent to Google Drive is AES-GCM encrypted in the browser. Keep this PIN safe; without it, an encrypted cloud backup cannot be restored. <b>The PIN is kept only in this open app session and is not saved to browser storage. <b>Reset PIN</b> clears it from the current session — do this if you're changing the PIN or using a shared device. If the box is ever empty during a sync, this app will now warn you instead of silently uploading an unencrypted backup.</div>
+                <div style="font-size:.64rem;color:#94a3b8;margin-top:5px;line-height:1.35;">When set, the database sent to Google Drive is AES-GCM encrypted in the browser. Keep this PIN safe; without it, an encrypted cloud backup cannot be restored. <b>The PIN is kept active on this device using encrypted device storage; the raw PIN is never saved to browser storage.</b> <b>Reset PIN</b> clears it from the current session — do this if you're changing the PIN or using a shared device. If the box is ever empty during a sync, this app will now warn you instead of silently uploading an unencrypted backup.</div>
             </div>
 
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
