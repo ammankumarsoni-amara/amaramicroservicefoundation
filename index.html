@@ -7653,15 +7653,18 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         async function restoreLatestFromGoogleDrive(){
             try{
                 const pin=getCloudPin(); if(!pin) return alert('Enter the Cloud Encryption PIN before restoring a Google Drive backup.');
-                if(!googleAccessToken) await getGoogleToken(true);
+                if(!googleAccessToken){
+                    try{ await getGoogleToken(false); }
+                    catch(e){ await getGoogleToken(true); }
+                }
                 const {files}=await driveListCurrent();
                 if(!files.length) return alert('No encrypted cloud database backup found in Google Drive.');
                 if(!confirm('Restore the latest encrypted Google Drive database? Your current device data will first be preserved in local version history.')) return;
                 try{ const safety={id:'pre-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:(typeof structuredClone==='function'?structuredClone(state):JSON.parse(JSON.stringify(state)))}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
                 const r=await driveApi('files/'+files[0].id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
-                state=parsed; normalizeOperationalPeriods(); normalizeBorrowingCosts(); await idbPutSnapshot(); try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));}catch(e){}
-                renderAll(); updateSecureCloudStatus('🟢 Encrypted Google Drive backup restored and validated.'); alert('Latest encrypted Google Drive backup restored successfully.'); closeModal('modal-cloud'); setTab('feed');
-            }catch(err){alert('Cloud restore failed: '+err.message);}
+                state=parsed; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state)); localStorage.removeItem('MF_LOCAL_DIRTY_AT'); localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));}catch(e){}
+                renderAll(); updateSecureCloudStatus('🟢 Latest encrypted Google Drive backup restored and validated.'); const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Restored latest backup: '+new Date().toLocaleString('en-IN'); alert('Latest encrypted Google Drive backup restored successfully.'); closeModal('modal-cloud'); setTab('feed');
+            }catch(err){alert('Cloud restore failed: '+(err?.message||err));}
         }
 
 
@@ -7693,12 +7696,17 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
 
         async function openDriveRestorePointPicker(){
             try{
-                if(!googleAccessToken) await getGoogleToken(true);
+                const pin=getCloudPin();
+                if(!pin) return alert('Enter the Cloud Encryption PIN before viewing Google Drive timestamped restore points.');
+                if(!googleAccessToken){
+                    try{ await getGoogleToken(false); }
+                    catch(e){ await getGoogleToken(true); }
+                }
                 const {files}=await listDriveTimestampedRestorePoints();
                 closeDriveRestorePointPicker();
                 const overlay=document.createElement('div');
                 overlay.id='mf-drive-restore-picker';
-                overlay.className='modal-overlay';
+                overlay.className='modal-overlay active';
                 overlay.style.zIndex='10050';
                 const card=document.createElement('div');
                 card.className='modal-card';
