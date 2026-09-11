@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Loan Management</title>
-    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-09-09">
+    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-09-11-SMOOTH-UI-V4-ADVANCED-REPORTS-CONTACTS-ALIGNMENT-VERIFIED-SELF-AUDITED">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -758,6 +758,67 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',mfApplyTheme); else mfApplyTheme();
 })();
 </script>
+
+<style id="mf-v4-advanced-layout">
+/* V4: compact, deterministic header layout. Desktop remains inline; mobile uses
+   two balanced rows so New Loan stays prominent and Excel is immediately followed by PDF. */
+.btn-action-group{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;align-items:stretch;width:100%;}
+.btn-action-group .btn-header{width:100%;min-width:0;justify-content:center;min-height:40px;overflow:hidden;text-overflow:ellipsis;}
+.btn-action-group .btn-header i{flex:0 0 auto;}
+@media(min-width:701px){
+  .btn-action-group{display:flex;justify-content:flex-end;width:auto;}
+  .btn-action-group .btn-header{width:auto;}
+}
+@media(max-width:700px){
+  .btn-action-group{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .btn-action-group .btn-header{font-size:.68rem;padding:8px 5px;gap:4px;}
+}
+@media(max-width:420px){
+  .btn-action-group{gap:5px;}
+  .btn-action-group .btn-header{font-size:.64rem;min-height:42px;padding:7px 4px;}
+}
+.btn-header,.tab-btn,.btn-collect-sm,.btn-foreclose-sm,.btn-edit-sm,.legacy-emi-btn{overflow-wrap:anywhere;word-break:break-word;}
+table{max-width:100%;}
+th,td{overflow-wrap:anywhere;word-break:break-word;}
+</style>
+
+
+<style id="mf-v4-contact-and-status-alignment">
+/* Contact output: preserve entered primary/secondary contacts in printable documents. */
+.mf-contact-output{overflow-wrap:anywhere;word-break:normal;line-height:1.35;}
+/* EMI status badges are atomic labels. They must never split as "SETTLE / D". */
+.badge-paid,.badge-pending,.badge-overdue,.badge-foreclosed,.loan-badge{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    white-space:nowrap !important;
+    word-break:normal !important;
+    overflow-wrap:normal !important;
+    max-width:100%;
+    vertical-align:middle;
+}
+/* Mobile schedule tables remain fully readable through horizontal scrolling rather than
+   shrinking text or breaking semantic labels. */
+.table-wrap{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.table-wrap table{min-width:650px;}
+.table-wrap th,.table-wrap td{word-break:normal;overflow-wrap:anywhere;}
+.table-wrap th:nth-child(1){min-width:72px;}
+.table-wrap th:nth-child(2){min-width:108px;}
+.table-wrap th:nth-child(3){min-width:92px;}
+.table-wrap th:nth-child(4){min-width:150px;}
+.table-wrap th:nth-child(5){min-width:115px;}
+@media(max-width:700px){
+    .table-wrap{border-radius:10px;}
+    .table-wrap .badge-paid,.table-wrap .badge-pending,.table-wrap .badge-overdue,.table-wrap .badge-foreclosed{font-size:.68rem;padding-left:7px;padding-right:7px;}
+}
+</style>
+
+
+<style id="mf-v4-final-contact-wrap">
+.finance-section td{overflow-wrap:anywhere;word-break:normal;}
+.finance-pill{white-space:normal;overflow-wrap:anywhere;word-break:normal;}
+</style>
+
 </head>
 <body>
 
@@ -773,9 +834,10 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             <div class="btn-action-group">
                 <button type="button" class="btn-header btn-green" onclick="openCloudModal()"><i class="fa-solid fa-cloud-arrow-up"></i> Cloud Sync</button>
                 <button type="button" class="btn-header btn-blue" onclick="openCompanyProfileModal()"><i class="fa-solid fa-building"></i> Company Profile</button>
-                <button type="button" class="btn-header btn-blue" onclick="exportFullEnterpriseExcel()"><i class="fa-solid fa-file-excel"></i> Excel Export</button>
-                <button type="button" class="btn-header btn-daynight" id="mf-theme-toggle" onclick="mfToggleTheme()" title="Switch Morning Glory / Night theme"><i class="fa-solid fa-sun"></i> Morning Glory</button>
                 <button type="button" class="btn-header btn-purple" onclick="openAddClientModal()"><i class="fa-solid fa-user-plus"></i> + New Loan</button>
+                <button type="button" class="btn-header btn-blue" onclick="exportFullEnterpriseExcel()"><i class="fa-solid fa-file-excel"></i> Excel Report</button>
+                <button type="button" class="btn-header btn-blue" onclick="exportExecutiveBusinessPdf()"><i class="fa-solid fa-file-pdf"></i> PDF Report</button>
+                <button type="button" class="btn-header btn-daynight" id="mf-theme-toggle" onclick="mfToggleTheme()" title="Switch Morning Glory / Night theme"><i class="fa-solid fa-sun"></i> Morning Glory</button>
             </div>
         </div>
     </div>
@@ -3447,6 +3509,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
 
         function setTab(tab) {
             const tabs = ['feed','npa','expenses','borrowings','passbook','products','all'];
+            mfActiveTab = tabs.includes(tab) ? tab : 'feed';
             tabs.forEach(t => {
                 const panel = document.getElementById('tab-' + t);
                 if (panel) panel.style.display = tab === t ? 'block' : 'none';
@@ -3454,15 +3517,30 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                 if (btn) btn.classList.toggle('active', tab === t);
             });
 
-            // Business Growth belongs to the dashboard/Customer Recovery view, not the NPA screen.
             const growthPanel=document.getElementById('business-growth-panel');
             if(growthPanel) growthPanel.style.display = tab === 'feed' ? '' : 'none';
-            // The NPA screen is intentionally filter-first: opening the tab never dumps the full customer list.
-            if (tab === 'npa') { initNpaFilters(); if(!npaFiltersApplied) resetNpaFilters(); }
-            if (tab === 'expenses') renderExpensesAndStaff();
-            if (tab === 'borrowings') renderBorrowingsList();
-            if (tab === 'passbook') populatePassbookDropdown();
-            if (tab === 'products') renderProductsList();
+
+            // Paint the tab switch first. Heavy table/list work is intentionally moved to the
+            // next animation frame so a phone can acknowledge the first tap immediately.
+            if(mfRenderRaf) cancelAnimationFrame(mfRenderRaf);
+            mfRenderRaf=requestAnimationFrame(()=>{
+                mfRenderRaf=0;
+                if (tab === 'npa') { initNpaFilters(); if(!npaFiltersApplied) resetNpaFilters(); }
+                if (tab === 'expenses' && typeof renderExpensesAndStaff==='function') renderExpensesAndStaff();
+                if (tab === 'borrowings' && typeof renderBorrowingsList==='function') renderBorrowingsList();
+                if (tab === 'passbook' && typeof populatePassbookDropdown==='function') populatePassbookDropdown();
+                if (tab === 'products' && typeof renderProductsList==='function') renderProductsList();
+                if (tab === 'all') {
+                    if(typeof renderAllLoansTable==='function') renderAllLoansTable();
+                    if(typeof renderLoanMasterSummary==='function') renderLoanMasterSummary();
+                }
+                if (tab === 'feed') {
+                    if(typeof renderBusinessGrowthChart==='function') renderBusinessGrowthChart();
+                    if(typeof renderProductFilters==='function') renderProductFilters();
+                    if(typeof renderFeed==='function') renderFeed();
+                    if(typeof renderUpcomingEmiSchedule==='function') renderUpcomingEmiSchedule();
+                }
+            });
         }
 
         // ================= DASHBOARD RENDER + KPI RESTORE FIX =================
@@ -3517,19 +3595,35 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             set('kpi-outstanding','₹'+outstanding.toLocaleString('en-IN'));
         }
 
+        // Mobile responsiveness fix: do not synchronously rebuild every hidden screen after
+        // each save. The old pipeline rendered Feed + Expenses + Borrowings + Passbook +
+        // Loan Master + Growth together, which can monopolize the main thread on phones.
+        // Calculations/state/security are untouched; only the DOM render scope is reduced.
+        let mfActiveTab = 'feed';
+        let mfRenderRaf = 0;
         function renderAll(){
             renderKPIs();
-            if (state.bizName) document.title = state.bizName; // shows the business name instead of a generic app title if the browser's Print "Headers and footers" is turned on
-            if(typeof renderBusinessGrowthChart==='function') renderBusinessGrowthChart();
-            if(typeof renderProductFilters==='function') renderProductFilters();
-            if(typeof renderFeed==='function') renderFeed();
-            if(typeof renderExpensesAndStaff==='function') renderExpensesAndStaff();
-            if(typeof renderBorrowingsList==='function') renderBorrowingsList();
-            if(typeof renderAllLoansTable==='function') renderAllLoansTable();
-            if(typeof populatePassbookDropdown==='function') populatePassbookDropdown();
-            if(typeof renderPassbookDetail==='function' && document.getElementById('passbook-select')?.value) renderPassbookDetail();
-            if(typeof renderLoanMasterSummary==='function') renderLoanMasterSummary();
-            if(typeof renderUpcomingEmiSchedule==='function') renderUpcomingEmiSchedule();
+            if (state.bizName) document.title = state.bizName;
+            const tab = mfActiveTab || 'feed';
+            if(tab==='feed'){
+                if(typeof renderBusinessGrowthChart==='function') renderBusinessGrowthChart();
+                if(typeof renderProductFilters==='function') renderProductFilters();
+                if(typeof renderFeed==='function') renderFeed();
+                if(typeof renderUpcomingEmiSchedule==='function') renderUpcomingEmiSchedule();
+            }else if(tab==='expenses'){
+                if(typeof renderExpensesAndStaff==='function') renderExpensesAndStaff();
+            }else if(tab==='borrowings'){
+                if(typeof renderBorrowingsList==='function') renderBorrowingsList();
+            }else if(tab==='passbook'){
+                if(typeof populatePassbookDropdown==='function') populatePassbookDropdown();
+                if(typeof renderPassbookDetail==='function' && document.getElementById('passbook-select')?.value) renderPassbookDetail();
+            }else if(tab==='products'){
+                if(typeof renderProductsList==='function') renderProductsList();
+            }else if(tab==='all'){
+                if(typeof renderAllLoansTable==='function') renderAllLoansTable();
+                if(typeof renderLoanMasterSummary==='function') renderLoanMasterSummary();
+            }
+            // NPA is intentionally filter-first; opening it initializes its controls in setTab().
         }
 
         function renderBusinessGrowthChart(){
@@ -4323,7 +4417,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                       prevBalance=prev.reduce((s,x)=>s+x.balance,0), prevPenalty=prev.reduce((s,x)=>s+x.penaltyDue,0),
                       rangeTotal=group.reduce((s,r)=>s+(Number(r.totalDue??r.emi)||0),0);
                 group.forEach(r=>data.push([
-                    l.name,l.id,loanCollectorName(l),l.phone||'',l.phone2||'',l.guarantorPhone||'',l.guarantorPhone2||l.guarantorSecondaryPhone||'',mfDisbursalModeLabel(l.disbursalMode),p.name||l.product,
+                    l.name,l.id,loanCollectorName(l),l.phone||'',l.phone2||'',l.guarantorPhone||'',(l.guarantorPhone2||l.guarantorSecondaryPhone||''),mfDisbursalModeLabel(l.disbursalMode),p.name||l.product,
                     l.disbursalDate,mfLoanScheduleDueIso(l,Number(p.tenure)||0),r.no,r.dueDate,Number(r.totalDue??r.emi)||0,
                     r.upcomingStatus,r.overdueDays,prev.map(x=>`#${x.no}`).join(', '),prevBalance,prevPenalty,prevBalance+prevPenalty,
                     rangeTotal,prevBalance+prevPenalty+rangeTotal
@@ -4581,9 +4675,9 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             const body=rows.map(x=>{const l=x,v=x._v; const st=l.foreclosed?'FORECLOSED':v.settled?'SETTLED':v.pending<=0?'CLOSED':v.overdueDays>0?(v.npaWatch?'90+ DPD':'OVERDUE'):'ACTIVE'; return `<div class="npa-row"><div><b>${financeEsc(l.name)}</b><div style="color:#64748b">${financeEsc(l.id)} · ${financeEsc(l.phone||'-')}</div></div><div class="npa-hide-mobile">${financeEsc(v.p.name||'-')}</div><div class="npa-hide-mobile">${v.overdueDays} DPD</div><div><b style="color:#f87171">₹${v.pending.toLocaleString('en-IN')}</b></div><div class="npa-hide-mobile">${st}</div><div class="npa-hide-mobile">${financeEsc(l.collectorName||'-')}</div><div><button class="btn-edit-sm" onclick="openLoanFromProduct('${l.id}')">Open</button>${v.overdueDays>0&&v.pending>0&&!l.foreclosed&&!v.settled?` <button class="btn-edit-sm" style="background:#92400e;color:#fde68a" onclick="openPostMaturitySettlementModal('${l.id}')">Settle</button>`:''}</div></div>`;}).join('');
             box.innerHTML=summary+(body?`<div style="display:grid;gap:6px;max-height:55vh;overflow:auto;">${body}</div>`:'<div class="npa-empty">No customer matches these filters.</div>');
         }
-        function getNpaExportRows(){return getNpaRows().map(x=>{const v=x._v;return [x.id,x.name,x.phone||'',v.p.name||'',formatToIndianDate(x.disbursalDate),v.maturity?formatToIndianDate(v.maturity.toISOString().split('T')[0]):'',v.overdueDays,v.recoveryMonths,v.pending,v.settled?'SETTLED':x.foreclosed?'FORECLOSED':v.pending<=0?'CLOSED':v.npaWatch?'90+ DPD':'OVERDUE',x.collectorName||'',formatToIndianDate(x.postMaturitySettlement?.settlementDate),x.postMaturitySettlement?.calculatedSettlement||0,x.postMaturitySettlement?.actualReceived||0,x.postMaturitySettlement?.waiverAmount||0,x.postMaturitySettlement?.partialAmountAlreadyCollected||0,x.postMaturitySettlement?.mode||''];});}
-        function exportNpaReportExcel(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}const wb=XLSX.utils.book_new();const headers=['Loan ID','Customer','Phone','Product','Disbursal Date','Maturity Date','DPD','Recovery Months','Contractual Pending','Status','Collector','Settlement Date','Calculated Settlement','Actual Received','Waiver','Partial Already Collected','Settlement Mode'];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['NPA & Recovery Report'],['Generated',new Date().toLocaleString('en-IN')],[],headers,...getNpaExportRows()]),'NPA_Recovery');XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_NPA_Recovery_Report.xlsx`);}
-        function printNpaReport(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}const rows=getNpaExportRows();const w=window.open('','_blank');if(!w){alert('Please allow pop-ups to print the report.');return;}w.document.write(`<html><head><title>NPA & Recovery Report - ${financeEsc(state.bizName)}</title><style>body{font-family:Arial,sans-serif;color:#111;padding:18px;font-size:10px}h1{font-size:18px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:5px;text-align:left}th{background:#eee}</style></head><body><h1>${financeEsc(state.bizName)} — NPA & Recovery Report</h1><div>Generated: ${new Date().toLocaleString('en-IN')}</div><table><thead><tr>${['Loan ID','Customer','Phone','Product','Disbursal','Maturity','DPD','Recovery Months','Pending','Status','Collector','Settlement Date','Calculated','Received','Waiver','Partial Collected','Mode'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${financeEsc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`);w.document.close();w.onload=()=>{w.focus();w.print();};}
+        function getNpaExportRows(){return getNpaRows().map(x=>{const v=x._v;return [x.id,x.name,x.phone||'',x.phone2||'',x.guarantorPhone||'',(x.guarantorPhone2||x.guarantorSecondaryPhone||''),v.p.name||'',formatToIndianDate(x.disbursalDate),v.maturity?formatToIndianDate(v.maturity.toISOString().split('T')[0]):'',v.overdueDays,v.recoveryMonths,v.pending,v.settled?'SETTLED':x.foreclosed?'FORECLOSED':v.pending<=0?'CLOSED':v.npaWatch?'90+ DPD':'OVERDUE',x.collectorName||'',formatToIndianDate(x.postMaturitySettlement?.settlementDate),x.postMaturitySettlement?.calculatedSettlement||0,x.postMaturitySettlement?.actualReceived||0,x.postMaturitySettlement?.waiverAmount||0,x.postMaturitySettlement?.partialAmountAlreadyCollected||0,x.postMaturitySettlement?.mode||''];});}
+        function exportNpaReportExcel(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}const wb=XLSX.utils.book_new();const headers=['Loan ID','Customer','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal Date','Maturity Date','DPD','Recovery Months','Contractual Pending','Status','Collector','Settlement Date','Calculated Settlement','Actual Received','Waiver','Partial Already Collected','Settlement Mode'];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['NPA & Recovery Report'],['Generated',new Date().toLocaleString('en-IN')],[],headers,...getNpaExportRows()]),'NPA_Recovery');XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_NPA_Recovery_Report.xlsx`);}
+        function printNpaReport(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}const rows=getNpaExportRows();const w=window.open('','_blank');if(!w){alert('Please allow pop-ups to print the report.');return;}w.document.write(`<html><head><title>NPA & Recovery Report - ${financeEsc(state.bizName)}</title><style>body{font-family:Arial,sans-serif;color:#111;padding:18px;font-size:10px}h1{font-size:18px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:5px;text-align:left}th{background:#eee}</style></head><body><h1>${financeEsc(state.bizName)} — NPA & Recovery Report</h1><div>Generated: ${new Date().toLocaleString('en-IN')}</div><table><thead><tr>${['Loan ID','Customer','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal','Maturity','DPD','Recovery Months','Pending','Status','Collector','Settlement Date','Calculated','Received','Waiver','Partial Collected','Mode'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${financeEsc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`);w.document.close();w.onload=()=>{w.focus();w.print();};}
 
         let recoveryStatusFilter='ALL';
         function setRecoveryStatusFilter(status){
@@ -4646,7 +4740,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                     actionButtons = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;"><span style="font-size:0.75rem; color:#c084fc; font-weight:700;"><i class="fa-solid fa-circle-check me-1"></i> Foreclosed on ${formatToIndianDate(loan.foreclosureData.settlementDate)}</span><button class="btn-edit-sm" onclick="openForecloseModal('${loan.id}',true)"><i class="fa-solid fa-pen"></i> Edit Foreclosure</button></div>`;
                 } else if (loan.postMaturitySettlement) {
                     statusBadge = `<span class="badge-paid">SETTLED</span>`;
-                    actionButtons = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;"><span style="font-size:0.75rem;color:#34d399;font-weight:700;"><i class="fa-solid fa-circle-check me-1"></i> SETTLED · ₹${Number(loan.postMaturitySettlement.actualReceived||0).toLocaleString('en-IN')}</span><button class="btn-edit-sm" onclick="openLoanFromProduct('${loan.id}')"><i class="fa-solid fa-file-invoice"></i> Statement</button><button class="btn-edit-sm" onclick="openPostMaturitySettlementEdit('${loan.id}')"><i class="fa-solid fa-pen"></i> Edit Settlement</button></div>`;
+                    actionButtons = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;"><span style="font-size:0.75rem;color:#34d399;font-weight:700;"><i class="fa-solid fa-circle-check me-1"></i> SETTLED · ₹${Number(loan.postMaturitySettlement.actualReceived||0).toLocaleString('en-IN')}</span><button class="btn-edit-sm" onclick="openPostMaturitySettlementEdit('${loan.id}')"><i class="fa-solid fa-pen"></i> Edit Settlement</button></div>`;
                 } else if (pending <= 0) {
                     statusBadge = `<span class="badge-paid">CLOSED</span>`;
                     actionButtons = `<span style="font-size:0.75rem; color:#34d399; font-weight:700;"><i class="fa-solid fa-circle-check me-1"></i> Completed</span>`;
@@ -5275,11 +5369,13 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
 
         function populateProductSelect() {
             const sel = document.getElementById("fc-product");
-            sel.innerHTML = "";
+            if(!sel) return;
+            const options=[];
             Object.keys(state.products).forEach(k => {
                 const p = state.products[k];
-                sel.innerHTML += `<option value="${k}">${p.name} (EMI: ₹${p.emi} · ${p.tenure} EMIs)</option>`;
+                options.push(`<option value="${k}">${p.name} (EMI: ₹${p.emi} · ${p.tenure} EMIs)</option>`);
             });
+            sel.innerHTML = options.join('');
         }
 
         function getClientDisbursalIso(){
@@ -5343,7 +5439,8 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
 
         function closeModal(id) { document.getElementById(id).classList.remove("active"); }
 
-        // Contact helpers: keep 1 or 2 customer/guarantor numbers consistent across collection outputs.
+        // Contact helpers: preserve every stored contact in customer-facing operational
+        // and printable outputs. One entered number => one shown; two => two shown.
         function mfContactText(primary, secondary) {
             const a=String(primary||'').trim(), b=String(secondary||'').trim();
             return [a,b].filter(Boolean).join(' / ') || '-';
@@ -5351,6 +5448,11 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         function mfGuarantorContactText(loan) {
             const g=mfContactText(loan?.guarantorPhone, loan?.guarantorPhone2 || loan?.guarantorSecondaryPhone);
             return g==='-' ? '' : g;
+        }
+        function mfAllContactText(loan) {
+            const c=mfContactText(loan?.phone, loan?.phone2);
+            const g=mfGuarantorContactText(loan);
+            return `Customer: ${c}${g ? ` · Guarantor: ${g}` : ''}`;
         }
         function mfDisbursalModeLabel(mode) {
             const m=String(mode||'').trim();
@@ -6703,12 +6805,15 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             if (!sel) return;
             const curVal = sel.value;
             const loansToShow = filteredLoans || state.loans;
-            sel.innerHTML = `<option value="">-- Choose Loan Account --</option>`;
+            // Build once instead of repeatedly reparsing select.innerHTML for every loan.
+            // This is materially faster on mobile for larger customer books.
+            const options = ['<option value="">-- Choose Loan Account --</option>'];
             loansToShow.forEach(l => {
                 const prod = state.products[l.product] || { name: "" };
                 const status = l.foreclosed ? 'FORECLOSED' : (l.postMaturitySettlement ? 'SETTLED' : (getLoanPending(l) <= 0 ? 'CLOSED' : 'ACTIVE'));
-                sel.innerHTML += `<option value="${l.id}">${l.name} (${l.id}) - ${prod.name} · ${status}</option>`;
+                options.push(`<option value="${l.id}">${l.name} (${l.id}) - ${prod.name} · ${status}</option>`);
             });
+            sel.innerHTML = options.join('');
             if (curVal && loansToShow.some(l => l.id === curVal)) sel.value = curVal;
         }
 
@@ -6960,7 +7065,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                     </div>
                     <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; font-size:0.8rem;">
                         <div><span style="color:#94a3b8;">Customer:</span> <b style="color:#fff;">${l.name}</b></div>
-                        <div style="text-align:right;"><span style="color:#94a3b8;">Customer Mobile:</span> <b style="color:#fff;">${mfContactText(l.phone,l.phone2)}</b></div>
+                        <div style="text-align:right;"><span style="color:#94a3b8;">Customer Mobile(s):</span> <b style="color:#fff;">${financeEsc(mfContactText(l.phone,l.phone2))}</b></div>
                         <div><span style="color:#94a3b8;">Plan:</span> <b style="color:#60a5fa;">${p.name}</b></div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Disbursal Date:</span> <b style="color:#fff;">${formatToIndianDate(l.disbursalDate)}</b></div>
                         <div><span style="color:#94a3b8;">Loan Amount:</span> <b style="color:#fff;">₹${p.amount.toLocaleString('en-IN')}</b></div>
@@ -6970,7 +7075,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                         <div><span style="color:#94a3b8;">Tenure:</span> ${p.tenure} EMIs (₹${p.emi})</div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Outstanding Balance:</span> <b style="color:${pending<=0?'#34d399':'#f87171'}; font-size:1rem;">₹${pending.toLocaleString('en-IN')}</b></div>
                     </div>
-                    ${l.guarantorName ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:0.8rem;"><span style="color:#94a3b8;">Guarantor:</span> <b style="color:#fff;">${l.guarantorName}</b>${mfGuarantorContactText(l) ? ` · <b style="color:#fff;">${mfGuarantorContactText(l)}</b>` : ''}</div>` : ''}
+                    ${l.guarantorName ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:0.8rem;"><span style="color:#94a3b8;">Guarantor:</span> <b style="color:#fff;">${l.guarantorName}</b>${mfGuarantorContactText(l) ? ` · <b style="color:#fff;">${financeEsc(mfGuarantorContactText(l))}</b>` : ""}</div>` : ""}
                 </div>
 
                 <!-- Total Collected From This Client — Segregation Box (like Lender Cost Breakdown) -->
@@ -7077,7 +7182,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                     </div>
                     <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; font-size:0.8rem;">
                         <div><span style="color:#94a3b8;">Customer:</span> <b style="color:#fff;">${l.name}</b></div>
-                        <div style="text-align:right;"><span style="color:#94a3b8;">Customer Mobile:</span> <b style="color:#fff;">${mfContactText(l.phone,l.phone2)}</b></div>
+                        <div style="text-align:right;"><span style="color:#94a3b8;">Customer Mobile(s):</span> <b style="color:#fff;">${financeEsc(mfContactText(l.phone,l.phone2))}</b></div>
                         <div><span style="color:#94a3b8;">Plan:</span> <b style="color:#60a5fa;">${p.name}</b></div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Disbursal Date:</span> <b style="color:#fff;">${formatToIndianDate(l.disbursalDate)}</b></div>
                         <div><span style="color:#94a3b8;">Disbursal Mode:</span> <b style="color:#34d399;">${mfDisbursalModeLabel(l.disbursalMode)}</b></div>
@@ -7210,7 +7315,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                             <tr><td style="border:none; padding:4px 0;"><b>Foreclosure Fee:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.feeAmount||0).toLocaleString('en-IN')}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>GST on Foreclosure Fee:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.gstAmount||0).toLocaleString('en-IN')}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Final Settlement Amount:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.settlementAmount||0).toLocaleString('en-IN')} (${l.foreclosureData.mode})</td></tr>
-                            ${l.guarantorName ? `<tr><td style="border:none; padding:4px 0;"><b>Guarantor:</b></td><td style="border:none; padding:4px 0;">${l.guarantorName}${mfGuarantorContactText(l) ? ' (' + mfGuarantorContactText(l) + ')' : ''}</td></tr>` : ''}
+                            ${l.guarantorName ? `<tr><td style="border:none; padding:4px 0;"><b>Guarantor:</b></td><td style="border:none; padding:4px 0;">${l.guarantorName}${mfGuarantorContactText(l) ? ' (' + financeEsc(mfGuarantorContactText(l)) + ')' : ''}</td></tr>` : ''}
                         </table>
                     </div>
 
@@ -7277,7 +7382,7 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
                             <tr><td style="border:none; padding:4px 0;"><b>Total EMIs Serviced:</b></td><td style="border:none; padding:4px 0;">${p.tenure} Installments</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Pre-EMI Interest:</b></td><td style="border:none; padding:4px 0;">₹${preEmiInterest.toLocaleString('en-IN',{maximumFractionDigits:2})}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Total Amount Paid:</b></td><td style="border:none; padding:4px 0;">₹${paidGross.toLocaleString('en-IN')}</td></tr>
-                            ${l.guarantorName ? `<tr><td style="border:none; padding:4px 0;"><b>Guarantor:</b></td><td style="border:none; padding:4px 0;">${l.guarantorName}${l.guarantorPhone ? ' (' + l.guarantorPhone + ')' : ''}</td></tr>` : ''}
+                            ${l.guarantorName ? `<tr><td style="border:none; padding:4px 0;"><b>Guarantor:</b></td><td style="border:none; padding:4px 0;">${l.guarantorName}${mfGuarantorContactText(l) ? ' (' + financeEsc(mfGuarantorContactText(l)) + ')' : ''}</td></tr>` : ''}
                         </table>
                     </div>
 
@@ -8084,174 +8189,307 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             }; reader.readAsText(file);
         }
 
+        // ================= ADVANCED EXECUTIVE EXPORTS =================
+        // These exports are intentionally business-level: no customer names, loan IDs,
+        // customer phones, guarantor phones, or customer-level payment rows are included.
+        // Existing operational data and calculations remain untouched.
+        function mfExecutiveReportData(){
+            const d=getFinanceSnapshot();
+            const loans=Array.isArray(state.loans)?state.loans:[];
+            const products=state.products||{};
+            const totalLoans=loans.length;
+            const totalDisbursed=loans.reduce((sum,l)=>sum+(Number(products[l.product]?.amount)||0),0);
+            const outstanding=loans.filter(l=>!l.foreclosed).reduce((sum,l)=>sum+Math.max(0,Number(getLoanPending(l))||0),0);
+
+            let active=0, overdue=0, closed=0, settled=0, foreclosed=0;
+            loans.forEach(l=>{
+                if(l.foreclosed){ foreclosed++; return; }
+                if(l.postMaturitySettlement){ settled++; return; }
+                const pending=Math.max(0,Number(getLoanPending(l))||0);
+                if(pending<=0){ closed++; return; }
+                active++;
+                try{ if(getLoanRecoveryView(l).overdueDays>0) overdue++; }catch(e){}
+            });
+
+            let capitalBorrowed=0, principalRepaid=0, lenderInterest=0, lenderGst=0, upfront=0;
+            (state.borrowings||[]).forEach(b=>{
+                capitalBorrowed += Number(b.amount)||0;
+                principalRepaid += (b.repayments||[]).reduce((sum,r)=>sum+(Number(r.principal)||0),0);
+                lenderInterest += (b.repayments||[]).reduce((sum,r)=>sum+(Number(r.interest)||0),0);
+                lenderGst += (b.repayments||[]).reduce((sum,r)=>sum+(Number(r.gst)||0),0);
+                upfront += Number(borrowingUpfrontCharges(b))||0;
+            });
+
+            const productRows=Object.keys(products).map(code=>{
+                const p=products[code]||{};
+                const pl=loans.filter(l=>l.product===code);
+                const disb=pl.reduce((sum)=>sum+(Number(p.amount)||0),0);
+                const scheduled=pl.reduce((sum,l)=>sum+(Number(p.emi)||0)*(Number(p.tenure)||0)+Number(mfLoanPreEmiDue(l)||0),0);
+                const pending=pl.filter(l=>!l.foreclosed).reduce((sum,l)=>sum+Math.max(0,Number(getLoanPending(l))||0),0);
+                return [p.name||code,pl.length,disb,Number(p.emi)||0,Number(p.tenure)||0,scheduled,pending];
+            });
+
+            const statusRows=[
+                ["Active / Current",active],
+                ["Overdue / Due",overdue],
+                ["Closed",closed],
+                ["Settled After Maturity",settled],
+                ["Foreclosed",foreclosed]
+            ];
+
+            return {
+                d,totalLoans,totalDisbursed,outstanding,
+                active,overdue,closed,settled,foreclosed,
+                capitalBorrowed,principalRepaid,lenderInterest,lenderGst,upfront,
+                remainingDebt:Math.max(0,capitalBorrowed-principalRepaid),
+                financingCost:lenderInterest+lenderGst+upfront,
+                productRows,statusRows,
+                reportDate:formatToIndianDate(new Date().toISOString().split('T')[0])
+            };
+        }
+
+        function mfStyleExecutiveSheet(ws, titleRows=1, headerRow=null){
+            if(!ws) return;
+            ws['!cols']=ws['!cols']||[];
+            if(headerRow!==null) ws['!autofilter']={ref:`A${headerRow}:G${headerRow}`};
+            ws['!freeze']={xSplit:0,ySplit:headerRow?headerRow:0};
+        }
+
         function exportFullEnterpriseExcel() {
-            if (state.loans.length === 0 && state.borrowings.length === 0 && state.expenses.length === 0) {
-                alert("No data available to export.");
-                return;
-            }
-            const wb = XLSX.utils.book_new();
+            if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}
+            const r=mfExecutiveReportData(), d=r.d;
+            const wb=XLSX.utils.book_new();
 
-            let totDisb = 0, totFile = 0, totPrin = 0, totInt = 0, totForeclose = 0, totPreClosure = 0, totPenalty = 0, totPostMaturity = 0, totPreEmi = 0, totRec = 0;
-            state.loans.forEach(l => {
-                const p = state.products[l.product];
-                if(p) {
-                    totDisb += p.amount; totFile += p.fileCharge;
-                    l.payments.forEach(pay => {
-                        totPrin += pay.principal; totInt += pay.interest; totRec += pay.amount;
-                        totPenalty += (pay.penalty || 0);
-                    });
+            const summary=[
+                ["AMARA MICRO SERVICE FOUNDATION — EXECUTIVE BUSINESS REPORT"],
+                ["Purpose","Management / Funding Discussion / CA Review"],
+                ["Important","Management information report — not audited financial statements or a statutory filing."],
+                ["Company",state.bizName||"My Finance Company"],
+                ["Report Date",r.reportDate],
+                [],
+                ["A. BUSINESS SNAPSHOT","VALUE"],
+                ["Total Loan Accounts",r.totalLoans],
+                ["Total Market Disbursed",r.totalDisbursed],
+                ["Current Customer Outstanding",r.outstanding],
+                ["Capital Borrowed",r.capitalBorrowed],
+                ["Remaining Lender Principal",r.remainingDebt],
+                ["Gross Business Earnings",d.gross],
+                ["Lender Financing Cost",d.lenderCost],
+                ["Operating Expenses & Payroll",d.opex],
+                ["TRUE IN-HAND NET SURPLUS / PROFIT",d.net],
+                [],
+                ["B. REVENUE / EARNINGS BREAKDOWN","AMOUNT (₹)"],
+                ["File Charges",d.file],
+                ["Customer Interest",d.interest],
+                ["Late Penalties",d.penalty],
+                ["Foreclosure Fees",d.foreclosureFee],
+                ["Pre-Closure Interest",d.preClosureInterest],
+                ["Post-Maturity Recovery Interest",d.postMaturityInterest],
+                ["Pre-EMI Interest",d.preEmiInterest],
+                ["TOTAL GROSS BUSINESS EARNINGS",d.gross],
+                [],
+                ["C. LENDER / CAPITAL COST","AMOUNT (₹)"],
+                ["Lender Interest Paid",d.lenderInterest],
+                ["Lender Interest GST",d.lenderGst],
+                ["Upfront Borrowing Charges",d.lenderUpfront],
+                ["TOTAL LENDER FINANCING COST",d.lenderCost],
+                ["Capital Borrowed",r.capitalBorrowed],
+                ["Principal Repaid to Lenders",r.principalRepaid],
+                ["Remaining Lender Principal",r.remainingDebt],
+                [],
+                ["D. OPERATING COST","AMOUNT (₹)"],
+                ["Staff Salaries",d.salaries],
+                ["General Business Expenses",d.generalExp],
+                ["TOTAL OPEX",d.opex],
+                [],
+                ["E. PORTFOLIO STATUS","LOAN ACCOUNTS"],
+                ...r.statusRows,
+                [],
+                ["F. REPORT INTERPRETATION"],
+                ["Gross Business Earnings","File charges + customer interest + penalties + foreclosure fees + pre-closure interest + post-maturity recovery interest + pre-EMI interest."],
+                ["Lender Financing Cost","Lender interest + lender GST + upfront borrowing charges."],
+                ["OPEX","Staff salaries + general business expenses."],
+                ["True In-Hand Net Surplus","Gross Business Earnings - Lender Financing Cost - OPEX."],
+                ["Customer Outstanding","Current contractual pending amount across non-foreclosed customer loans."],
+                ["Privacy","This executive export intentionally excludes customer names, loan IDs, customer/guarantor phone numbers and customer-level transaction rows."]
+            ];
+            const wsSummary=XLSX.utils.aoa_to_sheet(summary);
+            wsSummary['!cols']=[{wch:46},{wch:72}];
+            XLSX.utils.book_append_sheet(wb,wsSummary,'Executive_Summary');
 
-                    totPreEmi += (l.payments||[]).reduce((sum,pay)=>sum+(Number(pay.preEmiInterest)||0),0);
+            const portfolio=[
+                ["PORTFOLIO OVERVIEW BY PRODUCT"],
+                ["Product","Loan Accounts","Capital Disbursed (₹)","EMI (₹)","Tenure (EMIs)","Scheduled Payable (₹)","Current Outstanding (₹)"],
+                ...r.productRows,
+                [],
+                ["TOTAL",r.totalLoans,r.totalDisbursed,"","",r.productRows.reduce((sum,x)=>sum+(Number(x[5])||0),0),r.outstanding]
+            ];
+            const wsPortfolio=XLSX.utils.aoa_to_sheet(portfolio);
+            wsPortfolio['!cols']=[{wch:30},{wch:14},{wch:20},{wch:14},{wch:15},{wch:23},{wch:23}];
+            wsPortfolio['!autofilter']={ref:`A2:G${2+r.productRows.length}`};
+            wsPortfolio['!freeze']={xSplit:0,ySplit:2};
+            XLSX.utils.book_append_sheet(wb,wsPortfolio,'Portfolio_Overview');
 
-                    if (l.foreclosed) {
-                        totPrin += (Number(l.foreclosureData.principalPaid)||0) + (Number(l.foreclosureData.partialAmountAlreadyCollected)||0);
-                        totForeclose += l.foreclosureData.feeAmount;
-                        totPreClosure += Number(l.foreclosureData.preClosureInterest)||0;
-                        totRec += (Number(l.foreclosureData.settlementAmount)||0) + (Number(l.foreclosureData.partialAmountAlreadyCollected)||0);
-                    }
-                    if (l.postMaturitySettlement) {
-                        const pm=l.postMaturitySettlement;
-                        totPostMaturity += Number(pm.recoveryInterestReceived ?? pm.recoveryInterest) || 0;
-                        totRec += Number(pm.actualReceived) || 0;
-                    }
-                }
-            });
+            const collections=[
+                ["CUSTOMER-SIDE EARNINGS & RECOVERY SUMMARY"],
+                ["Metric","Amount (₹)"],
+                ["File Charges",d.file],
+                ["Customer Interest",d.interest],
+                ["Late Penalties",d.penalty],
+                ["Foreclosure Fees",d.foreclosureFee],
+                ["Pre-Closure Interest",d.preClosureInterest],
+                ["Post-Maturity Recovery Interest",d.postMaturityInterest],
+                ["Pre-EMI Interest",d.preEmiInterest],
+                ["TOTAL GROSS BUSINESS EARNINGS",d.gross],
+                [],
+                ["Current Customer Outstanding",r.outstanding],
+                ["Loan Accounts",r.totalLoans],
+                ["Active / Current",r.active],
+                ["Overdue / Due",r.overdue],
+                ["Closed",r.closed],
+                ["Settled After Maturity",r.settled],
+                ["Foreclosed",r.foreclosed]
+            ];
+            const wsCollections=XLSX.utils.aoa_to_sheet(collections);
+            wsCollections['!cols']=[{wch:38},{wch:22}];
+            XLSX.utils.book_append_sheet(wb,wsCollections,'Recovery_Summary');
 
-            let totLenderInt = 0, totLenderGst = 0, totBorrow = 0, totPaidBorrowPrin = 0, totBorrowUpfront = 0;
-            state.borrowings.forEach(b => {
-                totBorrow += b.amount;
-                totBorrowUpfront += borrowingUpfrontCharges(b);
-                b.repayments.forEach(r => {
-                    totPaidBorrowPrin += r.principal;
-                    totLenderInt += r.interest;
-                    totLenderGst += (r.gst || 0);
+            const capital=[
+                ["CAPITAL & LENDER LIABILITY SUMMARY"],
+                ["Metric","Amount (₹)"],
+                ["Capital Borrowed",r.capitalBorrowed],
+                ["Principal Repaid",r.principalRepaid],
+                ["Remaining Lender Principal",r.remainingDebt],
+                ["Lender Interest Paid",r.lenderInterest],
+                ["Lender Interest GST",r.lenderGst],
+                ["Upfront Borrowing Charges",r.upfront],
+                ["TOTAL FINANCING COST",r.financingCost],
+                [],
+                ["Business Net After Financing + OPEX",d.net]
+            ];
+            const wsCapital=XLSX.utils.aoa_to_sheet(capital);
+            wsCapital['!cols']=[{wch:42},{wch:22}];
+            XLSX.utils.book_append_sheet(wb,wsCapital,'Capital_Liabilities');
+
+            const opex=[
+                ["OPERATING EXPENSE SUMMARY"],
+                ["Metric","Amount (₹)"],
+                ["Staff Salaries",d.salaries],
+                ["General Business Expenses",d.generalExp],
+                ["TOTAL OPERATING EXPENSES",d.opex],
+                [],
+                ["Plain-English note","OPEX means the regular cost of running the business, separate from the cost of borrowed capital."]
+            ];
+            const wsOpex=XLSX.utils.aoa_to_sheet(opex);
+            wsOpex['!cols']=[{wch:42},{wch:80}];
+            XLSX.utils.book_append_sheet(wb,wsOpex,'Operating_Costs');
+
+            // Keep numeric presentation clean: counts stay as counts; financial columns use decimals.
+            const amountCols = (ws, cols) => {
+                Object.keys(ws).forEach(k=>{
+                    if(k[0]==='!' || !ws[k] || typeof ws[k].v!=='number') return;
+                    const m=k.match(/^([A-Z]+)\d+$/); if(!m || !cols.includes(m[1])) return;
+                    ws[k].z='#,##0.00';
                 });
-            });
+            };
+            amountCols(wsPortfolio,['C','D','F','G']);
+            amountCols(wsCollections,['B']);
+            amountCols(wsCapital,['B']);
+            amountCols(wsOpex,['B']);
 
-            let totSalaries = 0;
-            state.staff.forEach(s => {
-                s.salaryPayments.forEach(sp => totSalaries += (sp.amount || 0));
-            });
-
-            let totGeneralExp = 0;
-            state.expenses.forEach(ex => totGeneralExp += (ex.amount || 0));
-
-            const grossProfit = totFile + totInt + totPenalty + totForeclose + totPreClosure + totPostMaturity + totPreEmi;
-            const borrowingCost = totLenderInt + totLenderGst + totBorrowUpfront;
-            const opexCost = totSalaries + totGeneralExp;
-            const trueNetSpread = grossProfit - borrowingCost - opexCost;
-
-            const dashRows = [
-                ["MicroFinance Complete Business P&L & True In-Hand Surplus Summary"],
-                ["Company Name", state.bizName],
-                ["Report Date", formatToIndianDate(new Date().toISOString().split('T')[0])],
-                [],
-                ["1. Gross Revenue & Collections", "Amount (₹)"],
-                ["Total Capital Disbursed into Market", totDisb],
-                ["Total File Charges Realized", totFile],
-                ["Total Customer Interest Collected", totInt],
-                ["Total Late Penalties Collected", totPenalty],
-                ["Total Foreclosure Fees Collected", totForeclose],
-                ["Pre-EMI Interest Received", totPreEmi],
-                ["Post-Maturity Recovery Interest Received", totPostMaturity],
-                ["GROSS BUSINESS EARNINGS", grossProfit],
-                [],
-                ["2. Capital Borrowing Costs (Lenders/Banks)", "Amount (₹)"],
-                ["Total Capital Borrowed from Lenders/Banks", totBorrow],
-                ["Total Lender Interest Paid", totLenderInt],
-                ["Total 18% GST on Lender Interest Paid", totLenderGst],
-                ["Total Processing Fee + GST Paid", state.borrowings.reduce((s,b)=>s+(Number(b.processingFee)||0)+(Number(b.processingGst)||0),0)],
-                ["Total Other Charges + GST Paid", state.borrowings.reduce((s,b)=>s+(Number(b.otherCharges)||0)+(Number(b.otherGst)||0),0)],
-                ["TOTAL UPFRONT BORROWING CHARGES", totBorrowUpfront],
-                ["TOTAL COST OF BORROWED CAPITAL", borrowingCost],
-                [],
-                ["3. Operational Expenses & Payroll Outflows", "Amount (₹)"],
-                ["Total Staff Salaries Paid", totSalaries],
-                ["Total General Business Expenses (Fuel, Tea, Rent, etc.)", totGeneralExp],
-                ["TOTAL OPERATIONAL EXPENSES (OPEX)", opexCost],
-                [],
-                ["TRUE IN-HAND NET SURPLUS / SAVINGS (1 - 2 - 3)", trueNetSpread],
-                ["Current Market Outstanding to Collect", totDisb - totPrin],
-                ["Current Debt Payable to Lenders", totBorrow - totPaidBorrowPrin]
+            const notes=[
+                ["REPORT NOTES & DEFINITIONS"],
+                ["Item","Plain-English meaning"],
+                ["Market Disbursed","Total loan principal placed into the customer portfolio."],
+                ["Gross Business Earnings","All revenue components already used by the app's executive dashboard."],
+                ["Lender Financing Cost","Interest, GST and upfront borrowing charges paid/recorded for borrowed capital."],
+                ["OPEX","Staff salaries plus general business expenses."],
+                ["True In-Hand Net Surplus / Profit","Gross Business Earnings minus lender financing cost minus OPEX."],
+                ["Customer Outstanding","Current contractual pending amount for non-foreclosed customer loans."],
+                ["Privacy","No customer-level names, loan IDs, customer phones, guarantor phones or customer payment rows are included in this executive report."],
+                ["Use","Suitable for management review, funding discussions and giving a CA a clean business-level overview. It is not a statutory/audited financial statement."]
             ];
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashRows), "Executive_P&L");
+            const wsNotes=XLSX.utils.aoa_to_sheet(notes);
+            wsNotes['!cols']=[{wch:34},{wch:100}];
+            XLSX.utils.book_append_sheet(wb,wsNotes,'Notes_Definitions');
 
-            const masterRows = [
-                ["Loan ID", "Customer Name", "Phone", "Product Plan", "Disbursal Date", "Loan Amount", "File Charge", "EMI", "Principal Recovered", "Profit Realized", "Penalty Paid", "Outstanding", "Status"]
-            ];
-            state.loans.forEach(l => {
-                const p = state.products[l.product];
-                const paidP = l.payments.reduce((s, x) => s + x.principal, 0) + (l.foreclosed ? l.foreclosureData.principalPaid : 0);
-                const pen = l.payments.reduce((s, x) => s + (x.penalty || 0), 0);
-                const prof = p.fileCharge + l.payments.reduce((s, x) => s + x.interest, 0) + pen + (l.payments||[]).reduce((sum,pay)=>sum+(Number(pay.preEmiInterest)||0),0) + (l.foreclosed ? (Number(l.foreclosureData.feeAmount)||0) + (Number(l.foreclosureData.preClosureInterest)||0) : 0);
-                const pending = l.foreclosed ? 0 : getLoanPending(l);
-                masterRows.push([
-                    l.id, l.name, l.phone, p.name, formatToIndianDate(l.disbursalDate), p.amount, p.fileCharge, p.emi, paidP, prof, pen, pending, l.foreclosed ? "FORECLOSED" : (l.postMaturitySettlement ? "SETTLED" : (pending <= 0 ? "CLOSED" : "ACTIVE"))
-                ]);
-            });
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(masterRows), "Customer_Loans_Master");
+            XLSX.writeFile(wb,`${(state.bizName||'MicroFinance').replace(/\s+/g,'_')}_Executive_Business_Report.xlsx`);
+        }
 
-            const staffRows = [
-                ["Staff ID", "Employee Name", "Designation", "Monthly Salary (₹)", "Phone", "Salary Paid For Month", "Payment Date", "Amount Paid (₹)", "Mode"]
-            ];
-            state.staff.forEach(s => {
-                if (s.salaryPayments.length === 0) {
-                    staffRows.push([s.id, s.name, s.role, s.salary, s.phone || "-", "-", "-", 0, "-"]);
-                } else {
-                    s.salaryPayments.forEach(sp => {
-                        staffRows.push([s.id, s.name, s.role, s.salary, s.phone || "-", sp.month, formatToIndianDate(sp.date), sp.amount, sp.mode]);
-                    });
-                }
-            });
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(staffRows), "Staff_Payroll");
-
-            const expRows = [
-                ["Expense ID", "Category", "Amount (₹)", "Paid To / Description", "Date", "Payment Mode"]
-            ];
-            state.expenses.forEach(e => {
-                expRows.push([e.id, e.category, e.amount, e.desc || "-", formatToIndianDate(e.date), e.mode]);
-            });
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(expRows), "General_Expenses_Log");
-
-            const borrowRows = [
-                ["Borrowing ID", "Lender Name", "Category", "Loan Amount Taken", "Tenure (Months)", "Processing Fee (%)", "Processing Fee (₹)", "Processing Fee GST (%)", "Processing Fee GST (₹)", "Other Charges", "Other Charges GST", "Upfront Charges Total", "Net Capital Received", "Interest Rate (%)", "Repayment Type", "18% GST on Interest", "Borrowing Date", "Principal Repaid", "Interest Paid", "Interest GST Paid", "Remaining Debt", "Total Financing Cost", "Status"]
-            ];
-            state.borrowings.forEach(b => {
-                const pPrin = (b.repayments||[]).reduce((s, r) => s + (Number(r.principal)||0), 0);
-                const pInt = (b.repayments||[]).reduce((s, r) => s + (Number(r.interest)||0), 0);
-                const pGst = (b.repayments||[]).reduce((s, r) => s + (Number(r.gst)||0), 0);
-                const upfront = borrowingUpfrontCharges(b);
-                const remP = Math.max(0, (Number(b.amount)||0) - pPrin);
-                borrowRows.push([
-                    b.id, b.lenderName, b.category, b.amount, Number(b.tenure)||0,
-                    Number(b.processingFeePct)||0, Number(b.processingFee)||0, Number(b.processingGstPct)||0, Number(b.processingGst)||0,
-                    Number(b.otherCharges)||0, Number(b.otherGst)||0,
-                    upfront, Math.max(0,(Number(b.amount)||0)-upfront),
-                    b.rate, b.type, b.applyGst ? "YES" : "NO",
-                    formatToIndianDate(b.date), pPrin, pInt, pGst, remP,
-                    upfront+pInt+pGst, remP <= 0 ? "FULLY REPAID" : "ACTIVE"
-                ]);
-            });
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(borrowRows), "Borrowings_Liabilities");
-
-            const payRows = [
-                ["Actual Payment Date", "Scheduled Due Date", "Loan ID", "Customer Name", "Amount Collected", "Principal Split", "Interest Split", "Pre-Closure Interest", "Late Penalty Paid", "Mode", "Type"]
-            ];
-            state.loans.forEach(l => {
-                l.payments.forEach(p => {
-                    payRows.push([formatToIndianDate(p.date), formatToIndianDate(p.dueDate || p.date), l.id, l.name, p.amount, p.principal, p.interest, 0, p.penalty || 0, p.mode, "Regular EMI"]);
-                });
-                if (l.foreclosed) {
-                    payRows.push([formatToIndianDate(l.foreclosureData.settlementDate), formatToIndianDate(l.foreclosureData.settlementDate), l.id, l.name, l.foreclosureData.settlementAmount, l.foreclosureData.principalPaid, 0, Number(l.foreclosureData.preClosureInterest)||0, 0, l.foreclosureData.mode, "Foreclosure Settlement"]);
-                }
-                if (l.postMaturitySettlement) { const pm=l.postMaturitySettlement; payRows.push([formatToIndianDate(pm.settlementDate), formatToIndianDate(pm.maturityDate||pm.settlementDate), l.id, l.name, pm.actualReceived, pm.contractualPending, pm.recoveryInterest, 0, 0, pm.mode, "Post-Maturity Final Settlement"]); }
-            });
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(payRows), "Customer_Payments_Ledger");
-            const settlementRows=[["Loan ID","Customer","Product","Maturity Date","Settlement Date","Overdue Days","Recovery Months","Contractual Pending","Recovery Interest Calculated","Recovery Interest Received","Calculated Settlement","Actual Received","Waiver","Partial Already Collected","Mode"]];
-            state.loans.forEach(l=>{if(!l.postMaturitySettlement)return;const pm=l.postMaturitySettlement,p=state.products[l.product]||{};settlementRows.push([l.id,l.name,p.name||'',formatToIndianDate(pm.maturityDate),formatToIndianDate(pm.settlementDate),pm.overdueDays,pm.recoveryMonths,pm.contractualPending,pm.recoveryInterest,pm.recoveryInterestReceived??0,pm.calculatedSettlement,pm.actualReceived,pm.waiverAmount,pm.partialAmountAlreadyCollected||0,pm.mode||'']);});
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(settlementRows), "Post_Maturity_Settlements");
-
-            XLSX.writeFile(wb, `${state.bizName.replace(/\s+/g, '_')}_Complete_Accounts_With_Payroll.xlsx`);
+        function exportExecutiveBusinessPdf(){
+            const r=mfExecutiveReportData(), d=r.d;
+            const money=n=>`₹${Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2})}`;
+            const statusRows=r.statusRows.map(x=>`<tr><td>${financeEsc(x[0])}</td><td style="text-align:right">${Number(x[1]||0).toLocaleString('en-IN')}</td></tr>`).join('');
+            const productRows=r.productRows.map(x=>`<tr><td>${financeEsc(x[0])}</td><td style="text-align:right">${x[1]}</td><td style="text-align:right">${money(x[2])}</td><td style="text-align:right">${money(x[5])}</td><td style="text-align:right">${money(x[6])}</td></tr>`).join('');
+            const content=`
+                <div class="mf-exec-report">
+                    <div class="mf-exec-banner"><b>Executive Business Overview</b><span>Management / Funding / CA Review</span></div>
+                    <div class="mf-exec-kpis">
+                        <div><small>Loan Accounts</small><b>${r.totalLoans}</b></div>
+                        <div><small>Market Disbursed</small><b>${money(r.totalDisbursed)}</b></div>
+                        <div><small>Customer Outstanding</small><b>${money(r.outstanding)}</b></div>
+                        <div><small>Gross Earnings</small><b>${money(d.gross)}</b></div>
+                        <div><small>Lender Cost</small><b>${money(d.lenderCost)}</b></div>
+                        <div><small>OPEX</small><b>${money(d.opex)}</b></div>
+                        <div><small>True Net Surplus</small><b>${money(d.net)}</b></div>
+                    </div>
+                    <h2>1. Business Earnings</h2>
+                    <table><tbody>
+                        <tr><th>Revenue Component</th><th>Amount</th></tr>
+                        <tr><td>File Charges</td><td>${money(d.file)}</td></tr>
+                        <tr><td>Customer Interest</td><td>${money(d.interest)}</td></tr>
+                        <tr><td>Late Penalties</td><td>${money(d.penalty)}</td></tr>
+                        <tr><td>Foreclosure Fees</td><td>${money(d.foreclosureFee)}</td></tr>
+                        <tr><td>Pre-Closure Interest</td><td>${money(d.preClosureInterest)}</td></tr>
+                        <tr><td>Post-Maturity Recovery Interest</td><td>${money(d.postMaturityInterest)}</td></tr>
+                        <tr><td>Pre-EMI Interest</td><td>${money(d.preEmiInterest)}</td></tr>
+                        <tr class="total"><td>GROSS BUSINESS EARNINGS</td><td>${money(d.gross)}</td></tr>
+                    </tbody></table>
+                    <h2>2. Capital & Lender Liability</h2>
+                    <table><tbody>
+                        <tr><th>Metric</th><th>Amount</th></tr>
+                        <tr><td>Capital Borrowed</td><td>${money(r.capitalBorrowed)}</td></tr>
+                        <tr><td>Principal Repaid</td><td>${money(r.principalRepaid)}</td></tr>
+                        <tr><td>Remaining Lender Principal</td><td>${money(r.remainingDebt)}</td></tr>
+                        <tr><td>Lender Interest + GST + Upfront Charges</td><td>${money(r.financingCost)}</td></tr>
+                        <tr class="total"><td>TOTAL LENDER FINANCING COST</td><td>${money(d.lenderCost)}</td></tr>
+                    </tbody></table>
+                    <h2>3. Operating Costs & Net Position</h2>
+                    <table><tbody>
+                        <tr><th>Metric</th><th>Amount</th></tr>
+                        <tr><td>Staff Salaries</td><td>${money(d.salaries)}</td></tr>
+                        <tr><td>General Business Expenses</td><td>${money(d.generalExp)}</td></tr>
+                        <tr class="total"><td>TOTAL OPEX</td><td>${money(d.opex)}</td></tr>
+                        <tr class="grand"><td>TRUE IN-HAND NET SURPLUS / PROFIT</td><td>${money(d.net)}</td></tr>
+                    </tbody></table>
+                    <h2>4. Portfolio Status</h2>
+                    <table><tbody><tr><th>Status</th><th>Loan Accounts</th></tr>${statusRows}</tbody></table>
+                    <h2>5. Portfolio by Product</h2>
+                    <table><tbody><tr><th>Product</th><th>Accounts</th><th>Disbursed</th><th>Scheduled Payable</th><th>Outstanding</th></tr>${productRows || '<tr><td colspan="5">No product data available.</td></tr>'}</tbody></table>
+                    <div class="mf-exec-note"><b>Plain-English interpretation:</b> True In-Hand Net Surplus = Gross Business Earnings − Lender Financing Cost − Operating Expenses.</div>
+                    <div class="mf-exec-note"><b>Privacy:</b> This executive report deliberately excludes customer names, loan IDs, customer/guarantor phone numbers and customer-level transaction rows.</div>
+                    <div class="mf-exec-disclaimer">Management information report only. This is not an audited financial statement, statutory return, valuation report or certification by a Chartered Accountant.</div>
+                </div>`;
+            const css=`
+                <style id="mf-executive-pdf-css">
+                .mf-exec-report{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:9.5pt;line-height:1.4;}
+                .mf-exec-banner{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;border-bottom:2px solid #111;padding:0 0 7px;margin-bottom:10px;}
+                .mf-exec-banner b{font-size:15pt}.mf-exec-banner span{font-size:8pt;color:#555;text-align:right;}
+                .mf-exec-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;}
+                .mf-exec-kpis>div{border:1px solid #bbb;border-radius:5px;padding:6px;min-width:0;}
+                .mf-exec-kpis small{display:block;color:#666;font-size:7.2pt}.mf-exec-kpis b{display:block;font-size:9pt;margin-top:2px;overflow-wrap:anywhere;}
+                .mf-exec-report h2{font-size:11pt;margin:13px 0 5px;border-bottom:1px solid #bbb;padding-bottom:3px;}
+                .mf-exec-report table{width:100%;border-collapse:collapse;table-layout:fixed;}
+                .mf-exec-report th,.mf-exec-report td{border:1px solid #aaa;padding:5px 6px;vertical-align:top;overflow-wrap:anywhere;}
+                .mf-exec-report th{background:#f0f2f5;text-align:left;font-weight:800}.mf-exec-report td:nth-child(n+2){text-align:right;}
+                .mf-exec-report tr.total td{font-weight:800;background:#f6f6f6}.mf-exec-report tr.grand td{font-weight:900;background:#eef7f0;}
+                .mf-exec-note{margin-top:8px;border:1px solid #bbb;padding:7px 8px;background:#fafafa;font-size:8pt;}
+                .mf-exec-disclaimer{margin-top:9px;color:#555;font-size:7.5pt;border-top:1px solid #bbb;padding-top:6px;}
+                @media print{.mf-exec-kpis{grid-template-columns:repeat(4,1fr)}h2{break-after:avoid}.mf-exec-report table{page-break-inside:auto}tr{page-break-inside:avoid;page-break-after:auto}}
+                </style>`;
+            const w=mfPrintA4Shell(`${state.bizName||'MicroFinance'} — Executive Business Report`,mfCompanyPrintHeader('Executive Business Overview')+css+content);
+            if(!w)return;
+            w.onload=()=>{w.focus();setTimeout(()=>w.print(),100);};
         }
 
 
@@ -8354,9 +8592,9 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
             financeCurrentType=type; const d=getFinanceSnapshot(), area=document.getElementById('finance-detail-content'); let title='', headerHtml='', detailHtml='';
             if(type==='disbursed'){
                 title='Market Disbursed — Capital Given Detail';
-                const rows=d.disbursed.map(x=>{const l=x.loan,p=x.p,paid=l.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((a,z)=>a+(Number(z.principal)||0),0)+(l.foreclosed?(Number(l.foreclosureData?.principalPaid)||0):0); const out=l.foreclosed?0:getLoanPending(l); return `<tr><td><b>${financeEsc(l.name)}</b><br><span class="finance-pill">${financeEsc(l.id)}</span></td><td>${financeEsc(l.phone)}</td><td>${financeEsc(p.name)}</td><td>${x.includeDisb?formatToIndianDate(l.disbursalDate):'-'}</td><td>${x.includeDisb?money(p.amount):'-'}</td><td>${money(paid)}</td><td>${money(out)}</td><td>${l.foreclosed?'FORECLOSED':(l.postMaturitySettlement?'SETTLED':(out<=0?'CLOSED':'ACTIVE'))}</td></tr>`});
+                const rows=d.disbursed.map(x=>{const l=x.loan,p=x.p,paid=l.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((a,z)=>a+(Number(z.principal)||0),0)+(l.foreclosed?(Number(l.foreclosureData?.principalPaid)||0):0); const out=l.foreclosed?0:getLoanPending(l); return `<tr><td><b>${financeEsc(l.name)}</b><br><span class="finance-pill">${financeEsc(l.id)}</span></td><td>${financeEsc(mfContactText(l.phone,l.phone2))}<br>${mfGuarantorContactText(l)?`<span class="finance-pill">G: ${financeEsc(mfGuarantorContactText(l))}</span>`:''}</td><td>${financeEsc(p.name)}</td><td>${x.includeDisb?formatToIndianDate(l.disbursalDate):'-'}</td><td>${x.includeDisb?money(p.amount):'-'}</td><td>${money(paid)}</td><td>${money(out)}</td><td>${l.foreclosed?'FORECLOSED':(l.postMaturitySettlement?'SETTLED':(out<=0?'CLOSED':'ACTIVE'))}</td></tr>`});
                 headerHtml=financeHeader([['Accounts',d.disbursed.length],['Capital Given',money(d.disbursed.reduce((a,x)=>a+(x.includeDisb?x.p.amount:0),0))],['Principal Recovered',money(d.disbursed.reduce((a,x)=>a+x.loan.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((q,z)=>q+(Number(z.principal)||0),0),0))],['Current Outstanding',money(d.disbursed.reduce((a,x)=>a+(x.loan.foreclosed?0:getLoanPending(x.loan)),0))]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}</div>`;
-                detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Loan-wise Capital Disbursement</b></div>${financeTable(['Customer','Phone','Product','Disbursed Date','Amount','Principal Recovered','Outstanding','Status'],rows)}</div>`;
+                detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Loan-wise Capital Disbursement</b></div>${financeTable(['Customer','Customer / Guarantor Contacts','Product','Disbursed Date','Amount','Principal Recovered','Outstanding','Status'],rows.map(r=>[r[0],mfAllContactText({phone:r[1],phone2:r[2],guarantorPhone:r[3],guarantorPhone2:r[4]}),...r.slice(3)]))}</div>`;
             } else if(type==='gross'){
                 title='Gross Revenue — Client-wise Revenue Detail';
                 const rows=d.disbursed.map(x=>`<tr><td><b>${financeEsc(x.loan.name)}</b><br><span class="finance-pill">${financeEsc(x.loan.id)}</span></td><td>${financeEsc(x.p.name)}</td><td>${money(x.includeDisb?x.p.fileCharge:0)}</td><td>${money(x.interest)}</td><td>${money(x.preEmiInterest)}</td><td>${money(x.penalty)}</td><td>${money(x.foreclosureFee)}</td><td>${money(x.preClosureInterest)}</td><td>${money(x.postMaturityInterest)}</td><td>${money(x.settlementWaiver||0)}</td><td><b>${money(x.totalProfit)}</b></td></tr>`);
@@ -8461,14 +8699,14 @@ html.mf-qa-preview #app-lock-overlay{display:none!important;}
         function openFinanceDetail(type){ financeFilters={from:'',to:'',month:'',year:''}; financeDetailSearched=false; renderFinanceDetail(type); }
 
         function financeRowsForExport(type,d){
-            if(type==='gross') return d.disbursed.map(x=>[x.loan.id,x.loan.name,x.loan.phone,x.p.name,x.includeDisb?x.p.fileCharge:0,x.interest,x.preEmiInterest,x.penalty,x.foreclosureFee,x.preClosureInterest,x.postMaturityInterest,x.settlementWaiver||0,x.totalProfit]);
+            if(type==='gross') return d.disbursed.map(x=>[x.loan.id,x.loan.name,x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.includeDisb?x.p.fileCharge:0,x.interest,x.preEmiInterest,x.penalty,x.foreclosureFee,x.preClosureInterest,x.postMaturityInterest,x.settlementWaiver||0,x.totalProfit]);
             if(type==='lender') return d.lender.flatMap(x=>x.filteredRepayments.map(r=>[r.date,x.b.lenderName,r.principal,r.interest,r.gst||0,(Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0),r.mode||'']));
             if(type==='opex') return [...d.payroll.map(x=>[x.sp.date,x.st.name,'Payroll',x.sp.amount,x.sp.mode||'']),...d.expenses.map(x=>[x.date,x.category,x.desc,x.amount,x.mode||''])];
-            if(type==='disbursed') return d.disbursed.map(x=>[x.loan.id,x.loan.name,mfContactText(x.loan.phone,x.loan.phone2),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode),x.p.amount,x.loan.foreclosed?'FORECLOSED':(x.loan.postMaturitySettlement?'SETTLED':(x.loan.payments.length?'ACTIVE':'ACTIVE'))]);
+            if(type==='disbursed') return d.disbursed.map(x=>[x.loan.id,x.loan.name,x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode),x.p.amount,x.loan.foreclosed?'FORECLOSED':(x.loan.postMaturitySettlement?'SETTLED':(x.loan.payments.length?'ACTIVE':'ACTIVE'))]);
             return [['Gross Revenue',d.gross],['Lender Cost',d.lenderCost],['Staff Salaries',d.salaries],['General Expenses',d.generalExp],['TRUE IN-HAND NET SURPLUS',d.net]];
         }
         function exportFinanceDetailReport(){
-            const d=getFinanceSnapshot(), wb=XLSX.utils.book_new(), type=financeCurrentType, rows=financeRowsForExport(type,d), headers=type==='gross'?['Loan ID','Customer','Phone','Product','File Charge','Contractual Interest','Pre-EMI Interest','Penalty','Foreclosure Fee','Pre-Closure Interest','Post-Maturity Recovery Interest','Settlement Waiver (Not Revenue)','Revenue']:type==='lender'?['Date','Lender','Principal','Interest','GST','Total','Mode']:type==='opex'?['Date','Payee / Category','Type / Description','Amount','Mode']:type==='disbursed'?['Loan ID','Customer','Customer Mobile(s)','Product','Disbursal Date','Disbursal Mode','Loan Amount','Status']:['Metric','Amount'];
+            const d=getFinanceSnapshot(), wb=XLSX.utils.book_new(), type=financeCurrentType, rows=financeRowsForExport(type,d), headers=type==='gross'?['Loan ID','Customer','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','File Charge','Contractual Interest','Pre-EMI Interest','Penalty','Foreclosure Fee','Pre-Closure Interest','Post-Maturity Recovery Interest','Settlement Waiver (Not Revenue)','Revenue']:type==='lender'?['Date','Lender','Principal','Interest','GST','Total','Mode']:type==='opex'?['Date','Payee / Category','Type / Description','Amount','Mode']:type==='disbursed'?['Loan ID','Customer','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal Date','Disbursal Mode','Loan Amount','Status']:['Metric','Amount'];
             XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['MicroFinance Financial Detail Report'],['Report Period',financePeriodLabel()],[],headers,...rows]),'Detail_Report');
             XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_${type}_Detail_Report.xlsx`);
         }
