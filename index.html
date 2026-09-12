@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Loan Management</title>
-    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-09-11-SMOOTH-UI-V4-ADVANCED-REPORTS-CONTACTS-ALIGNMENT-VERIFIED-SELF-AUDITED">
+    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-09-11-SMOOTH-UI-V4-ADVANCED-REPORTS-CONTACTS-ALIGNMENT-VERIFIED-SELF-AUDITED-AUTOMATIC-GOOGLE-BACKUP-SILENT-REAUTH-NO-REPEATED-OAUTH-POPUP">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -1201,22 +1201,22 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <span id="modal-client-heading">Create New Loan Account</span>
                 <i class="fa-solid fa-xmark" onclick="closeModal('modal-client')" style="cursor: pointer; color: #94a3b8;"></i>
             </div>
-            <form id="form-client" onsubmit="handleClientSubmit(event)">
+            <form id="form-client" autocomplete="off" onsubmit="handleClientSubmit(event)">
                 <input type="hidden" id="fc-mode" value="ADD">
                 <input type="hidden" id="fc-id">
 
                 <div class="form-group">
                     <label>Customer Full Name *</label>
-                    <input type="text" id="fc-name" placeholder="e.g. Ramesh Sharma" required>
+                    <input type="text" id="fc-name" placeholder="e.g. Ramesh Sharma" required autocomplete="off">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                     <div class="form-group" style="margin-bottom:0;">
                         <label>Primary Mobile Number *</label>
-                        <input type="tel" id="fc-phone" placeholder="9876543210" required>
+                        <input type="tel" id="fc-phone" placeholder="9876543210" required autocomplete="off">
                     </div>
                     <div class="form-group" style="margin-bottom:0;">
                         <label>Secondary Mobile Number</label>
-                        <input type="tel" id="fc-phone2" placeholder="9876543211">
+                        <input type="tel" id="fc-phone2" placeholder="9876543211" autocomplete="off">
                     </div>
                 </div>
                 <div style="font-size:.66rem;color:#64748b;line-height:1.4;margin-top:5px;margin-bottom:12px;">Keep a second contact number for collection coordination. Existing accounts remain unchanged.</div>
@@ -1227,16 +1227,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px; margin-top:10px;">
                     <div class="form-group" style="margin-bottom:0;">
                         <label>Guarantor Name</label>
-                        <input type="text" id="fc-guarantor-name" placeholder="e.g. Suresh Sharma">
+                        <input type="text" id="fc-guarantor-name" placeholder="e.g. Suresh Sharma" autocomplete="off">
                     </div>
                     <div class="form-group" style="margin-bottom:0;">
                         <label>Guarantor Primary Mobile</label>
-                        <input type="tel" id="fc-guarantor-phone" placeholder="9876543212">
+                        <input type="tel" id="fc-guarantor-phone" placeholder="9876543212" autocomplete="off">
                     </div>
                 </div>
                 <div class="form-group" style="margin-top:8px;margin-bottom:10px;">
                     <label>Guarantor Secondary Mobile</label>
-                    <input type="tel" id="fc-guarantor-phone2" placeholder="9876543213">
+                    <input type="tel" id="fc-guarantor-phone2" placeholder="9876543213" autocomplete="off">
                 </div>
                 <div style="font-size:.66rem;color:#64748b;line-height:1.4;margin-top:5px;margin-bottom:12px;">Optional — store one or two guarantor contacts for recovery follow-up. Existing accounts remain unchanged.</div>
                 <div class="form-group">
@@ -2203,8 +2203,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="font-size:.66rem;color:#94a3b8;line-height:1.4;margin-bottom:8px;">Sign-in is the identity layer for the Secure Edition. It does not replace your App Lock PIN. Production Secure Sync is the default. Existing local data is preserved until you explicitly choose the cloud/local direction.</div>
                 <div id="mf-auth-status" style="font-size:.68rem;color:#94a3b8;margin-bottom:7px;">Not signed in.</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-                    <input id="mf-auth-email" type="email" placeholder="Account email" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;">
-                    <input id="mf-auth-password" type="password" placeholder="Password (Firebase Auth)" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;">
+                    <input id="mf-auth-email" type="email" placeholder="Account email" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="off">
+                    <input id="mf-auth-password" type="password" placeholder="Password (Firebase Auth)" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="new-password">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:7px;">
                     <button type="button" class="btn-header btn-green" style="justify-content:center;" onclick="mfAuthSignIn()"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
@@ -2243,7 +2243,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="font-size:.66rem;color:#94a3b8;margin-top:6px;line-height:1.4;">The app never asks for or stores your Gmail password. Google OAuth grants the app the limited <b>drive.file</b> Drive scope needed for its own backup files.</div>
                 <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, host this app on your HTTPS domain.</div>
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required)</label>
-                <input type="password" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for cloud backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
+                <input type="password" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for cloud backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
                 <label style="display:flex;align-items:center;gap:6px;font-size:.66rem;color:#94a3b8;margin-top:7px;cursor:pointer;">
                     <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Keep PIN active on this device (encrypted storage; raw PIN is never stored)
                 </label>
@@ -3312,8 +3312,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 wrap.innerHTML = `
                     <div style="font-size:.74rem;color:#34d399;font-weight:700;margin-bottom:8px;"><i class="fa-solid fa-lock"></i> App Lock is ON — a PIN is required to open this app.</div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-                        <input type="password" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
-                        <input type="password" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
+                        <input type="password" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                        <input type="password" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px;">
                         <button class="btn-header btn-blue" style="justify-content:center;" onclick="setAppLockPin()"><i class="fa-solid fa-rotate"></i> Change PIN</button>
@@ -3323,8 +3323,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 wrap.innerHTML = `
                     <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;">No lock is set — anyone with this link can currently open the app. Set a PIN so it's required every time the app is opened.</div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-                        <input type="password" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
-                        <input type="password" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
+                        <input type="password" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                        <input type="password" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
                     </div>
                     <button class="btn-header btn-green" style="width:100%;justify-content:center;margin-top:7px;" onclick="setAppLockPin()"><i class="fa-solid fa-lock"></i> Set PIN</button>`;
             }
@@ -3367,12 +3367,17 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         function scheduleAutomaticCloudSync(){
             clearTimeout(cloudSyncTimer);
-            cloudSyncTimer=setTimeout(()=>{
+            cloudSyncTimer=setTimeout(async ()=>{
                 if(!navigator.onLine){ updateSecureCloudStatus("🟡 Local save complete — waiting for internet connection to back up.",true); return; }
                 const hasClient=!!(localStorage.getItem('MF_GOOGLE_CLIENT_ID')||document.getElementById('google-client-id')?.value);
                 const hasPin=!!getCloudPin();
-                if(googleAccessToken || (hasClient && hasPin)) syncNowToGoogleDrive(true);
-                else if(hasClient && !hasPin) updateSecureCloudStatus("🟡 Local save is safe — unlock this device with App Lock and complete Drive setup once to resume automatic backup.",true);
+                if(hasClient && hasPin){
+                    // Try a silent OAuth renewal first. If Google requires real user
+                    // interaction, do not interrupt the current client workflow.
+                    if(!googleAccessToken) await getGoogleTokenSilently();
+                    if(googleAccessToken) syncNowToGoogleDrive(true);
+                    else updateSecureCloudStatus("🟡 Local save is safe — Google Drive needs a one-time reconnect before automatic backup can resume.",true);
+                }else if(hasClient && !hasPin) updateSecureCloudStatus("🟡 Local save is safe — unlock this device with App Lock and complete Drive setup once to resume automatic backup.",true);
                 else updateSecureCloudStatus("🟡 Local save is safe — connect Google Drive to enable automatic off-device backup.",true);
             },4000);
         }
@@ -7534,26 +7539,58 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             });
         }
 
-        async function driveApi(path,options={}){
-            if(!googleAccessToken) await getGoogleToken(true);
-            const headers=Object.assign({'Authorization':'Bearer '+googleAccessToken},options.headers||{});
-            const r=await fetch('https://www.googleapis.com/drive/v3/'+path,Object.assign({},options,{headers}));
-            if(r.status===401){googleAccessToken=null;throw new Error('Google authorization expired. Connect Google Drive again.');}
+        // Background authorization is deliberately silent. It may refresh/re-issue a token
+        // when Google already has a valid grant/session, but it must NEVER open the account
+        // chooser or consent UI merely because another client was saved.
+        let mfGoogleSilentAuthBusy=false;
+        let mfGoogleSilentAuthNextAt=0;
+        async function getGoogleTokenSilently(){
+            if(googleAccessToken) return googleAccessToken;
+            const now=Date.now();
+            if(mfGoogleSilentAuthBusy || now < mfGoogleSilentAuthNextAt) return null;
+            mfGoogleSilentAuthBusy=true;
+            mfGoogleSilentAuthNextAt=now+30000;
+            try{
+                return await getGoogleToken(false);
+            }catch(e){
+                return null;
+            }finally{
+                mfGoogleSilentAuthBusy=false;
+            }
+        }
+
+        async function driveApi(path,options={},interactive=true){
+            if(!googleAccessToken){
+                if(interactive) await getGoogleToken(true);
+                else if(!await getGoogleTokenSilently()) throw new Error('Google authorization needs a one-time reconnect.');
+            }
+            let headers=Object.assign({'Authorization':'Bearer '+googleAccessToken},options.headers||{});
+            let r=await fetch('https://www.googleapis.com/drive/v3/'+path,Object.assign({},options,{headers}));
+            if(r.status===401){
+                googleAccessToken=null;
+                if(interactive) await getGoogleToken(true);
+                else if(!await getGoogleTokenSilently()) throw new Error('Google authorization needs a one-time reconnect.');
+                headers=Object.assign({'Authorization':'Bearer '+googleAccessToken},options.headers||{});
+                r=await fetch('https://www.googleapis.com/drive/v3/'+path,Object.assign({},options,{headers}));
+            }
             if(!r.ok) throw new Error('Google Drive API '+r.status+': '+await r.text());
             return r;
         }
 
-        async function ensureDriveFolder(){
+        async function ensureDriveFolder(interactive=true){
             if(googleDriveFolderId) return googleDriveFolderId;
             const q=encodeURIComponent("name='Amara MicroFinance Secure' and mimeType='application/vnd.google-apps.folder' and trashed=false");
-            const r=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name)&pageSize=10');
+            const r=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name)&pageSize=10',{},interactive);
             const data=await r.json();
             if(data.files?.length){googleDriveFolderId=data.files[0].id;return googleDriveFolderId;}
-            const create=await driveApi('files?fields=id,name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Amara MicroFinance Secure',mimeType:'application/vnd.google-apps.folder'})});
+            const create=await driveApi('files?fields=id,name',{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({name:'Amara MicroFinance Secure',mimeType:'application/vnd.google-apps.folder'})
+            },interactive);
             googleDriveFolderId=(await create.json()).id;
             return googleDriveFolderId;
         }
-
         async function deriveCloudKey(pin,salt){
             const enc=new TextEncoder();
             const base=await crypto.subtle.importKey('raw',enc.encode(pin),'PBKDF2',false,['deriveKey']);
@@ -7684,10 +7721,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             }
             throw new Error('PIN/encryption validation failed: '+lastReason);
         }
-        async function driveListCurrent(){
-            const folder=await ensureDriveFolder();
+        async function driveListCurrent(interactive=true){
+            const folder=await ensureDriveFolder(interactive);
             const q=encodeURIComponent("name='Current Database.mfbackup.json' and trashed=false and '"+folder+"' in parents");
-            const list=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=10');
+            const list=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=10',{},interactive);
             return {folder,files:(await list.json()).files||[]};
         }
         async function syncNowToGoogleDrive(background=false){
@@ -7699,9 +7736,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     if(!background) alert('Enter your Cloud Encryption PIN before creating a Google Drive backup.');
                     return;
                 }
-                if(!googleAccessToken) await getGoogleToken(!background);
+                if(!googleAccessToken){
+                    if(background){
+                        await getGoogleTokenSilently();
+                        if(!googleAccessToken){
+                            updateSecureCloudStatus('🟡 Local save is safe — Google Drive needs a one-time reconnect before automatic backup can resume.',true);
+                            return;
+                        }
+                    }else{
+                        await getGoogleToken(true);
+                    }
+                }
                 if(!googleAccessToken) throw new Error('Google Drive is not connected.');
-                const {folder,files}=await driveListCurrent();
+                const {folder,files}=await driveListCurrent(!background);
                 const blob=await makeCloudBackupBlob();
                 const metadata={name:'Current Database.mfbackup.json',mimeType:'application/json',parents:[folder]};
                 let resp;
@@ -7749,8 +7796,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 return;
             }
             if(holdUntil) localStorage.removeItem('MF_RECOVERY_RESTORE_HOLD_UNTIL');
-            if(!googleAccessToken) await getGoogleToken(!background);
-            const {files}=await driveListCurrent();
+            if(!googleAccessToken){
+                if(background){
+                    await getGoogleTokenSilently();
+                    if(!googleAccessToken){
+                        updateSecureCloudStatus('🟡 Local save is safe — Google Drive needs a one-time reconnect before automatic backup can resume.',true);
+                        return;
+                    }
+                }else{
+                    await getGoogleToken(true);
+                }
+            }
+            const {files}=await driveListCurrent(!background);
             if(!files.length){ await syncNowToGoogleDrive(background); return; }
             const remote=files[0]; googleDriveFileId=remote.id;
             const snap=await idbGetSnapshot();
@@ -8786,14 +8843,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 <script>
 window.addEventListener('online',()=>{
     updateSecureCloudStatus('🟢 Internet restored — checking cloud sync.',false);
-    if(googleAccessToken) reconcileGoogleDrive(true).catch(()=>{});
+    if(googleAccessToken || (localStorage.getItem('MF_GOOGLE_CLIENT_ID') && getCloudPin())) reconcileGoogleDrive(true).catch(()=>{});
 });
 window.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState==='visible' && navigator.onLine && googleAccessToken) reconcileGoogleDrive(true).catch(()=>{});
+    if(document.visibilityState==='visible' && navigator.onLine && (googleAccessToken || (localStorage.getItem('MF_GOOGLE_CLIENT_ID') && getCloudPin()))) reconcileGoogleDrive(true).catch(()=>{});
 });
 let mfCloudPollBusy=false;
 setInterval(()=>{
-    if(!document.hidden && navigator.onLine && googleAccessToken && !mfCloudPollBusy){
+    if(!document.hidden && navigator.onLine && (googleAccessToken || (localStorage.getItem('MF_GOOGLE_CLIENT_ID') && getCloudPin())) && !mfCloudPollBusy){
         mfCloudPollBusy=true;
         reconcileGoogleDrive(true).catch(()=>{}).finally(()=>{mfCloudPollBusy=false;});
     }
@@ -8852,7 +8909,7 @@ window.addEventListener('load',()=>{ initializeSecureStorage(); });
     <i class="fa-solid fa-shield-halved" style="font-size:2.4rem;color:#34d399;margin-bottom:14px;"></i>
     <div style="font-size:1.05rem;font-weight:800;color:#fff;margin-bottom:4px;" id="app-lock-title">Enter PIN to Continue</div>
     <div style="font-size:.74rem;color:#94a3b8;margin-bottom:18px;">This device has an App Lock PIN set for this business data.</div>
-    <input type="password" id="app-lock-input" inputmode="numeric" maxlength="8" placeholder="• • • •" autocomplete="off" style="width:200px;text-align:center;letter-spacing:6px;font-size:1.3rem;padding:12px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#fff;">
+    <input type="password" id="app-lock-input" inputmode="numeric" maxlength="8" placeholder="• • • •" autocomplete="off" style="width:200px;text-align:center;letter-spacing:6px;font-size:1.3rem;padding:12px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#fff;" autocomplete="new-password">
     <div id="app-lock-error" style="color:#f87171;font-size:.72rem;margin-top:8px;min-height:16px;"></div>
     <button type="button" onclick="attemptAppUnlock()" style="margin-top:14px;background:#16a34a;color:#fff;border:none;padding:11px 28px;border-radius:10px;font-weight:800;font-size:.85rem;cursor:pointer;">Unlock</button>
     <div style="margin-top:16px;font-size:.72rem;color:#60a5fa;cursor:pointer;text-decoration:underline;" onclick="startForgotPinFlow()">Forgot PIN?</div>
