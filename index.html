@@ -2650,6 +2650,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         let cloudSyncBusy = false;
         let googleAccessToken = null;
         let googleTokenClient = null;
+        let googleTokenClientId = '';
+        let googleTokenPending = null;
         let googleTokenExpiresAt = 0;
         let googleSilentAuthBusy = false;
         let googleSilentAuthNextAt = 0;
@@ -7530,39 +7532,56 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(!clientId) throw new Error("Enter your Google OAuth Web Client ID first.");
             if(location.protocol==='file:') throw new Error("Direct Google OAuth needs an HTTPS web origin. Host this HTML as a secure web app first.");
             if(!window.google || !google.accounts || !google.accounts.oauth2) throw new Error("Google Identity Services has not loaded yet. Check your internet connection and try again.");
-            // A valid in-memory access token is reused until shortly before expiry.
             if(!interactive && googleAccessToken && googleTokenExpiresAt && Date.now() < googleTokenExpiresAt-60000) return googleAccessToken;
-            if(!googleTokenClient){
+
+            // One token client for the whole app. The callback is registered at init time,
+            // exactly as Google documents, rather than being replaced after initialization.
+            if(!googleTokenClient || googleTokenClientId!==clientId){
+                googleTokenClientId=clientId;
                 googleTokenClient=google.accounts.oauth2.initTokenClient({
                     client_id:clientId,
                     scope:'https://www.googleapis.com/auth/drive.file',
-                    callback:(resp)=>{}
+                    include_granted_scopes:true,
+                    callback:(resp)=>{
+                        const pending=googleTokenPending;
+                        googleTokenPending=null;
+                        if(!pending) return;
+                        if(resp && resp.error){
+                            googleAccessToken=null;
+                            googleTokenExpiresAt=0;
+                            pending.reject(new Error(resp.error_description||resp.error));
+                        }else if(resp && resp.access_token){
+                            googleAccessToken=resp.access_token;
+                            googleTokenExpiresAt=Date.now()+Math.max(60,Number(resp.expires_in||3600))*1000;
+                            localStorage.setItem("MF_GOOGLE_CLIENT_ID",clientId);
+                            pending.resolve(googleAccessToken);
+                        }else{
+                            pending.reject(new Error('Google did not return an access token.'));
+                        }
+                    },
+                    error_callback:(err)=>{
+                        const pending=googleTokenPending;
+                        googleTokenPending=null;
+                        if(pending) pending.reject(new Error(err?.type||'Google authorization window was closed or could not be opened.'));
+                    }
                 });
             }
-            return await new Promise((resolve,reject)=>{
-                let settled=false;
-                const finish=(fn,val)=>{if(settled)return;settled=true;fn(val);};
-                googleTokenClient.callback=(resp)=>{
-                    if(resp && resp.error){
-                        googleAccessToken=null;
-                        googleTokenExpiresAt=0;
-                        finish(reject,new Error(resp.error_description||resp.error));
-                    }else if(resp && resp.access_token){
-                        googleAccessToken=resp.access_token;
-                        googleTokenExpiresAt=Date.now()+Math.max(60,Number(resp.expires_in||3600))*1000;
-                        localStorage.setItem("MF_GOOGLE_CLIENT_ID",clientId);
-                        finish(resolve,googleAccessToken);
-                    }else{
-                        finish(reject,new Error('Google did not return an access token.'));
-                    }
-                };
-                try{
-                    // IMPORTANT: background renewal uses prompt=none. Google documents this
-                    // as the no-UI mode. If the existing Google session/grant is unavailable,
-                    // it fails instead of opening an account chooser or verification window.
-                    googleTokenClient.requestAccessToken({prompt:interactive?'consent':'none'});
-                }catch(e){ finish(reject,e); }
-            });
+
+            if(googleTokenPending) return googleTokenPending.promise;
+            let resolvePending,rejectPending;
+            const promise=new Promise((resolve,reject)=>{resolvePending=resolve;rejectPending=reject;});
+            googleTokenPending={promise,resolve:resolvePending,reject:rejectPending};
+            try{
+                // Manual Connect is the only user-visible OAuth path. An empty prompt lets
+                // Google reuse an already-approved grant instead of forcing consent every time.
+                // Background renewal uses prompt=none and is never allowed to open UI.
+                googleTokenClient.requestAccessToken({prompt:interactive?'':'none'});
+            }catch(e){
+                const pending=googleTokenPending;
+                googleTokenPending=null;
+                pending?.reject(e);
+            }
+            return promise;
         }
 
         async function getGoogleTokenSilently(){
@@ -7806,9 +7825,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Last encrypted backup: '+new Date().toLocaleString('en-IN');
                 updateSecureCloudStatus('🟢 Google Drive encrypted backup is up to date.');
                 if(!background) alert('Encrypted Google Drive backup completed successfully.');
+                return true;
             }catch(err){
                 console.error(err); if(!background) alert('Google Drive backup could not complete: '+err.message);
                 updateSecureCloudStatus('🟡 Local save is safe, but Google Drive backup is pending: '+err.message,true);
+                return false;
             }finally{cloudSyncBusy=false;}
         }
         async function reconcileGoogleDrive(background=false){
@@ -7857,10 +7878,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 localStorage.setItem('MF_GOOGLE_CLIENT_ID',clientId);
                 await getGoogleToken(true);
                 googleDriveFolderId=null; googleDriveFileId=null;
-                updateSecureCloudStatus('🟢 Google Drive connected. Starting the encrypted automatic backup in the background.');
+                // Verify the token against the actual Drive API before reporting success.
+                // This prevents a false "connected" message when OAuth succeeded but Drive
+                // access itself is not usable. The folder is app-owned under drive.file scope.
+                await ensureDriveFolder(true);
                 document.getElementById('sync-target-text').innerText='Google Drive Connected';
+                const backedUp=await syncNowToGoogleDrive(false);
+                if(!backedUp) throw new Error('Google authorization succeeded, but the Drive backup could not be verified. Your local data was not changed.');
+                updateSecureCloudStatus('🟢 Google Drive connected and verified. Encrypted automatic backup is active.');
                 scheduleAutomaticCloudSync();
-                alert('Google Drive connected successfully. Your Cloud Encryption PIN is securely persisted on this device. Automatic encrypted backup will now run in the background.');
+                alert('Google Drive connected successfully and verified. The encrypted backup has been created/updated, and future saves will back up automatically in the background.');
             }catch(err){ alert('Google Drive connection failed: '+err.message); }
         }
         async function restoreLatestFromGoogleDrive(){
