@@ -2532,12 +2532,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(!loan || !loan.disbursalDate) return '';
             const p=state.products[loan.product];
             const mode=mfProductFrequencyMode(p);
-            // New calendar-month products use the same day in the next calendar month.
+            // The contractual first EMI follows the product's repayment frequency.
+            // Weekly = +7 days, Fortnightly = +15 days, Monthly 30-day = +30 days.
+            // Monthly Calendar uses the same calendar date in the next month.
+            // Monthly 15-Day Start keeps its established +15-day first due rule.
             if(mode==='MONTHLY_CALENDAR') return mfAddMonthsClamped(loan.disbursalDate,1);
+            if(mode==='M15FIXED') return mfIsoAddDays(loan.disbursalDate,15);
+            if(mode==='WEEKLY') return mfIsoAddDays(loan.disbursalDate,7);
+            if(mode==='FORTNIGHTLY') return mfIsoAddDays(loan.disbursalDate,15);
+            if(mode==='MONTHLY_30') return mfIsoAddDays(loan.disbursalDate,30);
             // Custom-cycle products default to their configured cycle length.
             if(mode==='CUSTOM') return mfIsoAddDays(loan.disbursalDate,mfProductCycleDays(p));
-            // Preserve the established legacy/default behaviour for existing standard modes.
-            return mfIsoAddDays(loan.disbursalDate,15);
+            return mfIsoAddDays(loan.disbursalDate,mfProductCycleDays(p));
         }
         function mfLoanFirstDueIso(loan){
             const p=loan ? state.products[loan.product] : null;
