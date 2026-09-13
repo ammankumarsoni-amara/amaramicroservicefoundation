@@ -4760,7 +4760,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         function getLoanRecoveryView(loan){
             const p=state.products[loan.product]||{}; const maturity=getLoanMaturityDate(loan); const today=new Date();
-            const overdueDays=maturity?Math.max(0,Math.ceil((today-maturity)/86400000)):0; const pending=getLoanPending(loan); const settled=!!loan.postMaturitySettlement;
+            const pending=getLoanPending(loan); const settled=!!loan.postMaturitySettlement;
+            // A fully paid/closed, settled, or foreclosed loan is never overdue.
+            // Calculate DPD only while a contractual balance is actually pending.
+            const closed=!!loan.foreclosed || settled || pending<=0;
+            const overdueDays=(!closed && maturity)?Math.max(0,Math.ceil((today-maturity)/86400000)):0;
             return {p,maturity,overdueDays,pending,settled,recoveryMonths:overdueDays>0?Math.ceil(overdueDays/30):0,npaWatch:overdueDays>=90};
         }
         function initNpaFilters(){
