@@ -7827,66 +7827,79 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const list=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=10',{},interactive);
             return {folder,files:(await list.json()).files||[]};
         }
-        async function syncNowToGoogleDrive(background=false){
-            if(cloudSyncBusy) return; cloudSyncBusy=true;
-            try{
-                const pin=getCloudPin();
+        async function syncNowToGoogleDrive(background=false) {
+            const manual = !background;
+            try {
+                const pin = getCloudPin();
                 if(!pin){
-                    updateSecureCloudStatus('🟡 Google Drive backup skipped — Cloud Encryption PIN is required.',true);
-                    if(!background) alert('Enter your Cloud Encryption PIN before creating a Google Drive backup.');
-                    return;
+                    updateSecureCloudStatus(manual ? '⚠️ Enter/save the Cloud Encryption PIN first.' : 'Google Drive backup waiting for Cloud Encryption PIN.', true);
+                    if(manual) alert('Please enter and save the Cloud Encryption PIN first, then tap Sync Now again.');
+                    return false;
                 }
-                if(!googleAccessToken){
+
+                // Background sync is NEVER allowed to start OAuth.
+                // Manual Sync Now is explicitly allowed to establish/refresh the Google session.
+                if(!googleAccessToken || (googleTokenExpiresAt && Date.now() >= googleTokenExpiresAt - 15000)){
                     if(background){
-                        updateSecureCloudStatus('🟡 Local save is safe — Google Drive authorization needs one manual reconnect. No Google popup was opened automatically.',true);
+                        updateSecureCloudStatus('🟡 Google Drive backup waiting for an active authorization. Use Connect Google Drive / Sync Now manually.', false);
                         return false;
-                    }else{
-                        await getGoogleToken(true);
                     }
+                    await getGoogleToken(true);
                 }
-                if(!googleAccessToken) throw new Error('Google Drive is not connected.');
-                const {folder,files}=await driveListCurrent(!background);
-                const blob=await makeCloudBackupBlob();
-                const metadata={name:'Current Database.mfbackup.json',mimeType:'application/json',parents:[folder]};
-                let resp;
-                if(files.length){
-                    googleDriveFileId=files[0].id;
-                    const form=new FormData(); form.append('metadata',new Blob([JSON.stringify({name:metadata.name,mimeType:metadata.mimeType})],{type:'application/json'})); form.append('file',blob);
-                    resp=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+googleDriveFileId+'?uploadType=multipart&fields=id,modifiedTime',{method:'PATCH',headers:{Authorization:'Bearer '+googleAccessToken},body:form});
-                }else{
-                    const form=new FormData(); form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'})); form.append('file',blob);
-                    resp=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime',{method:'POST',headers:{Authorization:'Bearer '+googleAccessToken},body:form});
+
+                if(!googleAccessToken) throw new Error('Google Drive authorization is not available.');
+
+                // Verify the real Drive session before declaring success.
+                await verifyGoogleDriveConnectionForUser();
+
+                const blob = await makeCloudBackupBlob();
+                const dbName = 'Current Database.mfbackup.json';
+                const timestampName = 'Backup_' + new Date().toISOString().replace(/[:.]/g,'-') + '.mfbackup.json';
+
+                const uploadOne = async(name) => {
+                    const body = JSON.stringify(blob);
+                    const form = new FormData();
+                    form.append('metadata', new Blob([JSON.stringify({
+                        name,
+                        mimeType:'application/json',
+                        parents: [googleDriveFolderId]
+                    })], {type:'application/json'}));
+                    form.append('file', new Blob([body], {type:'application/json'}), name);
+
+                    return await driveApi('/upload/drive/v3/files?uploadType=multipart', {
+                        method:'POST',
+                        body:form
+                    }, true);
+                };
+
+                // Update the stable current backup and also keep an immutable timestamped recovery point.
+                const current = await findDriveFileByName(dbName, true);
+                if(current && current.id){
+                    const body = JSON.stringify(blob);
+                    const form = new FormData();
+                    form.append('metadata', new Blob([JSON.stringify({mimeType:'application/json'})], {type:'application/json'}));
+                    form.append('file', new Blob([body], {type:'application/json'}), dbName);
+                    await driveApi('/upload/drive/v3/files/' + encodeURIComponent(current.id) + '?uploadType=multipart', {
+                        method:'PATCH',
+                        body:form
+                    }, true);
+                } else {
+                    await uploadOne(dbName);
                 }
-                if(!resp.ok) throw new Error('Drive upload '+resp.status);
-                const result=await resp.json(); googleDriveFileId=result.id||googleDriveFileId;
-                localStorage.setItem(cloudLastSyncEncryptedKey(),'1');
+                await uploadOne(timestampName);
 
-                // Timestamped immutable restore point: every successful Drive backup gets its own
-                // encrypted, immutable file. The exact blob uploaded to Current Database is reused,
-                // so the restore point is guaranteed to match the same PIN/KDF/backup format.
-                const stamp=new Date();
-                const stampDay=stamp.toISOString().slice(0,10);
-                const stampName=`Backup_${stampDay}_${stamp.getTime()}.mfbackup.json`;
-                const stampMeta={name:stampName,mimeType:'application/json',parents:[folder]};
-                const sf=new FormData();
-                sf.append('metadata',new Blob([JSON.stringify(stampMeta)],{type:'application/json'}));
-                sf.append('file',blob);
-                const sr=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime',{method:'POST',headers:{Authorization:'Bearer '+googleAccessToken},body:sf});
-                if(!sr.ok) throw new Error('Timestamped recovery point upload '+sr.status);
-                const stampResult=await sr.json();
-                localStorage.setItem('MF_LAST_DRIVE_RESTORE_POINT', JSON.stringify({id:stampResult.id,name:stampName,modifiedTime:stampResult.modifiedTime||stamp.toISOString()}));
-
-                markCloudSynced();
-                document.getElementById('sync-target-text').innerText='Google Drive Backup Secured';
-                const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Last encrypted backup: '+new Date().toLocaleString('en-IN');
-                updateSecureCloudStatus('🟢 Google Drive encrypted backup is up to date.');
-                if(!background) alert('Encrypted Google Drive backup completed successfully.');
+                const now = new Date();
+                try { localStorage.setItem('MF_GOOGLE_LAST_BACKUP_AT', now.toISOString()); } catch(e) {}
+                updateSecureCloudStatus('🟢 Google Drive backup successful — ' + now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}), false);
+                if(manual) alert('Google Drive sync successful.\n\nEncrypted database backup and a new timestamped recovery point were uploaded successfully.');
                 return true;
-            }catch(err){
-                console.error(err); if(!background) alert('Google Drive backup could not complete: '+err.message);
-                updateSecureCloudStatus('🟡 Local save is safe, but Google Drive backup is pending: '+err.message,true);
+            } catch(e) {
+                console.error('Google Drive Sync Now failed:', e);
+                const msg = e?.message || String(e);
+                updateSecureCloudStatus('⚠️ Google Drive sync failed — ' + msg, true);
+                if(manual) alert('Google Drive Sync Now failed.\n\n' + msg);
                 return false;
-            }finally{cloudSyncBusy=false;}
+            }
         }
         async function reconcileGoogleDrive(background=false){
             const holdUntil=Number(localStorage.getItem('MF_RECOVERY_RESTORE_HOLD_UNTIL')||0);
@@ -9089,5 +9102,6 @@ window.addEventListener('online',()=>{
 
 
 <!-- PRODUCTION-V12-APPLOCK-INDEPENDENT-FIREBASE-SELF-HEAL-UNLOCK-NONBLOCKING -->
+<!-- PRODUCTION-V13-MANUAL-SYNC-NOW-FIXED -->
 </body>
 </html>
