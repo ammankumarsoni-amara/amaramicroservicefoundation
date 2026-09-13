@@ -2781,12 +2781,40 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const cfgRaw = (document.getElementById('firebase-config-input')?.value || '').trim();
                 const syncCode = (document.getElementById('firebase-sync-code')?.value || '').trim();
                 if (!cfgRaw || !syncCode) { alert('Please paste your Firebase config AND enter a Sync Code.'); return; }
+
                 const cfg = JSON.parse(cfgRaw);
+                if (!cfg || typeof cfg !== 'object' || !cfg.projectId) {
+                    throw new Error('Firebase config is missing projectId.');
+                }
+                if (typeof firebase === 'undefined' || !firebase.initializeApp || !firebase.firestore || !firebase.auth) {
+                    throw new Error('Firebase services are still loading. Please wait a moment and tap Connect Firebase again.');
+                }
+
                 localStorage.setItem('MF_FIREBASE_CONFIG', cfgRaw);
                 localStorage.setItem('MF_FIREBASE_SYNC_CODE', syncCode);
-                initFirebaseSync(cfg, syncCode, true);
+
+                // Self-heal Firebase core/Auth initialization without touching App Lock.
+                if (!mfFirebaseApp) {
+                    try { mfFirebaseApp = firebase.app(); }
+                    catch(e) { mfFirebaseApp = firebase.initializeApp(cfg); }
+                }
+                if (!mfFirestoreDb) mfFirestoreDb = firebase.firestore();
+                if (!mfFirebaseAuth) mfFirebaseAuth = firebase.auth();
+
+                const persistence = (firebase.auth.Auth && firebase.auth.Auth.Persistence)
+                    ? firebase.auth.Auth.Persistence.LOCAL : 'local';
+                const p = mfFirebaseAuth.setPersistence ? mfFirebaseAuth.setPersistence(persistence) : null;
+
+                const finish = () => {
+                    try { mfInitAuth(); } catch(e) { console.warn('Firebase Auth listener reattach skipped:', e); }
+                    initFirebaseSync(cfg, syncCode, true);
+                };
+                if (p && typeof p.then === 'function') p.then(finish).catch(() => finish());
+                else finish();
             } catch (e) {
-                alert('That Firebase config does not look valid. Please copy the whole object exactly as Firebase gave it to you, including the { } brackets.');
+                console.error('Firebase connect failed:', e);
+                setFirebaseStatus('⚠️ Firebase connection failed: ' + (e.message || e), true);
+                alert('Firebase Connect failed.\n\n' + (e.message || e));
             }
         }
 
@@ -3278,36 +3306,33 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         async function attemptAppUnlock() {
-            const inp = document.getElementById('app-lock-input');
-            const val = (inp?.value || '').trim();
+            const val = (document.getElementById('app-lock-input')?.value || '').trim();
             const stored = localStorage.getItem('MF_APP_PIN_HASH');
+            const hash = await mfHashPin(val);
             const err = document.getElementById('app-lock-error');
-            try {
-                const hash = await mfHashPin(val);
-                if (hash === stored) {
-                    // Unlock the application FIRST. Cloud-PIN restoration is only a convenience
-                    // feature and must never be able to block the App Lock itself.
-                    mfAppUnlockedThisSession = true;
-                    const overlay = document.getElementById('app-lock-overlay');
-                    if (overlay) overlay.style.display = 'none';
-                    if (inp) inp.value = '';
+            if (hash === stored) {
+                // App Lock is completely independent of Cloud PIN/Firebase/Google Drive.
+                // Hide the lock immediately after the PIN is verified.
+                mfAppUnlockedThisSession = true;
+                const overlay = document.getElementById('app-lock-overlay');
+                if (overlay) overlay.style.display = 'none';
+                if (err) err.innerText = '';
+
+                // Cloud/Firebase restoration must never be allowed to block unlocking.
+                Promise.resolve().then(async () => {
+                    try { await restoreCloudPinWrapped(); } catch(e) { console.warn('Cloud PIN restore after App Unlock skipped:', e); }
                     try {
-                        await Promise.race([
-                            restoreCloudPinWrapped(),
-                            new Promise(resolve => setTimeout(() => resolve(false), 2500))
-                        ]);
-                    } catch (e) { console.warn('Cloud PIN restore skipped after App Lock unlock:', e); }
-                    try {
-                        if (getCloudPin()) scheduleAutomaticCloudSync();
-                    } catch (e) {}
-                } else {
-                    if (err) err.innerText = 'Incorrect PIN. Please try again.';
-                    if (inp) { inp.value = ''; inp.focus(); }
-                }
-            } catch (e) {
-                console.error('App Lock unlock check failed:', e);
-                if (err) err.innerText = 'Unable to verify PIN. Please try again.';
-                if (inp) { inp.value = ''; inp.focus(); }
+                        const cfgRaw = localStorage.getItem('MF_FIREBASE_CONFIG');
+                        const syncCode = localStorage.getItem('MF_FIREBASE_SYNC_CODE');
+                        if (cfgRaw && syncCode && typeof firebase !== 'undefined' && firebase.firestore) {
+                            initFirebaseSync(JSON.parse(cfgRaw), syncCode, false);
+                        }
+                    } catch(e) { console.warn('Firebase resume after App Unlock skipped:', e); }
+                    try { if (getCloudPin()) scheduleAutomaticCloudSync(); } catch(e) {}
+                });
+            } else {
+                if (err) err.innerText = 'Incorrect PIN. Please try again.';
+                const inp = document.getElementById('app-lock-input'); if (inp) { inp.value = ''; inp.focus(); }
             }
         }
 
@@ -9062,6 +9087,7 @@ window.addEventListener('online',()=>{
 });
 </script>
 
-<!-- PRODUCTION-V11-APPLOCK-UNLOCK-NONBLOCKING-CLOUD-PIN-RESTORE -->
+
+<!-- PRODUCTION-V12-APPLOCK-INDEPENDENT-FIREBASE-SELF-HEAL-UNLOCK-NONBLOCKING -->
 </body>
 </html>
