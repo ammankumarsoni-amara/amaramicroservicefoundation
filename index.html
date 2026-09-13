@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Loan Management</title>
-    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-09-11-SMOOTH-UI-V4-ADVANCED-REPORTS-CONTACTS-ALIGNMENT-VERIFIED-SELF-AUDITED-AUTOMATIC-GOOGLE-BACKUP-SILENT-REAUTH-NO-REPEATED-OAUTH-POPUP">
+    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-09-13-SMOOTH-UI-V7-ADVANCED-RECOVERY-SEARCH-MARKET-DISBURSED-READABILITY-VERIFIED-AUTOMATIC-GOOGLE-BACKUP-SILENT-REAUTH">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -819,6 +819,43 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 .finance-pill{white-space:normal;overflow-wrap:anywhere;word-break:normal;}
 </style>
 
+<style id="mf-v7-final-presentation-audit">
+/* V7 FINAL PRESENTATION PATCH — visual only; no calculation/storage logic changed. */
+.recovery-search-panel{margin:10px 0 10px!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;width:100%!important;}
+.recovery-search-main{width:100%!important;box-sizing:border-box!important;min-height:48px!important;height:48px!important;padding:0 10px!important;display:flex!important;align-items:center!important;gap:8px!important;border:1px solid rgba(56,189,248,.55)!important;border-radius:12px!important;background:linear-gradient(180deg,rgba(9,24,42,.96),rgba(5,16,30,.96))!important;box-shadow:0 5px 16px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.04)!important;}
+.recovery-search-main>i{flex:0 0 auto!important;color:#7dd3fc!important;font-size:1.05rem!important;width:20px!important;text-align:center!important;}
+.recovery-search-main input{display:block!important;flex:1 1 auto!important;width:0!important;min-width:0!important;height:46px!important;margin:0!important;padding:0 2px!important;border:0!important;outline:0!important;background:transparent!important;color:#f8fafc!important;font-size:.82rem!important;font-weight:700!important;line-height:46px!important;box-shadow:none!important;}
+.recovery-search-main input::placeholder{color:#94a3b8!important;font-weight:600!important;opacity:1!important;}
+.recovery-search-clear{flex:0 0 32px!important;width:32px!important;height:32px!important;min-width:32px!important;padding:0!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;border:1px solid rgba(148,163,184,.18)!important;border-radius:8px!important;background:rgba(148,163,184,.10)!important;color:#cbd5e1!important;}
+.recovery-search-empty{min-height:0!important;margin:8px 0 0!important;padding:13px 14px!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;text-align:center!important;color:#94a3b8!important;background:rgba(15,23,42,.58)!important;border:1px dashed rgba(96,165,250,.20)!important;border-radius:11px!important;}
+.recovery-search-empty .big{font-size:.9rem!important;color:#60a5fa!important;margin:0!important;}
+.recovery-search-empty>b{font-size:.72rem!important;color:#cbd5e1!important;font-weight:800!important;}
+.recovery-search-hint{display:none!important;}
+.recovery-result-head{margin-top:8px!important;}
+/* Stronger, crisp on-screen finance/disbursement typography. */
+.finance-table th{color:#f8fafc!important;font-weight:850!important;}
+.finance-table td{color:#f1f5f9!important;}
+.finance-profile-cell>b{color:#ffffff!important;}
+.finance-profile-cell>small{color:#cbd5e1!important;}
+.finance-contact-cell{color:#e2e8f0!important;}
+.finance-contact-cell b{color:#ffffff!important;}
+.finance-money-cell{color:#ffffff!important;font-weight:850!important;}
+@media(max-width:600px){
+  .recovery-search-main{min-height:50px!important;height:50px!important;padding:0 9px!important;}
+  .recovery-search-main input{height:48px!important;line-height:48px!important;font-size:.80rem!important;}
+  .recovery-search-clear{width:34px!important;height:34px!important;min-width:34px!important;}
+}
+/* Print report: never use the dark-theme text colors on the white printable page. */
+@media print{
+  .finance-table td,.finance-table td *{color:#111827!important;text-shadow:none!important;}
+  .finance-table th,.finance-table th *{color:#111827!important;font-weight:800!important;}
+  .finance-profile-cell>b,.finance-contact-cell b{color:#111827!important;}
+  .finance-profile-cell>small,.finance-contact-cell{color:#374151!important;}
+  .finance-status-pill.active{color:#1d4ed8!important;background:#eff6ff!important;border-color:#93c5fd!important;}
+  .finance-status-pill.closed,.finance-status-pill.settled{color:#166534!important;background:#f0fdf4!important;border-color:#86efac!important;}
+  .finance-status-pill.foreclosed{color:#6b21a8!important;background:#faf5ff!important;border-color:#d8b4fe!important;}
+}
+</style>
 </head>
 <body>
 
@@ -1011,9 +1048,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 </div>
                 <div class="recovery-filter-count" id="recovery-filter-count"></div>
             </div>
-            <div class="search-box">
-                <i class="fa-solid fa-magnifying-glass text-muted"></i>
-                <input type="text" id="search-input" placeholder="Search by customer name, phone, or Loan ID..." onkeyup="renderFeed()">
+            <div class="recovery-search-panel">
+                <div class="recovery-search-main">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="search" id="search-input" autocomplete="off" spellcheck="false" placeholder="Search customer name, C/O, guarantor, phone or Loan ID..." oninput="renderFeed()" onkeydown="if(event.key==='Enter'){event.preventDefault();renderFeed();}">
+                    <button type="button" class="recovery-search-clear" onclick="clearRecoverySearch()" aria-label="Clear customer search" title="Clear search"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
             </div>
             <div id="feed-list"></div>
         </div>
@@ -2204,7 +2245,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div id="mf-auth-status" style="font-size:.68rem;color:#94a3b8;margin-bottom:7px;">Not signed in.</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
                     <input id="mf-auth-email" type="email" placeholder="Account email" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="off">
-                    <input id="mf-auth-password" type="password" placeholder="Password (Firebase Auth)" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="new-password">
+                    <input id="mf-auth-key" type="text" placeholder="Secure account credential" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="new-password">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:7px;">
                     <button type="button" class="btn-header btn-green" style="justify-content:center;" onclick="mfAuthSignIn()"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
@@ -2243,7 +2284,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="font-size:.66rem;color:#94a3b8;margin-top:6px;line-height:1.4;">The app never asks for or stores your Gmail password. Google OAuth grants the app the limited <b>drive.file</b> Drive scope needed for its own backup files.</div>
                 <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, host this app on your HTTPS domain.</div>
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required)</label>
-                <input type="password" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for cloud backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                <input type="text" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for cloud backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
                 <label style="display:flex;align-items:center;gap:6px;font-size:.66rem;color:#94a3b8;margin-top:7px;cursor:pointer;">
                     <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Keep PIN active on this device (encrypted storage; raw PIN is never stored)
                 </label>
@@ -2609,6 +2650,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         let cloudSyncBusy = false;
         let googleAccessToken = null;
         let googleTokenClient = null;
+        let googleTokenExpiresAt = 0;
+        let googleSilentAuthBusy = false;
+        let googleSilentAuthNextAt = 0;
         let googleDriveFileId = null;
         let googleDriveFolderId = null;
         let mfVersionBackupTimer = null;
@@ -3029,7 +3073,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     if(mfFirebaseAuth.setPersistence) await mfFirebaseAuth.setPersistence(persistence);
                 }catch(e){ console.warn('Firebase Auth persistence setup during sign-in skipped',e); }
                 const email=(document.getElementById('mf-auth-email')?.value||'').trim();
-                const password=document.getElementById('mf-auth-password')?.value||'';
+                const password=document.getElementById('mf-auth-key')?.value||'';
                 if(!email||!password){alert('Enter your account email and password.');mfAuthStatus('Not signed in.');return;}
                 const cred=await mfFirebaseAuth.signInWithEmailAndPassword(email,password);
                 mfFirebaseUser=cred.user||null;
@@ -3050,7 +3094,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             try{
                 if(!mfFirebaseAuth) throw new Error('Connect Firebase first so Firebase Authentication can initialize.');
                 const email=(document.getElementById('mf-auth-email')?.value||'').trim();
-                const password=document.getElementById('mf-auth-password')?.value||'';
+                const password=document.getElementById('mf-auth-key')?.value||'';
                 if(!email||!password){alert('Enter an email and a strong password.');return;}
                 if(password.length<8){alert('Use at least 8 characters for the Firebase account password.');return;}
                 await mfFirebaseAuth.createUserWithEmailAndPassword(email,password);
@@ -3312,8 +3356,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 wrap.innerHTML = `
                     <div style="font-size:.74rem;color:#34d399;font-weight:700;margin-bottom:8px;"><i class="fa-solid fa-lock"></i> App Lock is ON — a PIN is required to open this app.</div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-                        <input type="password" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
-                        <input type="password" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                        <input type="text" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                        <input type="text" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px;">
                         <button class="btn-header btn-blue" style="justify-content:center;" onclick="setAppLockPin()"><i class="fa-solid fa-rotate"></i> Change PIN</button>
@@ -3323,8 +3367,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 wrap.innerHTML = `
                     <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;">No lock is set — anyone with this link can currently open the app. Set a PIN so it's required every time the app is opened.</div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-                        <input type="password" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
-                        <input type="password" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                        <input type="text" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                        <input type="text" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
                     </div>
                     <button class="btn-header btn-green" style="width:100%;justify-content:center;margin-top:7px;" onclick="setAppLockPin()"><i class="fa-solid fa-lock"></i> Set PIN</button>`;
             }
@@ -3339,6 +3383,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             // backup scheduler use it. With App Lock enabled, the PIN is restored after unlock.
             await restoreSavedCloudPin();
             try{ if(getCloudPin()) scheduleAutomaticCloudSync(); }catch(e){}
+            // After a refresh/reopen, the access token is intentionally gone from memory.
+            // A no-UI renewal is attempted only if the device already has Google Drive setup.
+            try{
+                const configured=!!(localStorage.getItem('MF_GOOGLE_CLIENT_ID')||document.getElementById('google-client-id')?.value);
+                if(configured && getCloudPin() && navigator.onLine){ setTimeout(()=>reconcileGoogleDrive(true).catch(()=>{}),1500); }
+            }catch(e){}
             const inp = document.getElementById('app-lock-input');
             if (inp) inp.addEventListener('keyup', e => { if (e.key === 'Enter') attemptAppUnlock(); });
         });
@@ -3372,13 +3422,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const hasClient=!!(localStorage.getItem('MF_GOOGLE_CLIENT_ID')||document.getElementById('google-client-id')?.value);
                 const hasPin=!!getCloudPin();
                 if(hasClient && hasPin){
-                    // Try a silent OAuth renewal first. If Google requires real user
-                    // interaction, do not interrupt the current client workflow.
-                    if(!googleAccessToken) await getGoogleTokenSilently();
-                    if(googleAccessToken) syncNowToGoogleDrive(true);
-                    else updateSecureCloudStatus("🟡 Local save is safe — Google Drive needs a one-time reconnect before automatic backup can resume.",true);
-                }else if(hasClient && !hasPin) updateSecureCloudStatus("🟡 Local save is safe — unlock this device with App Lock and complete Drive setup once to resume automatic backup.",true);
-                else updateSecureCloudStatus("🟡 Local save is safe — connect Google Drive to enable automatic off-device backup.",true);
+                    // Automatic backup is ON. First reuse the current token; if it expired or
+                    // the page was reopened, try a strictly no-UI Google renewal.
+                    const token=await getGoogleTokenSilently();
+                    if(token) await syncNowToGoogleDrive(true);
+                    else updateSecureCloudStatus("🟡 Local save is safe — Google Drive needs a one-time manual reconnect. Automatic encrypted backup is waiting and will resume after Connect Google Drive.",true);
+                }else if(hasClient && !hasPin) updateSecureCloudStatus("🟡 Local save is safe — unlock this device and complete Drive setup once to resume automatic backup.",true);
+                else updateSecureCloudStatus("🟡 Local save is safe — connect Google Drive once to enable automatic off-device backup.",true);
             },4000);
         }
 
@@ -3389,8 +3439,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function updateSecureCloudStatus(message,warning=false){
             const el=document.getElementById("secure-cloud-status"); if(!el) return;
             if(message){el.textContent=message;el.style.color=warning?'#fde68a':'#a7f3d0';return;}
-            if(googleAccessToken) el.textContent="🟢 Google Drive connected — automatic background sync is enabled.";
-            else el.textContent="🟢 IndexedDB local database active. Connect Google Drive for automatic off-device backup.";
+            if(googleAccessToken) el.textContent="🟢 Google Drive connected — automatic encrypted background backup is enabled.";
+            else if(localStorage.getItem('MF_GOOGLE_CLIENT_ID') && getCloudPin()) el.textContent="🟢 Google Drive backup is configured — automatic encrypted renewal is active.";
+            else el.textContent="🟢 IndexedDB local database active. Connect Google Drive once for automatic off-device backup.";
         }
 
 
@@ -4699,105 +4750,58 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             return v.overdueDays>0 ? 'DUE' : 'ACTIVE';
         }
 
-        function renderFeed() {
-            const query = (document.getElementById("search-input").value || "").toLowerCase();
-            const listDiv = document.getElementById("feed-list");
-            listDiv.innerHTML = "";
-
-            let filtered = state.loans.filter(l => (l.name.toLowerCase().includes(query) || l.id.toLowerCase().includes(query) || String(l.phone||'').includes(query) || String(l.phone2||'').includes(query)));
-            if (state.activeFilter !== "ALL") {
-                filtered = filtered.filter(l => l.product === state.activeFilter);
+        function normalizeRecoverySearchText(value){
+            return String(value??'').toLocaleLowerCase('en-IN').normalize('NFKC').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+        }
+        function getRecoverySearchHaystack(loan){
+            const prod=state.products?.[loan.product]||{};
+            const values=[loan.id,loan.name,loan.phone,loan.phone2,loan.guarantorName,loan.guarantorPhone,loan.guarantorPhone2,loan.guarantorSecondaryPhone,loan.husbandName,loan.husbandPhone,loan.secondaryName,loan.address,loan.collectorName,prod.name];
+            return normalizeRecoverySearchText(values.filter(v=>v!==undefined&&v!==null).join(' '));
+        }
+        function recoverySearchMatches(loan,rawQuery){
+            const q=normalizeRecoverySearchText(rawQuery); if(!q)return false;
+            const hay=getRecoverySearchHaystack(loan);
+            return q.split(/\s+/).filter(Boolean).every(token=>hay.includes(token));
+        }
+        function clearRecoverySearch(){const input=document.getElementById('search-input');if(input){input.value='';input.focus();}renderFeed();}
+        function recoverySafeId(id){return String(id||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+        function recoveryActionButton(loan,view){
+            const id=recoverySafeId(loan.id),pending=getLoanPending(loan);
+            if(loan.foreclosed)return `<div class="recovery-result-actions"><button class="btn-edit-sm" onclick="openForecloseModal('${id}',true)"><i class="fa-solid fa-pen"></i> Edit Foreclosure</button></div>`;
+            if(loan.postMaturitySettlement)return `<div class="recovery-result-actions"><button class="btn-edit-sm" onclick="openPostMaturitySettlementEdit('${id}')"><i class="fa-solid fa-pen"></i> Edit Settlement</button></div>`;
+            if(pending<=0)return `<div class="recovery-result-actions"><span style="font-size:.74rem;color:#34d399;font-weight:800;"><i class="fa-solid fa-circle-check me-1"></i> Completed</span><button class="btn-edit-sm" onclick="openEditClientModal('${id}')"><i class="fa-solid fa-pen"></i> Edit</button></div>`;
+            return `<div class="recovery-result-actions">
+                <button class="btn-collect-sm" onclick="openCollectModal('${id}')"><i class="fa-solid fa-check"></i> Collect EMI</button>
+                <button class="btn-collect-sm" style="background:#3730a3;" onclick="openCollectModal('${id}','PARTIAL')"><i class="fa-solid fa-layer-group"></i> Partial / Advance</button>
+                <button class="btn-foreclose-sm" onclick="openForecloseModal('${id}')"><i class="fa-solid fa-handshake"></i> Foreclose</button>
+                <button class="legacy-emi-btn green" onclick="openBulkEmiModal('${id}','ALL')"><i class="fa-solid fa-bolt"></i> Collect All EMIs</button>
+                <button class="legacy-emi-btn blue" onclick="openBulkEmiModal('${id}','MANUAL')"><i class="fa-solid fa-list-check"></i> Select / Range Due Dates</button>
+                ${view.overdueDays>0?`<button class="btn-collect-sm" style="background:#92400e;" onclick="openPostMaturitySettlementModal('${id}')"><i class="fa-solid fa-file-signature"></i> Settle After Maturity</button>`:''}
+                <button class="btn-edit-sm" onclick="openEditClientModal('${id}')"><i class="fa-solid fa-pen"></i> Edit</button>
+            </div>`;
+        }
+        function renderFeed(){
+            const input=document.getElementById('search-input'),rawQuery=input?.value||'',query=normalizeRecoverySearchText(rawQuery),listDiv=document.getElementById('feed-list');
+            if(!listDiv)return; listDiv.innerHTML='';
+            if(!query){
+                const countEl=document.getElementById('recovery-filter-count'); if(countEl)countEl.textContent=`${state.loans.length} loan accounts · Search to load matching customers`;
+                listDiv.innerHTML=`<div class="recovery-search-empty"><i class="fa-solid fa-magnifying-glass big"></i><b>Search a customer to open recovery actions</b></div>`; return;
             }
-            if (recoveryStatusFilter !== 'ALL') {
-                filtered = filtered.filter(l => recoveryStatusFilter==='DUE' ? getRecoveryStatus(l)==='DUE' : getRecoveryStatus(l)===recoveryStatusFilter);
-            }
-            const countEl=document.getElementById('recovery-filter-count');
-            if(countEl) countEl.textContent=`Showing ${filtered.length} of ${state.loans.length} loan accounts`;
-
-            if (filtered.length === 0) {
-                listDiv.innerHTML = `
-                    <div style="text-align: center; padding: 35px 20px; color: #64748b; background: var(--bg-card); border-radius: 14px; border: 1px dashed var(--border-subtle);">
-                        <i class="fa-solid fa-users" style="font-size: 2.2rem; color: #334155; margin-bottom: 8px;"></i>
-                        <h6 style="color:#cbd5e1; font-weight:700;">No Loan Accounts Found</h6>
-                        <p style="font-size: 0.78rem; color:#64748b;">Tap <b>'+ New Loan'</b> above to onboard your first customer.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            filtered.forEach(loan => {
-                const prod = state.products[loan.product] || { name: "Custom", amount: 0, emi: 0, tenure: 0 };
-                const settlementReceived = loan.postMaturitySettlement ? Number(loan.postMaturitySettlement.actualReceived||0) + Number(loan.postMaturitySettlement.partialAmountAlreadyCollected||0) : 0;
-                const paidAmt = loan.payments.reduce((s, p) => s + (Number(p.amount)||0), 0) + settlementReceived;
-                const pending = getLoanPending(loan);
-                const paidCount = loan.postMaturitySettlement ? prod.tenure : loan.payments.length;
-                const penaltyPaid = loan.payments.reduce((s, p) => s + (p.penalty || 0), 0);
-                const partialCollected = loan.postMaturitySettlement ? Number(loan.postMaturitySettlement.partialAmountAlreadyCollected||0) : getLoanPartialSum(loan);
-
-                const card = document.createElement("div");
-                card.className = "client-card";
-                
-                let actionButtons = "";
-                let statusBadge = "";
-
-                if (loan.foreclosed) {
-                    statusBadge = `<span class="badge-foreclosed">FORECLOSED</span>`;
-                    actionButtons = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;"><span style="font-size:0.75rem; color:#c084fc; font-weight:700;"><i class="fa-solid fa-circle-check me-1"></i> Foreclosed on ${formatToIndianDate(loan.foreclosureData.settlementDate)}</span><button class="btn-edit-sm" onclick="openForecloseModal('${loan.id}',true)"><i class="fa-solid fa-pen"></i> Edit Foreclosure</button></div>`;
-                } else if (loan.postMaturitySettlement) {
-                    statusBadge = `<span class="badge-paid">SETTLED</span>`;
-                    actionButtons = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;"><span style="font-size:0.75rem;color:#34d399;font-weight:700;"><i class="fa-solid fa-circle-check me-1"></i> SETTLED · ₹${Number(loan.postMaturitySettlement.actualReceived||0).toLocaleString('en-IN')}</span><button class="btn-edit-sm" onclick="openPostMaturitySettlementEdit('${loan.id}')"><i class="fa-solid fa-pen"></i> Edit Settlement</button></div>`;
-                } else if (pending <= 0) {
-                    statusBadge = `<span class="badge-paid">CLOSED</span>`;
-                    actionButtons = `<span style="font-size:0.75rem; color:#34d399; font-weight:700;"><i class="fa-solid fa-circle-check me-1"></i> Completed</span>`;
-                } else {
-                    statusBadge = `<span style="color:#f87171; font-weight:700; font-size:0.82rem;">Due: ₹${pending.toLocaleString('en-IN')}</span>`;
-                    actionButtons = `
-                        <div>
-                            <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                                <button class="btn-collect-sm" onclick="openCollectModal('${loan.id}')"><i class="fa-solid fa-check"></i> Collect EMI</button>
-                                <button class="btn-collect-sm" style="background:#3730a3;" onclick="openCollectModal('${loan.id}','PARTIAL')"><i class="fa-solid fa-layer-group"></i> Partial / Advance</button>
-                                <button class="btn-foreclose-sm" onclick="openForecloseModal('${loan.id}')"><i class="fa-solid fa-handshake"></i> Foreclose</button>
-                                ${getLoanRecoveryView(loan).overdueDays > 0 ? `<button class="btn-collect-sm" style="background:#92400e;" onclick="openPostMaturitySettlementModal('${loan.id}')"><i class="fa-solid fa-file-signature"></i> Settle After Maturity</button>` : ''}
-                            </div>
-                            <div class="legacy-emi-actions">
-                                <button class="legacy-emi-btn green" onclick="openBulkEmiModal('${loan.id}','ALL')"><i class="fa-solid fa-bolt"></i> Collect All EMIs on Time</button>
-                                <button class="legacy-emi-btn blue" onclick="openBulkEmiModal('${loan.id}','MANUAL')"><i class="fa-solid fa-list-check"></i> Select Due Dates</button>
-                            </div>
-                        </div>
-                    `;
-                }
-
-                let penaltyInfo = penaltyPaid > 0 ? `<span style="color:#fbbf24; font-size:0.72rem; margin-left:5px;">Pen: ₹${penaltyPaid}</span>` : "";
-                let partialInfo = (!loan.foreclosed && !loan.postMaturitySettlement && partialCollected > 0) ? `<div style="font-size:0.72rem; color:#93c5fd; margin-top:4px;"><i class="fa-solid fa-layer-group me-1"></i> Partial collected: <b>₹${partialCollected.toLocaleString('en-IN')}</b> towards EMI #${paidCount + 1} (₹${Math.max(0, prod.emi - partialCollected).toLocaleString('en-IN')} more needed)</div>` : (loan.postMaturitySettlement && partialCollected>0 ? `<div style="font-size:0.72rem;color:#94a3b8;margin-top:4px;"><i class="fa-solid fa-circle-info me-1"></i> Historical partial included in settlement: <b>₹${partialCollected.toLocaleString('en-IN')}</b></div>` : "");
-                const duePenalties = getDuePenalties(loan);
-                const duePenaltyTotal = duePenalties.reduce((s, x) => s + x.amount, 0);
-                let penaltyDueInfo = duePenalties.length ? `<div style="font-size:0.72rem; color:#fbbf24; margin-top:4px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;"><span><i class="fa-solid fa-triangle-exclamation me-1"></i> Total Penalty Due: <b>₹${duePenaltyTotal.toLocaleString('en-IN')}</b> (${duePenalties.length} EMI${duePenalties.length>1?'s':''} pending)</span><button type="button" class="no-print" onclick="openDuePenaltiesListModal('${loan.id}')" style="background:rgba(245,158,11,.15); border:1px solid rgba(245,158,11,.4); color:#fde68a; font-size:.65rem; font-weight:700; padding:2px 7px; border-radius:999px; cursor:pointer;">View / Receive</button></div>` : "";
-
-                card.innerHTML = `
-                    <div class="client-header">
-                        <div>
-                            <span class="loan-badge">${loan.id}</span>
-                            <b style="font-size: 0.95rem; margin-left: 5px; color:#fff;">${loan.name}</b>
-                            <div style="font-size: 0.76rem; color: #94a3b8; margin-top: 2px;">
-                                <i class="fa-solid fa-phone me-1"></i> ${loan.phone}${loan.phone2 ? ` · ${loan.phone2}` : ''} · <span style="color:#60a5fa; font-weight:600;">${prod.name}</span> ${penaltyInfo}
-                            </div>
-                            ${partialInfo}
-                            ${penaltyDueInfo}
-                        </div>
-                        <div style="text-align:right;">
-                            ${statusBadge}
-                            <div style="margin-top:3px;">
-                                <button class="btn-edit-sm" onclick="openEditClientModal('${loan.id}')"><i class="fa-solid fa-pen"></i> Edit</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
-                        <div style="font-size: 0.76rem; color: #94a3b8;">
-                            Paid: <b style="color:#fff;">${paidCount}/${prod.tenure}</b> (₹${paidAmt.toLocaleString('en-IN')})
-                        </div>
-                        ${actionButtons}
-                    </div>
-                `;
+            let filtered=state.loans.filter(l=>recoverySearchMatches(l,rawQuery));
+            if(state.activeFilter!=='ALL')filtered=filtered.filter(l=>l.product===state.activeFilter);
+            if(recoveryStatusFilter!=='ALL')filtered=filtered.filter(l=>recoveryStatusFilter==='DUE'?getRecoveryStatus(l)==='DUE':getRecoveryStatus(l)===recoveryStatusFilter);
+            const countEl=document.getElementById('recovery-filter-count'); if(countEl)countEl.textContent=`Found ${filtered.length} matching ${state.loans.length} loan accounts`;
+            if(!filtered.length){listDiv.innerHTML=`<div class="recovery-search-empty"><i class="fa-solid fa-user-slash big"></i><b>No matching customer</b></div>`;return;}
+            const head=document.createElement('div');head.className='recovery-result-head';head.innerHTML=`<span><i class="fa-solid fa-bolt" style="color:#60a5fa;margin-right:4px;"></i><b>${filtered.length}</b> customer result${filtered.length===1?'':'s'}</span><span>Search is matching the stored profile fields</span>`;listDiv.appendChild(head);
+            filtered.forEach(loan=>{
+                const prod=state.products[loan.product]||{name:'Custom',amount:0,emi:0,tenure:0};
+                const settlementReceived=loan.postMaturitySettlement?Number(loan.postMaturitySettlement.actualReceived||0)+Number(loan.postMaturitySettlement.partialAmountAlreadyCollected||0):0;
+                const paidAmt=loan.payments.reduce((s,p)=>s+(Number(p.amount)||0),0)+settlementReceived,pending=getLoanPending(loan),paidCount=loan.postMaturitySettlement?prod.tenure:loan.payments.length,penaltyPaid=loan.payments.reduce((s,p)=>s+(Number(p.penalty)||0),0),partialCollected=loan.postMaturitySettlement?Number(loan.postMaturitySettlement.partialAmountAlreadyCollected||0):getLoanPartialSum(loan),view=getLoanRecoveryView(loan),status=getRecoveryStatus(loan);
+                const card=document.createElement('div');card.className='client-card recovery-search-card';
+                const statusBadge=loan.foreclosed?`<span class="badge-foreclosed">FORECLOSED</span>`:loan.postMaturitySettlement?`<span class="badge-paid">SETTLED</span>`:pending<=0?`<span class="badge-paid">CLOSED</span>`:`<span style="color:#f87171;font-weight:800;font-size:.82rem;">Due: ₹${pending.toLocaleString('en-IN')}</span>`;
+                const guarantorLine=loan.guarantorName?`<div style="font-size:.72rem;color:#94a3b8;margin-top:4px;"><i class="fa-solid fa-user-group me-1"></i> C/O / Guarantor: <b style="color:#fff;">${financeEsc(loan.guarantorName)}</b>${mfGuarantorContactText(loan)?` · ${financeEsc(mfGuarantorContactText(loan))}`:''}</div>`:'';
+                const extra=`${penaltyPaid>0?`<span style="color:#fbbf24;font-size:.7rem;margin-left:5px;">Penalty paid: ₹${penaltyPaid.toLocaleString('en-IN')}</span>`:''}${partialCollected>0&&!loan.postMaturitySettlement?`<div style="font-size:.7rem;color:#93c5fd;margin-top:4px;">Partial collected: <b>₹${partialCollected.toLocaleString('en-IN')}</b></div>`:''}`;
+                card.innerHTML=`<div class="client-header"><div><span class="loan-badge">${financeEsc(loan.id)}</span><b style="font-size:.95rem;margin-left:5px;color:#fff;">${financeEsc(loan.name)}</b><div style="font-size:.74rem;color:#94a3b8;margin-top:3px;"><i class="fa-solid fa-phone me-1"></i>${financeEsc(mfContactText(loan.phone,loan.phone2))} · <span style="color:#60a5fa;font-weight:700;">${financeEsc(prod.name)}</span>${extra}</div>${guarantorLine}</div><div style="text-align:right;">${statusBadge}<div style="margin-top:4px;"><button class="btn-edit-sm" onclick="openEditClientModal('${recoverySafeId(loan.id)}')"><i class="fa-solid fa-pen"></i> Edit</button></div></div></div><div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid rgba(255,255,255,.06);gap:10px;flex-wrap:wrap;"><div style="font-size:.74rem;color:#94a3b8;">Paid: <b style="color:#fff;">${paidCount}/${prod.tenure}</b> · ₹${paidAmt.toLocaleString('en-IN')} · Status: <b style="color:#cbd5e1;">${status}</b>${view.overdueDays>0?` · <span style="color:#f87171;">${view.overdueDays} days overdue</span>`:''}</div>${recoveryActionButton(loan,view)}</div>`;
                 listDiv.appendChild(card);
             });
         }
@@ -7526,6 +7530,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(!clientId) throw new Error("Enter your Google OAuth Web Client ID first.");
             if(location.protocol==='file:') throw new Error("Direct Google OAuth needs an HTTPS web origin. Host this HTML as a secure web app first.");
             if(!window.google || !google.accounts || !google.accounts.oauth2) throw new Error("Google Identity Services has not loaded yet. Check your internet connection and try again.");
+            // A valid in-memory access token is reused until shortly before expiry.
+            if(!interactive && googleAccessToken && googleTokenExpiresAt && Date.now() < googleTokenExpiresAt-60000) return googleAccessToken;
             if(!googleTokenClient){
                 googleTokenClient=google.accounts.oauth2.initTokenClient({
                     client_id:clientId,
@@ -7534,31 +7540,46 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 });
             }
             return await new Promise((resolve,reject)=>{
-                googleTokenClient.callback=(resp)=>{ if(resp.error) reject(new Error(resp.error)); else {googleAccessToken=resp.access_token;localStorage.setItem("MF_GOOGLE_CLIENT_ID",clientId);resolve(googleAccessToken);} };
-                googleTokenClient.requestAccessToken({prompt:interactive?'consent':''});
+                let settled=false;
+                const finish=(fn,val)=>{if(settled)return;settled=true;fn(val);};
+                googleTokenClient.callback=(resp)=>{
+                    if(resp && resp.error){
+                        googleAccessToken=null;
+                        googleTokenExpiresAt=0;
+                        finish(reject,new Error(resp.error_description||resp.error));
+                    }else if(resp && resp.access_token){
+                        googleAccessToken=resp.access_token;
+                        googleTokenExpiresAt=Date.now()+Math.max(60,Number(resp.expires_in||3600))*1000;
+                        localStorage.setItem("MF_GOOGLE_CLIENT_ID",clientId);
+                        finish(resolve,googleAccessToken);
+                    }else{
+                        finish(reject,new Error('Google did not return an access token.'));
+                    }
+                };
+                try{
+                    // IMPORTANT: background renewal uses prompt=none. Google documents this
+                    // as the no-UI mode. If the existing Google session/grant is unavailable,
+                    // it fails instead of opening an account chooser or verification window.
+                    googleTokenClient.requestAccessToken({prompt:interactive?'consent':'none'});
+                }catch(e){ finish(reject,e); }
             });
         }
 
-        // Background authorization is deliberately silent. It may refresh/re-issue a token
-        // when Google already has a valid grant/session, but it must NEVER open the account
-        // chooser or consent UI merely because another client was saved.
-        let mfGoogleSilentAuthBusy=false;
-        let mfGoogleSilentAuthNextAt=0;
         async function getGoogleTokenSilently(){
-            if(googleAccessToken) return googleAccessToken;
-            const now=Date.now();
-            if(mfGoogleSilentAuthBusy || now < mfGoogleSilentAuthNextAt) return null;
-            mfGoogleSilentAuthBusy=true;
-            mfGoogleSilentAuthNextAt=now+30000;
-            try{
-                return await getGoogleToken(false);
-            }catch(e){
-                return null;
-            }finally{
-                mfGoogleSilentAuthBusy=false;
-            }
+            if(googleAccessToken && googleTokenExpiresAt && Date.now() < googleTokenExpiresAt-60000) return googleAccessToken;
+            if(googleSilentAuthBusy || Date.now()<googleSilentAuthNextAt) return null;
+            googleSilentAuthBusy=true;
+            googleSilentAuthNextAt=Date.now()+60000;
+            try{ return await getGoogleToken(false); }
+            catch(e){ googleAccessToken=null; googleTokenExpiresAt=0; return null; }
+            finally{ googleSilentAuthBusy=false; }
         }
 
+        // Automatic/background Drive access may renew an already-granted Google session only
+        // through prompt=none, which is explicitly no-UI. It can never open the account chooser,
+        // Gmail verification, or consent window while the user is entering/saving client data.
+        // If Google cannot renew silently, local IndexedDB + Firebase remain authoritative and
+        // the status asks for one explicit reconnect.
         async function driveApi(path,options={},interactive=true){
             if(!googleAccessToken){
                 if(interactive) await getGoogleToken(true);
@@ -7568,6 +7589,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             let r=await fetch('https://www.googleapis.com/drive/v3/'+path,Object.assign({},options,{headers}));
             if(r.status===401){
                 googleAccessToken=null;
+                googleTokenExpiresAt=0;
                 if(interactive) await getGoogleToken(true);
                 else if(!await getGoogleTokenSilently()) throw new Error('Google authorization needs a one-time reconnect.');
                 headers=Object.assign({'Authorization':'Bearer '+googleAccessToken},options.headers||{});
@@ -7738,9 +7760,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }
                 if(!googleAccessToken){
                     if(background){
-                        await getGoogleTokenSilently();
-                        if(!googleAccessToken){
-                            updateSecureCloudStatus('🟡 Local save is safe — Google Drive needs a one-time reconnect before automatic backup can resume.',true);
+                        const silent=await getGoogleTokenSilently();
+                        if(!silent){
+                            updateSecureCloudStatus('🟡 Local save is safe — Google Drive could not renew silently. One manual Connect Google Drive is required; no popup was opened automatically.',true);
                             return;
                         }
                     }else{
@@ -7798,9 +7820,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(holdUntil) localStorage.removeItem('MF_RECOVERY_RESTORE_HOLD_UNTIL');
             if(!googleAccessToken){
                 if(background){
-                    await getGoogleTokenSilently();
-                    if(!googleAccessToken){
-                        updateSecureCloudStatus('🟡 Local save is safe — Google Drive needs a one-time reconnect before automatic backup can resume.',true);
+                    const silent=await getGoogleTokenSilently();
+                    if(!silent){
+                        updateSecureCloudStatus('🟡 Local save is safe — Google Drive could not renew silently. One manual Connect Google Drive is required; no popup was opened automatically.',true);
                         return;
                     }
                 }else{
@@ -7835,9 +7857,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 localStorage.setItem('MF_GOOGLE_CLIENT_ID',clientId);
                 await getGoogleToken(true);
                 googleDriveFolderId=null; googleDriveFileId=null;
-                updateSecureCloudStatus('🟢 Google Drive connected. No cloud data was read or changed. Use Sync Now when you want to create/refresh the encrypted backup.');
+                updateSecureCloudStatus('🟢 Google Drive connected. Starting the encrypted automatic backup in the background.');
                 document.getElementById('sync-target-text').innerText='Google Drive Connected';
-                alert('Google Drive connected successfully. No cloud data was read or changed. Your Cloud Encryption PIN is securely persisted on this device.');
+                scheduleAutomaticCloudSync();
+                alert('Google Drive connected successfully. Your Cloud Encryption PIN is securely persisted on this device. Automatic encrypted backup will now run in the background.');
             }catch(err){ alert('Google Drive connection failed: '+err.message); }
         }
         async function restoreLatestFromGoogleDrive(){
@@ -8649,9 +8672,23 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             financeCurrentType=type; const d=getFinanceSnapshot(), area=document.getElementById('finance-detail-content'); let title='', headerHtml='', detailHtml='';
             if(type==='disbursed'){
                 title='Market Disbursed — Capital Given Detail';
-                const rows=d.disbursed.map(x=>{const l=x.loan,p=x.p,paid=l.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((a,z)=>a+(Number(z.principal)||0),0)+(l.foreclosed?(Number(l.foreclosureData?.principalPaid)||0):0); const out=l.foreclosed?0:getLoanPending(l); return `<tr><td><b>${financeEsc(l.name)}</b><br><span class="finance-pill">${financeEsc(l.id)}</span></td><td>${financeEsc(mfContactText(l.phone,l.phone2))}<br>${mfGuarantorContactText(l)?`<span class="finance-pill">G: ${financeEsc(mfGuarantorContactText(l))}</span>`:''}</td><td>${financeEsc(p.name)}</td><td>${x.includeDisb?formatToIndianDate(l.disbursalDate):'-'}</td><td>${x.includeDisb?money(p.amount):'-'}</td><td>${money(paid)}</td><td>${money(out)}</td><td>${l.foreclosed?'FORECLOSED':(l.postMaturitySettlement?'SETTLED':(out<=0?'CLOSED':'ACTIVE'))}</td></tr>`});
+                const rows=d.disbursed.map(x=>{
+                    const l=x.loan,p=x.p;
+                    const paid=l.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((a,z)=>a+(Number(z.principal)||0),0)+(l.foreclosed?(Number(l.foreclosureData?.principalPaid)||0):0);
+                    const out=l.foreclosed?0:getLoanPending(l);
+                    const status=l.foreclosed?'FORECLOSED':(l.postMaturitySettlement?'SETTLED':(out<=0?'CLOSED':'ACTIVE'));
+                    const customerName=financeEsc(l.name||'-');
+                    const guarantorName=financeEsc(l.guarantorName||'');
+                    const customerPhones=financeEsc(mfContactText(l.phone,l.phone2));
+                    const guarantorPhones=financeEsc(mfGuarantorContactText(l)||'-');
+                    const profile=`<div class="finance-profile-cell"><b>${customerName}</b><span class="finance-pill">${financeEsc(l.id)}</span>${guarantorName?`<small>C/O / Guarantor: <b>${guarantorName}</b></small>`:''}</div>`;
+                    const contacts=`<div class="finance-contact-cell"><span><b>Customer:</b> ${customerPhones}</span>${guarantorName?`<span><b>Guarantor:</b> ${guarantorPhones}</span>`:''}</div>`;
+                    const productCell=`<div class="finance-profile-cell"><b>${financeEsc(p.name||'Custom')}</b><small>Loan Amount: ${money(p.amount)}</small></div>`;
+                    const disbCell=x.includeDisb?`<div class="finance-profile-cell"><b>${formatToIndianDate(l.disbursalDate)}</b><small>${financeEsc(mfDisbursalModeLabel(l.disbursalMode))}</small></div>`:`-`;
+                    return [profile,contacts,productCell,disbCell,x.includeDisb?money(p.amount):'-',money(paid),money(out),`<span class="finance-status-pill ${status.toLowerCase()}">${status}</span>`];
+                });
                 headerHtml=financeHeader([['Accounts',d.disbursed.length],['Capital Given',money(d.disbursed.reduce((a,x)=>a+(x.includeDisb?x.p.amount:0),0))],['Principal Recovered',money(d.disbursed.reduce((a,x)=>a+x.loan.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((q,z)=>q+(Number(z.principal)||0),0),0))],['Current Outstanding',money(d.disbursed.reduce((a,x)=>a+(x.loan.foreclosed?0:getLoanPending(x.loan)),0))]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}</div>`;
-                detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Loan-wise Capital Disbursement</b></div>${financeTable(['Customer','Customer / Guarantor Contacts','Product','Disbursed Date','Amount','Principal Recovered','Outstanding','Status'],rows.map(r=>[r[0],mfAllContactText({phone:r[1],phone2:r[2],guarantorPhone:r[3],guarantorPhone2:r[4]}),...r.slice(3)]))}</div>`;
+                detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Loan-wise Capital Disbursement</b><span class="finance-pill">Complete customer profile · all stored contact numbers</span></div>${financeTable(['Customer Profile','All Contact Numbers','Product','Disbursal','Capital Given','Principal Recovered','Outstanding','Status'],rows.map(r=>`<tr>${r.map((cell,i)=>`<td class="${i>=4&&i<=6?'finance-money-cell':''}">${cell}</td>`).join('')}</tr>`))}</div>`;
             } else if(type==='gross'){
                 title='Gross Revenue — Client-wise Revenue Detail';
                 const rows=d.disbursed.map(x=>`<tr><td><b>${financeEsc(x.loan.name)}</b><br><span class="finance-pill">${financeEsc(x.loan.id)}</span></td><td>${financeEsc(x.p.name)}</td><td>${money(x.includeDisb?x.p.fileCharge:0)}</td><td>${money(x.interest)}</td><td>${money(x.preEmiInterest)}</td><td>${money(x.penalty)}</td><td>${money(x.foreclosureFee)}</td><td>${money(x.preClosureInterest)}</td><td>${money(x.postMaturityInterest)}</td><td>${money(x.settlementWaiver||0)}</td><td><b>${money(x.totalProfit)}</b></td></tr>`);
@@ -8776,7 +8813,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const title=document.getElementById('finance-detail-title').innerText, body=document.getElementById('finance-detail-content').innerHTML, period=financePeriodLabel();
             if (!wasSearched) { financeDetailSearched = false; renderFinanceDetail(financeCurrentType); }
             const w=window.open('','_blank'); if(!w){alert('Please allow pop-ups to print the report.');return;}
-            w.document.write(`<html><head><title>${financeEsc(title)}</title><style>body{font-family:Arial,sans-serif;color:#111;padding:22px;font-size:11px}h1{font-size:20px;margin:0 0 5px}h3{margin:18px 0 7px}.finance-detail-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.finance-mini-card{border:1px solid #ddd;padding:8px;border-radius:6px}.finance-mini-card span{display:block;color:#666;font-size:9px}.finance-mini-card b{font-size:13px}.finance-section{margin-top:12px;border:1px solid #ddd;border-radius:6px;overflow:hidden}.finance-section-head{padding:8px;background:#f3f4f6;font-weight:bold}.finance-table{width:100%;border-collapse:collapse;font-size:9px}.finance-table th,.finance-table td{border:1px solid #ddd;padding:5px;text-align:left}.finance-table th{background:#eee}.finance-waterfall{display:grid;gap:5px;padding:8px}.finance-line{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:5px}.finance-line.total{font-weight:bold;background:#f5f5f5}.finance-pill{font-size:8px}.finance-report-note{color:#555;margin:6px 0}.no-print{display:none!important}@media print{body{padding:10px}}
+            const printOrientation=financeCurrentType==='disbursed'?'landscape':'portrait';
+            w.document.write(`<html><head><title>${financeEsc(title)}</title><style>@page{size:A4 ${printOrientation};margin:10mm}body{font-family:Arial,sans-serif;color:#111827;background:#fff;padding:22px;font-size:11px}h1{font-size:20px;margin:0 0 5px;color:#111827}h3{margin:18px 0 7px;color:#111827}.finance-detail-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.finance-mini-card{border:1px solid #d1d5db;padding:8px;border-radius:6px;background:#fff}.finance-mini-card span{display:block;color:#374151;font-size:9px}.finance-mini-card b{font-size:13px;color:#111827}.finance-section{margin-top:12px;border:1px solid #d1d5db;border-radius:6px;overflow:hidden;background:#fff}.finance-section-head{padding:8px;background:#f3f4f6;font-weight:bold;color:#111827}.finance-table{width:100%;border-collapse:collapse;font-size:${financeCurrentType==='disbursed'?'10px':'9px'};color:#111827}.finance-table th,.finance-table td{border:1px solid #cbd5e1;padding:${financeCurrentType==='disbursed'?'6px':'5px'};text-align:left;color:#111827!important;background:#fff}.finance-table th{background:#e5e7eb;color:#111827!important;font-weight:800}.finance-table td *{color:#111827!important}.finance-table .finance-status-pill.active{color:#1d4ed8!important;background:#eff6ff!important;border-color:#93c5fd!important}.finance-table .finance-status-pill.closed,.finance-table .finance-status-pill.settled{color:#166534!important;background:#f0fdf4!important;border-color:#86efac!important}.finance-table .finance-status-pill.foreclosed{color:#6b21a8!important;background:#faf5ff!important;border-color:#d8b4fe!important}.finance-waterfall{display:grid;gap:5px;padding:8px}.finance-line{display:flex;justify-content:space-between;border-bottom:1px solid #e5e7eb;padding:5px;color:#111827}.finance-line.total{font-weight:bold;background:#f5f5f5;color:#111827}.finance-pill{font-size:8px;color:#374151}.finance-report-note{color:#374151;margin:6px 0}.no-print{display:none!important}@media print{body{padding:10px}}
 </style>
 <style id="mf-final-recovery-print-fix">
 /* Final targeted fixes: preserve existing screen UI, improve only collection/report presentation. */
@@ -8815,6 +8853,36 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 @media(max-width:420px){.mf-collection-report-summary{grid-template-columns:1fr;}}
 </style>
 
+<style id="mf-recovery-advanced-search-fix">
+.recovery-search-panel{margin:10px 0 12px;padding:10px 11px;border:1px solid rgba(96,165,250,.25);border-radius:14px;background:linear-gradient(180deg,rgba(15,23,42,.68),rgba(2,6,23,.42));box-shadow:inset 0 1px 0 rgba(255,255,255,.03);}
+.recovery-search-main{display:flex;align-items:center;gap:8px;min-height:46px;padding:0 10px;border:1px solid rgba(56,189,248,.42);border-radius:11px;background:rgba(2,6,23,.72);}
+.recovery-search-main>i{color:#60a5fa;font-size:1rem;}
+.recovery-search-main input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:#fff;font-size:.8rem;font-weight:700;}
+.recovery-search-main input::placeholder{color:#64748b;font-weight:600;}
+.recovery-search-clear{width:30px;height:30px;border:0;border-radius:8px;background:rgba(148,163,184,.09);color:#94a3b8;cursor:pointer;}
+.recovery-search-hint{margin-top:7px;color:#64748b;font-size:.63rem;line-height:1.4;}
+.recovery-search-hint i{color:#a78bfa;margin-right:4px;}
+.recovery-search-empty{padding:30px 18px;text-align:center;color:#64748b;background:var(--bg-card);border-radius:14px;border:1px dashed rgba(96,165,250,.25);}
+.recovery-search-empty .big{font-size:1.8rem;color:#475569;margin-bottom:7px;}
+.recovery-result-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 8px;padding:8px 10px;border-radius:10px;background:rgba(59,130,246,.08);border:1px solid rgba(96,165,250,.16);font-size:.68rem;color:#94a3b8;}
+.recovery-result-head b{color:#dbeafe;}
+.recovery-search-card{border-color:rgba(96,165,250,.34)!important;box-shadow:0 8px 24px rgba(2,6,23,.18);}
+.recovery-search-card .recovery-result-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+@media(max-width:600px){.recovery-search-panel{padding:8px}.recovery-search-main{min-height:50px}.recovery-search-hint{font-size:.61rem}.recovery-search-card .recovery-result-actions{justify-content:flex-start;width:100%;}}
+</style>
+<style id="mf-finance-disbursed-profile-fix">
+.finance-profile-cell{display:flex;flex-direction:column;gap:3px;min-width:150px;line-height:1.2;}
+.finance-profile-cell>b{color:#fff;font-weight:800;}
+.finance-profile-cell>small{color:#94a3b8;font-size:.66rem;line-height:1.25;}
+.finance-contact-cell{display:flex;flex-direction:column;gap:4px;min-width:170px;color:#cbd5e1;font-size:.7rem;line-height:1.3;}
+.finance-contact-cell span{display:block;overflow-wrap:anywhere;}
+.finance-money-cell{white-space:nowrap;font-weight:700;}
+.finance-status-pill{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;word-break:normal;overflow-wrap:normal;padding:4px 8px;border-radius:999px;font-size:.62rem;font-weight:900;letter-spacing:.02em;border:1px solid rgba(148,163,184,.25);}
+.finance-status-pill.active{color:#93c5fd;background:rgba(59,130,246,.12);border-color:rgba(96,165,250,.35);}
+.finance-status-pill.closed,.finance-status-pill.settled{color:#86efac;background:rgba(16,185,129,.10);border-color:rgba(52,211,153,.3);}
+.finance-status-pill.foreclosed{color:#d8b4fe;background:rgba(168,85,247,.12);border-color:rgba(192,132,252,.35);}
+@media(max-width:700px){.finance-profile-cell{min-width:130px}.finance-contact-cell{min-width:150px}.finance-table{min-width:1050px;}}
+</style>
 <style id="mf-company-profile-alignment-final">
 .company-address-input{resize:vertical;min-height:64px;line-height:1.35;box-sizing:border-box;}
 .mf-print-company-header{width:100%;max-width:100%;overflow-wrap:anywhere;}
@@ -8842,22 +8910,35 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
 <script>
 window.addEventListener('online',()=>{
-    updateSecureCloudStatus('🟢 Internet restored — checking cloud sync.',false);
-    if(googleAccessToken || (localStorage.getItem('MF_GOOGLE_CLIENT_ID') && getCloudPin())) reconcileGoogleDrive(true).catch(()=>{});
+    updateSecureCloudStatus('🟢 Internet restored — checking encrypted cloud backup.',false);
+    if((localStorage.getItem('MF_GOOGLE_CLIENT_ID')||document.getElementById('google-client-id')?.value) && getCloudPin()) reconcileGoogleDrive(true).catch(()=>{});
 });
 window.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState==='visible' && navigator.onLine && (googleAccessToken || (localStorage.getItem('MF_GOOGLE_CLIENT_ID') && getCloudPin()))) reconcileGoogleDrive(true).catch(()=>{});
+    if(document.visibilityState==='visible' && navigator.onLine && (localStorage.getItem('MF_GOOGLE_CLIENT_ID')||document.getElementById('google-client-id')?.value) && getCloudPin()) reconcileGoogleDrive(true).catch(()=>{});
 });
 let mfCloudPollBusy=false;
 setInterval(()=>{
-    if(!document.hidden && navigator.onLine && (googleAccessToken || (localStorage.getItem('MF_GOOGLE_CLIENT_ID') && getCloudPin())) && !mfCloudPollBusy){
+    const hasClient=!!(localStorage.getItem('MF_GOOGLE_CLIENT_ID')||document.getElementById('google-client-id')?.value);
+    if(!document.hidden && navigator.onLine && hasClient && getCloudPin() && !mfCloudPollBusy){
         mfCloudPollBusy=true;
         reconcileGoogleDrive(true).catch(()=>{}).finally(()=>{mfCloudPollBusy=false;});
     }
-},10000);
+},60000);
 window.addEventListener('load',()=>{ initializeSecureStorage(); });
 </script>
 
+<script id="mf-password-manager-hardening-final-js">
+(function(){
+  function hardenSecretFields(){
+    document.querySelectorAll('input[data-mf-secret="1"]').forEach(function(el){
+      el.setAttribute('type','text');el.setAttribute('autocomplete','off');el.setAttribute('data-lpignore','true');el.setAttribute('data-1p-ignore','true');el.setAttribute('data-bwignore','true');el.setAttribute('spellcheck','false');el.style.webkitTextSecurity='disc';el.style.textSecurity='disc';
+    });
+  }
+  function markSecretFields(){['mf-auth-key','cloud-encryption-pin','applock-new-pin','applock-confirm-pin','app-lock-input'].forEach(function(id){var el=document.getElementById(id);if(el)el.setAttribute('data-mf-secret','1');});hardenSecretFields();}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',markSecretFields);else markSecretFields();
+  new MutationObserver(markSecretFields).observe(document.body,{childList:true,subtree:true});
+})();
+</script>
 <script id="mf-pay-lender-modal-final-js">
 (function(){
   function normalizePayLenderModal(){
@@ -8909,7 +8990,7 @@ window.addEventListener('load',()=>{ initializeSecureStorage(); });
     <i class="fa-solid fa-shield-halved" style="font-size:2.4rem;color:#34d399;margin-bottom:14px;"></i>
     <div style="font-size:1.05rem;font-weight:800;color:#fff;margin-bottom:4px;" id="app-lock-title">Enter PIN to Continue</div>
     <div style="font-size:.74rem;color:#94a3b8;margin-bottom:18px;">This device has an App Lock PIN set for this business data.</div>
-    <input type="password" id="app-lock-input" inputmode="numeric" maxlength="8" placeholder="• • • •" autocomplete="off" style="width:200px;text-align:center;letter-spacing:6px;font-size:1.3rem;padding:12px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#fff;" autocomplete="new-password">
+    <input type="text" id="app-lock-input" inputmode="numeric" maxlength="8" placeholder="• • • •" autocomplete="off" style="width:200px;text-align:center;letter-spacing:6px;font-size:1.3rem;padding:12px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#fff;" autocomplete="new-password">
     <div id="app-lock-error" style="color:#f87171;font-size:.72rem;margin-top:8px;min-height:16px;"></div>
     <button type="button" onclick="attemptAppUnlock()" style="margin-top:14px;background:#16a34a;color:#fff;border:none;padding:11px 28px;border-radius:10px;font-weight:800;font-size:.85rem;cursor:pointer;">Unlock</button>
     <div style="margin-top:16px;font-size:.72rem;color:#60a5fa;cursor:pointer;text-decoration:underline;" onclick="startForgotPinFlow()">Forgot PIN?</div>
