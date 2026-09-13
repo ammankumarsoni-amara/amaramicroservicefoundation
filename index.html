@@ -3391,12 +3391,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             // backup scheduler use it. With App Lock enabled, the PIN is restored after unlock.
             await restoreSavedCloudPin();
             try{ if(getCloudPin()) scheduleAutomaticCloudSync(); }catch(e){}
-            // After a refresh/reopen, the access token is intentionally gone from memory.
-            // A no-UI renewal is attempted only if the device already has Google Drive setup.
-            try{
-                const configured=!!(localStorage.getItem('MF_GOOGLE_CLIENT_ID')||document.getElementById('google-client-id')?.value);
-                if(configured && getCloudPin() && navigator.onLine){ setTimeout(()=>reconcileGoogleDrive(true).catch(()=>{}),1500); }
-            }catch(e){}
+            // After a refresh/reopen the browser access token is intentionally gone from memory.
+            // Do not start any OAuth or remote reconciliation automatically. Local IndexedDB and
+            // Firebase remain available; Google Drive resumes background upload after one explicit
+            // Connect Google Drive action establishes a fresh session for this page.
+            try{ if(getCloudPin()) scheduleAutomaticCloudSync(); }catch(e){}
             const inp = document.getElementById('app-lock-input');
             if (inp) inp.addEventListener('keyup', e => { if (e.key === 'Enter') attemptAppUnlock(); });
         });
@@ -3544,7 +3543,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 .mf-print-page .loan-badge{background:#eef2ff!important;color:#1e40af!important;border:1px solid #93a7e8!important;padding:3px 8px;border-radius:7px;font-weight:800;}
                 .mf-print-page .finance-pill{background:#f1f5f9!important;color:#334155!important;border:1px solid #cbd5e1!important;}
                 @media print{body{width:auto;} .mf-print-page{max-width:none;} a{color:#111;text-decoration:none;} .upcoming-emi-table{font-size:8pt;} .priority-print-table{font-size:8pt;}}
-            </style></head><body><main class="mf-print-page">${content}</main></body></html>`);
+            </style></head><body><main class="mf-print-page">${content}</main><!-- PRODUCTION-V10-GOOGLE-NO-AUTO-OAUTH-POPUP-STABLE-BACKGROUND-BACKUP-PIN-SELFTEST-WEEKLY-EMI-PRESERVED -->
+</body></html>`);
             w.document.close();
             return w;
         }
@@ -7591,13 +7591,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         async function getGoogleTokenSilently(){
+            // HARD RULE: background code must never call Google OAuth. It may reuse only
+            // an access token that is already alive in this page session. This guarantees
+            // that saving a client/collection can never launch an account chooser, consent
+            // window, or verification popup. A genuinely expired token requires one explicit
+            // Connect Google Drive action by the user.
             if(googleAccessToken && googleTokenExpiresAt && Date.now() < googleTokenExpiresAt-60000) return googleAccessToken;
-            if(googleSilentAuthBusy || Date.now()<googleSilentAuthNextAt) return null;
-            googleSilentAuthBusy=true;
-            googleSilentAuthNextAt=Date.now()+60000;
-            try{ return await getGoogleToken(false); }
-            catch(e){ googleAccessToken=null; googleTokenExpiresAt=0; return null; }
-            finally{ googleSilentAuthBusy=false; }
+            googleAccessToken=null; googleTokenExpiresAt=0;
+            return null;
         }
 
         // Automatic/background Drive access may renew an already-granted Google session only
@@ -7608,7 +7609,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         async function driveApi(path,options={},interactive=true){
             if(!googleAccessToken){
                 if(interactive) await getGoogleToken(true);
-                else if(!await getGoogleTokenSilently()) throw new Error('Google authorization needs a one-time reconnect.');
+                else throw new Error('Google Drive authorization needs a one-time manual reconnect.');
             }
             let headers=Object.assign({'Authorization':'Bearer '+googleAccessToken},options.headers||{});
             let r=await fetch('https://www.googleapis.com/drive/v3/'+path,Object.assign({},options,{headers}));
@@ -7616,7 +7617,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 googleAccessToken=null;
                 googleTokenExpiresAt=0;
                 if(interactive) await getGoogleToken(true);
-                else if(!await getGoogleTokenSilently()) throw new Error('Google authorization needs a one-time reconnect.');
+                else throw new Error('Google Drive authorization expired; one manual reconnect is required.');
                 headers=Object.assign({'Authorization':'Bearer '+googleAccessToken},options.headers||{});
                 r=await fetch('https://www.googleapis.com/drive/v3/'+path,Object.assign({},options,{headers}));
             }
@@ -7676,6 +7677,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             try{
                 const ok=await persistCloudPinWrapped(pin);
                 if(!ok) throw new Error('Secure device storage unavailable.');
+                // Verify the exact cloud-encryption path before declaring the PIN active.
+                // This catches a bad/blank PIN before any Drive upload is attempted.
+                const probeSalt=crypto.getRandomValues(new Uint8Array(16));
+                const probeIv=crypto.getRandomValues(new Uint8Array(12));
+                const probeKey=await deriveCloudKey(pin,probeSalt);
+                const probeText=new TextEncoder().encode('MF-CLOUD-PIN-VERIFY');
+                const probeCt=await crypto.subtle.encrypt({name:'AES-GCM',iv:probeIv},probeKey,probeText);
+                const probePlain=await crypto.subtle.decrypt({name:'AES-GCM',iv:probeIv},probeKey,probeCt);
+                if(new TextDecoder().decode(probePlain)!=='MF-CLOUD-PIN-VERIFY') throw new Error('Cloud encryption self-test failed.');
             }catch(e){
                 mfCloudPinMemory='';
                 if(cb) cb.checked=false;
@@ -7785,11 +7795,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }
                 if(!googleAccessToken){
                     if(background){
-                        const silent=await getGoogleTokenSilently();
-                        if(!silent){
-                            updateSecureCloudStatus('🟡 Local save is safe — Google Drive could not renew silently. One manual Connect Google Drive is required; no popup was opened automatically.',true);
-                            return;
-                        }
+                        updateSecureCloudStatus('🟡 Local save is safe — Google Drive authorization needs one manual reconnect. No Google popup was opened automatically.',true);
+                        return false;
                     }else{
                         await getGoogleToken(true);
                     }
@@ -7872,6 +7879,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(localUpdated > remoteUpdated + 2000 || dirty){ await syncNowToGoogleDrive(background); return; }
             markCloudSynced(); updateSecureCloudStatus('🟢 Google Drive and this device are up to date.');
         }
+        async function verifyGoogleDriveConnectionForUser(){
+            if(!googleAccessToken) throw new Error('Google Drive is not connected in this page session. Click Connect Google Drive once.');
+            const folder=await ensureDriveFolder(true);
+            const q=encodeURIComponent("name='Current Database.mfbackup.json' and trashed=false and '"+folder+"' in parents");
+            const r=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=10',{},true);
+            if(!r.ok) throw new Error('Google Drive verification failed.');
+            return folder;
+        }
+
         async function connectGoogleDrive(){
             try{
                 const clientId=(document.getElementById('google-client-id').value||'').trim();
@@ -7887,7 +7903,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // Verify the token against the actual Drive API before reporting success.
                 // This prevents a false "connected" message when OAuth succeeded but Drive
                 // access itself is not usable. The folder is app-owned under drive.file scope.
-                await ensureDriveFolder(true);
+                await verifyGoogleDriveConnectionForUser();
                 document.getElementById('sync-target-text').innerText='Google Drive Connected';
                 const backedUp=await syncNowToGoogleDrive(false);
                 if(!backedUp) throw new Error('Google authorization succeeded, but the Drive backup could not be verified. Your local data was not changed.');
@@ -7900,8 +7916,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             try{
                 const pin=getCloudPin(); if(!pin) return alert('Enter the Cloud Encryption PIN before restoring a Google Drive backup.');
                 if(!googleAccessToken){
-                    try{ await getGoogleToken(false); }
-                    catch(e){ await getGoogleToken(true); }
+                    await getGoogleToken(true);
                 }
                 const {files}=await driveListCurrent();
                 if(!files.length) return alert('No encrypted cloud database backup found in Google Drive.');
@@ -7948,8 +7963,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const pin=getCloudPin();
                 if(!pin) return alert('Enter the Cloud Encryption PIN before viewing Google Drive timestamped restore points.');
                 if(!googleAccessToken){
-                    try{ await getGoogleToken(false); }
-                    catch(e){ await getGoogleToken(true); }
+                    await getGoogleToken(true);
                 }
                 const {files}=await listDriveTimestampedRestorePoints();
                 closeDriveRestorePointPicker();
@@ -8941,22 +8955,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         populateSalaryMonthOptions();
     </script>
 
-<script>
+<script id="mf-stable-cloud-lifecycle-v10">
+// Stable cloud lifecycle: local IndexedDB + Firebase remain automatic. Google Drive
+// background uploads run only when an already-valid OAuth token exists in this page.
+// No timer, visibility event, or online event is allowed to initiate OAuth or remote
+// reconciliation. This prevents popup loops and UI/network hangs.
 window.addEventListener('online',()=>{
-    updateSecureCloudStatus('🟢 Internet restored — checking encrypted cloud backup.',false);
-    if((localStorage.getItem('MF_GOOGLE_CLIENT_ID')||document.getElementById('google-client-id')?.value) && getCloudPin()) reconcileGoogleDrive(true).catch(()=>{});
+    updateSecureCloudStatus('🟢 Internet restored — local/Firebase sync resumed. Google Drive will back up automatically when its current authorization is available.',false);
+    try{ scheduleAutomaticCloudSync(); }catch(e){}
 });
-window.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState==='visible' && navigator.onLine && (localStorage.getItem('MF_GOOGLE_CLIENT_ID')||document.getElementById('google-client-id')?.value) && getCloudPin()) reconcileGoogleDrive(true).catch(()=>{});
-});
-let mfCloudPollBusy=false;
-setInterval(()=>{
-    const hasClient=!!(localStorage.getItem('MF_GOOGLE_CLIENT_ID')||document.getElementById('google-client-id')?.value);
-    if(!document.hidden && navigator.onLine && hasClient && getCloudPin() && !mfCloudPollBusy){
-        mfCloudPollBusy=true;
-        reconcileGoogleDrive(true).catch(()=>{}).finally(()=>{mfCloudPollBusy=false;});
-    }
-},60000);
 window.addEventListener('load',()=>{ initializeSecureStorage(); });
 </script>
 
