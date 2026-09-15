@@ -3100,6 +3100,36 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             Object.entries(state.products||{}).forEach(([k,v],i)=>out.push({type:'products',id:mfStructuredStableId('products',v,k,i),data:v}));
             return out;
         }
+        async function mfStructuredRecordsAsync(){
+            const out=[];
+            const yieldUi=()=>new Promise(resolve=>setTimeout(resolve,0));
+            let work=0;
+            const addArray=async(type,arr)=>{
+                for(let i=0;i<(Array.isArray(arr)?arr:[]).length;i++){
+                    const item=arr[i];out.push({type,id:mfStructuredStableId(type,item,null,i),data:item});
+                    if(++work%50===0)await yieldUi();
+                }
+            };
+            const loans=Array.isArray(state.loans)?state.loans:[];
+            for(let i=0;i<loans.length;i++){
+                const loan=loans[i];
+                const copy=(typeof structuredClone==='function')?structuredClone(loan):JSON.parse(JSON.stringify(loan));
+                const repayments=Array.isArray(copy.repayments)?copy.repayments:[];
+                delete copy.repayments;
+                out.push({type:'loans',id:mfStructuredStableId('loans',copy,null,i),data:copy});
+                for(let j=0;j<repayments.length;j++){
+                    const payment=repayments[j];out.push({type:'payments',id:mfStructuredPaymentId(copy.id,payment,j),data:{loanId:copy.id||'',index:j,payment}});
+                    if(++work%50===0)await yieldUi();
+                }
+                if(++work%25===0){setFirebaseStatus('🟢 Firebase connected — preparing structured storage ('+(i+1)+' / '+loans.length+' loans)…');await yieldUi();}
+            }
+            await addArray('borrowings',state.borrowings);
+            await addArray('staff',state.staff);
+            await addArray('expenses',state.expenses);
+            const products=Object.entries(state.products||{});
+            for(let i=0;i<products.length;i++){const [k,v]=products[i];out.push({type:'products',id:mfStructuredStableId('products',v,k,i),data:v});if(++work%50===0)await yieldUi();}
+            return out;
+        }
         function mfStructuredSettings(){
             return {
                 bizName:state.bizName||'', companyProfile:state.companyProfile||{},
@@ -3185,6 +3215,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         async function mfTryEnableStructuredSync(showAlerts){
             if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return false;
             try{
+                // Never let the initial structured-cloud preparation monopolize the browser UI.
+                // Give Chrome a chance to paint/respond before any large local-state scan.
+                await new Promise(resolve => setTimeout(resolve, 0));
+                setFirebaseStatus('🟢 Firebase connected — preparing scalable structured storage…');
                 const metaSnap=await mfStructuredMetaRef().get();
                 if(metaSnap.exists){const meta=metaSnap.data()||{};if(meta.ownerUid&&meta.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: structured business belongs to another account.');mfStructuredSyncEnabled=true;localStorage.setItem(MF_STRUCTURED_MODE_KEY,'structured');return true;}
                 const legacy=await mfSecureFirebaseDoc().get();
@@ -3192,12 +3226,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     const ld=legacy.data()||{};if(ld.ownerUid&&ld.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: cloud business belongs to another account.');
                     const incoming=JSON.parse(ld.payload||'null');if(!incoming||!Array.isArray(incoming.loans))throw new Error('Legacy cloud payload failed validation.');
                     let useCloud=true;if(showAlerts)useCloud=confirm('Existing secure Firebase data was found.\n\nOK = migrate the existing Firebase data into the new scalable structured database.\nCancel = keep THIS device data and make it the new structured cloud baseline.');
-                    if(useCloud){state=incoming;normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();await idbPutSnapshot();await mfStructuredWriteBatch(mfStructuredRecords(),[]);await mfStructuredSetMeta(Number(ld.version||1),mfLocalStateFingerprint());}
-                    else{await mfStructuredWriteBatch(mfStructuredRecords(),[]);await mfStructuredSetMeta(1,mfLocalStateFingerprint());}
+                    if(useCloud){state=incoming;normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();await idbPutSnapshot();await mfStructuredWriteBatch(await mfStructuredRecordsAsync(),[]);await mfStructuredSetMeta(Number(ld.version||1),mfLocalStateFingerprint());}
+                    else{await mfStructuredWriteBatch(await mfStructuredRecordsAsync(),[]);await mfStructuredSetMeta(1,mfLocalStateFingerprint());}
                     mfStructuredSyncEnabled=true;localStorage.setItem(MF_STRUCTURED_MODE_KEY,'structured');
                     if(showAlerts)mfShowTransientNotice('🟢 Scalable structured Firebase database is ready.');return true;
                 }
-                await mfStructuredWriteBatch(mfStructuredRecords(),[]);await mfStructuredSetMeta(1,mfLocalStateFingerprint());mfStructuredSyncEnabled=true;localStorage.setItem(MF_STRUCTURED_MODE_KEY,'structured');return true;
+                await mfStructuredWriteBatch(await mfStructuredRecordsAsync(),[]);await mfStructuredSetMeta(1,mfLocalStateFingerprint());mfStructuredSyncEnabled=true;localStorage.setItem(MF_STRUCTURED_MODE_KEY,'structured');return true;
             }catch(e){
                 console.error('Structured Firestore initialization failed:',e);
                 mfStructuredSyncEnabled=false;
@@ -3214,7 +3248,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         async function mfStructuredPushState(silent){
             if(mfStructuredBusy)return;mfStructuredBusy=true;
             try{
-                const old=await mfStructuredHashes(),next={},records=mfStructuredRecords(),changed=[],currentKeys=new Set();
+                const old=await mfStructuredHashes(),next={},records=await mfStructuredRecordsAsync(),changed=[],currentKeys=new Set();
                 for(const r of records){const k=r.type+'/'+r.id;currentKeys.add(k);const h=mfStructuredHash(r.data);next[k]=h;if(old[k]!==h)changed.push(r);}
                 const deletes=Object.keys(old).filter(k=>!currentKeys.has(k)).map(k=>{const a=k.split('/');return{type:a[0],id:a.slice(1).join('/')};});
                 if(changed.length||deletes.length)await mfStructuredWriteBatch(changed,deletes);
@@ -3226,7 +3260,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         async function mfStructuredPullState(showConfirm){
             if(showConfirm&&!confirm('This will replace the data on THIS device with the latest structured cloud data. Continue?'))return;
-            try{const x=await mfStructuredReadAll();if(!x.state||!Array.isArray(x.state.loans))throw new Error('Structured cloud data failed integrity validation.');const keepActive=state.activeFilter;state={...state,...x.state,activeFilter:keepActive};normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();const v=Number(x.meta?.version||0);mfSetKnownCloudVersion(v);await mfSaveStructuredHashes(Object.fromEntries(mfStructuredRecords().map(r=>[r.type+'/'+r.id,mfStructuredHash(r.data)])));await idbPutSnapshot();renderAll();setFirebaseStatus('🟢 Loaded latest structured cloud data — '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));}
+            try{const x=await mfStructuredReadAll();if(!x.state||!Array.isArray(x.state.loans))throw new Error('Structured cloud data failed integrity validation.');const keepActive=state.activeFilter;state={...state,...x.state,activeFilter:keepActive};normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();const v=Number(x.meta?.version||0);mfSetKnownCloudVersion(v);const pulledRecords=await mfStructuredRecordsAsync();await mfSaveStructuredHashes(Object.fromEntries(pulledRecords.map(r=>[r.type+'/'+r.id,mfStructuredHash(r.data)])));await idbPutSnapshot();renderAll();setFirebaseStatus('🟢 Loaded latest structured cloud data — '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));}
             catch(e){console.error(e);setFirebaseStatus(mfFirebaseErrorLabel(e,'Structured Secure Pull'),true);}
         }
         function mfStructuredStartListener(){
@@ -3248,9 +3282,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     if(cv>lv){let pull=true;if(localDirty&&showAlerts)pull=confirm('Structured Firebase has a newer cloud version.\n\nOK = load the latest cloud data onto THIS device.\nCancel = keep THIS device data and upload it as the new structured cloud version.');if(pull)await mfStructuredPullState(false);else await mfStructuredPushState(true);}
                     else if(cv<lv||cv===0)await mfStructuredPushState(true);else setFirebaseStatus('🟢 Structured Firebase is up to date.',false);return;
                 }
-                // Structured sync is the production path. Never mask a structured failure
-                // by silently switching the user back to the legacy whole-state document.
-                setFirebaseStatus('⚠️ Structured Firebase sync could not be enabled. See the exact error above.',true);
+                // Structured sync is the production path. The initializer already surfaced the
+                // exact actionable error; do not overwrite it with a generic message.
+                return;
             }catch(e){console.error(e);setFirebaseStatus(mfFirebaseErrorLabel(e,'Firebase connection check'),true);}
         }
         // ================== END SCALABLE STRUCTURED FIRESTORE SYNC ==================
