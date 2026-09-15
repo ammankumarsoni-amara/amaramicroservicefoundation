@@ -3137,45 +3137,44 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             return out;
         }
         async function mfStructuredWriteStateInChunks(){
-            // Initial migration/baseline writer: bounded chunks plus UI yields.
+            // Initial baseline writer: one Firestore write at a time with an explicit UI yield.
+            // This avoids large WriteBatch serialization/commit bursts during first setup.
             const yieldUi=()=>new Promise(resolve=>setTimeout(resolve,0));
-            const chunk=[];
-            // Keep initial Firestore commits deliberately small. A large batch can make
-            // the browser spend too long serializing one commit, which is unnecessary
-            // for a small business dataset and can trigger Chrome's Page Unresponsive UI.
-            const CHUNK_SIZE=20; let total=0;
-            const flush=async()=>{
-                if(!chunk.length)return;
-                const part=chunk.splice(0,chunk.length);
-                await mfStructuredWriteBatch(part,[]);
-                total+=part.length;
-                setFirebaseStatus('🟢 Firebase connected — structured storage synced ('+total+' records)…');
+            const writeOne=async(r,totalDone,totalExpected)=>{
+                const safe=mfStructuredSafeRecord(r.data);
+                const ref=mfStructuredCollection(r.type).doc(r.id);
+                await ref.set({...safe,_ownerUid:mfFirebaseUser.uid,_updatedAt:firebase.firestore.FieldValue.serverTimestamp(),_device:mfFirebaseDeviceId},{merge:true});
+                const n=totalDone+1;
+                setFirebaseStatus('🟢 Firebase connected — structured storage synced ('+n+' records)…');
                 await yieldUi();
+                return n;
             };
-            let workSinceYield=0;
-            const push=async(r)=>{
-                chunk.push(r); workSinceYield++;
-                if(chunk.length>=CHUNK_SIZE){await flush();workSinceYield=0;}
-                else if(workSinceYield>=20){workSinceYield=0;await yieldUi();}
-            };
+            let total=0;
             const loans=Array.isArray(state.loans)?state.loans:[];
+            const loanCount=loans.length;
+            setFirebaseStatus('🟢 Firebase connected — preparing structured storage (0 / '+loanCount+' loans)…');
+            await yieldUi();
             for(let i=0;i<loans.length;i++){
                 await yieldUi();
                 const loan=loans[i];
                 const copy=(typeof structuredClone==='function')?structuredClone(loan):JSON.parse(JSON.stringify(loan));
                 const repayments=Array.isArray(copy.repayments)?copy.repayments:[];
                 delete copy.repayments;
-                await push({type:'loans',id:mfStructuredStableId('loans',copy,null,i),data:copy});
+                total=await writeOne({type:'loans',id:mfStructuredStableId('loans',copy,null,i),data:copy},total,0);
                 for(let j=0;j<repayments.length;j++){
                     const payment=repayments[j];
-                    await push({type:'payments',id:mfStructuredPaymentId(copy.id,payment,j),data:{loanId:copy.id||'',index:j,payment}});
+                    total=await writeOne({type:'payments',id:mfStructuredPaymentId(copy.id,payment,j),data:{loanId:copy.id||'',index:j,payment}},total,0);
+                    if(j%5===4)await yieldUi();
                 }
-                setFirebaseStatus('🟢 Firebase connected — preparing structured storage ('+(i+1)+' / '+loans.length+' loans)…');
+                setFirebaseStatus('🟢 Firebase connected — structured storage: '+(i+1)+' / '+loanCount+' loans processed ('+total+' records)…');
                 await yieldUi();
             }
             const addArray=async(type,arr)=>{
                 const list=Array.isArray(arr)?arr:[];
-                for(let i=0;i<list.length;i++)await push({type,id:mfStructuredStableId(type,list[i],null,i),data:list[i]});
+                for(let i=0;i<list.length;i++){
+                    total=await writeOne({type,id:mfStructuredStableId(type,list[i],null,i),data:list[i]},total,0);
+                    if(i%5===4)await yieldUi();
+                }
             };
             await addArray('borrowings',state.borrowings);
             await addArray('staff',state.staff);
@@ -3183,9 +3182,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const products=Object.entries(state.products||{});
             for(let i=0;i<products.length;i++){
                 const [k,v]=products[i];
-                await push({type:'products',id:mfStructuredStableId('products',v,k,i),data:v});
+                total=await writeOne({type:'products',id:mfStructuredStableId('products',v,k,i),data:v},total,0);
+                if(i%5===4)await yieldUi();
             }
-            await flush();
+            setFirebaseStatus('🟢 Firebase connected — structured storage synced ('+total+' records)…');
+            await yieldUi();
         }
         function mfStructuredSettings(){
             return {
