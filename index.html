@@ -3139,7 +3139,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         async function mfStructuredWriteStateInChunks(){
             // Initial migration/baseline writer: bounded chunks plus UI yields.
             const yieldUi=()=>new Promise(resolve=>setTimeout(resolve,0));
-            const chunk=[]; const CHUNK_SIZE=100; let total=0;
+            const chunk=[];
+            // Keep initial Firestore commits deliberately small. A large batch can make
+            // the browser spend too long serializing one commit, which is unnecessary
+            // for a small business dataset and can trigger Chrome's Page Unresponsive UI.
+            const CHUNK_SIZE=20; let total=0;
             const flush=async()=>{
                 if(!chunk.length)return;
                 const part=chunk.splice(0,chunk.length);
