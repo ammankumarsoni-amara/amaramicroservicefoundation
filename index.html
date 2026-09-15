@@ -3102,11 +3102,44 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             };
         }
         function mfStructuredHash(v){ try{return JSON.stringify(v);}catch(e){return String(v);} }
+        // Firestore rejects undefined values. The legacy app state can legitimately contain
+        // optional/undefined fields, so normalize the structured payload before every write.
+        // This is deliberately isolated to the cloud serialization layer and does not mutate
+        // the application's live state or any financial calculation.
+        function mfFirestoreSafeValue(value, seen){
+            if(value===undefined)return undefined;
+            if(value===null)return null;
+            if(value instanceof Date)return value.toISOString();
+            const stack=seen||new WeakSet();
+            if(typeof value==='object'){
+                if(stack.has(value))return null;
+                stack.add(value);
+                if(Array.isArray(value)){
+                    const arr=value.map(v=>{const x=mfFirestoreSafeValue(v,stack);return x===undefined?null:x;});
+                    stack.delete(value);return arr;
+                }
+                const out={};
+                Object.keys(value).forEach(k=>{
+                    const x=mfFirestoreSafeValue(value[k],stack);
+                    if(x!==undefined)out[k]=x;
+                });
+                stack.delete(value);return out;
+            }
+            if(typeof value==='function'||typeof value==='symbol')return undefined;
+            if(typeof value==='number'&&!Number.isFinite(value))return null;
+            return value;
+        }
+        function mfStructuredSafeRecord(data){
+            const safe=mfFirestoreSafeValue(data);
+            if(!safe||typeof safe!=='object'||Array.isArray(safe))throw new Error('Structured cloud payload is not a valid object.');
+            return safe;
+        }
         async function mfStructuredWriteBatch(records,deletes){
             let batch=mfFirestoreDb.batch(), count=0;
             const flush=async()=>{if(!count)return;await batch.commit();batch=mfFirestoreDb.batch();count=0;};
             for(const r of records){
-                batch.set(mfStructuredRoot().collection(r.type).doc(r.id),{...r.data,_ownerUid:mfFirebaseUser.uid,_updatedAt:firebase.firestore.FieldValue.serverTimestamp(),_device:mfFirebaseDeviceId},{merge:true});
+                const safe=mfStructuredSafeRecord(r.data);
+                batch.set(mfStructuredRoot().collection(r.type).doc(r.id),{...safe,_ownerUid:mfFirebaseUser.uid,_updatedAt:firebase.firestore.FieldValue.serverTimestamp(),_device:mfFirebaseDeviceId},{merge:true});
                 if(++count>=450)await flush();
             }
             for(const d of deletes){
@@ -3116,7 +3149,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             await flush();
         }
         async function mfStructuredSetMeta(version,fingerprint){
-            await mfStructuredMetaRef().set({schemaVersion:'MF-STRUCTURED-2',ownerUid:mfFirebaseUser.uid,version:Number(version)||1,stateFingerprint:fingerprint,updatedByDevice:mfFirebaseDeviceId,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAtLabel:new Date().toLocaleString('en-IN'),settings:mfStructuredSettings()},{merge:true});
+            const settings=mfStructuredSafeRecord(mfStructuredSettings());
+            await mfStructuredMetaRef().set({schemaVersion:'MF-STRUCTURED-2',ownerUid:mfFirebaseUser.uid,version:Number(version)||1,stateFingerprint:String(fingerprint||''),updatedByDevice:mfFirebaseDeviceId,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAtLabel:new Date().toLocaleString('en-IN'),settings},{merge:true});
         }
         async function mfStructuredReadAll(){
             const types=['loans','payments','borrowings','staff','expenses','products'];
@@ -3158,7 +3192,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     if(showAlerts)mfShowTransientNotice('🟢 Scalable structured Firebase database is ready.');return true;
                 }
                 await mfStructuredWriteBatch(mfStructuredRecords(),[]);await mfStructuredSetMeta(1,mfLocalStateFingerprint());mfStructuredSyncEnabled=true;localStorage.setItem(MF_STRUCTURED_MODE_KEY,'structured');return true;
-            }catch(e){console.warn('Structured Firestore mode unavailable; keeping legacy sync:',e);mfStructuredSyncEnabled=false;localStorage.setItem(MF_STRUCTURED_MODE_KEY,'legacy');return false;}
+            }catch(e){
+                console.error('Structured Firestore initialization failed:',e);
+                mfStructuredSyncEnabled=false;
+                try{localStorage.setItem(MF_STRUCTURED_MODE_KEY,'error');}catch(x){}
+                // Do not silently fall back to the legacy whole-database document. That
+                // fallback hides the exact production failure and defeats the scalable
+                // architecture. Surface the actionable Firebase error instead.
+                const label=mfFirebaseErrorLabel(e,'Structured Firebase initialization');
+                setFirebaseStatus(label,true);
+                if(showAlerts)mfShowTransientNotice(label);
+                return false;
+            }
         }
         async function mfStructuredPushState(silent){
             if(mfStructuredBusy)return;mfStructuredBusy=true;
@@ -3197,7 +3242,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     if(cv>lv){let pull=true;if(localDirty&&showAlerts)pull=confirm('Structured Firebase has a newer cloud version.\n\nOK = load the latest cloud data onto THIS device.\nCancel = keep THIS device data and upload it as the new structured cloud version.');if(pull)await mfStructuredPullState(false);else await mfStructuredPushState(true);}
                     else if(cv<lv||cv===0)await mfStructuredPushState(true);else setFirebaseStatus('🟢 Structured Firebase is up to date.',false);return;
                 }
-                mfLegacyInitFirebaseSync(cfg,syncCode,showAlerts);setTimeout(()=>setFirebaseStatus('🟡 Firebase connected in compatibility mode — update Firestore Rules to enable structured scalable sync.',true),250);
+                // Structured sync is the production path. Never mask a structured failure
+                // by silently switching the user back to the legacy whole-state document.
+                setFirebaseStatus('⚠️ Structured Firebase sync could not be enabled. See the exact error above.',true);
             }catch(e){console.error(e);setFirebaseStatus(mfFirebaseErrorLabel(e,'Firebase connection check'),true);}
         }
         // ================== END SCALABLE STRUCTURED FIRESTORE SYNC ==================
