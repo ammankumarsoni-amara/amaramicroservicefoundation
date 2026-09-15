@@ -3201,6 +3201,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // architecture. Surface the actionable Firebase error instead.
                 const label=mfFirebaseErrorLabel(e,'Structured Firebase initialization');
                 setFirebaseStatus(label,true);
+                console.error('STRUCTURED_FIREBASE_EXACT_FAILURE', {
+                    code: e?.code || '',
+                    message: e?.message || String(e || ''),
+                    action: 'Structured Firebase initialization'
+                });
                 if(showAlerts)mfShowTransientNotice(label);
                 return false;
             }
@@ -3244,7 +3249,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }
                 // Structured sync is the production path. Never mask a structured failure
                 // by silently switching the user back to the legacy whole-state document.
-                setFirebaseStatus('⚠️ Structured Firebase sync could not be enabled. See the exact error above.',true);
+                // mfTryEnableStructuredSync() has already surfaced the actionable error.
+                // Do NOT overwrite it with a generic compatibility-mode message.
+                return;
             }catch(e){console.error(e);setFirebaseStatus(mfFirebaseErrorLabel(e,'Firebase connection check'),true);}
         }
         // ================== END SCALABLE STRUCTURED FIRESTORE SYNC ==================
