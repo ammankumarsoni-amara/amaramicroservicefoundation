@@ -3148,9 +3148,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 setFirebaseStatus('🟢 Firebase connected — structured storage synced ('+total+' records)…');
                 await yieldUi();
             };
-            const push=async(r)=>{chunk.push(r);if(chunk.length>=CHUNK_SIZE)await flush();};
+            let workSinceYield=0;
+            const push=async(r)=>{
+                chunk.push(r); workSinceYield++;
+                if(chunk.length>=CHUNK_SIZE){await flush();workSinceYield=0;}
+                else if(workSinceYield>=20){workSinceYield=0;await yieldUi();}
+            };
             const loans=Array.isArray(state.loans)?state.loans:[];
             for(let i=0;i<loans.length;i++){
+                await yieldUi();
                 const loan=loans[i];
                 const copy=(typeof structuredClone==='function')?structuredClone(loan):JSON.parse(JSON.stringify(loan));
                 const repayments=Array.isArray(copy.repayments)?copy.repayments:[];
