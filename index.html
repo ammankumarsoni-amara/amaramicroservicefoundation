@@ -3123,7 +3123,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const result={loans:[],borrowings:[],staff:[],expenses:[],products:{}};
             const paymentsByLoan=new Map();
             for(const type of types){
-                const snap=await mfStructuredRoot().collection(type).get();
+                // Security Rules restrict reads by _ownerUid, so the query must carry
+                // the same owner constraint; Firestore rules are not client-side filters.
+                const snap=await mfStructuredRoot().collection(type).where('_ownerUid','==',mfFirebaseUser.uid).get();
                 snap.forEach(d=>{
                     const x=d.data()||{};delete x._ownerUid;delete x._updatedAt;delete x._device;
                     if(type==='products') result.products[d.id]=x;
