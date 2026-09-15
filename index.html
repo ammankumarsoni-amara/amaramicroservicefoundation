@@ -3273,30 +3273,33 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         async function mfTryEnableStructuredSync(showAlerts){
             if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return false;
             try{
-                // Never let the initial structured-cloud preparation monopolize the browser UI.
-                // Give Chrome a chance to paint/respond before any large local-state scan.
-                await new Promise(resolve => setTimeout(resolve, 0));
-                setFirebaseStatus('🟢 Firebase connected — preparing scalable structured storage…');
+                // Connection must remain lightweight: never scan/clone/upload the entire local
+                // database during Connect Fast Sync. This prevents browser freezes during the
+                // initial structured-storage check.
+                await new Promise(resolve=>setTimeout(resolve,0));
+                setFirebaseStatus('🟢 Firebase connected — checking scalable structured storage…');
                 const metaSnap=await mfStructuredMetaRef().get();
-                if(metaSnap.exists){const meta=metaSnap.data()||{};if(meta.ownerUid&&meta.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: structured business belongs to another account.');mfStructuredSyncEnabled=true;localStorage.setItem(MF_STRUCTURED_MODE_KEY,'structured');return true;}
-                const legacy=await mfSecureFirebaseDoc().get();
-                if(legacy.exists&&legacy.data()?.payload){
-                    const ld=legacy.data()||{};if(ld.ownerUid&&ld.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: cloud business belongs to another account.');
-                    const incoming=JSON.parse(ld.payload||'null');if(!incoming||!Array.isArray(incoming.loans))throw new Error('Legacy cloud payload failed validation.');
-                    let useCloud=true;if(showAlerts)useCloud=confirm('Existing secure Firebase data was found.\n\nOK = migrate the existing Firebase data into the new scalable structured database.\nCancel = keep THIS device data and make it the new structured cloud baseline.');
-                    if(useCloud){state=incoming;normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();await idbPutSnapshot();await mfStructuredWriteStateInChunks();await mfStructuredSetMeta(Number(ld.version||1),mfLocalStateFingerprint());}
-                    else{await mfStructuredWriteStateInChunks();await mfStructuredSetMeta(1,mfLocalStateFingerprint());}
-                    mfStructuredSyncEnabled=true;localStorage.setItem(MF_STRUCTURED_MODE_KEY,'structured');
-                    if(showAlerts)mfShowTransientNotice('🟢 Scalable structured Firebase database is ready.');return true;
+                if(metaSnap.exists){
+                    const meta=metaSnap.data()||{};
+                    if(meta.ownerUid&&meta.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: structured business belongs to another account.');
+                    mfStructuredSyncEnabled=true;
+                    localStorage.setItem(MF_STRUCTURED_MODE_KEY,'structured');
+                    setFirebaseStatus('🟢 Firebase connected — structured storage ready.');
+                    return true;
                 }
-                await mfStructuredWriteStateInChunks();await mfStructuredSetMeta(1,mfLocalStateFingerprint());mfStructuredSyncEnabled=true;localStorage.setItem(MF_STRUCTURED_MODE_KEY,'structured');return true;
+                // Only create the tiny metadata document here. Do NOT migrate/clone/write all
+                // local records while connecting. Data seeding uses the normal structured push
+                // path separately, so Connect Fast Sync can finish immediately.
+                await mfStructuredSetMeta(1,mfLocalStateFingerprint());
+                mfStructuredSyncEnabled=true;
+                localStorage.setItem(MF_STRUCTURED_MODE_KEY,'structured');
+                setFirebaseStatus('🟢 Firebase connected — structured storage ready. Local data is ready to sync.');
+                if(showAlerts)mfShowTransientNotice('🟢 Scalable structured Firebase is connected.');
+                return true;
             }catch(e){
                 console.error('Structured Firestore initialization failed:',e);
                 mfStructuredSyncEnabled=false;
                 try{localStorage.setItem(MF_STRUCTURED_MODE_KEY,'error');}catch(x){}
-                // Do not silently fall back to the legacy whole-database document. That
-                // fallback hides the exact production failure and defeats the scalable
-                // architecture. Surface the actionable Firebase error instead.
                 const label=mfFirebaseErrorLabel(e,'Structured Firebase initialization');
                 setFirebaseStatus(label,true);
                 if(showAlerts)mfShowTransientNotice(label);
