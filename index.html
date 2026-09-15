@@ -3103,11 +3103,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         async function mfStructuredRecordsAsync(){
             const out=[];
             const yieldUi=()=>new Promise(resolve=>setTimeout(resolve,0));
-            let work=0;
             const addArray=async(type,arr)=>{
-                for(let i=0;i<(Array.isArray(arr)?arr:[]).length;i++){
-                    const item=arr[i];out.push({type,id:mfStructuredStableId(type,item,null,i),data:item});
-                    if(++work%50===0)await yieldUi();
+                const list=Array.isArray(arr)?arr:[];
+                for(let i=0;i<list.length;i++){
+                    const item=list[i];out.push({type,id:mfStructuredStableId(type,item,null,i),data:item});
+                    if(i%10===0)await yieldUi();
                 }
             };
             const loans=Array.isArray(state.loans)?state.loans:[];
@@ -3118,17 +3118,64 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 delete copy.repayments;
                 out.push({type:'loans',id:mfStructuredStableId('loans',copy,null,i),data:copy});
                 for(let j=0;j<repayments.length;j++){
-                    const payment=repayments[j];out.push({type:'payments',id:mfStructuredPaymentId(copy.id,payment,j),data:{loanId:copy.id||'',index:j,payment}});
-                    if(++work%50===0)await yieldUi();
+                    const payment=repayments[j];
+                    out.push({type:'payments',id:mfStructuredPaymentId(copy.id,payment,j),data:{loanId:copy.id||'',index:j,payment}});
+                    if(j%10===0)await yieldUi();
                 }
-                if(++work%25===0){setFirebaseStatus('🟢 Firebase connected — preparing structured storage ('+(i+1)+' / '+loans.length+' loans)…');await yieldUi();}
+                setFirebaseStatus('🟢 Firebase connected — preparing structured storage ('+(i+1)+' / '+loans.length+' loans)…');
+                await yieldUi();
             }
             await addArray('borrowings',state.borrowings);
             await addArray('staff',state.staff);
             await addArray('expenses',state.expenses);
             const products=Object.entries(state.products||{});
-            for(let i=0;i<products.length;i++){const [k,v]=products[i];out.push({type:'products',id:mfStructuredStableId('products',v,k,i),data:v});if(++work%50===0)await yieldUi();}
+            for(let i=0;i<products.length;i++){
+                const [k,v]=products[i];
+                out.push({type:'products',id:mfStructuredStableId('products',v,k,i),data:v});
+                if(i%10===0)await yieldUi();
+            }
             return out;
+        }
+        async function mfStructuredWriteStateInChunks(){
+            // Initial migration/baseline writer: bounded chunks plus UI yields.
+            const yieldUi=()=>new Promise(resolve=>setTimeout(resolve,0));
+            const chunk=[]; const CHUNK_SIZE=100; let total=0;
+            const flush=async()=>{
+                if(!chunk.length)return;
+                const part=chunk.splice(0,chunk.length);
+                await mfStructuredWriteBatch(part,[]);
+                total+=part.length;
+                setFirebaseStatus('🟢 Firebase connected — structured storage synced ('+total+' records)…');
+                await yieldUi();
+            };
+            const push=async(r)=>{chunk.push(r);if(chunk.length>=CHUNK_SIZE)await flush();};
+            const loans=Array.isArray(state.loans)?state.loans:[];
+            for(let i=0;i<loans.length;i++){
+                const loan=loans[i];
+                const copy=(typeof structuredClone==='function')?structuredClone(loan):JSON.parse(JSON.stringify(loan));
+                const repayments=Array.isArray(copy.repayments)?copy.repayments:[];
+                delete copy.repayments;
+                await push({type:'loans',id:mfStructuredStableId('loans',copy,null,i),data:copy});
+                for(let j=0;j<repayments.length;j++){
+                    const payment=repayments[j];
+                    await push({type:'payments',id:mfStructuredPaymentId(copy.id,payment,j),data:{loanId:copy.id||'',index:j,payment}});
+                }
+                setFirebaseStatus('🟢 Firebase connected — preparing structured storage ('+(i+1)+' / '+loans.length+' loans)…');
+                await yieldUi();
+            }
+            const addArray=async(type,arr)=>{
+                const list=Array.isArray(arr)?arr:[];
+                for(let i=0;i<list.length;i++)await push({type,id:mfStructuredStableId(type,list[i],null,i),data:list[i]});
+            };
+            await addArray('borrowings',state.borrowings);
+            await addArray('staff',state.staff);
+            await addArray('expenses',state.expenses);
+            const products=Object.entries(state.products||{});
+            for(let i=0;i<products.length;i++){
+                const [k,v]=products[i];
+                await push({type:'products',id:mfStructuredStableId('products',v,k,i),data:v});
+            }
+            await flush();
         }
         function mfStructuredSettings(){
             return {
@@ -3226,12 +3273,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     const ld=legacy.data()||{};if(ld.ownerUid&&ld.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: cloud business belongs to another account.');
                     const incoming=JSON.parse(ld.payload||'null');if(!incoming||!Array.isArray(incoming.loans))throw new Error('Legacy cloud payload failed validation.');
                     let useCloud=true;if(showAlerts)useCloud=confirm('Existing secure Firebase data was found.\n\nOK = migrate the existing Firebase data into the new scalable structured database.\nCancel = keep THIS device data and make it the new structured cloud baseline.');
-                    if(useCloud){state=incoming;normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();await idbPutSnapshot();await mfStructuredWriteBatch(await mfStructuredRecordsAsync(),[]);await mfStructuredSetMeta(Number(ld.version||1),mfLocalStateFingerprint());}
-                    else{await mfStructuredWriteBatch(await mfStructuredRecordsAsync(),[]);await mfStructuredSetMeta(1,mfLocalStateFingerprint());}
+                    if(useCloud){state=incoming;normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();await idbPutSnapshot();await mfStructuredWriteStateInChunks();await mfStructuredSetMeta(Number(ld.version||1),mfLocalStateFingerprint());}
+                    else{await mfStructuredWriteStateInChunks();await mfStructuredSetMeta(1,mfLocalStateFingerprint());}
                     mfStructuredSyncEnabled=true;localStorage.setItem(MF_STRUCTURED_MODE_KEY,'structured');
                     if(showAlerts)mfShowTransientNotice('🟢 Scalable structured Firebase database is ready.');return true;
                 }
-                await mfStructuredWriteBatch(await mfStructuredRecordsAsync(),[]);await mfStructuredSetMeta(1,mfLocalStateFingerprint());mfStructuredSyncEnabled=true;localStorage.setItem(MF_STRUCTURED_MODE_KEY,'structured');return true;
+                await mfStructuredWriteStateInChunks();await mfStructuredSetMeta(1,mfLocalStateFingerprint());mfStructuredSyncEnabled=true;localStorage.setItem(MF_STRUCTURED_MODE_KEY,'structured');return true;
             }catch(e){
                 console.error('Structured Firestore initialization failed:',e);
                 mfStructuredSyncEnabled=false;
