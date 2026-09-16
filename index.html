@@ -3311,7 +3311,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 pullStateFromFirebase(true);
                                 setFirebaseStatus('🟢 Secure Firebase updated this device automatically.',false);
                             }else{
-                                setFirebaseStatus('⚠️ Cloud data is newer. Review Pull Latest or Push Now.',false);
+                                setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);
                             }
                         }else if(cloudVersion===localVersion){
                             setFirebaseStatus('🟢 Secure Firebase is up to date.',false);
@@ -3362,7 +3362,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         setFirebaseStatus('🟢 New cloud data loaded automatically.',false);
                         return;
                     }
-                    setFirebaseStatus('⚠️ Cloud data is newer. Review Pull Latest or Push Now.',false);
+                    setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);
                     showFirebaseUpdateBanner(data.updatedAtLabel || '', cloudVersion);
                 }
             }, err => {
@@ -3385,7 +3385,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 document.body.appendChild(bar);
             }
             bar.dataset.cloudVersion = String(version);
-            bar.innerHTML = `<span><i class="fa-solid fa-cloud-arrow-down me-1"></i> A newer cloud version is available${whenLabel ? ' (' + whenLabel + ')' : ''}; this device has local changes.</span>
+            bar.innerHTML = `<span><i class="fa-solid fa-cloud-arrow-down me-1"></i> A newer cloud version is available${whenLabel ? ' (' + whenLabel + ')' : ''}; this device has unsynced local changes.</span>
                 <span>
                     <button type="button" id="firebase-banner-load" style="background:#fff;color:#0f766e;border:none;padding:6px 12px;border-radius:8px;font-weight:800;cursor:pointer;margin-right:6px;touch-action:manipulation;">Pull Latest</button>
                     <button type="button" id="firebase-banner-dismiss" style="background:transparent;color:#fff;border:1px solid #fff;padding:6px 12px;border-radius:8px;font-weight:700;cursor:pointer;touch-action:manipulation;">Dismiss</button>
@@ -3422,8 +3422,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         function mfHasUnpushedLocalChanges(){
             try{
-                const dirtyAt=localStorage.getItem('MF_LOCAL_DIRTY_AT')||'';
-                if(dirtyAt) return true;
+                // A dirty marker is only meaningful when it was created AFTER the last
+                // successful Firebase push. Older builds left MF_LOCAL_DIRTY_AT behind after
+                // a successful push, which could falsely make a clean device look conflicted.
+                const dirtyAt=Date.parse(localStorage.getItem('MF_LOCAL_DIRTY_AT')||'')||0;
+                const lastPushAt=Date.parse(localStorage.getItem('MF_SECURE_LAST_PUSH_AT')||'')||0;
+                if(dirtyAt && (!lastPushAt || dirtyAt>lastPushAt)) return true;
                 const last=localStorage.getItem('MF_SECURE_LAST_PUSH_FINGERPRINT')||'';
                 if(!last) return false;
                 const current=mfLocalStateFingerprint();
@@ -3456,7 +3460,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             });
             write.then(version=>{
                 mfSetKnownCloudVersion(version);
-                try{ localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint()); localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString()); }catch(e){}
+                try{
+                    localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());
+                    localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());
+                    // The successful push consumes the pending local-change marker. This is
+                    // essential so a clean device does not show a false cloud/local conflict
+                    // on the next refresh or Firebase listener snapshot.
+                    localStorage.removeItem('MF_LOCAL_DIRTY_AT');
+                }catch(e){}
                 mfLocalAudit('CLOUD_PUSH','Secure Firestore snapshot written');
                 setFirebaseStatus('🟢 Securely synced to Firebase — ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
                 if(!silent) mfShowTransientNotice('🟢 Firebase sync completed successfully.');
