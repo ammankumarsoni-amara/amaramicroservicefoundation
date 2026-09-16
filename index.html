@@ -3286,7 +3286,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 updateSecureCloudStatus();
                 ensureInitialVersionedBackup();
                 mfScaleReinstallStateProxy();
-                mfScaleDirty.full=true;
+                // Do not force a full scalable-index rebuild on every page refresh.
+                // The entity_mirror metadata decides whether a rebuild is actually needed;
+                // restore/import paths explicitly mark mfScaleDirty.full=true when required.
                 initializeScalableDataLayer();
             }catch(err){
                 console.error("IndexedDB initialization failed",err);
@@ -8908,7 +8910,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             updateSecureCloudStatus();
             try{
                 await restoreSavedCloudPin();
-                if(mfFirestoreDb && mfFirebaseSyncCode) setFirebaseStatus('🟢 Connected — fast sync is active for Sync Code: '+mfFirebaseSyncCode);
+                if(mfFirestoreDb && mfFirebaseSyncCode) setFirebaseStatus('🟢 Secure Firebase is connected — automatic sync is active.',false);
                 updateSecureCloudStatus();
             }catch(e){
                 console.warn('Cloud PIN hydration after modal open failed:',e);
