@@ -2280,7 +2280,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="font-size:.84rem;font-weight:800;color:#34d399;margin-bottom:3px;"><i class="fa-solid fa-bolt"></i> Secure Firebase Sync</div>
                 <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;line-height:1.4;">Secure cloud sync for your business. Your data syncs automatically after saves. Use the same signed-in account and Sync Code on mobile and laptop.</div>
 
-                <div class="mf-sync-status" id="firebase-sync-status" style="font-size:.68rem;color:#94a3b8;margin-top:7px;">Not connected yet.</div>
+                <div class="mf-sync-status" id="firebase-sync-status" role="status" aria-live="polite" style="font-size:.68rem;color:#94a3b8;margin-top:7px;display:flex;align-items:flex-start;gap:6px;min-height:22px;line-height:1.35;">Not connected yet.</div>
                 <div class="mf-sync-actions">
                     <button type="button" class="btn-header btn-blue" style="justify-content:center;" id="mf-push-sync-btn" onclick="pushStateToFirebase(false)"><i class="fa-solid fa-cloud-arrow-up"></i> Sync Now</button>
                     <button type="button" class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" id="mf-pull-sync-btn" onclick="pullStateFromFirebase(true)"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Latest</button>
@@ -2326,7 +2326,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
                 <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Manual Google Drive Backup & Recovery</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-                    <button type="button" class="btn-header btn-blue" style="justify-content:center;" onclick="syncNowToGoogleDrive()"><i class="fa-solid fa-cloud-arrow-up"></i> Sync Now</button>
+                    <button type="button" class="btn-header btn-blue" style="justify-content:center;" onclick="syncNowToGoogleDrive()"><i class="fa-solid fa-cloud-arrow-up"></i> Backup to Google Drive</button>
                     <button type="button" class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="restoreLatestFromGoogleDrive()"><i class="fa-solid fa-cloud-arrow-down"></i> Restore Latest</button>
                 </div>
                 <button type="button" class="btn-header btn-blue" style="width:100%;margin-top:7px;justify-content:center;background:#334155;" onclick="openDriveRestorePointPicker()"><i class="fa-solid fa-clock-rotate-left"></i> Restore Timestamped Backup</button>
@@ -3169,26 +3169,69 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const meta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
             const full=!!mfScaleDirty.full || !meta?.bootstrapped;
             const workKinds={loans:[],products:[],staff:[],expenses:[],borrowings:[]};
+            // First-time structured-cloud bootstrap is deliberately resumable and bounded.
+            // It never attempts to push the entire business in one browser task. Existing
+            // incremental updates continue to use the normal dirty-entity path below.
             if(full){
-                // Bootstrap/recovery only. Process one entity type in bounded chunks instead of
-                // constructing a huge work array or a giant fingerprint metadata document.
-                const sources={loans:Array.isArray(state.loans)?state.loans:[],products:Object.entries(state.products||{}).map(([id,v])=>({...v,id:String(id)})),staff:Array.isArray(state.staff)?state.staff:[],expenses:Array.isArray(state.expenses)?state.expenses:[],borrowings:Array.isArray(state.borrowings)?state.borrowings:[]};
-                for(const [kind,rows] of Object.entries(sources)){
-                    for(let i=0;i<rows.length;i+=450){
-                        const batch=mfFirestoreDb.batch();
-                        rows.slice(i,i+450).forEach((row,off)=>{const id=String(row?.id||row?.key||(kind.toUpperCase()+'-'+(i+off)));const ref=mfScaleStructuredCollection(kind)?.doc(id);if(ref)batch.set(ref,{...mfScaleFirestoreSafe(mfScaleClone(row)),_ownerUid:owner,_scaleFingerprint:mfScaleHash(row),_updatedAtLabel:new Date().toLocaleString('en-IN')},{merge:true});});
-                        await batch.commit();
-                        await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(()=>r(),{timeout:80}):setTimeout(r,0));
-                    }
+                const sources={
+                    loans:Array.isArray(state.loans)?state.loans:[],
+                    products:Object.entries(state.products||{}).map(([id,v])=>({...v,id:String(id)})),
+                    staff:Array.isArray(state.staff)?state.staff:[],
+                    expenses:Array.isArray(state.expenses)?state.expenses:[],
+                    borrowings:Array.isArray(state.borrowings)?state.borrowings:[]
+                };
+                const kindOrder=['loans','products','staff','expenses','borrowings'];
+                let kind=String(meta?.bootstrapKind||'loans');
+                let ki=Math.max(0,kindOrder.indexOf(kind)); if(ki<0) ki=0;
+                let offset=Math.max(0,Number(meta?.bootstrapOffset)||0);
+                const rows=sources[kindOrder[ki]]||[];
+                const chunk=kindOrder[ki]==='loans'?25:100;
+                const slice=rows.slice(offset,offset+chunk);
+                const batch=mfFirestoreDb.batch();
+                const refs=[];
+                for(const row of slice){
+                    const id=String(row?.id||row?.key||(kindOrder[ki].toUpperCase()+'-'+offset));
+                    const ref=mfScaleStructuredCollection(kindOrder[ki])?.doc(id);
+                    if(ref){ batch.set(ref,{...mfScaleFirestoreSafe(mfScaleClone(row)),_ownerUid:owner,_scaleFingerprint:mfScaleHash(row),_updatedAtLabel:new Date().toLocaleString('en-IN')},{merge:true}); refs.push([kindOrder[ki],id,row]); }
                 }
-            }else{
-                const add=(kind,ids,rows)=>{const map=new Map((rows||[]).map(r=>[String(r?.id||r?.key||''),r]));for(const id of ids){const row=map.get(String(id));if(row)workKinds[kind].push({id:String(id),row});else workKinds[kind].push({id:String(id),deleted:true});}};
-                add('loans',mfScaleDirty.loans,state.loans||[]); add('products',mfScaleDirty.products,Object.entries(state.products||{}).map(([id,v])=>({...v,id:String(id)})));
-                add('staff',mfScaleDirty.staff,state.staff||[]); add('expenses',mfScaleDirty.expenses,state.expenses||[]); add('borrowings',mfScaleDirty.borrowings,state.borrowings||[]);
-                for(const [kind,items] of Object.entries(workKinds)) for(let i=0;i<items.length;i+=450){const batch=mfFirestoreDb.batch();items.slice(i,i+450).forEach(item=>{const ref=mfScaleStructuredCollection(kind)?.doc(item.id);if(!ref)return;if(item.deleted)batch.delete(ref);else batch.set(ref,{...mfScaleFirestoreSafe(mfScaleClone(item.row)),_ownerUid:owner,_scaleFingerprint:mfScaleHash(item.row),_updatedAtLabel:new Date().toLocaleString('en-IN')},{merge:true});});await batch.commit();}
+                if(refs.length) await batch.commit();
+                offset+=slice.length;
+                if(offset>=rows.length){
+                    ki+=1; offset=0;
+                }
+                if(ki<kindOrder.length){
+                    await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:false,bootstrapKind:kindOrder[ki],bootstrapOffset:offset,lastSyncAt:new Date().toISOString(),version:3}).catch(()=>{});
+                    // Payments are bootstrapped only alongside loan chunks. This keeps each
+                    // browser turn bounded while still separating payments from loan documents.
+                    if(kindOrder[ki-1]==='loans' && refs.length){
+                        const payCol=mfScaleStructuredCollection('payments');
+                        for(const [,loanId,row] of refs){
+                            const payments=Array.isArray(row?.payments)?row.payments:[];
+                            for(let i=0;i<payments.length;i+=200){
+                                const pb=mfFirestoreDb.batch();
+                                payments.slice(i,i+200).forEach((pay,off)=>{const idx=i+off;pb.set(payCol.doc(String(loanId)+'-'+idx),{...mfScaleFirestoreSafe(mfScaleClone(pay)),_ownerUid:owner,loanId:String(loanId),paymentIndex:idx},{merge:true});});
+                                if(payments.length) await pb.commit();
+                            }
+                            mfScalePaymentCounts.set(String(loanId),payments.length);
+                        }
+                    }
+                    mfScaleResetDirty();
+                    mfScaleScheduleMirror();
+                    return;
+                }
+                // All structured entity types are bootstrapped. Mark complete; normal saves
+                // will thereafter use only dirty entities.
+                await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:true,bootstrapKind:'',bootstrapOffset:0,lastSyncAt:new Date().toISOString(),version:3}).catch(()=>{});
+                mfScaleResetDirty();
+                return;
             }
-            // Payments remain separate so loan documents stay compact.
-            const loanIds=full ? (state.loans||[]).map(l=>String(l.id)) : [...mfScaleDirty.loans];
+            const add=(kind,ids,rows)=>{const map=new Map((rows||[]).map(r=>[String(r?.id||r?.key||''),r]));for(const id of ids){const row=map.get(String(id));if(row)workKinds[kind].push({id:String(id),row});else workKinds[kind].push({id:String(id),deleted:true});}};
+            add('loans',mfScaleDirty.loans,state.loans||[]); add('products',mfScaleDirty.products,Object.entries(state.products||{}).map(([id,v])=>({...v,id:String(id)})));
+            add('staff',mfScaleDirty.staff,state.staff||[]); add('expenses',mfScaleDirty.expenses,state.expenses||[]); add('borrowings',mfScaleDirty.borrowings,state.borrowings||[]);
+            for(const [kind,items] of Object.entries(workKinds)) for(let i=0;i<items.length;i+=450){const batch=mfFirestoreDb.batch();items.slice(i,i+450).forEach(item=>{const ref=mfScaleStructuredCollection(kind)?.doc(item.id);if(!ref)return;if(item.deleted)batch.delete(ref);else batch.set(ref,{...mfScaleFirestoreSafe(mfScaleClone(item.row)),_ownerUid:owner,_scaleFingerprint:mfScaleHash(item.row),_updatedAtLabel:new Date().toLocaleString('en-IN')},{merge:true});});await batch.commit();}
+            // Payments remain separate so loan documents stay compact. Normal incremental
+            // changes only touch payments belonging to dirty loans.
+            const loanIds=[...mfScaleDirty.loans];
             for(const loanId of loanIds){
                 const loan=(state.loans||[]).find(x=>String(x.id)===String(loanId));
                 try{
@@ -3197,21 +3240,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         const payments=Array.isArray(loan.payments)?loan.payments:[];
                         const previousCount=mfScalePaymentCounts.has(String(loanId)) ? Number(mfScalePaymentCounts.get(String(loanId))) : NaN;
                         for(let i=0;i<payments.length;i+=450){const batch=mfFirestoreDb.batch();payments.slice(i,i+450).forEach((pay,off)=>{const idx=i+off;batch.set(col.doc(String(loan.id)+'-'+idx),{...mfScaleFirestoreSafe(mfScaleClone(pay)),_ownerUid:owner,loanId:String(loan.id),paymentIndex:idx},{merge:true});});await batch.commit();}
-                        if(Number.isFinite(previousCount) && previousCount>payments.length){
-                            for(let start=payments.length;start<previousCount;start+=450){const b=mfFirestoreDb.batch();for(let idx=start;idx<Math.min(previousCount,start+450);idx++) b.delete(col.doc(String(loanId)+'-'+idx));await b.commit();}
-                        } else if(!Number.isFinite(previousCount)){
-                            const snap=await col.where('loanId','==',String(loanId)).get(); const stale=snap.docs.filter(d=>Number(d.data()?.paymentIndex)>=payments.length);
-                            for(let i=0;i<stale.length;i+=450){const b=mfFirestoreDb.batch();stale.slice(i,i+450).forEach(d=>b.delete(d.ref));await b.commit();}
-                        }
+                        if(Number.isFinite(previousCount) && previousCount>payments.length){for(let start=payments.length;start<previousCount;start+=450){const b=mfFirestoreDb.batch();for(let idx=start;idx<Math.min(previousCount,start+450);idx++)b.delete(col.doc(String(loanId)+'-'+idx));await b.commit();}}
+                        else if(!Number.isFinite(previousCount)){const snap=await col.where('loanId','==',String(loanId)).get();const stale=snap.docs.filter(d=>Number(d.data()?.paymentIndex)>=payments.length);for(let i=0;i<stale.length;i+=450){const b=mfFirestoreDb.batch();stale.slice(i,i+450).forEach(d=>b.delete(d.ref));await b.commit();}}
                         mfScalePaymentCounts.set(String(loanId),payments.length);
-                    }else{
-                        mfScalePaymentCounts.delete(String(loanId));
-                        const snap=await col.where('loanId','==',String(loanId)).get();
-                        for(let i=0;i<snap.docs.length;i+=450){const b=mfFirestoreDb.batch();snap.docs.slice(i,i+450).forEach(d=>b.delete(d.ref));await b.commit();}
-                    }
+                    }else{mfScalePaymentCounts.delete(String(loanId));const snap=await col.where('loanId','==',String(loanId)).get();for(let i=0;i<snap.docs.length;i+=450){const b=mfFirestoreDb.batch();snap.docs.slice(i,i+450).forEach(d=>b.delete(d.ref));await b.commit();}}
                 }catch(e){console.warn('Structured payment sync/cleanup skipped:',e);}
             }
-            await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,lastSyncAt:new Date().toISOString(),bootstrapped:true,version:2}).catch(()=>{});
+            await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,lastSyncAt:new Date().toISOString(),bootstrapped:true,version:3}).catch(()=>{});
             mfScaleResetDirty();
         }
         async function initializeScalableDataLayer(){
@@ -3296,7 +3331,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         function setFirebaseStatus(msg, isWarning) {
             const el = document.getElementById('firebase-sync-status');
-            if (el) { el.textContent = msg; el.style.color = isWarning ? '#fde68a' : '#a7f3d0'; }
+            if (el) {
+                el.textContent = msg;
+                el.style.color = isWarning ? '#fde68a' : '#a7f3d0';
+                el.style.minHeight = '22px';
+            }
             try { mfRefreshFirebaseSyncControls(); } catch(e) {}
         }
 
