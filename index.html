@@ -2863,7 +2863,22 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             try{ state=mfScaleWrapObject(state); } finally { mfScaleProxySuspend=false; mfScaleStateProxyInstalled=true; }
         }
 
-        function mfScaleClone(v){ try{return typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v));}catch(e){return v;} }
+        function mfScaleClone(v){
+            // The scalable data layer receives live state objects that are wrapped in
+            // JavaScript Proxies. Native structuredClone(Proxy) throws DataCloneError.
+            // Never return the live object after a clone failure: doing so would pass a
+            // Proxy directly to IndexedDB/Firestore and silently leave the scalable
+            // recovery mirror stale. Fall back to a plain JSON data clone instead.
+            try{
+                if(typeof structuredClone==='function'){
+                    try{return structuredClone(v);}catch(e){ /* Proxy/DataCloneError */ }
+                }
+                return JSON.parse(JSON.stringify(v));
+            }catch(e){
+                console.warn('Scalable data clone failed:',e);
+                return null;
+            }
+        }
         function mfScaleFirestoreSafe(value){
             if(value===undefined) return undefined;
             if(value===null || typeof value!=='object') return value;
@@ -2960,10 +2975,22 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const meta=await mfScaleGetMeta('entity_mirror');
                 const dirtyAt=localStorage.getItem('MF_LOCAL_DIRTY_AT')||'';
                 const loans=Array.isArray(state.loans)?state.loans:[];
-                if(!fullRebuild && meta?.localDirtyAt===dirtyAt && Number(meta.loanCount||0)===loans.length && meta.searchReady){
+                // A timestamp/count check alone is not sufficient: an older scalable mirror
+                // can have the same loan count and the same dirty marker after an interrupted
+                // migration/restore. Compare a deterministic fingerprint of the authoritative
+                // V15 loan collection (including payments) before allowing the mirror to be
+                // treated as current. This is what prevents Statement/PDF and Recovery from
+                // silently reading two different versions of the same loan.
+                const sourceLoanFingerprint=mfScaleHash(loans);
+                const mirrorSourceMatches=String(meta?.sourceLoanFingerprint||'')===String(sourceLoanFingerprint);
+                if(!fullRebuild && mirrorSourceMatches && meta?.localDirtyAt===dirtyAt && Number(meta.loanCount||0)===loans.length && meta.searchReady){
                     mfScaleReady=true; mfScaleSearchReady=true; return;
                 }
-                if(fullRebuild || !meta?.searchReady){
+                // Any mismatch between the authoritative loan collection and its scalable
+                // projection is a rebuild condition, even when the proxy dirty flags are clear.
+                const needsConsistencyRebuild=!mirrorSourceMatches;
+                const rebuildRequested=fullRebuild || !meta?.searchReady || needsConsistencyRebuild;
+                if(rebuildRequested){
                     // Full rebuilds (first install / restore) must remove stale scalable records
                     // before rebuilding. Otherwise a deleted old loan could remain searchable.
                     await mfScaleTx(['scalable_loans','scalable_search','scalable_payments'],'readwrite',stores=>{
@@ -3040,7 +3067,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }
                 mfScaleReady=true; mfScaleSearchReady=true;
                 const scaleEl=document.getElementById('mf-scalable-status'); if(scaleEl) scaleEl.textContent='🟢 Local data setup is ready.';
-                await mfScalePutMeta({id:'entity_mirror',schema:MF_SCALE.schema,localDirtyAt:dirtyAt,loanCount:loans.length,searchReady:true,updatedAt:new Date().toISOString()});
+                await mfScalePutMeta({id:'entity_mirror',schema:MF_SCALE.schema,localDirtyAt:dirtyAt,loanCount:loans.length,searchReady:true,sourceLoanFingerprint:sourceLoanFingerprint,updatedAt:new Date().toISOString()});
             }catch(e){console.warn('Scalable local entity update skipped:',e);}
             finally{mfScaleBuildBusy=false;}
         }
@@ -3270,7 +3297,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         async function initializeScalableDataLayer(){
             try{
-                const run=()=>mfScaleBuildLocalEntities(false).then(()=>mfScaleScheduleMirror()).catch(e=>console.warn('Scalable data layer initialization skipped:',e));
+                const run=()=>mfScaleBuildLocalEntities(false).then(()=>{
+                    mfScaleScheduleMirror();
+                    try{ if(typeof renderFeed==='function') renderFeed(); }catch(e){}
+                }).catch(e=>console.warn('Scalable data layer initialization skipped:',e));
                 if('requestIdleCallback' in window) requestIdleCallback(run,{timeout:1500}); else setTimeout(run,250);
             }catch(e){console.warn('Scalable data layer initialization skipped:',e);}
         }
@@ -4217,7 +4247,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // automatic cloud save when the compatibility localStorage copy succeeded.
                 // Google Drive remains the encrypted secondary backup/recovery layer.
                 try{ scheduleFirebasePush(); }catch(e){ console.warn('Automatic Secure Firebase sync scheduling skipped:',e); }
-                try{ mfScaleBuildLocalEntities(false).then(()=>mfScaleScheduleMirror()).catch(e=>console.warn('Scalable entity refresh skipped:',e)); }catch(e){}
+                try{
+                    mfScaleBuildLocalEntities(false).then(()=>{
+                        mfScaleScheduleMirror();
+                        // renderAll() runs before the scalable mirror refresh. Once the
+                        // mirror is current, refresh Customer Recovery so it cannot keep
+                        // displaying an older payment/foreclosure projection than the
+                        // authoritative state used by Statement/PDF.
+                        try{ if(typeof renderFeed==='function') renderFeed(); }catch(e){}
+                    }).catch(e=>console.warn('Scalable entity refresh skipped:',e));
+                }catch(e){}
                 /* Drive auto-sync disabled by production policy. */
             });
         }
