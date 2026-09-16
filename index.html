@@ -3301,6 +3301,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         let mfFirestoreDb = null;
         let mfFirebaseSyncCode = null;
         let mfFirebaseListenerUnsub = null;
+        let mfFirebaseListenerKey = '';
+        let mfFirebaseAuthListenerAttached = false;
+        let mfFirebaseInitKey = '';
         let mfFirebaseDeviceId = localStorage.getItem('MF_DEVICE_ID') || ('DEV-' + Math.random().toString(36).slice(2, 10));
         localStorage.setItem('MF_DEVICE_ID', mfFirebaseDeviceId);
         let mfFirebasePushTimer = null;
@@ -3332,9 +3335,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function setFirebaseStatus(msg, isWarning) {
             const el = document.getElementById('firebase-sync-status');
             if (el) {
-                el.textContent = msg;
-                el.style.color = isWarning ? '#fde68a' : '#a7f3d0';
-                el.style.minHeight = '22px';
+                const next = String(msg || '');
+                const nextWarning = !!isWarning;
+                const same = el.textContent === next && el.dataset.warning === String(nextWarning);
+                if (!same) {
+                    el.textContent = next;
+                    el.style.color = nextWarning ? '#fde68a' : '#a7f3d0';
+                    el.style.minHeight = '22px';
+                    el.dataset.warning = String(nextWarning);
+                }
             }
             try { mfRefreshFirebaseSyncControls(); } catch(e) {}
         }
@@ -3405,13 +3414,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 try { mfRefreshFirebaseSyncControls(); } catch(e) {}
                 try{
                     mfFirebaseAuth = firebase.auth();
+                    // Attach the Firebase Auth observer only once. Re-attaching it from every
+                    // sync initialization caused a listener cascade: each auth callback called
+                    // initFirebaseSync again, which repeatedly reset the status and listener.
                     if(typeof mfInitAuth==='function') mfInitAuth();
                 }catch(e){ console.warn('Firebase Auth initialization skipped:',e); }
-                setFirebaseStatus('🟢 Firebase connected — Secure Sync is active.');
                 if(!mfFirebaseUser){
                     setFirebaseStatus('🔒 Secure Sync is waiting for Firebase sign-in.',true);
                     return;
                 }
+                const initKey = String(mfFirebaseUser.uid || '') + '|' + String(syncCode || '');
+                const sameInit = mfFirebaseInitKey === initKey;
+                mfFirebaseInitKey = initKey;
+                if (!sameInit) setFirebaseStatus('🟢 Firebase connected — Secure Sync is active.');
                 startFirebaseListener();
                 const ref = mfSecureFirebaseDoc();
                 ref.get().then(doc => {
@@ -3446,7 +3461,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());
                                 localStorage.removeItem('MF_LOCAL_DIRTY_AT');
                             }catch(e){}
-                            setFirebaseStatus('🟢 Secure Firebase is up to date — local and cloud data match.',false);
+                            setFirebaseStatus('🟢 Secure Firebase is connected — automatic sync is active.',false);
                             return;
                         }
                         if(showAlerts){
@@ -3464,7 +3479,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);
                             }
                         }else if(cloudVersion===localVersion){
-                            setFirebaseStatus('🟢 Secure Firebase is up to date.',false);
+                            setFirebaseStatus('🟢 Secure Firebase is connected — automatic sync is active.',false);
                         }else{
                             // Local device is ahead of the remembered cloud version; push automatically.
                             scheduleFirebasePush();
@@ -3487,8 +3502,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         function startFirebaseListener() {
-            if (mfFirebaseListenerUnsub) { mfFirebaseListenerUnsub(); mfFirebaseListenerUnsub = null; }
             if (!mfFirestoreDb || !mfFirebaseSyncCode || !mfFirebaseUser) return;
+            const listenerKey = String(mfFirebaseUser.uid || '') + '|' + String(mfFirebaseSyncCode || '');
+            if (mfFirebaseListenerUnsub && mfFirebaseListenerKey === listenerKey) return;
+            if (mfFirebaseListenerUnsub) { mfFirebaseListenerUnsub(); mfFirebaseListenerUnsub = null; }
+            mfFirebaseListenerKey = listenerKey;
             const ref = mfSecureFirebaseDoc();
             mfFirebaseListenerUnsub = ref.onSnapshot(doc => {
                 if (!doc.exists) return;
@@ -3503,7 +3521,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(sameDatabase){
                     mfSetKnownCloudVersion(cloudVersion);
                     try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',localFp);localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(cloudVersion));localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
-                    setFirebaseStatus('🟢 Secure Firebase is up to date — local and cloud data match.',false);
+                    setFirebaseStatus('🟢 Secure Firebase is connected — automatic sync is active.',false);
                     return;
                 }
                 if(cloudVersion>mfKnownCloudVersion()){
@@ -3699,6 +3717,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const persistence = (firebase.auth.Auth && firebase.auth.Auth.Persistence)
                     ? firebase.auth.Auth.Persistence.LOCAL : 'local';
                 const attachListener = ()=>{
+                    if (mfFirebaseAuthListenerAttached) return;
+                    mfFirebaseAuthListenerAttached = true;
                     mfFirebaseAuth.onAuthStateChanged(user=>{
                         mfFirebaseUser=user||null;
                         if(user) {
@@ -3707,7 +3727,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 const cfgRaw=localStorage.getItem('MF_FIREBASE_CONFIG');
                                 try{ if(cfgRaw) initFirebaseSync(JSON.parse(cfgRaw),mfFirebaseSyncCode,false); }catch(e){console.warn('Secure Firebase reconnect skipped',e);}
                             }
-                        } else mfAuthStatus('Not signed in.');
+                        } else {
+                            mfAuthStatus('Not signed in.');
+                            mfFirebaseInitKey='';
+                            mfFirebaseListenerKey='';
+                            if(mfFirebaseListenerUnsub){ try{mfFirebaseListenerUnsub();}catch(e){} mfFirebaseListenerUnsub=null; }
+                            try{ mfRefreshFirebaseSyncControls(); }catch(e){}
+                        }
                         const cb=document.getElementById('mf-secure-sync-enabled'); if(cb) cb.checked=mfSecureSyncEnabled;
                     });
                 };
