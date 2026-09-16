@@ -2226,7 +2226,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <i class="fa-solid fa-xmark" onclick="closeModal('modal-cloud')" style="cursor:pointer;color:#94a3b8;"></i>
             </div>
 
-            <div class="secure-cloud-status" id="secure-cloud-status">🟢 Local database is protected by IndexedDB. Cloud sync is optional until Google Drive is connected.</div>
+            <div class="secure-cloud-status" id="secure-cloud-status">🟢 Local database is protected by IndexedDB. Firebase Secure Sync is the primary cloud path; Google Drive is manual backup & recovery.</div>
 
             <div style="margin-top:2px;margin-bottom:12px;border:1px solid rgba(52,211,153,.25);border-radius:12px;padding:12px;background:rgba(52,211,153,.05);">
                 <div style="font-size:.84rem;font-weight:800;color:#34d399;margin-bottom:6px;"><i class="fa-solid fa-shield-halved"></i> App Lock PIN — who can open this app</div>
@@ -2236,7 +2236,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             <div class="secure-cloud-grid">
                 <div class="secure-cloud-card"><b>⚡ IndexedDB Local Database</b><span>Fast, asynchronous browser storage. Existing localStorage data is migrated automatically.</span></div>
                 <div class="secure-cloud-card"><b>☁️ Google Drive Backup</b><span>Manual encrypted backup/recovery. Firebase handles automatic operational cloud sync; Drive is used only when you explicitly press Sync Now or Restore.</span></div>
-                <div class="secure-cloud-card"><b>🧩 Versioned Recovery</b><span>Cloud snapshots are kept as separate backup files so one bad write does not erase the previous snapshot.</span></div>
+                <div class="secure-cloud-card"><b>🧩 Versioned Recovery</b><span>Local recovery versions are kept separately so you can restore an earlier safe point if needed.</span></div>
                 <div class="secure-cloud-card"><b>📊 Excel & JSON Export</b><span>Your existing reports/export and one-click JSON backup remain available.</span></div>
             </div>
 
@@ -2298,7 +2298,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             </div>
 
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
-                <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Automatic Backup Controls</div>
+                <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Manual Google Drive Backup & Recovery</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
                     <button type="button" class="btn-header btn-blue" style="justify-content:center;" onclick="syncNowToGoogleDrive()"><i class="fa-solid fa-cloud-arrow-up"></i> Sync Now</button>
                     <button type="button" class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="restoreLatestFromGoogleDrive()"><i class="fa-solid fa-cloud-arrow-down"></i> Restore Latest</button>
@@ -3307,7 +3307,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             // unpushed local edits (or is effectively empty). A locally changed, unsynced database is never silently overwritten.
                             pullStateFromFirebase(false);
                         }else if(cloudVersion>localVersion){
-                            setFirebaseStatus('🟡 Newer secure cloud data found, but this device has local changes. Cloud copy was NOT overwritten and local data was NOT replaced; review Pull Latest/Push Now.',true);
+                            setFirebaseStatus('ℹ️ Cloud update available — review Pull Latest or Push Now.',false);
                         }else if(cloudVersion===localVersion){
                             setFirebaseStatus('🟢 Secure Firebase is up to date.',false);
                         }else{
@@ -3341,8 +3341,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if (!data.payload) return;
                 if (data.ownerUid && data.ownerUid!==mfFirebaseUser.uid) { setFirebaseStatus('🔒 Cloud record belongs to another account.',true); return; }
                 if (data.updatedByDevice === mfFirebaseDeviceId) return;
-                if(Number(data.version||0)>mfKnownCloudVersion()) setFirebaseStatus('🟡 Newer secure cloud version detected — Pull Latest before editing.',true);
-                showFirebaseUpdateBanner(data.updatedAtLabel || '', Number(data.version||0));
+                const cloudVersion=Number(data.version||0);
+                const localFp=mfLocalStateFingerprint();
+                const cloudFp=mfCloudPayloadFingerprint(data);
+                const sameDatabase=!!cloudFp&&!!localFp&&cloudFp===localFp;
+                if(sameDatabase){
+                    mfSetKnownCloudVersion(cloudVersion);
+                    try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',localFp);localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(cloudVersion));localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
+                    setFirebaseStatus('🟢 Secure Firebase is up to date — local and cloud data match.',false);
+                    return;
+                }
+                if(cloudVersion>mfKnownCloudVersion()) setFirebaseStatus('ℹ️ Cloud update available — review Pull Latest or Push Now.',false);
+                showFirebaseUpdateBanner(data.updatedAtLabel || '', cloudVersion);
             }, err => {
                 console.error('Firebase secure listener error', err);
                 setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Firebase listener'), true);
@@ -3585,11 +3595,46 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 while(a.length>200) a.shift(); localStorage.setItem(key,JSON.stringify(a));
             }catch(e){}
         }
+        function mfCanonicalStateForFingerprint(obj){
+            // Compatibility-only normalization: older cloud snapshots may omit fields that
+            // V15 adds locally with deterministic defaults. Treat those equivalent states as
+            // the same database so a fresh deployment does not create a false conflict.
+            try{
+                const x=mfScaleClone(obj||{});
+                (x.loans||[]).forEach(l=>{
+                    if(!l) return;
+                    l.phone2=String(l.phone2||l.secondaryPhone||l.husbandPhone||'').trim();
+                    l.guarantorPhone2=String(l.guarantorPhone2||l.guarantorSecondaryPhone||'').trim();
+                    l.disbursalMode=String(l.disbursalMode||'Cash').trim()||'Cash';
+                    l.collectorId=String(l.collectorId||'').trim();
+                    l.collectorName=String(l.collectorName||'').trim();
+                });
+                Object.keys(x.products||{}).forEach(code=>{
+                    const q=x.products[code]; if(!q) return;
+                    if(q.rate===undefined||q.rate===null||q.rate==='') q.rate=0;
+                    if(!q.interestBasis) q.interestBasis='Reducing Basis';
+                    if(!q.days) q.days=30;
+                    if(!q.frequencyMode) q.frequencyMode=Number(q.days)===7?'WEEKLY':(Number(q.days)===15?'FORTNIGHTLY':(Number(q.days)===30?'MONTHLY_30':'CUSTOM'));
+                    if((code==='P-30K'||code==='P-45K')&&Number(q.amount)===(code==='P-30K'?30000:45000)&&/15\s*[- ]?Days/i.test(String(q.name||''))) q.days=15;
+                    if(code==='P-20K'&&Number(q.amount)===20000&&/weekly/i.test(String(q.name||''))) q.days=7;
+                    if(q.postMaturityInterest===undefined||q.postMaturityInterest===null||q.postMaturityInterest===''){ const a=Number(q.amount)||0; q.postMaturityInterest=a===20000?600:(a===30000?900:(a===45000?1000:0)); }
+                });
+                return x;
+            }catch(e){ return obj; }
+        }
+        function mfStableStringify(value){
+            if(value===null||typeof value!=='object') return JSON.stringify(value);
+            if(Array.isArray(value)) return '['+value.map(mfStableStringify).join(',')+']';
+            return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+mfStableStringify(value[k])).join(',')+'}';
+        }
         function mfStateFingerprintObject(obj){
-            try{const raw=JSON.stringify(obj);let h=2166136261;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(16);}catch(e){return '';}
+            try{const raw=mfStableStringify(mfCanonicalStateForFingerprint(obj));let h=2166136261;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(16);}catch(e){return '';}
         }
         function mfLocalStateFingerprint(){
             return mfStateFingerprintObject(state);
+        }
+        function mfCloudPayloadFingerprint(data){
+            try{return data?.payload?mfStateFingerprintObject(JSON.parse(data.payload)):'';}catch(e){return '';}
         }
         function mfRecordLocalVersion(){
             try{localStorage.setItem('MF_LOCAL_STATE_VERSION',JSON.stringify({at:new Date().toISOString(),fingerprint:mfLocalStateFingerprint()}));}catch(e){}
