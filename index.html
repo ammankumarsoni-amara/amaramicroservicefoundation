@@ -2950,16 +2950,22 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         if(statusEl) statusEl.textContent=`Scalable Data Engine: indexing ${Math.min(start+batch.length,total).toLocaleString('en-IN')} / ${total.toLocaleString('en-IN')} loans…`;
                         await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(()=>r(),{timeout:50}):setTimeout(r,0));
                     }
-                    await mfScaleTx(['scalable_products','scalable_staff','scalable_expenses','scalable_borrowings'],'readwrite',stores=>{
-                        const replaceStore=(storeName,values)=>{
-                            const st=stores[storeName], keep=new Set();
-                            if(Array.isArray(values)) values.forEach((v,i)=>{const id=String(v?.id||v?.key||('ROW-'+i));keep.add(id);st.put({...mfScaleClone(v),id});});
-                            else Object.entries(values||{}).forEach(([id,v])=>{keep.add(String(id));st.put({...mfScaleClone(v),id:String(id)});});
-                            st.openCursor().onsuccess=e=>{const c=e.target.result;if(!c)return;if(!keep.has(String(c.key)))c.delete();c.continue();};
-                        };
-                        replaceStore('scalable_products',state.products||{}); replaceStore('scalable_staff',state.staff||[]);
-                        replaceStore('scalable_expenses',state.expenses||[]); replaceStore('scalable_borrowings',state.borrowings||[]);
-                    });
+                    try{
+                        const statusEl=document.getElementById('mf-scalable-status');
+                        if(statusEl) statusEl.textContent='Scalable Data Engine: finalizing local entity indexes…';
+                        await mfScaleTx(['scalable_products','scalable_staff','scalable_expenses','scalable_borrowings'],'readwrite',stores=>{
+                            const replaceStore=(storeName,values)=>{
+                                const st=stores[storeName], keep=new Set();
+                                if(Array.isArray(values)) values.forEach((v,i)=>{const id=String(v?.id||v?.key||('ROW-'+i));keep.add(id);st.put({...mfScaleClone(v),id});});
+                                else Object.entries(values||{}).forEach(([id,v])=>{keep.add(String(id));st.put({...mfScaleClone(v),id:String(id)});});
+                                st.openCursor().onsuccess=e=>{const c=e.target.result;if(!c)return;if(!keep.has(String(c.key)))c.delete();c.continue();};
+                            };
+                            replaceStore('scalable_products',state.products||{}); replaceStore('scalable_staff',state.staff||[]);
+                            replaceStore('scalable_expenses',state.expenses||[]); replaceStore('scalable_borrowings',state.borrowings||[]);
+                        });
+                    }catch(e){
+                        console.warn('Secondary scalable entity indexes skipped; loan/search index remains usable:',e);
+                    }
                 } else {
                     // Normal save: update only entities actually touched through the state proxy.
                     for(const id of [...mfScaleDirty.loans]){
@@ -3269,6 +3275,30 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         const localFp=mfLocalStateFingerprint();
                         const lastPushedFp=localStorage.getItem('MF_SECURE_LAST_PUSH_FINGERPRINT')||'';
                         const hasLocalData=Array.isArray(state?.loans)&&state.loans.length>0 || (state?.products && Object.keys(state.products).length>0);
+                        // A fresh device can legitimately know cloudVersion=0 even when its local
+                        // database is already the same database as the cloud copy (for example after
+                        // a GitHub deployment). Compare the actual cloud payload fingerprint before
+                        // declaring a local/cloud conflict. This prevents a false warning while still
+                        // refusing to overwrite genuinely different local data.
+                        let cloudPayloadFp='';
+                        try {
+                            if(data.payload){
+                                const cloudState=JSON.parse(data.payload);
+                                cloudPayloadFp=mfStateFingerprintObject(cloudState);
+                            }
+                        } catch(e) { cloudPayloadFp=''; }
+                        const sameDatabase = !!cloudPayloadFp && !!localFp && cloudPayloadFp===localFp;
+                        if(sameDatabase && cloudVersion>0){
+                            mfSetKnownCloudVersion(cloudVersion);
+                            try{
+                                localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',localFp);
+                                localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(cloudVersion));
+                                localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());
+                                localStorage.removeItem('MF_LOCAL_DIRTY_AT');
+                            }catch(e){}
+                            setFirebaseStatus('🟢 Secure Firebase is up to date — local and cloud data match.',false);
+                            return;
+                        }
                         if(showAlerts){
                             if(confirm('Secure cloud data already exists for this account. Load it onto THIS device now? Choose Cancel to keep this device data and upload it as the new secure cloud version.')) pullStateFromFirebase(false);
                             else pushStateToFirebase(false);
@@ -3555,8 +3585,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 while(a.length>200) a.shift(); localStorage.setItem(key,JSON.stringify(a));
             }catch(e){}
         }
+        function mfStateFingerprintObject(obj){
+            try{const raw=JSON.stringify(obj);let h=2166136261;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(16);}catch(e){return '';}
+        }
         function mfLocalStateFingerprint(){
-            try{const raw=JSON.stringify(state);let h=2166136261;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(16);}catch(e){return '';}
+            return mfStateFingerprintObject(state);
         }
         function mfRecordLocalVersion(){
             try{localStorage.setItem('MF_LOCAL_STATE_VERSION',JSON.stringify({at:new Date().toISOString(),fingerprint:mfLocalStateFingerprint()}));}catch(e){}
