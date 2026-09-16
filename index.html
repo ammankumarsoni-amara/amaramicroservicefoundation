@@ -459,6 +459,24 @@
         .secure-cloud-status{padding:9px 10px;border-radius:9px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.22);font-size:.72rem;color:#a7f3d0;margin:8px 0}
         .secure-cloud-warning{padding:9px 10px;border-radius:9px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.22);font-size:.7rem;color:#fde68a;margin:8px 0}
         @media(max-width:600px){.secure-cloud-grid{grid-template-columns:1fr}}
+        /* Final responsive cloud-sync cleanup: keep configuration available without making the
+           daily business UI look technical or forcing horizontal overflow on phones/laptops. */
+        .mf-cloud-config-details{margin-top:10px;border:1px solid var(--border-subtle);border-radius:10px;background:rgba(255,255,255,.025);overflow:hidden;}
+        .mf-cloud-config-details>summary{cursor:pointer;list-style:none;padding:9px 11px;font-size:.72rem;font-weight:800;color:#cbd5e1;display:flex;align-items:center;justify-content:space-between;gap:8px;touch-action:manipulation;}
+        .mf-cloud-config-details>summary::-webkit-details-marker{display:none}
+        .mf-cloud-config-details>summary:after{content:'▾';font-size:.75rem;color:#94a3b8;transition:transform .15s ease;}
+        .mf-cloud-config-details[open]>summary:after{transform:rotate(180deg)}
+        .mf-cloud-config-body{padding:10px;border-top:1px solid var(--border-subtle)}
+        .mf-sync-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px;margin-top:9px;}
+        .mf-sync-actions .btn-header{min-width:0;white-space:nowrap;}
+        .mf-sync-status{min-height:18px;overflow-wrap:anywhere;}
+        .mf-cloud-safe-note{font-size:.62rem;color:#64748b;margin-top:6px;line-height:1.35;}
+        @media(max-width:600px){
+          .mf-sync-actions{grid-template-columns:1fr;}
+          .mf-sync-actions .btn-header{width:100%;}
+          .mf-cloud-config-details>summary{padding:10px 9px;}
+        }
+        @media(min-width:601px) and (max-width:900px){.mf-sync-actions{grid-template-columns:1fr 1fr;}}
 
         /* V32.1 action controls: prevent native white buttons on mobile Chrome. */
         .opex-action-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
@@ -2259,30 +2277,38 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             </div>
 
             <div style="margin-top:12px;border-top:2px solid #34d399;padding-top:12px;">
-                <div style="font-size:.84rem;font-weight:800;color:#34d399;margin-bottom:3px;"><i class="fa-solid fa-bolt"></i> Secure Firebase Sync (Production)</div>
+                <div style="font-size:.84rem;font-weight:800;color:#34d399;margin-bottom:3px;"><i class="fa-solid fa-bolt"></i> Secure Firebase Sync</div>
                 <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;line-height:1.4;">Secure cloud sync for your business. Your data syncs automatically after saves. Use the same signed-in account and Sync Code on mobile and laptop.</div>
 
-                <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Firebase Config (paste the whole firebaseConfig object here)</label>
-                <textarea id="firebase-config-input" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}' style="width:100%;min-height:70px;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.72rem;font-family:monospace;margin-bottom:7px;"></textarea>
-
-                <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Sync Code (use the SAME code on mobile and laptop)</label>
-                <input type="text" id="firebase-sync-code" placeholder="e.g. amma-loan-2026-secure" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;margin-bottom:7px;">
-
-                <button type="button" class="btn-header btn-green" style="width:100%;justify-content:center;" id="mf-connect-sync-btn" onclick="connectFirebaseSync()"><i class="fa-solid fa-bolt"></i> Connect Firebase Sync</button>
-                <div id="firebase-sync-status" style="font-size:.68rem;color:#94a3b8;margin-top:7px;">Not connected yet.</div>
-
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px;">
+                <div class="mf-sync-status" id="firebase-sync-status" style="font-size:.68rem;color:#94a3b8;margin-top:7px;">Not connected yet.</div>
+                <div class="mf-sync-actions">
                     <button type="button" class="btn-header btn-blue" style="justify-content:center;" id="mf-push-sync-btn" onclick="pushStateToFirebase(false)"><i class="fa-solid fa-cloud-arrow-up"></i> Sync Now</button>
                     <button type="button" class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" id="mf-pull-sync-btn" onclick="pullStateFromFirebase(true)"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Latest</button>
                 </div>
-                <div style="font-size:.62rem;color:#64748b;margin-top:6px;line-height:1.35;"><b>How it works:</b> Firebase sync runs automatically after a save. Use <b>Sync Now</b> only when you want an immediate manual sync. Keep your Sync Code private.</div>
+                <div class="mf-cloud-safe-note"><b>Automatic sync:</b> Firebase sync runs automatically after a save. Use <b>Sync Now</b> only when you want an immediate manual sync.</div>
+                <details class="mf-cloud-config-details">
+                    <summary><span><i class="fa-solid fa-sliders me-1"></i> Connection settings</span><span style="font-weight:600;color:#64748b;">Advanced</span></summary>
+                    <div class="mf-cloud-config-body">
+                        <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Firebase Config</label>
+                        <textarea id="firebase-config-input" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}' style="width:100%;min-height:70px;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.72rem;font-family:monospace;margin-bottom:7px;"></textarea>
+                        <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Firebase Sync Code</label>
+                        <input type="text" id="firebase-sync-code" placeholder="Your business Sync Code" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;margin-bottom:7px;">
+                        <button type="button" class="btn-header btn-green" style="width:100%;justify-content:center;" id="mf-connect-sync-btn" onclick="connectFirebaseSync()"><i class="fa-solid fa-bolt"></i> Connect Firebase Sync</button>
+                        <div style="font-size:.62rem;color:#64748b;margin-top:6px;line-height:1.35;">Connection settings are only needed when setting up this device or reconnecting it.</div>
+                    </div>
+                </details>
             </div>
 
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
                 <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Google Drive Backup & Recovery</div>
-                <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Google OAuth Web Client ID</label>
-                <input type="text" id="google-client-id" placeholder="xxxx.apps.googleusercontent.com" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;margin-bottom:7px;">
                 <button type="button" class="btn-header btn-green" style="width:100%;justify-content:center;" onclick="connectGoogleDrive()"><i class="fa-brands fa-google-drive"></i> Connect My Google Drive</button>
+                <details class="mf-cloud-config-details">
+                    <summary><span><i class="fa-solid fa-sliders me-1"></i> Google Drive connection settings</span><span style="font-weight:600;color:#64748b;">Advanced</span></summary>
+                    <div class="mf-cloud-config-body">
+                        <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Google OAuth Web Client ID</label>
+                        <input type="text" id="google-client-id" placeholder="xxxx.apps.googleusercontent.com" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;margin-bottom:7px;">
+                    </div>
+                </details>
                 <div style="font-size:.66rem;color:#94a3b8;margin-top:6px;line-height:1.4;">The app never asks for or stores your Gmail password. Google OAuth grants the app the limited <b>drive.file</b> Drive scope needed for its own backup files.</div>
                 <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, host this app on your HTTPS domain.</div>
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required)</label>
@@ -2947,12 +2973,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 (loan.payments||[]).forEach((pay,i)=>{const id=String(loan.id)+'|'+String(i)+'|'+String(pay?.date||'')+'|'+String(pay?.amount||0);paySt.put({...mfScaleClone(pay),id,loanId:String(loan.id),paymentIndex:i});});
                             }
                         });
-                        if(statusEl) statusEl.textContent=`Scalable Data Engine: indexing ${Math.min(start+batch.length,total).toLocaleString('en-IN')} / ${total.toLocaleString('en-IN')} loans…`;
+                        if(statusEl) statusEl.textContent=`Preparing local data… ${Math.min(start+batch.length,total).toLocaleString('en-IN')} / ${total.toLocaleString('en-IN')}`;
                         await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(()=>r(),{timeout:50}):setTimeout(r,0));
                     }
                     try{
                         const statusEl=document.getElementById('mf-scalable-status');
-                        if(statusEl) statusEl.textContent='Scalable Data Engine: finishing…';
+                        if(statusEl) statusEl.textContent='Finishing local data setup…';
                         await mfScaleTx(['scalable_products','scalable_staff','scalable_expenses','scalable_borrowings'],'readwrite',stores=>{
                             const replaceStore=(storeName,values)=>{
                                 const st=stores[storeName], keep=new Set();
@@ -2985,7 +3011,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     }
                 }
                 mfScaleReady=true; mfScaleSearchReady=true;
-                const scaleEl=document.getElementById('mf-scalable-status'); if(scaleEl) scaleEl.textContent=`Scalable Data Engine: Ready`;
+                const scaleEl=document.getElementById('mf-scalable-status'); if(scaleEl) scaleEl.textContent='🟢 Local data setup is ready.';
                 await mfScalePutMeta({id:'entity_mirror',schema:MF_SCALE.schema,localDirtyAt:dirtyAt,loanCount:loans.length,searchReady:true,updatedAt:new Date().toISOString()});
             }catch(e){console.warn('Scalable local entity update skipped:',e);}
             finally{mfScaleBuildBusy=false;}
