@@ -837,6 +837,28 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 .finance-pill{white-space:normal;overflow-wrap:anywhere;word-break:normal;}
 </style>
 
+<style id="mf-v10-global-overflow-audit-ui">
+/* Do not clip action labels or wide operational tables. Keep the existing layout geometry,
+   but allow content to wrap/scroll instead of silently cutting words on phones. */
+.btn-action-group .btn-header{overflow:visible!important;text-overflow:clip!important;white-space:normal!important;word-break:normal!important;overflow-wrap:anywhere!important;line-height:1.12;min-height:40px;height:auto;}
+.upcoming-day{overflow-x:auto!important;overflow-y:hidden!important;-webkit-overflow-scrolling:touch;}
+.upcoming-emi-table{min-width:760px;width:max-content;max-width:none;}
+@media(max-width:700px){.btn-action-group .btn-header{min-height:42px;padding-top:7px;padding-bottom:7px;}}
+</style>
+<style id="mf-v9-status-definition-ui">
+.recovery-status-definition{display:inline-flex;align-items:center;min-height:30px;padding:5px 8px;border-radius:8px;color:#94a3b8;background:rgba(255,255,255,.025);border:1px dashed rgba(148,163,184,.12);font-size:.58rem;font-weight:700;line-height:1.3;}
+@media(max-width:600px){.recovery-status-definition{width:100%;justify-content:center;text-align:center;}}
+</style>
+<style id="mf-v8-complete-status-and-detail-ui">
+.finance-table-wrap{width:100%;max-width:100%;overflow-x:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:thin;}
+.finance-table{min-width:1050px;table-layout:auto;}
+.finance-table th,.finance-table td{white-space:nowrap;overflow-wrap:normal;word-break:normal;}
+.finance-profile-cell,.finance-contact-cell{white-space:normal;min-width:150px;}
+.finance-money-cell{white-space:nowrap;min-width:110px;}
+.finance-status-pill{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap!important;word-break:normal!important;}
+.finance-table-wrap:after{content:'Swipe left / right to view all columns';display:block;text-align:center;color:#64748b;font-size:.58rem;padding:5px 0 2px;}
+@media(max-width:700px){.finance-table{min-width:1120px}.finance-table th,.finance-table td{padding-left:9px;padding-right:9px}}
+</style>
 <style id="mf-v7-final-presentation-audit">
 /* V7 FINAL PRESENTATION PATCH — visual only; no calculation/storage logic changed. */
 .recovery-search-panel{margin:10px 0 10px!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;width:100%!important;}
@@ -1059,7 +1081,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div class="recovery-quick-filters" role="group" aria-label="Customer Recovery quick filters">
                     <button type="button" class="recovery-filter-btn active" data-recovery-status="ALL" onclick="setRecoveryStatusFilter('ALL')">All</button>
                     <button type="button" class="recovery-filter-btn" data-recovery-status="ACTIVE" onclick="setRecoveryStatusFilter('ACTIVE')">Active</button>
-                    <button type="button" class="recovery-filter-btn" data-recovery-status="DUE" onclick="setRecoveryStatusFilter('DUE')">Due / Overdue</button>
+                    <button type="button" class="recovery-filter-btn" data-recovery-status="DUE" onclick="setRecoveryStatusFilter('DUE')">Due / Overdue</button><span class="recovery-status-definition">Overdue = unpaid EMI past due date · Due = unpaid EMI due today</span>
                     <button type="button" class="recovery-filter-btn" data-recovery-status="SETTLED" onclick="setRecoveryStatusFilter('SETTLED')">Settled</button>
                     <button type="button" class="recovery-filter-btn" data-recovery-status="CLOSED" onclick="setRecoveryStatusFilter('CLOSED')">Closed</button>
                     <button type="button" class="recovery-filter-btn" data-recovery-status="FORECLOSED" onclick="setRecoveryStatusFilter('FORECLOSED')">Foreclosed</button>
@@ -1224,7 +1246,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <input id="loan-master-search" oninput="mfScaleLoanMasterPage=0;renderAllLoansTable()" placeholder="Search customer, phone, Loan ID or product..." style="width:100%;padding:9px 10px 9px 30px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;font-weight:600;">
                     </div>
                     <select id="loan-master-product" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;font-weight:700;min-width:150px;"><option value="ALL">All Products</option></select>
-                    <select id="loan-master-status" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;font-weight:700;min-width:125px;"><option value="ALL">All Status</option><option value="ACTIVE">Active</option><option value="CLOSED">Closed</option><option value="FORECLOSED">Foreclosed</option></select>
+                    <select id="loan-master-status" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;font-weight:700;min-width:125px;"><option value="ALL">All Status</option><option value="ACTIVE">Active</option><option value="DUE">Due Today</option><option value="OVERDUE">Overdue</option><option value="CLOSED">Closed</option><option value="SETTLED">Settled</option><option value="FORECLOSED">Foreclosed</option></select>
                     <button class="btn-header btn-blue" onclick="resetLoanMasterFilters()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
                 </div>
                 <div id="loan-master-result-count" style="font-size:.7rem;color:#64748b;margin-top:7px;"></div>
@@ -2920,10 +2942,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 scaleMaturity=String(getLoanMaturityDate(loan)||'');
                 paidPrincipal=(loan.payments||[]).reduce((sum,p)=>sum+(Number(p.principal)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.principalPaid||0)+Number(loan.foreclosureData?.partialAmountAlreadyCollected||0):0);
                 realizedProfit=Number(product.fileCharge)||0+(loan.payments||[]).reduce((sum,p)=>sum+(Number(p.interest)||0)+(Number(p.penalty)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.feeAmount||0):0);
-                scaleStatus=loan.foreclosed?'FORECLOSED':(loan.postMaturitySettlement?'SETTLED':(pending<=0?'CLOSED':'ACTIVE'));
+                scaleStatus=mfLoanOperationalStatus(loan);
             }catch(e){}
-            const loanCopy=mfScaleClone(loan); delete loanCopy.payments;
-            await mfScaleTx(['scalable_loans'],'readwrite',s=>s.scalable_loans.put({...loanCopy,id:String(loan.id),_scaleFingerprint:fp,_scaleUpdatedAt:new Date().toISOString(),_scaleStatus:scaleStatus,_scaleRecoveryStatus:(scaleStatus==='ACTIVE' && scaleMaturity && new Date()>new Date(scaleMaturity+'T23:59:59'))?'DUE':scaleStatus,_scaleMaturityIso:scaleMaturity,_scalePending:pending,_scalePaidPrincipal:paidPrincipal,_scaleRealizedProfit:realizedProfit}));
+            const statusInfo=(()=>{try{return mfLoanOperationalStatusInfo(loan);}catch(e){return {overdueCount:0,dueTodayCount:0,overdueDays:0,oldestOverdueDueDate:'',firstUnpaidDueDate:''};}})();
+            const loanCopy=mfScaleClone(loan); if(!loanCopy) throw new Error('Loan mirror clone failed'); delete loanCopy.payments;
+            await mfScaleTx(['scalable_loans'],'readwrite',s=>s.scalable_loans.put({...loanCopy,id:String(loan.id),_scaleFingerprint:fp,_scaleUpdatedAt:new Date().toISOString(),_scaleStatus:scaleStatus,_scaleRecoveryStatus:(scaleStatus==='OVERDUE'||scaleStatus==='DUE')?'DUE':scaleStatus,_scaleOverdueCount:statusInfo.overdueCount,_scaleDueTodayCount:statusInfo.dueTodayCount,_scaleOverdueDays:statusInfo.overdueDays,_scaleOldestOverdueDueDate:statusInfo.oldestOverdueDueDate,_scaleFirstUnpaidDueDate:statusInfo.firstUnpaidDueDate,_scaleMaturityIso:scaleMaturity,_scalePending:pending,_scalePaidPrincipal:paidPrincipal,_scaleRealizedProfit:realizedProfit}));
         }
         async function mfScaleReplaceSearchForLoan(loan){
             if(!loan?.id) return;
@@ -3015,15 +3038,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 try{
                                     const product=state.products?.[loan.product]||{};
                                     scaleMaturity=String(getLoanMaturityDate(loan)||'');
-                                    const scheduled=Number(loan.principal)||Number(loan.amount)||Number(product.principal)||0;
-                                    const paid=(loan.payments||[]).reduce((sum,x)=>sum+(Number(x?.amount)||0),0);
-                                    pending=Math.max(0,scheduled-paid);
+                                    pending=Math.max(0,Number(getLoanPending(loan))||0);
                                     paidPrincipal=(loan.payments||[]).reduce((sum,x)=>sum+(Number(x?.principal)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.principalPaid||0)+Number(loan.foreclosureData?.partialAmountAlreadyCollected||0):0);
                                     realizedProfit=Number(product.fileCharge)||0+(loan.payments||[]).reduce((sum,x)=>sum+(Number(x?.interest)||0)+(Number(x?.penalty)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.feeAmount||0):0);
-                                    scaleStatus=loan.foreclosed?'FORECLOSED':(loan.postMaturitySettlement?'SETTLED':(pending<=0?'CLOSED':'ACTIVE'));
+                                    scaleStatus=mfLoanOperationalStatus(loan);
                                 }catch(e){}
-                                const loanCopy=mfScaleClone(loan); delete loanCopy.payments;
-                                loanSt.put({...loanCopy,id:String(loan.id),_scaleFingerprint:fp,_scaleUpdatedAt:new Date().toISOString(),_scaleStatus:scaleStatus,_scaleRecoveryStatus:(scaleStatus==='ACTIVE' && scaleMaturity && new Date()>new Date(scaleMaturity+'T23:59:59'))?'DUE':scaleStatus,_scaleMaturityIso:scaleMaturity,_scalePending:pending,_scalePaidPrincipal:paidPrincipal,_scaleRealizedProfit:realizedProfit});
+                                let statusInfo={overdueCount:0,dueTodayCount:0,overdueDays:0,oldestOverdueDueDate:'',firstUnpaidDueDate:''}; try{statusInfo=mfLoanOperationalStatusInfo(loan);}catch(e){}
+                                const loanCopy=mfScaleClone(loan); if(!loanCopy) throw new Error('Loan mirror clone failed'); delete loanCopy.payments;
+                                loanSt.put({...loanCopy,id:String(loan.id),_scaleFingerprint:fp,_scaleUpdatedAt:new Date().toISOString(),_scaleStatus:scaleStatus,_scaleRecoveryStatus:(scaleStatus==='OVERDUE'||scaleStatus==='DUE')?'DUE':scaleStatus,_scaleOverdueCount:statusInfo.overdueCount,_scaleDueTodayCount:statusInfo.dueTodayCount,_scaleOverdueDays:statusInfo.overdueDays,_scaleOldestOverdueDueDate:statusInfo.oldestOverdueDueDate,_scaleFirstUnpaidDueDate:statusInfo.firstUnpaidDueDate,_scaleMaturityIso:scaleMaturity,_scalePending:pending,_scalePaidPrincipal:paidPrincipal,_scaleRealizedProfit:realizedProfit});
                                 for(const token of mfScaleTokens(mfScaleLoanSearchText(loan))) searchSt.put({id:token+'|'+String(loan.id),token,loanId:String(loan.id)});
                                 (loan.payments||[]).forEach((pay,i)=>{const id=String(loan.id)+'|'+String(i)+'|'+String(pay?.date||'')+'|'+String(pay?.amount||0);paySt.put({...mfScaleClone(pay),id,loanId:String(loan.id),paymentIndex:i});});
                             }
@@ -3133,7 +3155,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 });
                 if(!loan) continue;
                 if(product!=='ALL' && String(loan.product)!==String(product)) continue;
-                const dynamicStatus=String(loan._scaleStatus)==='ACTIVE' && loan._scaleMaturityIso && new Date()>new Date(String(loan._scaleMaturityIso)+'T23:59:59') ? 'DUE' : String(loan._scaleStatus||'ACTIVE');
+                const storedStatus=String(loan._scaleStatus||'ACTIVE');
+                const dynamicStatus=storedStatus;
                 if(status!=='ALL' && dynamicStatus!==String(status)) continue;
                 matched.push(String(loan.id));
             }
@@ -3156,7 +3179,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const rec=await new Promise(resolve=>{const tx=db.transaction('scalable_loans','readonly');const r=tx.objectStore('scalable_loans').get(String(id));r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>resolve(null);});
                 if(!rec) return null;
                 if(product!=='ALL'&&String(rec.product)!==String(product)) return null;
-                if(status!=='ALL'&&String(rec._scaleStatus)!==String(status)) return null;
+                const recStatus=String(rec._scaleStatus||'ACTIVE'); if(status!=='ALL'&&recStatus!==String(status)) return null;
                 if(tokens.length>1){
                     for(const token of tokens.slice(1)){
                         const exists=await new Promise(resolve=>{const tx=db.transaction('scalable_search','readonly');const r=tx.objectStore('scalable_search').get(token+'|'+String(id));r.onsuccess=()=>resolve(!!r.result);r.onerror=()=>resolve(false);});
@@ -4438,56 +4461,70 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             });
         }
 
+        // ================= FINANCIAL RECONCILIATION CORE =================
+        // One canonical calculation source for dashboard KPIs, executive exports and audit checks.
+        // Principal/disbursal is capital, not revenue. Only actually recorded customer-side
+        // earnings are included in Gross Revenue; settlement principal and waivers are excluded.
+        function mfFinancialReconciliation(){
+            const loans=Array.isArray(state.loans)?state.loans:[], products=state.products||{};
+            const out={loans:loans.length,disbursed:0,file:0,interest:0,penalty:0,foreclosureFee:0,preClosureInterest:0,postMaturityInterest:0,preEmiInterest:0,settlementReceived:0,settlementPrincipal:0,settlementContractualInterest:0,settlementRecoveryInterest:0,settlementWaiver:0,outstanding:0,collections:0,negativeRecords:0,missingProducts:0,statusCounts:{ACTIVE:0,DUE:0,OVERDUE:0,CLOSED:0,SETTLED:0,FORECLOSED:0},issues:[]};
+            const issue=(code,msg)=>out.issues.push({code,msg});
+            loans.forEach(l=>{
+                const p=products[l.product];
+                if(!p){out.missingProducts++;issue('MISSING_PRODUCT',`${l.id}: linked product ${l.product||'-'} is missing.`);return;}
+                const amount=Number(p.amount)||0, file=Number(p.fileCharge)||0;
+                if(amount<0||file<0)out.negativeRecords++;
+                out.disbursed+=amount; out.file+=file;
+                (l.payments||[]).forEach(pay=>{
+                    const amt=Number(pay.amount)||0, intr=Number(pay.interest)||0, pen=Number(pay.penalty)||0, pre=Number(pay.preEmiInterest)||0;
+                    if(amt<0||intr<0||pen<0||pre<0)out.negativeRecords++;
+                    out.collections+=Math.max(0,amt); out.interest+=intr; out.penalty+=pen; out.preEmiInterest+=pre;
+                });
+                if(l.foreclosed&&l.foreclosureData){out.foreclosureFee+=Math.max(0,Number(l.foreclosureData.feeAmount)||0);out.preClosureInterest+=Math.max(0,Number(l.foreclosureData.preClosureInterest)||0);}
+                if(l.postMaturitySettlement){
+                    const pm=l.postMaturitySettlement, c=getPostMaturitySettlementCalc(l,pm.settlementDate), a=mfSettlementAllocation(l,Number(pm.actualReceived)||0,c);
+                    out.settlementReceived+=Math.max(0,Number(pm.actualReceived)||0);
+                    out.settlementPrincipal+=Math.max(0,Number(a.principalReceived)||0);
+                    out.settlementContractualInterest+=Math.max(0,Number(a.contractualInterestReceived)||0);
+                    out.settlementRecoveryInterest+=Math.max(0,Number(a.recoveryInterestReceived)||0);
+                    out.settlementWaiver+=Math.max(0,c.calculatedSettlement-(Number(pm.actualReceived)||0));
+                    out.interest+=Math.max(0,Number(a.contractualInterestReceived||0)-Number(a.preEmiReceived||0));
+                    out.preEmiInterest+=Math.max(0,Number(a.preEmiReceived)||0);
+                    out.postMaturityInterest+=Math.max(0,Number(a.recoveryInterestReceived)||0);
+                }
+                out.outstanding += l.foreclosed ? 0 : Math.max(0,Number(getLoanPending(l))||0);
+                out.statusCounts[mfLoanOperationalStatus(l)] = (out.statusCounts[mfLoanOperationalStatus(l)]||0)+1;
+            });
+            out.collections += out.settlementReceived;
+            let lenderInterest=0,lenderGst=0,lenderUpfront=0,principalRepaid=0,capitalBorrowed=0;
+            (state.borrowings||[]).forEach(b=>{
+                capitalBorrowed+=Math.max(0,Number(b.amount)||0); lenderUpfront+=Math.max(0,Number(borrowingUpfrontCharges(b))||0);
+                (b.repayments||[]).forEach(r=>{principalRepaid+=Math.max(0,Number(r.principal)||0);lenderInterest+=Math.max(0,Number(r.interest)||0);lenderGst+=Math.max(0,Number(r.gst)||0);});
+            });
+            const salaries=(state.staff||[]).reduce((a,st)=>a+(st.salaryPayments||[]).reduce((s,x)=>s+Math.max(0,Number(x.amount)||0),0),0);
+            const generalExp=(state.expenses||[]).reduce((a,e)=>a+Math.max(0,Number(e.amount)||0),0);
+            out.lenderInterest=lenderInterest;out.lenderGst=lenderGst;out.lenderUpfront=lenderUpfront;out.capitalBorrowed=capitalBorrowed;out.principalRepaid=principalRepaid;out.remainingDebt=Math.max(0,capitalBorrowed-principalRepaid);out.salaries=salaries;out.generalExp=generalExp;
+            out.gross=out.file+out.interest+out.penalty+out.foreclosureFee+out.preClosureInterest+out.postMaturityInterest+out.preEmiInterest;
+            out.lenderCost=lenderInterest+lenderGst+lenderUpfront;out.opex=salaries+generalExp;out.net=out.gross-out.lenderCost-out.opex;
+            const sumStatuses=Object.values(out.statusCounts).reduce((a,x)=>a+x,0); if(sumStatuses!==out.loans)issue('STATUS_COUNT_MISMATCH',`Status counts total ${sumStatuses}, loan records ${out.loans}.`);
+            const expectedGross=out.file+out.interest+out.penalty+out.foreclosureFee+out.preClosureInterest+out.postMaturityInterest+out.preEmiInterest; if(Math.abs(expectedGross-out.gross)>0.005)issue('GROSS_MISMATCH','Gross revenue component sum does not reconcile.');
+            const expectedNet=out.gross-out.lenderCost-out.opex; if(Math.abs(expectedNet-out.net)>0.005)issue('NET_MISMATCH','Net surplus does not reconcile with Gross − Lender Cost − OPEX.');
+            if(out.settlementReceived+0.005 < out.settlementPrincipal+out.settlementContractualInterest+out.settlementRecoveryInterest) issue('SETTLEMENT_ALLOCATION','Settlement allocation exceeds actual received amount.');
+            return out;
+        }
+
         // ================= DASHBOARD RENDER + KPI RESTORE FIX =================
         // Keep the existing V32 calculations intact; this only reconnects the dashboard
         // render pipeline that the Pay Lender patch accidentally omitted.
         function renderKPIs(){
-            const loans=Array.isArray(state.loans)?state.loans:[];
-            const products=state.products||{};
-            let totalDisbursed=0,totalFile=0,totalInterest=0,totalPenalty=0,totalForeclose=0,totalPreClosure=0,totalPostMaturity=0,totalPreEmi=0;
-            loans.forEach(l=>{
-                const p=products[l.product]; if(!p) return;
-                totalDisbursed += Number(p.amount)||0;
-                totalFile += Number(p.fileCharge)||0;
-                (l.payments||[]).forEach(pay=>{
-                    totalInterest += Number(pay.interest)||0;
-                    totalPenalty += Number(pay.penalty)||0;
-                    totalPreEmi += Number(pay.preEmiInterest)||0;
-                });
-                if(l.foreclosed){ totalForeclose += Number(l.foreclosureData?.feeAmount)||0; totalPreClosure += Number(l.foreclosureData?.preClosureInterest)||0; }
-                if(l.postMaturitySettlement){
-                    const c=getPostMaturitySettlementCalc(l,l.postMaturitySettlement.settlementDate);
-                    const a=mfSettlementAllocation(l,Number(l.postMaturitySettlement.actualReceived)||0,c);
-                    totalInterest += Math.max(0,Number(a.contractualInterestReceived||0)-Number(a.preEmiReceived||0));
-                    totalPreEmi += Number(a.preEmiReceived)||0;
-                    totalPostMaturity += Number(a.recoveryInterestReceived)||0;
-                }
-            });
-            let lenderInterest=0,lenderGst=0,lenderUpfront=0;
-            (state.borrowings||[]).forEach(b=>{
-                (b.repayments||[]).forEach(r=>{
-                    lenderInterest += Number(r.interest)||0;
-                    lenderGst += Number(r.gst)||0;
-                });
-                lenderUpfront += (Number(b.processingFee)||0)+(Number(b.processingGst)||0)+(Number(b.otherCharges)||0)+(Number(b.otherGst)||0);
-            });
-            let salaries=0;
-            (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(sp=>salaries+=Number(sp.amount)||0));
-            const generalExpenses=(state.expenses||[]).reduce((a,e)=>a+(Number(e.amount)||0),0);
-            const gross=totalFile+totalInterest+totalPenalty+totalForeclose+totalPreClosure+totalPostMaturity+totalPreEmi;
-            const lenderCost=lenderInterest+lenderGst+lenderUpfront;
-            const opex=salaries+generalExpenses;
-            const net=gross-lenderCost-opex;
-            const outstanding=loans.filter(l=>!l.foreclosed).reduce((sum,l)=>{
-                return sum + Math.max(0,Number(getLoanPending(l))||0);
-            },0);
+            const r=mfFinancialReconciliation();
             const set=(id,v)=>{const el=document.getElementById(id);if(el)el.innerText=v;};
-            set('kpi-disbursed','₹'+totalDisbursed.toLocaleString('en-IN'));
-            set('kpi-gross-profit','₹'+gross.toLocaleString('en-IN'));
-            set('kpi-borrow-cost','-₹'+lenderCost.toLocaleString('en-IN'));
-            set('kpi-opex-cost','-₹'+opex.toLocaleString('en-IN'));
-            set('kpi-net-spread','₹'+net.toLocaleString('en-IN'));
-            set('kpi-outstanding','₹'+outstanding.toLocaleString('en-IN'));
+            set('kpi-disbursed','₹'+r.disbursed.toLocaleString('en-IN'));
+            set('kpi-gross-profit','₹'+r.gross.toLocaleString('en-IN'));
+            set('kpi-borrow-cost','-₹'+r.lenderCost.toLocaleString('en-IN'));
+            set('kpi-opex-cost','-₹'+r.opex.toLocaleString('en-IN'));
+            set('kpi-net-spread','₹'+r.net.toLocaleString('en-IN'));
+            set('kpi-outstanding','₹'+r.outstanding.toLocaleString('en-IN'));
         }
 
         // Mobile responsiveness fix: do not synchronously rebuild every hidden screen after
@@ -5053,23 +5090,58 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function mfIsoToday(){ return new Date().toISOString().slice(0,10); }
         function mfIsoAddDays(iso, days){ const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m) return ''; const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3])); d.setDate(d.getDate()+Number(days||0)); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
         function mfDaysBetween(a,b){ const x=new Date(a+'T00:00:00'), y=new Date(b+'T00:00:00'); return Math.round((y-x)/86400000); }
+        // Canonical contractual schedule view. Match a payment to its own due date (or
+        // explicit installment number) before falling back to array position. This prevents
+        // editing/deleting one old payment from shifting later EMI statuses.
+        function mfPaymentForInstallment(loan, installmentNo, dueIso){
+            const payments=Array.isArray(loan?.payments)?loan.payments:[];
+            const exactNo=payments.find(x=>Number(x?.installmentNo)===Number(installmentNo));
+            if(exactNo) return exactNo;
+            const exactDue=payments.find(x=>String(x?.dueDate||'').slice(0,10)===String(dueIso||'').slice(0,10));
+            if(exactDue) return exactDue;
+            return payments[Number(installmentNo)-1]||null;
+        }
         function mfLoanScheduleRows(loan){
             const p=state.products[loan.product];
             if(!p || !p.tenure || !loan.disbursalDate) return [];
             const payments=Array.isArray(loan.payments)?loan.payments:[];
-                        mfScalePaymentCounts.set(String(loan.id),payments.length);
+            mfScalePaymentCounts.set(String(loan.id),payments.length);
             const rows=[];
             for(let i=1;i<=Number(p.tenure);i++){
                 const due=mfLoanScheduleDueIso(loan,i);
-                const paid=payments[i-1];
+                const paid=mfPaymentForInstallment(loan,i,due);
                 const preEmiInterest=i===1?mfLoanPreEmiDue(loan):0;
                 rows.push({loan,product:p,no:i,dueDate:due,emi:Number(p.emi)||0,baseEmi:Number(p.emi)||0,totalDue:mfLoanInstallmentAmount(loan,i),preEmiInterest,principal:Number(p.principal)||0,interest:Number(p.interest)||0,paid:!!paid,paidRecord:paid||null});
             }
             return rows;
         }
+        // Canonical account status. OVERDUE = one or more unpaid EMIs whose contractual due
+        // date is before today. DUE = an unpaid EMI due today. Final maturity alone never makes
+        // an account overdue when all scheduled installments have already been collected.
+        function mfLoanOperationalStatus(loan){
+            if(!loan) return 'ACTIVE';
+            if(loan.foreclosed) return 'FORECLOSED';
+            if(loan.postMaturitySettlement) return 'SETTLED';
+            const pending=Math.max(0,Number(getLoanPending(loan))||0);
+            if(pending<=0) return 'CLOSED';
+            const rows=mfLoanScheduleRows(loan), today=mfIsoToday();
+            let overdue=0,dueToday=0;
+            rows.forEach(r=>{if(r.paid)return;if(r.dueDate<today)overdue++;else if(r.dueDate===today)dueToday++;});
+            if(overdue>0) return 'OVERDUE';
+            if(dueToday>0) return 'DUE';
+            return 'ACTIVE';
+        }
+        function mfLoanOperationalStatusInfo(loan){
+            const status=mfLoanOperationalStatus(loan), rows=mfLoanScheduleRows(loan), today=mfIsoToday();
+            const unpaid=rows.filter(r=>!r.paid), overdueRows=unpaid.filter(r=>r.dueDate<today), dueRows=unpaid.filter(r=>r.dueDate===today);
+            const oldest=overdueRows.length?overdueRows[0].dueDate:'';
+            return {status,unpaidCount:unpaid.length,overdueCount:overdueRows.length,dueTodayCount:dueRows.length,firstUnpaidDueDate:unpaid[0]?.dueDate||'',oldestOverdueDueDate:oldest,overdueDays:oldest?mfUpcomingOverdueDays(oldest,today):0};
+        }
         function mfUpcomingStatus(row, todayIso){
             if(row.paid) return 'PAID';
-            return row.dueDate < todayIso ? 'DUE' : 'UPCOMING';
+            if(row.dueDate < todayIso) return 'OVERDUE';
+            if(row.dueDate === todayIso) return 'DUE';
+            return 'UPCOMING';
         }
         function mfUpcomingOverdueDays(dueDate, todayIso){
             if(!dueDate || dueDate >= todayIso) return 0;
@@ -5224,6 +5296,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const total=rows.reduce((s,r)=>s+(Number(r.totalDue??r.emi)||0),0),
                   clients=new Set(rows.map(r=>r.loan.id)).size,
                   due=rows.filter(r=>r.upcomingStatus==='DUE'),
+                  overdue=rows.filter(r=>r.upcomingStatus==='OVERDUE'),
                   upcoming=rows.filter(r=>r.upcomingStatus==='UPCOMING'),
                   paid=rows.filter(r=>r.upcomingStatus==='PAID'),
                   attentionCustomers=new Set(rows.filter(r=>!!mfCollectionAttentionForRow(r)).map(r=>r.loan.id)).size,
@@ -5231,7 +5304,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(summary) summary.innerHTML=`
                 <div class="upcoming-emi-mini"><small>EMIs in Range</small><b>${rows.length}</b></div>
                 <div class="upcoming-emi-mini"><small>Clients</small><b>${clients}</b></div>
-                <div class="upcoming-emi-mini"><small>Due / Overdue</small><b style="color:#f87171;">${due.length}</b></div>
+                <div class="upcoming-emi-mini"><small>Due Today</small><b style="color:#fbbf24;">${due.length}</b></div>
+                <div class="upcoming-emi-mini"><small>Overdue</small><b style="color:#f87171;">${overdue.length}</b></div>
                 <div class="upcoming-emi-mini"><small>Upcoming</small><b style="color:#fbbf24;">${upcoming.length}</b></div>
                 <div style="grid-column:1/-1;font-size:.68rem;color:#94a3b8;padding:2px 3px;line-height:1.5;">
                     Selected-range EMI total: <b style="color:#34d399;">₹${total.toLocaleString('en-IN')}</b>
@@ -5254,9 +5328,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function renderUpcomingCollectorSummary(rows){
             const old=document.getElementById('upcoming-collector-summary'); if(old) old.remove();
             const wrap=document.createElement('div'); wrap.id='upcoming-collector-summary'; wrap.className='upcoming-collector-summary';
-            const groups={}; rows.forEach(r=>{const key=loanCollectorName(r.loan); (groups[key] ||= {count:0,total:0,due:0,upcoming:0}); groups[key].count++; groups[key].total+=Number(r.emi)||0; if(r.upcomingStatus==='DUE')groups[key].due++; if(r.upcomingStatus==='UPCOMING')groups[key].upcoming++;});
+            const groups={}; rows.forEach(r=>{const key=loanCollectorName(r.loan); (groups[key] ||= {count:0,total:0,due:0,overdue:0,upcoming:0}); groups[key].count++; groups[key].total+=Number(r.emi)||0; if(r.upcomingStatus==='DUE')groups[key].due++; if(r.upcomingStatus==='OVERDUE')groups[key].overdue++; if(r.upcomingStatus==='UPCOMING')groups[key].upcoming++;});
             const entries=Object.entries(groups).sort((a,b)=>b[1].total-a[1].total);
-            wrap.innerHTML=`<div class="upcoming-collector-title"><i class="fa-solid fa-user-group"></i> Collector-wise Collection</div>${entries.length?entries.map(([name,g])=>`<div class="upcoming-collector-row"><span><b>${name}</b><small>${g.count} EMI · ${g.due} due · ${g.upcoming} upcoming</small></span><strong>₹${g.total.toLocaleString('en-IN')}</strong></div>`).join(''):'<div class="upcoming-collector-empty">No collection entries for the selected filters.</div>'}`;
+            wrap.innerHTML=`<div class="upcoming-collector-title"><i class="fa-solid fa-user-group"></i> Collector-wise Collection</div>${entries.length?entries.map(([name,g])=>`<div class="upcoming-collector-row"><span><b>${name}</b><small>${g.count} EMI · ${g.overdue} overdue · ${g.due} due today · ${g.upcoming} upcoming</small></span><strong>₹${g.total.toLocaleString('en-IN')}</strong></div>`).join(''):'<div class="upcoming-collector-empty">No collection entries for the selected filters.</div>'}`;
             const sec=document.getElementById('upcoming-emi-section'), summary=document.getElementById('upcoming-emi-summary'); if(sec&&summary) sec.insertBefore(wrap,summary.nextSibling);
         }
 
@@ -5550,13 +5624,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             closeModal('modal-post-maturity-settlement'); persist(); alert(`Loan ${loan.id} (${loan.name}) settled after maturity. Received ₹${actual.toLocaleString('en-IN')}; waiver ₹${waiver.toLocaleString('en-IN')}.`);
         }
         function getLoanRecoveryView(loan){
-            const p=state.products[loan.product]||{}; const maturity=getLoanMaturityDate(loan); const today=new Date();
-            const pending=getLoanPending(loan); const settled=!!loan.postMaturitySettlement;
-            // A fully paid/closed, settled, or foreclosed loan is never overdue.
-            // Calculate DPD only while a contractual balance is actually pending.
-            const closed=!!loan.foreclosed || settled || pending<=0;
-            const overdueDays=(!closed && maturity)?Math.max(0,Math.ceil((today-maturity)/86400000)):0;
-            return {p,maturity,overdueDays,pending,settled,recoveryMonths:overdueDays>0?Math.ceil(overdueDays/30):0,npaWatch:overdueDays>=90};
+            const p=state.products[loan.product]||{}; const maturity=getLoanMaturityDate(loan);
+            const pending=Math.max(0,Number(getLoanPending(loan))||0); const settled=!!loan.postMaturitySettlement;
+            const info=mfLoanOperationalStatusInfo(loan);
+            const overdueDays=(info.status==='OVERDUE'&&!settled&&!loan.foreclosed&&pending>0)?info.overdueDays:0;
+            return {p,maturity,overdueDays,pending,settled,recoveryMonths:overdueDays>0?Math.ceil(overdueDays/30):0,npaWatch:overdueDays>=90,unpaidCount:info.unpaidCount,overdueCount:info.overdueCount,dueTodayCount:info.dueTodayCount,firstUnpaidDueDate:info.firstUnpaidDueDate,oldestOverdueDueDate:info.oldestOverdueDueDate,status:info.status};
         }
         function initNpaFilters(){
             const y=document.getElementById('npa-year-filter'), pr=document.getElementById('npa-product-filter'), ag=document.getElementById('npa-agent-filter'); if(!y||!pr||!ag)return;
@@ -5567,14 +5639,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         let npaFiltersApplied=false;
         function getNpaRows(){
             const q=(document.getElementById('npa-search')?.value||'').toLowerCase().trim(), y=document.getElementById('npa-year-filter')?.value||'ALL', pr=document.getElementById('npa-product-filter')?.value||'ALL', st=document.getElementById('npa-status-filter')?.value||'90PLUS', ag=document.getElementById('npa-agent-filter')?.value||'ALL';
-            return (state.loans||[]).map(l=>{const v=getLoanRecoveryView(l); return {...l,_v:v};}).filter(x=>{const l=x,v=x._v; const hay=[l.name,l.id,l.phone,l.phone2].filter(Boolean).join(' ').toLowerCase(); if(q&&!hay.includes(q))return false;if(y!=='ALL'&&String(new Date(l.disbursalDate).getFullYear())!==String(y))return false;if(pr!=='ALL'&&l.product!==pr)return false;if(ag!=='ALL'&&(l.collectorName||'')!==ag)return false; if(st==='90PLUS'&&!(v.npaWatch&&!v.settled&&!l.foreclosed&&v.pending>0))return false;if(st==='POSTMATURITY'&&!(v.overdueDays>0&&v.pending>0&&!v.settled&&!l.foreclosed))return false;if(st==='90PLUS_OR_POSTMATURITY'&&!((v.npaWatch||v.overdueDays>0)&&!v.settled&&!l.foreclosed&&v.pending>0))return false;if(st==='SETTLED'&&!v.settled&&!l.foreclosed&&v.pending>0)return false;return true;}).sort((a,b)=>b._v.overdueDays-a._v.overdueDays);
+            return (state.loans||[]).map(l=>{const v=getLoanRecoveryView(l); return {...l,_v:v};}).filter(x=>{const l=x,v=x._v; const hay=[l.name,l.id,l.phone,l.phone2].filter(Boolean).join(' ').toLowerCase(); if(q&&!hay.includes(q))return false;if(y!=='ALL'&&String(new Date(l.disbursalDate).getFullYear())!==String(y))return false;if(pr!=='ALL'&&l.product!==pr)return false;if(ag!=='ALL'&&(l.collectorName||'')!==ag)return false; if(st==='90PLUS'&&!(v.npaWatch&&!v.settled&&!l.foreclosed&&v.pending>0))return false;if(st==='POSTMATURITY'&&!((v.maturity&&mfIsoToday()>String(v.maturity.toISOString().slice(0,10)))&&v.pending>0&&!v.settled&&!l.foreclosed))return false;if(st==='90PLUS_OR_POSTMATURITY'&&!((v.npaWatch||(v.maturity&&mfIsoToday()>String(v.maturity.toISOString().slice(0,10))))&&!v.settled&&!l.foreclosed&&v.pending>0))return false;if(st==='SETTLED'&&!v.settled&&!l.foreclosed&&v.pending>0)return false;return true;}).sort((a,b)=>b._v.overdueDays-a._v.overdueDays);
         }
         function applyNpaFilters(){npaFiltersApplied=true;renderNpaResults();}
         function resetNpaFilters(){['npa-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['npa-year-filter','npa-product-filter','npa-agent-filter'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='ALL';});const ns=document.getElementById('npa-status-filter');if(ns)ns.value='90PLUS';npaFiltersApplied=false;document.getElementById('npa-results').innerHTML='<div class="npa-empty"><i class="fa-solid fa-magnifying-glass" style="font-size:1.4rem;display:block;margin-bottom:8px;"></i>Use Search / Filters and tap <b>Apply Filters</b> to load the recovery list.</div>';}
         function renderNpaResults(){
-            const box=document.getElementById('npa-results'); if(!box)return; if(!npaFiltersApplied){resetNpaFilters();return;} const rows=getNpaRows(); const totalPending=rows.reduce((a,x)=>a+x._v.pending,0), watch=rows.filter(x=>x._v.npaWatch&&!x._v.settled).length, eligible=rows.filter(x=>x._v.overdueDays>0&&x._v.pending>0&&!x._v.settled).length, settled=rows.filter(x=>x._v.settled||x.foreclosed||x._v.pending<=0).length;
+            const box=document.getElementById('npa-results'); if(!box)return; if(!npaFiltersApplied){resetNpaFilters();return;} const rows=getNpaRows(); const totalPending=rows.reduce((a,x)=>a+x._v.pending,0), watch=rows.filter(x=>x._v.npaWatch&&!x._v.settled).length, eligible=rows.filter(x=>x._v.maturity&&mfIsoToday()>String(x._v.maturity.toISOString().slice(0,10))&&x._v.pending>0&&!x._v.settled&&!x.foreclosed).length, settled=rows.filter(x=>x._v.settled||x.foreclosed||x._v.pending<=0).length;
             const summary=`<div class="npa-summary"><div class="kpi-card" style="padding:8px"><div class="kpi-label">Matched Accounts</div><div class="kpi-val" style="font-size:1rem">${rows.length}</div></div><div class="kpi-card" style="padding:8px"><div class="kpi-label">90+ DPD Watch</div><div class="kpi-val" style="font-size:1rem;color:#f87171">${watch}</div></div><div class="kpi-card" style="padding:8px"><div class="kpi-label">Post-Maturity Eligible</div><div class="kpi-val" style="font-size:1rem;color:#fbbf24">${eligible}</div></div><div class="kpi-card" style="padding:8px"><div class="kpi-label">Pending Amount</div><div class="kpi-val" style="font-size:1rem;color:#34d399">₹${totalPending.toLocaleString('en-IN')}</div></div></div>`;
-            const body=rows.map(x=>{const l=x,v=x._v; const st=l.foreclosed?'FORECLOSED':v.settled?'SETTLED':v.pending<=0?'CLOSED':v.overdueDays>0?(v.npaWatch?'90+ DPD':'OVERDUE'):'ACTIVE'; return `<div class="npa-row"><div><b>${financeEsc(l.name)}</b><div style="color:#64748b">${financeEsc(l.id)} · ${financeEsc(l.phone||'-')}</div></div><div class="npa-hide-mobile">${financeEsc(v.p.name||'-')}</div><div class="npa-hide-mobile">${v.overdueDays} DPD</div><div><b style="color:#f87171">₹${v.pending.toLocaleString('en-IN')}</b></div><div class="npa-hide-mobile">${st}</div><div class="npa-hide-mobile">${financeEsc(l.collectorName||'-')}</div><div><button class="btn-edit-sm" onclick="openLoanFromProduct('${l.id}')">Open</button>${v.overdueDays>0&&v.pending>0&&!l.foreclosed&&!v.settled?` <button class="btn-edit-sm" style="background:#92400e;color:#fde68a" onclick="openPostMaturitySettlementModal('${l.id}')">Settle</button>`:''}</div></div>`;}).join('');
+            const body=rows.map(x=>{const l=x,v=x._v; const st=l.foreclosed?'FORECLOSED':v.settled?'SETTLED':v.pending<=0?'CLOSED':v.overdueDays>0?(v.npaWatch?'90+ DPD':'OVERDUE'):'ACTIVE'; return `<div class="npa-row"><div><b>${financeEsc(l.name)}</b><div style="color:#64748b">${financeEsc(l.id)} · ${financeEsc(l.phone||'-')}</div></div><div class="npa-hide-mobile">${financeEsc(v.p.name||'-')}</div><div class="npa-hide-mobile">${v.overdueDays} DPD</div><div><b style="color:#f87171">₹${v.pending.toLocaleString('en-IN')}</b></div><div class="npa-hide-mobile">${st}</div><div class="npa-hide-mobile">${financeEsc(l.collectorName||'-')}</div><div><button class="btn-edit-sm" onclick="openLoanFromProduct('${l.id}')">Open</button>${v.maturity&&mfIsoToday()>String(v.maturity.toISOString().slice(0,10))&&v.pending>0&&!l.foreclosed&&!v.settled?` <button class="btn-edit-sm" style="background:#92400e;color:#fde68a" onclick="openPostMaturitySettlementModal('${l.id}')">Settle</button>`:''}</div></div>`;}).join('');
             box.innerHTML=summary+(body?`<div style="display:grid;gap:6px;max-height:55vh;overflow:auto;">${body}</div>`:'<div class="npa-empty">No customer matches these filters.</div>');
         }
         function getNpaExportRows(){return getNpaRows().map(x=>{const v=x._v;return [x.id,x.name,x.phone||'',x.phone2||'',x.guarantorPhone||'',(x.guarantorPhone2||x.guarantorSecondaryPhone||''),v.p.name||'',formatToIndianDate(x.disbursalDate),v.maturity?formatToIndianDate(v.maturity.toISOString().split('T')[0]):'',v.overdueDays,v.recoveryMonths,v.pending,v.settled?'SETTLED':x.foreclosed?'FORECLOSED':v.pending<=0?'CLOSED':v.npaWatch?'90+ DPD':'OVERDUE',x.collectorName||'',formatToIndianDate(x.postMaturitySettlement?.settlementDate),x.postMaturitySettlement?.calculatedSettlement||0,x.postMaturitySettlement?.actualReceived||0,x.postMaturitySettlement?.waiverAmount||0,x.postMaturitySettlement?.partialAmountAlreadyCollected||0,x.postMaturitySettlement?.mode||''];});}
@@ -5588,12 +5660,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             renderFeed();
         }
         function getRecoveryStatus(loan){
-            if(loan.foreclosed) return 'FORECLOSED';
-            if(loan.postMaturitySettlement) return 'SETTLED';
-            const pending=getLoanPending(loan);
-            if(pending<=0) return 'CLOSED';
-            const v=getLoanRecoveryView(loan);
-            return v.overdueDays>0 ? 'DUE' : 'ACTIVE';
+            const st=mfLoanOperationalStatus(loan);
+            return (st==='OVERDUE'||st==='DUE') ? 'DUE' : st;
         }
 
         function normalizeRecoverySearchText(value){
@@ -5622,7 +5690,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <button class="btn-foreclose-sm" onclick="openForecloseModal('${id}')"><i class="fa-solid fa-handshake"></i> Foreclose</button>
                 <button class="legacy-emi-btn green" onclick="openBulkEmiModal('${id}','ALL')"><i class="fa-solid fa-bolt"></i> Collect All EMIs</button>
                 <button class="legacy-emi-btn blue" onclick="openBulkEmiModal('${id}','MANUAL')"><i class="fa-solid fa-list-check"></i> Select / Range Due Dates</button>
-                ${view.overdueDays>0?`<button class="btn-collect-sm" style="background:#92400e;" onclick="openPostMaturitySettlementModal('${id}')"><i class="fa-solid fa-file-signature"></i> Settle After Maturity</button>`:''}
+                ${view.maturity&&mfIsoToday()>String(view.maturity.toISOString().slice(0,10))?`<button class="btn-collect-sm" style="background:#92400e;" onclick="openPostMaturitySettlementModal('${id}')"><i class="fa-solid fa-file-signature"></i> Settle After Maturity</button>`:''}
                 <button class="btn-edit-sm" onclick="openEditClientModal('${id}')"><i class="fa-solid fa-pen"></i> Edit</button>
             </div>`;
         }
@@ -5658,7 +5726,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const settlementReceived=loan.postMaturitySettlement?Number(loan.postMaturitySettlement.actualReceived||0)+Number(loan.postMaturitySettlement.partialAmountAlreadyCollected||0):0;
                 const paidAmt=loan.payments.reduce((s,p)=>s+(Number(p.amount)||0),0)+settlementReceived,pending=getLoanPending(loan),paidCount=loan.postMaturitySettlement?prod.tenure:loan.payments.length,penaltyPaid=loan.payments.reduce((s,p)=>s+(Number(p.penalty)||0),0),partialCollected=loan.postMaturitySettlement?Number(loan.postMaturitySettlement.partialAmountAlreadyCollected||0):getLoanPartialSum(loan),view=getLoanRecoveryView(loan),status=getRecoveryStatus(loan);
                 const card=document.createElement('div');card.className='client-card recovery-search-card';
-                const statusBadge=loan.foreclosed?`<span class="badge-foreclosed">FORECLOSED</span>`:loan.postMaturitySettlement?`<span class="badge-paid">SETTLED</span>`:pending<=0?`<span class="badge-paid">CLOSED</span>`:`<span style="color:#f87171;font-weight:800;font-size:.82rem;">Due: ₹${pending.toLocaleString('en-IN')}</span>`;
+                const opStatus=mfLoanOperationalStatus(loan); const statusBadge=opStatus==='FORECLOSED'?`<span class="badge-foreclosed">FORECLOSED</span>`:opStatus==='SETTLED'?`<span class="badge-paid">SETTLED</span>`:opStatus==='CLOSED'?`<span class="badge-paid">CLOSED</span>`:opStatus==='OVERDUE'?`<span class="badge-overdue">OVERDUE</span>`:opStatus==='DUE'?`<span class="badge-pending">DUE TODAY</span>`:`<span style="color:#f87171;font-weight:800;font-size:.82rem;">Due: ₹${pending.toLocaleString('en-IN')}</span>`;
                 const guarantorLine=loan.guarantorName?`<div style="font-size:.72rem;color:#94a3b8;margin-top:4px;"><i class="fa-solid fa-user-group me-1"></i> C/O / Guarantor: <b style="color:#fff;">${financeEsc(loan.guarantorName)}</b>${mfGuarantorContactText(loan)?` · ${financeEsc(mfGuarantorContactText(loan))}`:''}</div>`:'';
                 const extra=`${penaltyPaid>0?`<span style="color:#fbbf24;font-size:.7rem;margin-left:5px;">Penalty paid: ₹${penaltyPaid.toLocaleString('en-IN')}</span>`:''}${partialCollected>0&&!loan.postMaturitySettlement?`<div style="font-size:.7rem;color:#93c5fd;margin-top:4px;">Partial collected: <b>₹${partialCollected.toLocaleString('en-IN')}</b></div>`:''}`;
                 card.innerHTML=`<div class="client-header"><div><span class="loan-badge">${financeEsc(loan.id)}</span><b style="font-size:.95rem;margin-left:5px;color:#fff;">${financeEsc(loan.name)}</b><div style="font-size:.74rem;color:#94a3b8;margin-top:3px;"><i class="fa-solid fa-phone me-1"></i>${financeEsc(mfContactText(loan.phone,loan.phone2))} · <span style="color:#60a5fa;font-weight:700;">${financeEsc(prod.name)}</span>${extra}</div>${guarantorLine}</div><div style="text-align:right;">${statusBadge}<div style="margin-top:4px;"><button class="btn-edit-sm" onclick="openEditClientModal('${recoverySafeId(loan.id)}')"><i class="fa-solid fa-pen"></i> Edit</button></div></div></div><div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid rgba(255,255,255,.06);gap:10px;flex-wrap:wrap;"><div style="font-size:.74rem;color:#94a3b8;">Paid: <b style="color:#fff;">${paidCount}/${prod.tenure}</b> · ₹${paidAmt.toLocaleString('en-IN')} · Status: <b style="color:#cbd5e1;">${status}</b>${view.overdueDays>0?` · <span style="color:#f87171;">${view.overdueDays} days overdue</span>`:''}</div>${recoveryActionButton(loan,view)}</div>`;
@@ -7814,7 +7882,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const defaultDueDt = new Date(defaultDueIso + 'T00:00:00');
 
                 const settlementRow = postMaturity ? (mfSettlementScheduleRows(l)||[])[i-1] : null;
-                const pay = l.payments[i - 1];
+                const pay = mfPaymentForInstallment(l, i, defaultDueIso);
                 let badge = `<span class="badge-pending">Pending</span>`;
                 // Contractual due date is derived from the original disbursal date + cycle.
                 // Never let a historical payment record override the schedule date.
@@ -8046,7 +8114,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(sr && sr.status==='SETTLED'){ paidCell=`<span class="badge-paid">SETTLED</span><div class="loan-card-paid-date">${formatToIndianDate(l.postMaturitySettlement.settlementDate)}</div>`; }
                 else if(sr && sr.status==='PARTIAL SETTLEMENT'){ paidCell=`<span style="color:#93c5fd;font-weight:800;font-size:.65rem;">PARTIAL SETTLEMENT</span><div class="loan-card-paid-date">${formatToIndianDate(l.postMaturitySettlement.settlementDate)}</div>`; }
                 else if(sr && sr.status==='WAIVED'){ paidCell=`<span class="badge-foreclosed">WAIVED</span><div class="loan-card-paid-date">${formatToIndianDate(l.postMaturitySettlement.settlementDate)}</div>`; }
-                else if(!settlementRows && l.payments[i-1]){ paidCell=`<span class="badge-paid">PAID</span><div class="loan-card-paid-date">${formatToIndianDate(l.payments[i-1].date)}</div>`; }
+                else if(!settlementRows && mfPaymentForInstallment(l,i,dueIso)){ const sp=mfPaymentForInstallment(l,i,dueIso); paidCell=`<span class="badge-paid">PAID</span><div class="loan-card-paid-date">${formatToIndianDate(sp.date)}</div>`; }
                 rows += `
                     <tr>
                         <td><b>#${i}</b></td>
@@ -8386,7 +8454,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             tbody.innerHTML='<tr><td colspan="11" style="padding:20px;text-align:center;color:#94a3b8;">Loading scalable loan records…</td></tr>';
             try{
                 const result=mfScaleReady?await mfScaleLoanMasterPageData({query:q,product,status,page:mfScaleLoanMasterPage,pageSize:MF_SCALE.pageSize}):null;
-                const filtered=result?result.rows:state.loans.filter(loan=>{const prod=state.products[loan.product]||{};const pending=getLoanPending(loan);const st=loan.foreclosed?'FORECLOSED':(loan.postMaturitySettlement?'SETTLED':(pending<=0?'CLOSED':'ACTIVE'));const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.address,loan.product,prod.name].filter(Boolean).join(' ').toLowerCase();return(!q||hay.includes(q.toLowerCase()))&&(product==='ALL'||loan.product===product)&&(status==='ALL'||st===status);}).slice(mfScaleLoanMasterPage*MF_SCALE.pageSize,(mfScaleLoanMasterPage+1)*MF_SCALE.pageSize);
+                const filtered=result?result.rows:state.loans.filter(loan=>{const prod=state.products[loan.product]||{};const st=mfLoanOperationalStatus(loan);const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.address,loan.product,prod.name].filter(Boolean).join(' ').toLowerCase();return(!q||hay.includes(q.toLowerCase()))&&(product==='ALL'||loan.product===product)&&(status==='ALL'||st===status);}).slice(mfScaleLoanMasterPage*MF_SCALE.pageSize,(mfScaleLoanMasterPage+1)*MF_SCALE.pageSize);
                 const total=result?.total;
                 const hasNext=result?result.hasNext:(mfScaleLoanMasterPage+1)*MF_SCALE.pageSize<state.loans.length;
                 const count=document.getElementById('loan-master-result-count');
@@ -8401,7 +8469,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     const paidPrincipal=Number(loan._scalePaidPrincipal)||((loan.payments||[]).reduce((s,p)=>s+(Number(p.principal)||0),0)+(loan.foreclosed?(loan.foreclosureData?.principalPaid||0)+Number(loan.foreclosureData?.partialAmountAlreadyCollected||0):0));
                     const realizedProfit=Number(loan._scaleRealizedProfit)|| (Number(prod.fileCharge)||0+(loan.payments||[]).reduce((s,p)=>s+(Number(p.interest)||0)+(Number(p.penalty)||0),0)+(loan.foreclosed?(loan.foreclosureData?.feeAmount||0):0));
                     const pending=Number.isFinite(Number(loan._scalePending))?Number(loan._scalePending):getLoanPending(loan);
-                    const badge=loan.foreclosed?'<span class="badge-foreclosed">FORECLOSED</span>':loan.postMaturitySettlement?'<span class="badge-paid">SETTLED</span>':pending<=0?'<span class="badge-paid">CLOSED</span>':'<span class="badge-overdue">ACTIVE</span>';
+                    const st=mfLoanOperationalStatus(loan); const badge=st==='FORECLOSED'?'<span class="badge-foreclosed">FORECLOSED</span>':st==='SETTLED'?'<span class="badge-paid">SETTLED</span>':st==='CLOSED'?'<span class="badge-paid">CLOSED</span>':st==='OVERDUE'?'<span class="badge-overdue">OVERDUE</span>':st==='DUE'?'<span class="badge-pending">DUE TODAY</span>':'<span class="badge-pending">ACTIVE</span>';
                     tbody.innerHTML+=`<tr onclick="openLoanMasterLoan('${recoverySafeId(loan.id)}')" style="cursor:pointer;" title="Open loan statement"><td><b style="color:#60a5fa;">${financeEsc(loan.id)}</b></td><td><b style="color:#fff;">${financeEsc(loan.name)}</b></td><td>${financeEsc(loan.phone||'-')}${loan.phone2?`<br><span style="font-size:.62rem;color:#60a5fa;">${financeEsc(loan.phone2)}</span>`:''}</td><td>${financeEsc(prod.name)}</td><td>${formatToIndianDate(loan.disbursalDate)}</td><td>₹${Number(prod.amount||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${Number(prod.emi||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${paidPrincipal.toLocaleString('en-IN')}</td><td style="color:#fbbf24;font-weight:700;">₹${realizedProfit.toLocaleString('en-IN')}</td><td style="color:${pending<=0?'#34d399':'#f87171'};font-weight:700;">₹${pending.toLocaleString('en-IN')}</td><td>${badge}</td></tr>`;
                 });
             }catch(e){tbody.innerHTML=`<tr><td colspan="11" style="padding:20px;text-align:center;color:#f87171;">Scalable loan index could not be loaded. Legacy view retained: ${financeEsc(e.message)}</td></tr>`;}
@@ -9204,21 +9272,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         // Existing operational data and calculations remain untouched.
         function mfExecutiveReportData(){
             const d=getFinanceSnapshot();
+            const recon=mfFinancialReconciliation();
             const loans=Array.isArray(state.loans)?state.loans:[];
             const products=state.products||{};
             const totalLoans=loans.length;
-            const totalDisbursed=loans.reduce((sum,l)=>sum+(Number(products[l.product]?.amount)||0),0);
-            const outstanding=loans.filter(l=>!l.foreclosed).reduce((sum,l)=>sum+Math.max(0,Number(getLoanPending(l))||0),0);
+            const totalDisbursed=recon.disbursed;
+            const outstanding=recon.outstanding;
 
-            let active=0, overdue=0, closed=0, settled=0, foreclosed=0;
-            loans.forEach(l=>{
-                if(l.foreclosed){ foreclosed++; return; }
-                if(l.postMaturitySettlement){ settled++; return; }
-                const pending=Math.max(0,Number(getLoanPending(l))||0);
-                if(pending<=0){ closed++; return; }
-                active++;
-                try{ if(getLoanRecoveryView(l).overdueDays>0) overdue++; }catch(e){}
-            });
+            const active=recon.statusCounts.ACTIVE||0, overdue=recon.statusCounts.OVERDUE||0, dueToday=recon.statusCounts.DUE||0, closed=recon.statusCounts.CLOSED||0, settled=recon.statusCounts.SETTLED||0, foreclosed=recon.statusCounts.FORECLOSED||0;
 
             let capitalBorrowed=0, principalRepaid=0, lenderInterest=0, lenderGst=0, upfront=0;
             (state.borrowings||[]).forEach(b=>{
@@ -9240,7 +9301,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
             const statusRows=[
                 ["Active / Current",active],
-                ["Overdue / Due",overdue],
+                ["Due Today",dueToday],
+                ["Overdue",overdue],
                 ["Closed",closed],
                 ["Settled After Maturity",settled],
                 ["Foreclosed",foreclosed]
@@ -9248,7 +9310,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
             return {
                 d,totalLoans,totalDisbursed,outstanding,
-                active,overdue,closed,settled,foreclosed,
+                active,overdue,dueToday,closed,settled,foreclosed,
                 capitalBorrowed,principalRepaid,lenderInterest,lenderGst,upfront,
                 remainingDebt:Math.max(0,capitalBorrowed-principalRepaid),
                 financingCost:lenderInterest+lenderGst+upfront,
@@ -9354,7 +9416,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 ["Current Customer Outstanding",r.outstanding],
                 ["Loan Accounts",r.totalLoans],
                 ["Active / Current",r.active],
-                ["Overdue / Due",r.overdue],
+                ["Due Today",r.dueToday],
+                ["Overdue",r.overdue],
                 ["Closed",r.closed],
                 ["Settled After Maturity",r.settled],
                 ["Foreclosed",r.foreclosed]
@@ -9605,7 +9668,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     const l=x.loan,p=x.p;
                     const paid=l.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((a,z)=>a+(Number(z.principal)||0),0)+(l.foreclosed?(Number(l.foreclosureData?.principalPaid)||0):0);
                     const out=l.foreclosed?0:getLoanPending(l);
-                    const status=l.foreclosed?'FORECLOSED':(l.postMaturitySettlement?'SETTLED':(out<=0?'CLOSED':'ACTIVE'));
+                    const rawStatus=mfLoanOperationalStatus(l); const status=(rawStatus==='OVERDUE'||rawStatus==='DUE')?'DUE':rawStatus;
                     const customerName=financeEsc(l.name||'-');
                     const guarantorName=financeEsc(l.guarantorName||'');
                     const customerPhones=financeEsc(mfContactText(l.phone,l.phone2));
@@ -9725,7 +9788,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(type==='gross') return d.disbursed.map(x=>[x.loan.id,x.loan.name,x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.includeDisb?x.p.fileCharge:0,x.interest,x.preEmiInterest,x.penalty,x.foreclosureFee,x.preClosureInterest,x.postMaturityInterest,x.settlementWaiver||0,x.totalProfit]);
             if(type==='lender') return d.lender.flatMap(x=>x.filteredRepayments.map(r=>[r.date,x.b.lenderName,r.principal,r.interest,r.gst||0,(Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0),r.mode||'']));
             if(type==='opex') return [...d.payroll.map(x=>[x.sp.date,x.st.name,'Payroll',x.sp.amount,x.sp.mode||'']),...d.expenses.map(x=>[x.date,x.category,x.desc,x.amount,x.mode||''])];
-            if(type==='disbursed') return d.disbursed.map(x=>[x.loan.id,x.loan.name,x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode),x.p.amount,x.loan.foreclosed?'FORECLOSED':(x.loan.postMaturitySettlement?'SETTLED':(x.loan.payments.length?'ACTIVE':'ACTIVE'))]);
+            if(type==='disbursed') return d.disbursed.map(x=>[x.loan.id,x.loan.name,x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode),x.p.amount,(()=>{const fs=mfLoanOperationalStatus(x.loan);return (fs==='OVERDUE'||fs==='DUE')?'DUE':fs;})()]);
             return [['Gross Revenue',d.gross],['Lender Cost',d.lenderCost],['Staff Salaries',d.salaries],['General Expenses',d.generalExp],['TRUE IN-HAND NET SURPLUS',d.net]];
         }
         function exportFinanceDetailReport(){
