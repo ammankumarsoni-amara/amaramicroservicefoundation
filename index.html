@@ -2254,18 +2254,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     <button type="button" class="btn-header btn-blue" style="justify-content:center;" onclick="mfAuthSignOut()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
                 </div>
                 <label style="display:flex;align-items:center;gap:6px;font-size:.65rem;color:#94a3b8;margin-top:8px;cursor:pointer;"><input type="checkbox" id="mf-secure-sync-enabled" checked disabled style="accent-color:#22c55e;"> Secure Firebase Sync (required for production)</label>
-                <div id="mf-secure-sync-note" style="font-size:.62rem;color:#64748b;margin-top:5px;line-height:1.35;">Secure Sync is the production mode. Firebase Authentication + the production Firestore Rules are required for cloud reads/writes.</div>
-                <div id="mf-scalable-status" style="font-size:.62rem;color:#64748b;margin-top:5px;line-height:1.35;">Scalable Data Engine: preparing local entity index…</div>
+                <div id="mf-secure-sync-note" style="font-size:.62rem;color:#64748b;margin-top:5px;line-height:1.35;">Secure Sync keeps your business data connected to Firebase. Sign in is required for secure cloud sync.</div>
+                <div id="mf-scalable-status" style="font-size:.62rem;color:#64748b;margin-top:5px;line-height:1.35;">Scalable Data Engine: preparing…</div>
             </div>
 
             <div style="margin-top:12px;border-top:2px solid #34d399;padding-top:12px;">
                 <div style="font-size:.84rem;font-weight:800;color:#34d399;margin-bottom:3px;"><i class="fa-solid fa-bolt"></i> Secure Firebase Fast Sync (Production)</div>
-                <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;line-height:1.4;">Authenticated secure sync for your production Firebase. The same signed-in account + Sync Code can be used on mobile and laptop.</div>
+                <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;line-height:1.4;">Secure cloud sync for your business. Use the same signed-in account and Sync Code on your mobile and laptop.</div>
 
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Firebase Config (paste the whole firebaseConfig object here)</label>
                 <textarea id="firebase-config-input" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}' style="width:100%;min-height:70px;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.72rem;font-family:monospace;margin-bottom:7px;"></textarea>
 
-                <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Sync Code (create one secret code — use the SAME code on mobile and laptop)</label>
+                <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Sync Code (use the SAME code on mobile and laptop)</label>
                 <input type="text" id="firebase-sync-code" placeholder="e.g. amma-loan-2026-secure" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;margin-bottom:7px;">
 
                 <button type="button" class="btn-header btn-green" style="width:100%;justify-content:center;" onclick="connectFirebaseSync()"><i class="fa-solid fa-bolt"></i> Connect Fast Sync</button>
@@ -2952,7 +2952,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     }
                     try{
                         const statusEl=document.getElementById('mf-scalable-status');
-                        if(statusEl) statusEl.textContent='Scalable Data Engine: finalizing local entity indexes…';
+                        if(statusEl) statusEl.textContent='Scalable Data Engine: finishing…';
                         await mfScaleTx(['scalable_products','scalable_staff','scalable_expenses','scalable_borrowings'],'readwrite',stores=>{
                             const replaceStore=(storeName,values)=>{
                                 const st=stores[storeName], keep=new Set();
@@ -2985,7 +2985,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     }
                 }
                 mfScaleReady=true; mfScaleSearchReady=true;
-                const scaleEl=document.getElementById('mf-scalable-status'); if(scaleEl) scaleEl.textContent=`Scalable Data Engine: ready · ${loans.length.toLocaleString('en-IN')} loans indexed · incremental entity updates active.`;
+                const scaleEl=document.getElementById('mf-scalable-status'); if(scaleEl) scaleEl.textContent=`Scalable Data Engine: Ready`;
                 await mfScalePutMeta({id:'entity_mirror',schema:MF_SCALE.schema,localDirtyAt:dirtyAt,loanCount:loans.length,searchReady:true,updatedAt:new Date().toISOString()});
             }catch(e){console.warn('Scalable local entity update skipped:',e);}
             finally{mfScaleBuildBusy=false;}
@@ -3307,7 +3307,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             // unpushed local edits (or is effectively empty). A locally changed, unsynced database is never silently overwritten.
                             pullStateFromFirebase(false);
                         }else if(cloudVersion>localVersion){
-                            setFirebaseStatus('ℹ️ Cloud update available — review Pull Latest or Push Now.',false);
+                            if(!mfHasUnpushedLocalChanges()){
+                                pullStateFromFirebase(true);
+                                setFirebaseStatus('🟢 Secure Firebase updated this device automatically.',false);
+                            }else{
+                                setFirebaseStatus('⚠️ Cloud data is newer. Review Pull Latest or Push Now.',false);
+                            }
                         }else if(cloudVersion===localVersion){
                             setFirebaseStatus('🟢 Secure Firebase is up to date.',false);
                         }else{
@@ -3351,8 +3356,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     setFirebaseStatus('🟢 Secure Firebase is up to date — local and cloud data match.',false);
                     return;
                 }
-                if(cloudVersion>mfKnownCloudVersion()) setFirebaseStatus('ℹ️ Cloud update available — review Pull Latest or Push Now.',false);
-                showFirebaseUpdateBanner(data.updatedAtLabel || '', cloudVersion);
+                if(cloudVersion>mfKnownCloudVersion()){
+                    if(!mfHasUnpushedLocalChanges()){
+                        pullStateFromFirebase(true);
+                        setFirebaseStatus('🟢 New cloud data loaded automatically.',false);
+                        return;
+                    }
+                    setFirebaseStatus('⚠️ Cloud data is newer. Review Pull Latest or Push Now.',false);
+                    showFirebaseUpdateBanner(data.updatedAtLabel || '', cloudVersion);
+                }
             }, err => {
                 console.error('Firebase secure listener error', err);
                 setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Firebase listener'), true);
@@ -3373,9 +3385,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 document.body.appendChild(bar);
             }
             bar.dataset.cloudVersion = String(version);
-            bar.innerHTML = `<span><i class="fa-solid fa-cloud-arrow-down me-1"></i> New data synced from another device${whenLabel ? ' (' + whenLabel + ')' : ''}.</span>
+            bar.innerHTML = `<span><i class="fa-solid fa-cloud-arrow-down me-1"></i> A newer cloud version is available${whenLabel ? ' (' + whenLabel + ')' : ''}; this device has local changes.</span>
                 <span>
-                    <button type="button" id="firebase-banner-load" style="background:#fff;color:#0f766e;border:none;padding:6px 12px;border-radius:8px;font-weight:800;cursor:pointer;margin-right:6px;touch-action:manipulation;">Load It</button>
+                    <button type="button" id="firebase-banner-load" style="background:#fff;color:#0f766e;border:none;padding:6px 12px;border-radius:8px;font-weight:800;cursor:pointer;margin-right:6px;touch-action:manipulation;">Pull Latest</button>
                     <button type="button" id="firebase-banner-dismiss" style="background:transparent;color:#fff;border:1px solid #fff;padding:6px 12px;border-radius:8px;font-weight:700;cursor:pointer;touch-action:manipulation;">Dismiss</button>
                 </span>`;
             const markAck = () => {
@@ -3407,6 +3419,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(!el){ el=document.createElement('div'); el.id='mf-transient-notice'; el.style.cssText='position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483646;background:#0f172a;color:#fff;border:1px solid rgba(52,211,153,.45);padding:10px 14px;border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.35);font-size:.78rem;font-weight:800;max-width:min(92vw,520px);text-align:center;'; document.body.appendChild(el); }
                 el.textContent=message; el.style.display='block'; clearTimeout(window.__mfNoticeTimer); window.__mfNoticeTimer=setTimeout(()=>{el.style.display='none';},2600);
             }catch(e){}
+        }
+        function mfHasUnpushedLocalChanges(){
+            try{
+                const dirtyAt=localStorage.getItem('MF_LOCAL_DIRTY_AT')||'';
+                if(dirtyAt) return true;
+                const last=localStorage.getItem('MF_SECURE_LAST_PUSH_FINGERPRINT')||'';
+                if(!last) return false;
+                const current=mfLocalStateFingerprint();
+                return !!current && current!==last;
+            }catch(e){ return false; }
         }
         function mfKnownCloudVersion(){ return Number(localStorage.getItem('MF_SECURE_CLOUD_VERSION')||0); }
         function mfSetKnownCloudVersion(v){ try{localStorage.setItem('MF_SECURE_CLOUD_VERSION',String(Number(v)||0));}catch(e){} }
