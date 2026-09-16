@@ -2918,13 +2918,37 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     mfScaleReady=true; mfScaleSearchReady=true; return;
                 }
                 if(fullRebuild || !meta?.searchReady){
-                    // One-time/bootstrap rebuild only. It is deliberately chunked and idle-yielded.
-                    for(let start=0;start<loans.length;start+=75){
-                        const batch=loans.slice(start,start+75);
-                        for(const loan of batch){
-                            await mfScaleUpsertLoan(loan); await mfScaleReplaceSearchForLoan(loan); await mfScaleUpsertPayments(loan);
-                        }
-                        await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(()=>r(),{timeout:60}):setTimeout(r,0));
+                    // One-time/bootstrap rebuild: use bulk IndexedDB transactions instead of
+                    // opening 2-3 transactions per loan. This keeps startup practical as the
+                    // customer base grows. Progress is surfaced so a slow first build is never
+                    // mistaken for a Firebase error.
+                    const total=loans.length;
+                    const statusEl=document.getElementById('mf-scalable-status');
+                    for(let start=0;start<total;start+=250){
+                        const batch=loans.slice(start,start+250);
+                        await mfScaleTx(['scalable_loans','scalable_search','scalable_payments'],'readwrite',stores=>{
+                            const loanSt=stores.scalable_loans, searchSt=stores.scalable_search, paySt=stores.scalable_payments;
+                            for(const loan of batch){
+                                if(!loan?.id) continue;
+                                const fp=mfScaleHash(loan);
+                                let pending=0,paidPrincipal=0,realizedProfit=0,scaleStatus='ACTIVE';
+                                try{
+                                    const product=state.products?.[loan.product]||{};
+                                    const scheduled=Number(loan.principal)||Number(loan.amount)||Number(product.principal)||0;
+                                    const paid=(loan.payments||[]).reduce((sum,x)=>sum+(Number(x?.amount)||0),0);
+                                    pending=Math.max(0,scheduled-paid);
+                                    paidPrincipal=(loan.payments||[]).reduce((sum,x)=>sum+(Number(x?.principal)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.principalPaid||0)+Number(loan.foreclosureData?.partialAmountAlreadyCollected||0):0);
+                                    realizedProfit=Number(product.fileCharge)||0+(loan.payments||[]).reduce((sum,x)=>sum+(Number(x?.interest)||0)+(Number(x?.penalty)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.feeAmount||0):0);
+                                    scaleStatus=loan.foreclosed?'FORECLOSED':(loan.postMaturitySettlement?'SETTLED':(pending<=0?'CLOSED':'ACTIVE'));
+                                }catch(e){}
+                                const loanCopy=mfScaleClone(loan); delete loanCopy.payments;
+                                loanSt.put({...loanCopy,id:String(loan.id),_scaleFingerprint:fp,_scaleUpdatedAt:new Date().toISOString(),_scaleStatus:scaleStatus,_scalePending:pending,_scalePaidPrincipal:paidPrincipal,_scaleRealizedProfit:realizedProfit});
+                                for(const token of mfScaleTokens(mfScaleLoanSearchText(loan))) searchSt.put({id:token+'|'+String(loan.id),token,loanId:String(loan.id)});
+                                (loan.payments||[]).forEach((pay,i)=>{const id=String(loan.id)+'|'+String(i)+'|'+String(pay?.date||'')+'|'+String(pay?.amount||0);paySt.put({...mfScaleClone(pay),id,loanId:String(loan.id),paymentIndex:i});});
+                            }
+                        });
+                        if(statusEl) statusEl.textContent=`Scalable Data Engine: indexing ${Math.min(start+batch.length,total).toLocaleString('en-IN')} / ${total.toLocaleString('en-IN')} loans…`;
+                        await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(()=>r(),{timeout:50}):setTimeout(r,0));
                     }
                     await mfScaleTx(['scalable_products','scalable_staff','scalable_expenses','scalable_borrowings'],'readwrite',stores=>{
                         const replaceStore=(storeName,values)=>{
