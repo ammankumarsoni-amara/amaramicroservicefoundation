@@ -2880,15 +2880,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(!loan?.id) return;
             const fp=mfScaleHash(loan); mfScaleLoanFingerprints.set(String(loan.id),fp);
             const product=state.products?.[loan.product]||{};
-            let pending=0,paidPrincipal=0,realizedProfit=0,scaleStatus='ACTIVE';
+            let pending=0,paidPrincipal=0,realizedProfit=0,scaleStatus='ACTIVE',scaleMaturity='';
             try{
                 pending=Math.max(0,Number(getLoanPending(loan))||0);
+                scaleMaturity=String(getLoanMaturityDate(loan)||'');
                 paidPrincipal=(loan.payments||[]).reduce((sum,p)=>sum+(Number(p.principal)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.principalPaid||0)+Number(loan.foreclosureData?.partialAmountAlreadyCollected||0):0);
                 realizedProfit=Number(product.fileCharge)||0+(loan.payments||[]).reduce((sum,p)=>sum+(Number(p.interest)||0)+(Number(p.penalty)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.feeAmount||0):0);
                 scaleStatus=loan.foreclosed?'FORECLOSED':(loan.postMaturitySettlement?'SETTLED':(pending<=0?'CLOSED':'ACTIVE'));
             }catch(e){}
             const loanCopy=mfScaleClone(loan); delete loanCopy.payments;
-            await mfScaleTx(['scalable_loans'],'readwrite',s=>s.scalable_loans.put({...loanCopy,id:String(loan.id),_scaleFingerprint:fp,_scaleUpdatedAt:new Date().toISOString(),_scaleStatus:scaleStatus,_scalePending:pending,_scalePaidPrincipal:paidPrincipal,_scaleRealizedProfit:realizedProfit}));
+            await mfScaleTx(['scalable_loans'],'readwrite',s=>s.scalable_loans.put({...loanCopy,id:String(loan.id),_scaleFingerprint:fp,_scaleUpdatedAt:new Date().toISOString(),_scaleStatus:scaleStatus,_scaleRecoveryStatus:(scaleStatus==='ACTIVE' && scaleMaturity && new Date()>new Date(scaleMaturity+'T23:59:59'))?'DUE':scaleStatus,_scaleMaturityIso:scaleMaturity,_scalePending:pending,_scalePaidPrincipal:paidPrincipal,_scaleRealizedProfit:realizedProfit}));
         }
         async function mfScaleReplaceSearchForLoan(loan){
             if(!loan?.id) return;
@@ -2944,6 +2945,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     mfScaleReady=true; mfScaleSearchReady=true; return;
                 }
                 if(fullRebuild || !meta?.searchReady){
+                    // Full rebuilds (first install / restore) must remove stale scalable records
+                    // before rebuilding. Otherwise a deleted old loan could remain searchable.
+                    await mfScaleTx(['scalable_loans','scalable_search','scalable_payments'],'readwrite',stores=>{
+                        stores.scalable_loans.clear();
+                        stores.scalable_search.clear();
+                        stores.scalable_payments.clear();
+                    });
                     // One-time/bootstrap rebuild: use bulk IndexedDB transactions instead of
                     // opening 2-3 transactions per loan. This keeps startup practical as the
                     // customer base grows. Progress is surfaced so a slow first build is never
@@ -2957,9 +2965,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             for(const loan of batch){
                                 if(!loan?.id) continue;
                                 const fp=mfScaleHash(loan);
-                                let pending=0,paidPrincipal=0,realizedProfit=0,scaleStatus='ACTIVE';
+                                let pending=0,paidPrincipal=0,realizedProfit=0,scaleStatus='ACTIVE',scaleMaturity='';
                                 try{
                                     const product=state.products?.[loan.product]||{};
+                                    scaleMaturity=String(getLoanMaturityDate(loan)||'');
                                     const scheduled=Number(loan.principal)||Number(loan.amount)||Number(product.principal)||0;
                                     const paid=(loan.payments||[]).reduce((sum,x)=>sum+(Number(x?.amount)||0),0);
                                     pending=Math.max(0,scheduled-paid);
@@ -2968,7 +2977,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                     scaleStatus=loan.foreclosed?'FORECLOSED':(loan.postMaturitySettlement?'SETTLED':(pending<=0?'CLOSED':'ACTIVE'));
                                 }catch(e){}
                                 const loanCopy=mfScaleClone(loan); delete loanCopy.payments;
-                                loanSt.put({...loanCopy,id:String(loan.id),_scaleFingerprint:fp,_scaleUpdatedAt:new Date().toISOString(),_scaleStatus:scaleStatus,_scalePending:pending,_scalePaidPrincipal:paidPrincipal,_scaleRealizedProfit:realizedProfit});
+                                loanSt.put({...loanCopy,id:String(loan.id),_scaleFingerprint:fp,_scaleUpdatedAt:new Date().toISOString(),_scaleStatus:scaleStatus,_scaleRecoveryStatus:(scaleStatus==='ACTIVE' && scaleMaturity && new Date()>new Date(scaleMaturity+'T23:59:59'))?'DUE':scaleStatus,_scaleMaturityIso:scaleMaturity,_scalePending:pending,_scalePaidPrincipal:paidPrincipal,_scaleRealizedProfit:realizedProfit});
                                 for(const token of mfScaleTokens(mfScaleLoanSearchText(loan))) searchSt.put({id:token+'|'+String(loan.id),token,loanId:String(loan.id)});
                                 (loan.payments||[]).forEach((pay,i)=>{const id=String(loan.id)+'|'+String(i)+'|'+String(pay?.date||'')+'|'+String(pay?.amount||0);paySt.put({...mfScaleClone(pay),id,loanId:String(loan.id),paymentIndex:i});});
                             }
@@ -3041,6 +3050,57 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const ids=await mfScaleFindLoanIds(rawQuery); if(ids===null) return null;
             return mfScaleGetLoansByIds(ids,{hydratePayments:true});
         }
+        async function mfScaleRecoveryPageData({query='',product='ALL',status='ALL',page=0,pageSize=50}={}){
+            if(!mfScaleSearchReady) return null;
+            const db=await openMfDb();
+            const tokens=mfScaleTokens(query);
+            let candidateIds=null;
+            if(tokens.length){
+                for(const token of tokens){
+                    const ids=await new Promise((resolve,reject)=>{
+                        const tx=db.transaction('scalable_search','readonly');
+                        const idx=tx.objectStore('scalable_search').index('token');
+                        const r=idx.getAll(token);
+                        r.onsuccess=()=>resolve((r.result||[]).map(x=>String(x.loanId)));
+                        r.onerror=()=>reject(r.error||new Error('Recovery search index read failed'));
+                    });
+                    const set=new Set(ids);
+                    candidateIds=candidateIds===null?set:new Set([...candidateIds].filter(id=>set.has(id)));
+                    if(!candidateIds.size) break;
+                }
+            }else{
+                candidateIds=await new Promise((resolve,reject)=>{
+                    const tx=db.transaction('scalable_loans','readonly');
+                    const r=tx.objectStore('scalable_loans').getAllKeys();
+                    r.onsuccess=()=>resolve(new Set((r.result||[]).map(String)));
+                    r.onerror=()=>reject(r.error||new Error('Recovery loan index read failed'));
+                });
+            }
+            const ids=[...(candidateIds||[])];
+            const matched=[];
+            const skip=Math.max(0,Number(page)||0)*pageSize;
+            for(const id of ids){
+                const loan=await new Promise(resolve=>{
+                    const tx=db.transaction('scalable_loans','readonly');
+                    const r=tx.objectStore('scalable_loans').get(String(id));
+                    r.onsuccess=()=>resolve(r.result||null); r.onerror=()=>resolve(null);
+                });
+                if(!loan) continue;
+                if(product!=='ALL' && String(loan.product)!==String(product)) continue;
+                const dynamicStatus=String(loan._scaleStatus)==='ACTIVE' && loan._scaleMaturityIso && new Date()>new Date(String(loan._scaleMaturityIso)+'T23:59:59') ? 'DUE' : String(loan._scaleStatus||'ACTIVE');
+                if(status!=='ALL' && dynamicStatus!==String(status)) continue;
+                matched.push(String(loan.id));
+            }
+            const total=matched.length;
+            const pageIds=matched.slice(skip,skip+pageSize+1);
+            const hasNext=pageIds.length>pageSize;
+            if(hasNext) pageIds.length=pageSize;
+            const rows=await mfScaleGetLoansByIds(pageIds,{hydratePayments:true});
+            const order=new Map(pageIds.map((id,i)=>[String(id),i]));
+            rows.sort((a,b)=>(order.get(String(a.id))??0)-(order.get(String(b.id))??0));
+            return {rows,total,hasNext};
+        }
+
         async function mfScaleLoanMasterPageData({query='',product='ALL',status='ALL',page=0,pageSize=50}={}){
             const db=await openMfDb();
             const skip=Math.max(0,Number(page)||0)*pageSize;
@@ -5408,13 +5468,23 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const countEl=document.getElementById('recovery-filter-count'); if(countEl)countEl.textContent=`${state.loans.length} loan accounts · Search to load matching customers`;
                 listDiv.innerHTML=`<div class="recovery-search-empty"><i class="fa-solid fa-magnifying-glass big"></i><b>Search a customer to open recovery actions</b></div>`; return;
             }
-            let indexed=await mfScaleFindLoans(rawQuery);
-            let filtered=(indexed===null?state.loans:indexed).filter(l=>recoverySearchMatches(l,rawQuery));
-            if(state.activeFilter!=='ALL')filtered=filtered.filter(l=>l.product===state.activeFilter);
-            if(recoveryStatusFilter!=='ALL')filtered=filtered.filter(l=>recoveryStatusFilter==='DUE'?getRecoveryStatus(l)==='DUE':getRecoveryStatus(l)===recoveryStatusFilter);
-            const totalMatches=filtered.length;
-            const pageSize=MF_SCALE.recoveryPageSize; const totalPages=Math.max(1,Math.ceil(totalMatches/pageSize)); mfScaleRecoveryPage=Math.min(mfScaleRecoveryPage,totalPages-1);
-            const start=mfScaleRecoveryPage*pageSize, pageLoans=filtered.slice(start,start+pageSize);
+            let pageData=null;
+            try{
+                pageData=await mfScaleRecoveryPageData({query:rawQuery,product:state.activeFilter||'ALL',status:recoveryStatusFilter||'ALL',page:mfScaleRecoveryPage,pageSize:MF_SCALE.recoveryPageSize});
+            }catch(e){ console.warn('Scalable recovery page read skipped:',e); }
+            let filtered=pageData?null:state.loans.filter(l=>recoverySearchMatches(l,rawQuery));
+            if(filtered){
+                if(state.activeFilter!=='ALL')filtered=filtered.filter(l=>l.product===state.activeFilter);
+                if(recoveryStatusFilter!=='ALL')filtered=filtered.filter(l=>recoveryStatusFilter==='DUE'?getRecoveryStatus(l)==='DUE':getRecoveryStatus(l)===recoveryStatusFilter);
+            }
+            const pageSize=MF_SCALE.recoveryPageSize;
+            const totalMatches=pageData?Number(pageData.total)||0:filtered.length;
+            const totalPages=Math.max(1,Math.ceil(totalMatches/pageSize)); mfScaleRecoveryPage=Math.min(mfScaleRecoveryPage,totalPages-1);
+            let pageLoans=pageData?pageData.rows:filtered.slice(mfScaleRecoveryPage*pageSize,mfScaleRecoveryPage*pageSize+pageSize);
+            if(pageData && mfScaleRecoveryPage !== Number(pageData.page||mfScaleRecoveryPage)){
+                pageData=await mfScaleRecoveryPageData({query:rawQuery,product:state.activeFilter||'ALL',status:recoveryStatusFilter||'ALL',page:mfScaleRecoveryPage,pageSize});
+                pageLoans=pageData?.rows||[];
+            }
             const countEl=document.getElementById('recovery-filter-count'); if(countEl)countEl.textContent=`Found ${totalMatches} matching ${state.loans.length} loan accounts`;
             if(!totalMatches){listDiv.innerHTML=`<div class="recovery-search-empty"><i class="fa-solid fa-user-slash big"></i><b>No matching customer</b></div>`;return;}
             const head=document.createElement('div');head.className='recovery-result-head';head.innerHTML=`<span><i class="fa-solid fa-bolt" style="color:#60a5fa;margin-right:4px;"></i><b>${totalMatches}</b> customer result${totalMatches===1?'':'s'}</span><span>Page ${mfScaleRecoveryPage+1} / ${totalPages}</span>`;listDiv.appendChild(head);
@@ -5434,6 +5504,20 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 nav.innerHTML=`<button type="button" class="btn-header btn-blue" ${mfScaleRecoveryPage===0?'disabled':''} onclick="mfRecoveryPageChange(-1)"><i class="fa-solid fa-chevron-left"></i> Previous</button><span style="font-size:.72rem;color:#94a3b8;font-weight:800;">Page ${mfScaleRecoveryPage+1} of ${totalPages}</span><button type="button" class="btn-header btn-blue" ${mfScaleRecoveryPage>=totalPages-1?'disabled':''} onclick="mfRecoveryPageChange(1)">Next <i class="fa-solid fa-chevron-right"></i></button>`;
                 listDiv.appendChild(nav);
             }
+        }
+
+        let mfRecoverySearchTimer=0;
+        function mfRecoverySearchChanged(force=false){
+            clearTimeout(mfRecoverySearchTimer);
+            mfScaleRecoveryPage=0;
+            if(force) return renderFeed();
+            mfRecoverySearchTimer=setTimeout(()=>{ renderFeed().catch(e=>console.warn('Recovery search refresh skipped:',e)); },140);
+        }
+        function mfRecoveryPageChange(delta){
+            const next=Math.max(0,mfScaleRecoveryPage+(Number(delta)||0));
+            if(next===mfScaleRecoveryPage) return;
+            mfScaleRecoveryPage=next;
+            renderFeed().catch(e=>console.warn('Recovery page refresh skipped:',e));
         }
 
         // Borrowings Rendering
