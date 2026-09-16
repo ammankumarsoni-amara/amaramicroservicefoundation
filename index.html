@@ -2720,9 +2720,25 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             });
         }
 
+        // IMPORTANT: state is wrapped in a Proxy by the scalable data engine.
+        // structuredClone(Proxy) throws DataCloneError in browsers, which used to
+        // abort the IndexedDB snapshot save and consequently stop the automatic
+        // Firebase push chained after persist(). Always de-proxy through JSON when
+        // the native clone cannot handle the live state object.
+        function mfCloneStateForPersistence(){
+            try{
+                if(typeof structuredClone==='function'){
+                    try{return structuredClone(state);}catch(e){ /* Proxy/DataCloneError: use plain-data fallback below. */ }
+                }
+                return JSON.parse(JSON.stringify(state));
+            }catch(e){
+                throw new Error('Database snapshot serialization failed: '+(e?.message||e));
+            }
+        }
+
         async function idbPutSnapshot(){
             const db=await openMfDb();
-            const payload={id:"current",version:1,updatedAt:new Date().toISOString(),state:(typeof structuredClone==='function'?structuredClone(state):JSON.parse(JSON.stringify(state)))};
+            const payload={id:"current",version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()};
             await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,"readwrite");tx.objectStore(MF_IDB_STORE).put(payload);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
             return payload;
         }
@@ -2733,7 +2749,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         function mfCloneStateForBackup(){
-            return (typeof structuredClone==='function') ? structuredClone(state) : JSON.parse(JSON.stringify(state));
+            // Versioned backups must use the same Proxy-safe persistence clone as the
+            // live IndexedDB snapshot path. This prevents backup creation from failing
+            // for the same DataCloneError reason.
+            return mfCloneStateForPersistence();
         }
         function mfStateFingerprint(obj){
             try{return JSON.stringify(obj);}catch(e){return String(Date.now());}
@@ -8655,7 +8674,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const remoteUpdated=new Date(remote.modifiedTime||0).getTime();
             const dirty=!!localStorage.getItem('MF_LOCAL_DIRTY_AT');
             if(remoteUpdated > localUpdated + 2000){
-                try{ const conflict={id:'conflict-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:(typeof structuredClone==='function'?structuredClone(state):JSON.parse(JSON.stringify(state)))}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(conflict);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); localStorage.setItem('MF_LAST_LOCAL_CONFLICT_AT',conflict.updatedAt); }catch(e){}
+                try{ const conflict={id:'conflict-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(conflict);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); localStorage.setItem('MF_LAST_LOCAL_CONFLICT_AT',conflict.updatedAt); }catch(e){}
                 const r=await driveApi('files/'+remote.id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
                 state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); await idbPutSnapshot(); try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));}catch(e){}
                 markCloudSynced(); renderAll(); updateSecureCloudStatus('🟢 Latest encrypted Google Drive data loaded on this device.'); return;
@@ -8705,7 +8724,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const {files}=await driveListCurrent();
                 if(!files.length) return alert('No encrypted cloud database backup found in Google Drive.');
                 if(!confirm('Restore the latest encrypted Google Drive database? Your current device data will first be preserved in local version history.')) return;
-                try{ const safety={id:'pre-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:(typeof structuredClone==='function'?structuredClone(state):JSON.parse(JSON.stringify(state)))}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
+                try{ const safety={id:'pre-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
                 const r=await driveApi('files/'+files[0].id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
                 state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state)); localStorage.removeItem('MF_LOCAL_DIRTY_AT'); localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));}catch(e){}
                 renderAll(); updateSecureCloudStatus('🟢 Latest encrypted Google Drive backup restored and validated.'); const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Restored latest backup: '+new Date().toLocaleString('en-IN'); alert('Latest encrypted Google Drive backup restored successfully.'); closeModal('modal-cloud'); setTab('feed');
@@ -8805,7 +8824,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const raw=await r.json();
                 const parsed=await parseCloudBackup(raw);
                 try{
-                    const safety={id:'pre-timestamp-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:(typeof structuredClone==='function'?structuredClone(state):JSON.parse(JSON.stringify(state)))};
+                    const safety={id:'pre-timestamp-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()};
                     const db=await openMfDb();
                     await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
                 }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
@@ -8871,7 +8890,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
                 // Preserve the exact current device state before changing anything.
                 try{
-                    const safety={id:'pre-recovery-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:(typeof structuredClone==='function'?structuredClone(state):JSON.parse(JSON.stringify(state)))};
+                    const safety={id:'pre-recovery-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()};
                     const db=await openMfDb();
                     await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
                 }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
