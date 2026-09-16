@@ -2738,7 +2738,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         async function idbPutSnapshot(){
             const db=await openMfDb();
-            const payload={id:"current",version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()};
+            const payload={id:"current",version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; payload.stateFingerprint=mfStateFingerprintObject(payload.state);
             await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,"readwrite");tx.objectStore(MF_IDB_STORE).put(payload);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
             return payload;
         }
@@ -3289,12 +3289,43 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const hasData=obj=>!!(obj && obj.products && (Array.isArray(obj.loans)?obj.loans.length:0)+(Array.isArray(obj.borrowings)?obj.borrowings.length:0)+(Array.isArray(obj.staff)?obj.staff.length:0)+(Array.isArray(obj.expenses)?obj.expenses.length:0));
                 const idbHasData=hasData(snap?.state), localHasData=hasData(localState);
                 const snapUpdated=Date.parse(snap?.updatedAt||'')||0;
-                // Never let an empty/stale IndexedDB snapshot wipe a populated local database.
-                if(localHasData && (!idbHasData || localDirtyAt>snapUpdated)) state=localState;
-                else if(idbHasData) state=snap.state;
-                else if(localState && localState.products) state=localState;
-                else await idbPutSnapshot();
+                const localSavedAt=Date.parse(localStorage.getItem('MF_LOCAL_SAVED_AT')||'')||0;
+                // Storage consistency rule: localStorage is a compatibility cache, while the
+                // IndexedDB snapshot is the durable local database. A previous build could
+                // remove MF_LOCAL_DIRTY_AT after a successful Firebase push even though the
+                // IndexedDB snapshot had not been refreshed, causing the next reload to pick
+                // the older IndexedDB copy and roll the device back. Prefer a populated local
+                // copy only when its durable save marker is newer (or, for legacy builds, when
+                // the old dirty marker is newer), then immediately reconcile both stores.
+                const localIsNewer=localHasData && Math.max(localSavedAt,localDirtyAt)>snapUpdated;
+                if(localIsNewer || (localHasData && !idbHasData)){
+                    state=localState;
+                    await idbPutSnapshot();
+                }else if(idbHasData){
+                    state=snap.state;
+                    try{
+                        localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));
+                        localStorage.setItem('MF_LOCAL_SAVED_AT',snap?.updatedAt||new Date().toISOString());
+                    }catch(e){}
+                }else if(localState && localState.products){
+                    state=localState;
+                    await idbPutSnapshot();
+                }else{
+                    await idbPutSnapshot();
+                }
+                // Normalize the selected state before the final startup reconciliation.
+                // The old startup order normalized only after the IndexedDB snapshot write,
+                // which could leave the durable snapshot one normalization step behind.
                 normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
+                // Final startup reconciliation: the exact normalized state now becomes the
+                // durable IndexedDB snapshot and the legacy localStorage compatibility copy.
+                // Use the snapshot's actual timestamp as the save marker; never advance the
+                // marker merely because the page was opened.
+                const startupSnapshot=await idbPutSnapshot();
+                try{
+                    localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));
+                    localStorage.setItem('MF_LOCAL_SAVED_AT',startupSnapshot?.updatedAt||new Date().toISOString());
+                }catch(e){}
                 mfDbReady=true;
                 markStorageReady();
                 localStorage.setItem("MF_OPEX_PRO_DB_META", JSON.stringify({migratedToIndexedDB:true,updatedAt:new Date().toISOString()}));
@@ -3683,6 +3714,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 try{ localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(pulledVersion)); localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint()); localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString()); }catch(e){}
                 mfLocalAudit('CLOUD_PULL','Secure cloud snapshot loaded after schema and ownership validation');
                 localStorage.setItem('MF_OPEX_PRO_DB', JSON.stringify(state));
+                try{ localStorage.setItem('MF_LOCAL_SAVED_AT',new Date().toISOString()); }catch(e){}
                 idbPutSnapshot().finally(() => { renderAll(); setFirebaseStatus('🟢 Loaded latest secure cloud data — ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})); });
             }).catch(err => { console.error(err); setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Pull'), true); });
         }
@@ -4161,7 +4193,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         function persist(){
             const now=new Date();
-            try{ localStorage.setItem("MF_LOCAL_DIRTY_AT", now.toISOString()); }catch(e){}
+            try{
+                localStorage.setItem("MF_LOCAL_DIRTY_AT", now.toISOString());
+                // Persistent save marker survives successful Firebase sync. It lets startup
+                // distinguish a newer local compatibility copy from an older IndexedDB copy.
+                localStorage.setItem("MF_LOCAL_SAVED_AT", now.toISOString());
+            }catch(e){}
             // Keep a small compatibility copy for legacy versions; IndexedDB is the primary store.
             try{ localStorage.setItem("MF_OPEX_PRO_DB",JSON.stringify(state)); }catch(e){ console.warn("Legacy localStorage copy skipped",e); }
             idbPutSnapshot().then(()=>{
@@ -4169,16 +4206,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(el) el.innerHTML=`<i class="fa-solid fa-check text-success me-1"></i> Saved: ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
                 renderAll();
                 queueAutomaticVersionedBackup();
-                // PRIMARY OPERATIONAL CLOUD COPY: Firebase Secure Sync is automatic after every local save.
-                // Google Drive remains the encrypted secondary backup/recovery layer.
-                try{ scheduleFirebasePush(); }catch(e){ console.warn('Automatic Secure Firebase sync scheduling skipped:',e); }
-                try{ mfScaleBuildLocalEntities(false).then(()=>mfScaleScheduleMirror()).catch(e=>console.warn('Scalable entity refresh skipped:',e)); }catch(e){}
-                /* Drive auto-sync disabled by production policy. */
             }).catch(err=>{
                 console.error("IndexedDB save failed",err);
                 const el=document.getElementById("last-sync-time");
                 if(el) el.innerHTML=`<i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> Local save warning`;
                 renderAll();
+            }).finally(()=>{
+                // PRIMARY OPERATIONAL CLOUD COPY: Firebase Secure Sync must not depend on
+                // IndexedDB success. A transient IndexedDB failure must never block the
+                // automatic cloud save when the compatibility localStorage copy succeeded.
+                // Google Drive remains the encrypted secondary backup/recovery layer.
+                try{ scheduleFirebasePush(); }catch(e){ console.warn('Automatic Secure Firebase sync scheduling skipped:',e); }
+                try{ mfScaleBuildLocalEntities(false).then(()=>mfScaleScheduleMirror()).catch(e=>console.warn('Scalable entity refresh skipped:',e)); }catch(e){}
+                /* Drive auto-sync disabled by production policy. */
             });
         }
 
@@ -8676,7 +8716,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(remoteUpdated > localUpdated + 2000){
                 try{ const conflict={id:'conflict-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(conflict);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); localStorage.setItem('MF_LAST_LOCAL_CONFLICT_AT',conflict.updatedAt); }catch(e){}
                 const r=await driveApi('files/'+remote.id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); await idbPutSnapshot(); try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));}catch(e){}
+                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); await idbPutSnapshot(); try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state)); localStorage.setItem('MF_LOCAL_SAVED_AT',new Date().toISOString());}catch(e){}
                 markCloudSynced(); renderAll(); updateSecureCloudStatus('🟢 Latest encrypted Google Drive data loaded on this device.'); return;
             }
             if(localUpdated > remoteUpdated + 2000 || dirty){ await syncNowToGoogleDrive(background); return; }
@@ -8726,7 +8766,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(!confirm('Restore the latest encrypted Google Drive database? Your current device data will first be preserved in local version history.')) return;
                 try{ const safety={id:'pre-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
                 const r=await driveApi('files/'+files[0].id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state)); localStorage.removeItem('MF_LOCAL_DIRTY_AT'); localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));}catch(e){}
+                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state)); localStorage.setItem('MF_LOCAL_SAVED_AT',new Date().toISOString()); localStorage.removeItem('MF_LOCAL_DIRTY_AT'); localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));}catch(e){}
                 renderAll(); updateSecureCloudStatus('🟢 Latest encrypted Google Drive backup restored and validated.'); const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Restored latest backup: '+new Date().toLocaleString('en-IN'); alert('Latest encrypted Google Drive backup restored successfully.'); closeModal('modal-cloud'); setTab('feed');
             }catch(err){alert('Cloud restore failed: '+(err?.message||err));}
         }
