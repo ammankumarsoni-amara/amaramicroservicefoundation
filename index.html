@@ -2259,8 +2259,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             </div>
 
             <div style="margin-top:12px;border-top:2px solid #34d399;padding-top:12px;">
-                <div style="font-size:.84rem;font-weight:800;color:#34d399;margin-bottom:3px;"><i class="fa-solid fa-bolt"></i> Secure Firebase Fast Sync (Production)</div>
-                <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;line-height:1.4;">Secure cloud sync for your business. Use the same signed-in account and Sync Code on your mobile and laptop.</div>
+                <div style="font-size:.84rem;font-weight:800;color:#34d399;margin-bottom:3px;"><i class="fa-solid fa-bolt"></i> Secure Firebase Sync (Production)</div>
+                <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;line-height:1.4;">Secure cloud sync for your business. Your data syncs automatically after saves. Use the same signed-in account and Sync Code on mobile and laptop.</div>
 
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Firebase Config (paste the whole firebaseConfig object here)</label>
                 <textarea id="firebase-config-input" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}' style="width:100%;min-height:70px;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.72rem;font-family:monospace;margin-bottom:7px;"></textarea>
@@ -2268,14 +2268,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-bottom:4px;">Sync Code (use the SAME code on mobile and laptop)</label>
                 <input type="text" id="firebase-sync-code" placeholder="e.g. amma-loan-2026-secure" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;margin-bottom:7px;">
 
-                <button type="button" class="btn-header btn-green" style="width:100%;justify-content:center;" onclick="connectFirebaseSync()"><i class="fa-solid fa-bolt"></i> Connect Fast Sync</button>
+                <button type="button" class="btn-header btn-green" style="width:100%;justify-content:center;" id="mf-connect-sync-btn" onclick="connectFirebaseSync()"><i class="fa-solid fa-bolt"></i> Connect Firebase Sync</button>
                 <div id="firebase-sync-status" style="font-size:.68rem;color:#94a3b8;margin-top:7px;">Not connected yet.</div>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px;">
-                    <button type="button" class="btn-header btn-blue" style="justify-content:center;" onclick="pushStateToFirebase(false)"><i class="fa-solid fa-cloud-arrow-up"></i> Push Now</button>
-                    <button type="button" class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="pullStateFromFirebase(true)"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Latest</button>
+                    <button type="button" class="btn-header btn-blue" style="justify-content:center;" id="mf-push-sync-btn" onclick="pushStateToFirebase(false)"><i class="fa-solid fa-cloud-arrow-up"></i> Sync Now</button>
+                    <button type="button" class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" id="mf-pull-sync-btn" onclick="pullStateFromFirebase(true)"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Latest</button>
                 </div>
-                <div style="font-size:.62rem;color:#64748b;margin-top:6px;line-height:1.35;"><b>Note:</b> Keep your Sync Code private. Secure Sync also requires your signed-in Firebase account.</div>
+                <div style="font-size:.62rem;color:#64748b;margin-top:6px;line-height:1.35;"><b>How it works:</b> Firebase sync runs automatically after a save. Use <b>Sync Now</b> only when you want an immediate manual sync. Keep your Sync Code private.</div>
             </div>
 
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
@@ -3185,9 +3185,33 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         let mfFirebasePushTimer = null;
         let mfIgnoreNextSnapshot = false;
 
+        function mfRefreshFirebaseSyncControls() {
+            try {
+                const connectBtn = document.getElementById('mf-connect-sync-btn');
+                const pushBtn = document.getElementById('mf-push-sync-btn');
+                const pullBtn = document.getElementById('mf-pull-sync-btn');
+                const connected = !!(mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser);
+                if (connectBtn) {
+                    connectBtn.innerHTML = connected ? '<i class="fa-solid fa-circle-check"></i> Firebase Connected' : '<i class="fa-solid fa-bolt"></i> Connect Firebase Sync';
+                    connectBtn.disabled = connected;
+                    connectBtn.style.opacity = connected ? '.72' : '1';
+                    connectBtn.style.cursor = connected ? 'default' : 'pointer';
+                }
+                if (pushBtn) {
+                    pushBtn.disabled = !connected;
+                    pushBtn.style.opacity = connected ? '1' : '.55';
+                }
+                if (pullBtn) {
+                    pullBtn.disabled = !connected;
+                    pullBtn.style.opacity = connected ? '1' : '.55';
+                }
+            } catch (e) {}
+        }
+
         function setFirebaseStatus(msg, isWarning) {
             const el = document.getElementById('firebase-sync-status');
             if (el) { el.textContent = msg; el.style.color = isWarning ? '#fde68a' : '#a7f3d0'; }
+            try { mfRefreshFirebaseSyncControls(); } catch(e) {}
         }
 
         function connectFirebaseSync() {
@@ -3253,6 +3277,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     mfFirestoreDb = firebase.firestore();
                 }
                 mfFirebaseSyncCode = syncCode;
+                try { mfRefreshFirebaseSyncControls(); } catch(e) {}
                 try{
                     mfFirebaseAuth = firebase.auth();
                     if(typeof mfInitAuth==='function') mfInitAuth();
