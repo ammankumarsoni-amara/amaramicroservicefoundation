@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Loan Management</title>
-    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-09-13-SMOOTH-UI-V7-ADVANCED-RECOVERY-SEARCH-MARKET-DISBURSED-READABILITY-VERIFIED-AUTOMATIC-GOOGLE-BACKUP-SILENT-REAUTH">
+    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-09-13-SMOOTH-UI-V7-ADVANCED-RECOVERY-SEARCH-MARKET-DISBURSED-READABILITY-VERIFIED-MANUAL-GOOGLE-BACKUP-PERSISTENT-AUTH-SILENT-REAUTH">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -2333,8 +2333,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 </details>
                 <div style="font-size:.66rem;color:#94a3b8;margin-top:6px;line-height:1.4;">The app never asks for or stores your Gmail password. Google OAuth grants the app the limited <b>drive.file</b> Drive scope needed for its own backup files.</div>
                 <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, host this app on your HTTPS domain.</div>
-                <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required)</label>
-                <input type="text" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for cloud backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required for backup/restore)</label>
+                <input type="text" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for encrypted backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
                 <label style="display:flex;align-items:center;gap:6px;font-size:.66rem;color:#94a3b8;margin-top:7px;cursor:pointer;">
                     <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Keep PIN active on this device (encrypted storage; raw PIN is never stored)
                 </label>
@@ -2352,7 +2352,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     <button type="button" class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="restoreLatestFromGoogleDrive()"><i class="fa-solid fa-cloud-arrow-down"></i> Restore Latest</button>
                 </div>
                 <button type="button" class="btn-header btn-blue" style="width:100%;margin-top:7px;justify-content:center;background:#334155;" onclick="openDriveRestorePointPicker()"><i class="fa-solid fa-clock-rotate-left"></i> Restore Timestamped Backup</button>
-                <div id="drive-last-sync" style="font-size:.67rem;color:#94a3b8;margin-top:7px;">Drive backup is manual. Each successful Sync Now creates an encrypted timestamped restore point; Current Database remains the latest manual copy.</div>
+                <div id="drive-last-sync" style="font-size:.67rem;color:#94a3b8;margin-top:7px;">Drive backup is manual. Each successful backup creates an encrypted timestamped restore point; Current Database remains the latest manual copy.</div>
             </div><div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
                 <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:4px;"><i class="fa-solid fa-screwdriver-wrench" style="color:#60a5fa;"></i> Advanced Maintenance & QA</div>
                 <div style="font-size:.64rem;color:#94a3b8;line-height:1.4;">Read-only integrity checks, automatic local version history, and a real responsive preview. These tools do not change loan math or existing records unless you explicitly restore a backup.</div>
@@ -2828,6 +2828,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         let mfScaleProxySuspend=false;
         let mfScaleStateProxyInstalled=false;
         function mfScaleMarkDirty(kind,id){
+            try{ mfFinancialReconciliationCache=null; mfGrowthCache=null; }catch(e){}
             if(mfScaleProxySuspend) return;
             if(kind==='root'){ mfScaleDirty.full=true; return; }
             if(mfScaleDirty[kind]) { mfScaleDirty[kind].add(String(id)); if(kind==='loans' && id) { try { const ref=Array.isArray(state?.loans)?state.loans.find(x=>String(x?.id)===String(id)):null; if(ref) mfScaleDirtyLoanRefs.set(String(id),ref); } catch(e) {} } }
@@ -2883,6 +2884,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function mfScaleReinstallStateProxy(){
             mfScaleStateProxyInstalled=false; mfScaleProxySuspend=true;
             try{ state=mfScaleWrapObject(state); } finally { mfScaleProxySuspend=false; mfScaleStateProxyInstalled=true; }
+            // Replaced/restored state invalidates all derived finance/dashboard caches.
+            try{ mfFinancialReconciliationCache=null; mfGrowthCache=null; }catch(e){}
         }
 
         function mfScaleClone(v){
@@ -4235,17 +4238,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             // is already unlocked (or App Lock is not configured), then let the normal automatic
             // backup scheduler use it. With App Lock enabled, the PIN is restored after unlock.
             await restoreSavedCloudPin();
-            // After a refresh/reopen the browser access token is intentionally gone from memory.
-            // Do not start any OAuth or remote reconciliation automatically. Local IndexedDB and
-            // Firebase remains available; Google Drive stays manual-only after an explicit
-            // Connect Google Drive action establishes a fresh session for this page.
-            try{ /* Google Drive is manual-only; no background Drive scheduler. */ }catch(e){}
+            // After a refresh/reopen the short-lived access token is intentionally gone from memory.
+            // The persistent Drive configuration remains on this device, but no OAuth, Drive API
+            // call, upload, reconciliation, or popup is started automatically. A user-triggered
+            // Backup/Restore action silently reuses the existing Google grant when possible.
+            try{ mfRefreshDriveBackupUi(); updateSecureCloudStatus(); }catch(e){}
             const inp = document.getElementById('app-lock-input');
             if (inp) inp.addEventListener('keyup', e => { if (e.key === 'Enter') attemptAppUnlock(); });
         });
 
         function persist(){
             const now=new Date();
+            try{ mfFinancialReconciliationCache=null; mfGrowthCache=null; }catch(e){}
             try{
                 localStorage.setItem("MF_LOCAL_DIRTY_AT", now.toISOString());
                 // Persistent save marker survives successful Firebase sync. It lets startup
@@ -4297,12 +4301,26 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             try{ localStorage.removeItem("MF_LOCAL_DIRTY_AT"); localStorage.setItem("MF_LAST_CLOUD_SYNC_AT",new Date().toISOString()); }catch(e){}
         }
 
+        const MF_GOOGLE_DRIVE_CONFIGURED_KEY='MF_GOOGLE_DRIVE_CONFIGURED';
+        const MF_LAST_DRIVE_BACKUP_AT_KEY='MF_LAST_DRIVE_BACKUP_AT';
+        function mfGoogleDriveIsConfigured(){
+            try{ return localStorage.getItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY)==='1' && !!(localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'').trim(); }catch(e){ return false; }
+        }
+        function mfRefreshDriveBackupUi(){
+            const ds=document.getElementById('drive-last-sync'); if(!ds) return;
+            try{
+                const last=localStorage.getItem(MF_LAST_DRIVE_BACKUP_AT_KEY);
+                if(last){ ds.textContent='Last encrypted backup: '+new Date(last).toLocaleString('en-IN')+' · Each successful backup also creates a timestamped restore point.'; }
+                else ds.textContent='Drive backup is manual. Each successful backup creates an encrypted timestamped restore point; Current Database remains the latest manual copy.';
+            }catch(e){}
+        }
         function updateSecureCloudStatus(message,warning=false){
             const el=document.getElementById("secure-cloud-status"); if(!el) return;
             if(message){el.textContent=message;el.style.color=warning?'#fde68a':'#a7f3d0';return;}
-            if(googleAccessToken) el.textContent="🟢 Google Drive connected — manual encrypted backup is ready.";
+            if(googleAccessToken) el.textContent="🟢 Google Drive connected for this session — manual encrypted backup is ready.";
+            else if(mfGoogleDriveIsConfigured()) el.textContent="🟢 Google Drive is configured on this device — manual encrypted backup is ready. Authorization is renewed only when you use Backup/Restore.";
             else if(localStorage.getItem('MF_GOOGLE_CLIENT_ID') && getCloudPin()) el.textContent="🟢 Google Drive backup is configured — manual encrypted backup is ready.";
-            else el.textContent="🟢 IndexedDB local database active. Use Sync Now for a manual encrypted off-device backup.";
+            else el.textContent="🟢 IndexedDB local database active. Use Backup to Google Drive for a manual encrypted off-device backup.";
         }
 
 
@@ -4465,7 +4483,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         // One canonical calculation source for dashboard KPIs, executive exports and audit checks.
         // Principal/disbursal is capital, not revenue. Only actually recorded customer-side
         // earnings are included in Gross Revenue; settlement principal and waivers are excluded.
+        let mfFinancialReconciliationCache=null;
+        let mfGrowthCache=null;
         function mfFinancialReconciliation(){
+            if(mfFinancialReconciliationCache) return mfFinancialReconciliationCache;
             const loans=Array.isArray(state.loans)?state.loans:[], products=state.products||{};
             const out={loans:loans.length,disbursed:0,file:0,interest:0,penalty:0,foreclosureFee:0,preClosureInterest:0,postMaturityInterest:0,preEmiInterest:0,settlementReceived:0,settlementPrincipal:0,settlementContractualInterest:0,settlementRecoveryInterest:0,settlementWaiver:0,outstanding:0,collections:0,negativeRecords:0,missingProducts:0,statusCounts:{ACTIVE:0,DUE:0,OVERDUE:0,CLOSED:0,SETTLED:0,FORECLOSED:0},issues:[]};
             const issue=(code,msg)=>out.issues.push({code,msg});
@@ -4510,6 +4531,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const expectedGross=out.file+out.interest+out.penalty+out.foreclosureFee+out.preClosureInterest+out.postMaturityInterest+out.preEmiInterest; if(Math.abs(expectedGross-out.gross)>0.005)issue('GROSS_MISMATCH','Gross revenue component sum does not reconcile.');
             const expectedNet=out.gross-out.lenderCost-out.opex; if(Math.abs(expectedNet-out.net)>0.005)issue('NET_MISMATCH','Net surplus does not reconcile with Gross − Lender Cost − OPEX.');
             if(out.settlementReceived+0.005 < out.settlementPrincipal+out.settlementContractualInterest+out.settlementRecoveryInterest) issue('SETTLEMENT_ALLOCATION','Settlement allocation exceeds actual received amount.');
+            mfFinancialReconciliationCache=out;
             return out;
         }
 
@@ -4558,36 +4580,77 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             // NPA is intentionally filter-first; opening it initializes its controls in setTab().
         }
 
+        function mfGrowthBlank(){ return {disb:0,gross:0,opex:0,net:0}; }
+        function mfGrowthYearBucket(map,year){
+            const y=Number(year); if(!Number.isFinite(y)) return null;
+            if(!map[y]) map[y]={total:mfGrowthBlank(),months:Array.from({length:12},()=>mfGrowthBlank())};
+            return map[y];
+        }
+        function mfGrowthAdd(map,iso,field,value){
+            if(!iso) return;
+            const d=new Date(iso); if(Number.isNaN(d.getTime())) return;
+            const y=d.getFullYear(), m=d.getMonth(), v=Number(value)||0;
+            const bucket=mfGrowthYearBucket(map,y); if(!bucket) return;
+            bucket.total[field]+=v; bucket.months[m][field]+=v;
+        }
+        function mfGrowthAddFiscal(map,iso,field,value){
+            if(!iso) return;
+            const d=new Date(iso); if(Number.isNaN(d.getTime())) return;
+            const fy=(d.getMonth()+1>=4)?d.getFullYear()+1:d.getFullYear(), v=Number(value)||0;
+            const bucket=mfGrowthYearBucket(map,fy); if(!bucket) return;
+            bucket.total[field]+=v;
+        }
+        function mfBuildGrowthCache(){
+            const calendar={}, fiscal={}, years=new Set();
+            const addBoth=(iso,field,value)=>{
+                if(!iso) return;
+                const d=new Date(iso); if(Number.isNaN(d.getTime())) return;
+                years.add(d.getFullYear());
+                mfGrowthAdd(calendar,iso,field,value); mfGrowthAddFiscal(fiscal,iso,field,value);
+            };
+            (state.loans||[]).forEach(l=>{
+                const p=state.products?.[l.product];
+                if(p && l.disbursalDate){ addBoth(l.disbursalDate,'disb',Number(p.amount)||0); addBoth(l.disbursalDate,'gross',Number(p.fileCharge)||0); }
+                (l.payments||[]).forEach(pay=>{
+                    addBoth(pay.date,'gross',(Number(pay.interest)||0)+(Number(pay.penalty)||0));
+                    if(Number(pay.preEmiInterest)||0) addBoth(pay.date,'gross',Number(pay.preEmiInterest)||0);
+                });
+                if(l.foreclosed&&l.foreclosureData?.settlementDate){
+                    addBoth(l.foreclosureData.settlementDate,'gross',Number(l.foreclosureData.feeAmount)||0);
+                    addBoth(l.foreclosureData.settlementDate,'gross',Number(l.foreclosureData.preClosureInterest)||0);
+                }
+                if(l.postMaturitySettlement?.settlementDate){
+                    const c=getPostMaturitySettlementCalc(l,l.postMaturitySettlement.settlementDate), a=mfSettlementAllocation(l,Number(l.postMaturitySettlement.actualReceived)||0,c);
+                    addBoth(l.postMaturitySettlement.settlementDate,'gross',Number(a.contractualInterestReceived||0)+Number(a.recoveryInterestReceived||0));
+                }
+            });
+            (state.expenses||[]).forEach(e=>addBoth(e.date,'opex',e.amount));
+            (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(pay=>addBoth(pay.date,'opex',pay.amount)));
+            Object.values(calendar).forEach(b=>b.total.net=b.total.gross-b.total.opex);
+            Object.values(calendar).forEach(b=>b.months.forEach(m=>m.net=m.gross-m.opex));
+            Object.values(fiscal).forEach(b=>b.total.net=b.total.gross-b.total.opex);
+            return {calendar,fiscal,years:[...years]};
+        }
         function renderBusinessGrowthChart(){
             const wrap=document.getElementById('business-growth-chart'); if(!wrap)return;
             const yearSel=document.getElementById('growth-year-select');
             const period=document.getElementById('growth-period-select')?.value||'MONTHLY';
             const metric=document.getElementById('growth-metric-select')?.value||'ALL';
             const now=new Date().getFullYear();
-            const dataYears=[];
-            (state.loans||[]).forEach(l=>{if(l.disbursalDate)dataYears.push(new Date(l.disbursalDate).getFullYear());(l.payments||[]).forEach(p=>{if(p.date)dataYears.push(new Date(p.date).getFullYear());});if(l.foreclosed&&l.foreclosureData?.settlementDate)dataYears.push(new Date(l.foreclosureData.settlementDate).getFullYear());});
-            (state.expenses||[]).forEach(e=>{if(e.date)dataYears.push(new Date(e.date).getFullYear());});
-            (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(p=>{if(p.date)dataYears.push(new Date(p.date).getFullYear());}));
-            const years=[...new Set([...Array.from({length:101},(_,i)=>now-50+i),...dataYears.filter(Number.isFinite)])].sort((a,b)=>b-a);
+            if(!mfGrowthCache) mfGrowthCache=mfBuildGrowthCache();
+            const years=[...new Set([...Array.from({length:101},(_,i)=>now-50+i),...mfGrowthCache.years.filter(Number.isFinite)])].sort((a,b)=>b-a);
             if(yearSel){const old=yearSel.value||String(now);yearSel.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join('');yearSel.value=years.includes(Number(old))?old:String(now);}
             const selectedYear=Number(yearSel?.value||now);
             const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
             const blank=()=>({disb:0,gross:0,opex:0,net:0});
-            const monthData=months.map((m,i)=>({label:m,month:i,...blank()}));
-            const addDateValue=(iso,field,val)=>{if(!iso)return;const d=new Date(iso);if(Number.isNaN(d.getTime()))return;if(d.getFullYear()===selectedYear)monthData[d.getMonth()][field]+=Number(val)||0;};
-            (state.loans||[]).forEach(l=>{const p=state.products?.[l.product];if(p){addDateValue(l.disbursalDate,'disb',p.amount);addDateValue(l.disbursalDate,'gross',p.fileCharge);(l.payments||[]).forEach(pay=>{if(Number(pay.preEmiInterest)||0)addDateValue(pay.date,'gross',Number(pay.preEmiInterest)||0);});} (l.payments||[]).forEach(pay=>addDateValue(pay.date,'gross',(Number(pay.interest)||0)+(Number(pay.penalty)||0)));if(l.foreclosed&&l.foreclosureData){addDateValue(l.foreclosureData.settlementDate,'gross',Number(l.foreclosureData.feeAmount)||0);addDateValue(l.foreclosureData.settlementDate,'gross',Number(l.foreclosureData.preClosureInterest)||0);}if(l.postMaturitySettlement){const c=getPostMaturitySettlementCalc(l,l.postMaturitySettlement.settlementDate),a=mfSettlementAllocation(l,Number(l.postMaturitySettlement.actualReceived)||0,c);addDateValue(l.postMaturitySettlement.settlementDate,'gross',Number(a.contractualInterestReceived||0)+Number(a.recoveryInterestReceived||0));}});
-            (state.expenses||[]).forEach(e=>addDateValue(e.date,'opex',e.amount));
-            (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(p=>addDateValue(p.date,'opex',p.amount)));
-            monthData.forEach(x=>x.net=x.gross-x.opex);
+            const monthData=(mfGrowthCache.calendar[selectedYear]?.months||months.map(()=>blank())).map((x,i)=>({label:months[i],month:i,...x}));
             let data=[],periodLabel='';
             if(period==='MONTHLY'){data=monthData;periodLabel=`Monthly view — ${selectedYear}`;}
             else if(period==='QUARTERLY'){data=[0,1,2,3].map(q=>{const x=blank();monthData.slice(q*3,q*3+3).forEach(m=>{x.disb+=m.disb;x.gross+=m.gross;x.opex+=m.opex;x.net+=m.net;});return {...x,label:`Q${q+1}`};});periodLabel=`Quarterly view — ${selectedYear}`;}
             else if(period==='YEARLY'){
-                const getY=y=>{const x=blank();(state.loans||[]).forEach(l=>{const p=state.products?.[l.product];if(p&&l.disbursalDate&&new Date(l.disbursalDate).getFullYear()===y){x.disb+=Number(p.amount)||0;x.gross+=Number(p.fileCharge)||0;}(l.payments||[]).forEach(pay=>{if(pay.date&&new Date(pay.date).getFullYear()===y)x.gross+=(Number(pay.interest)||0)+(Number(pay.penalty)||0);});(l.payments||[]).forEach(pay=>{if(pay.date&&new Date(pay.date).getFullYear()===y)x.gross+=Number(pay.preEmiInterest)||0;});if(l.foreclosed&&l.foreclosureData?.settlementDate&&new Date(l.foreclosureData.settlementDate).getFullYear()===y)x.gross+=(Number(l.foreclosureData.feeAmount)||0)+(Number(l.foreclosureData.preClosureInterest)||0);if(l.postMaturitySettlement?.settlementDate&&new Date(l.postMaturitySettlement.settlementDate).getFullYear()===y){const c=getPostMaturitySettlementCalc(l,l.postMaturitySettlement.settlementDate),a=mfSettlementAllocation(l,Number(l.postMaturitySettlement.actualReceived)||0,c);x.gross+=Number(a.contractualInterestReceived||0)+Number(a.recoveryInterestReceived||0);}});(state.expenses||[]).forEach(e=>{if(e.date&&new Date(e.date).getFullYear()===y)x.opex+=Number(e.amount)||0;});(state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(p=>{if(p.date&&new Date(p.date).getFullYear()===y)x.opex+=Number(p.amount)||0;}));x.net=x.gross-x.opex;return x;};
-                data=Array.from({length:10},(_,i)=>{const y=selectedYear-9+i;return {...getY(y),label:String(y)}});periodLabel=`Yearly trend — ${selectedYear-9} to ${selectedYear}`;
+                data=Array.from({length:10},(_,i)=>{const y=selectedYear-9+i;const x=mfGrowthCache.calendar[y]?.total||blank();return {...x,label:String(y)}});periodLabel=`Yearly trend — ${selectedYear-9} to ${selectedYear}`;
             }else{
-                const getFY=fyEnd=>{const x=blank(), inFY=iso=>{if(!iso)return false;const d=new Date(iso),fy=(d.getMonth()+1>=4)?d.getFullYear()+1:d.getFullYear();return fy===fyEnd;};(state.loans||[]).forEach(l=>{const p=state.products?.[l.product];if(p&&inFY(l.disbursalDate)){x.disb+=Number(p.amount)||0;x.gross+=Number(p.fileCharge)||0;}(l.payments||[]).forEach(pay=>{if(inFY(pay.date))x.gross+=(Number(pay.interest)||0)+(Number(pay.penalty)||0);});(l.payments||[]).forEach(pay=>{if(inFY(pay.date))x.gross+=Number(pay.preEmiInterest)||0;});if(l.foreclosed&&l.foreclosureData&&inFY(l.foreclosureData.settlementDate))x.gross+=(Number(l.foreclosureData.feeAmount)||0)+(Number(l.foreclosureData.preClosureInterest)||0);if(l.postMaturitySettlement&&inFY(l.postMaturitySettlement.settlementDate)){const c=getPostMaturitySettlementCalc(l,l.postMaturitySettlement.settlementDate),a=mfSettlementAllocation(l,Number(l.postMaturitySettlement.actualReceived)||0,c);x.gross+=Number(a.contractualInterestReceived||0)+Number(a.recoveryInterestReceived||0);}});(state.expenses||[]).forEach(e=>{if(inFY(e.date))x.opex+=Number(e.amount)||0;});(state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(p=>{if(inFY(p.date))x.opex+=Number(p.amount)||0;}));x.net=x.gross-x.opex;return x;};
-                data=Array.from({length:10},(_,i)=>{const fy=selectedYear-9+i;return {...getFY(fy),label:`FY ${fy-1}-${String(fy).slice(-2)}`}});periodLabel=`Financial Yearly trend — FY ending ${selectedYear}`;
+                data=Array.from({length:10},(_,i)=>{const fy=selectedYear-9+i;const x=mfGrowthCache.fiscal[fy]?.total||blank();return {...x,label:`FY ${fy-1}-${String(fy).slice(-2)}`}});periodLabel=`Financial Yearly trend — FY ending ${selectedYear}`;
             }
             const keys=metric==='ALL'?['disb','gross','opex','net']:[metric.toLowerCase()];
             const labels={disb:'Market Disbursement',gross:'Gross Revenue',opex:'Expenses & Payroll',net:'Net Profit'};const dot={disb:'#60a5fa',gross:'#34d399',opex:'#f472b6',net:'#fbbf24'};const visible=keys.filter(k=>labels[k]);
@@ -5106,10 +5169,20 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(!p || !p.tenure || !loan.disbursalDate) return [];
             const payments=Array.isArray(loan.payments)?loan.payments:[];
             mfScalePaymentCounts.set(String(loan.id),payments.length);
+            // Build the two exact-match indexes once. The old implementation performed a
+            // full Array.find() over payments for every installment, which becomes costly at
+            // large client counts. First-match semantics remain identical.
+            const byNo=new Map(), byDue=new Map();
+            payments.forEach(pay=>{
+                const no=Number(pay?.installmentNo);
+                const dueKey=String(pay?.dueDate||'').slice(0,10);
+                if(Number.isFinite(no) && no>0 && !byNo.has(no)) byNo.set(no,pay);
+                if(/^\d{4}-\d{2}-\d{2}$/.test(dueKey) && !byDue.has(dueKey)) byDue.set(dueKey,pay);
+            });
             const rows=[];
             for(let i=1;i<=Number(p.tenure);i++){
                 const due=mfLoanScheduleDueIso(loan,i);
-                const paid=mfPaymentForInstallment(loan,i,due);
+                const paid=byNo.get(i)||byDue.get(String(due||'').slice(0,10))||payments[i-1]||null;
                 const preEmiInterest=i===1?mfLoanPreEmiDue(loan):0;
                 rows.push({loan,product:p,no:i,dueDate:due,emi:Number(p.emi)||0,baseEmi:Number(p.emi)||0,totalDue:mfLoanInstallmentAmount(loan,i),preEmiInterest,principal:Number(p.principal)||0,interest:Number(p.interest)||0,paid:!!paid,paidRecord:paid||null});
             }
@@ -8480,11 +8553,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             mfScaleLoanMasterPage=next; renderAllLoansTable();
         }
 
+        async function mfWaitForGoogleIdentityServices(timeoutMs=8000){
+            const started=Date.now();
+            while(!(window.google && google.accounts && google.accounts.oauth2)){
+                if(Date.now()-started>=timeoutMs) throw new Error("Google Identity Services has not loaded yet. Check your internet connection and try again.");
+                await new Promise(r=>setTimeout(r,50));
+            }
+        }
         async function getGoogleToken(interactive=true){
             const clientId=(document.getElementById("google-client-id")?.value||localStorage.getItem("MF_GOOGLE_CLIENT_ID")||"").trim();
             if(!clientId) throw new Error("Enter your Google OAuth Web Client ID first.");
             if(location.protocol==='file:') throw new Error("Direct Google OAuth needs an HTTPS web origin. Host this HTML as a secure web app first.");
-            if(!window.google || !google.accounts || !google.accounts.oauth2) throw new Error("Google Identity Services has not loaded yet. Check your internet connection and try again.");
+            await mfWaitForGoogleIdentityServices();
             if(!interactive && googleAccessToken && googleTokenExpiresAt && Date.now() < googleTokenExpiresAt-60000) return googleAccessToken;
 
             // One token client for the whole app. The callback is registered at init time,
@@ -8535,6 +8615,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 pending?.reject(e);
             }
             return promise;
+        }
+
+        // User-triggered Drive actions use this order: live token -> silent grant reuse ->
+        // interactive authorization only if Google genuinely requires user attention.
+        // No page-load, timer, save, visibility, or online event calls this helper.
+        async function mfEnsureGoogleAccessForUser(){
+            if(googleAccessToken && googleTokenExpiresAt && Date.now() < googleTokenExpiresAt-60000) return googleAccessToken;
+            try{ return await getGoogleToken(false); }
+            catch(silentErr){ return await getGoogleToken(true); }
         }
 
         async function getGoogleTokenSilently(){
@@ -8731,7 +8820,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         async function syncNowToGoogleDrive(background=false){
             if(background){
-                updateSecureCloudStatus('🟢 Local + Firebase data remain active. Google Drive backup is manual; press Sync Now when you want an encrypted backup.',false);
+                updateSecureCloudStatus('🟢 Local + Firebase data remain active. Google Drive backup is manual; press Backup to Google Drive when you want an encrypted backup.',false);
                 return false;
             }
             if(cloudSyncBusy) return; cloudSyncBusy=true;
@@ -8744,14 +8833,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }
                 if(!googleAccessToken){
                     if(background){
-                        updateSecureCloudStatus('🟡 Local save is safe — Google Drive authorization needs one manual reconnect. No Google popup was opened automatically.',true);
+                        updateSecureCloudStatus('🟡 Local save is safe — Google Drive remains manual and no authorization popup was opened automatically.',true);
                         return false;
                     }else{
-                        await getGoogleToken(true);
+                        await mfEnsureGoogleAccessForUser();
                     }
                 }
-                if(!googleAccessToken) throw new Error('Google Drive is not connected.');
-                const {folder,files}=await driveListCurrent(!background);
+                if(!googleAccessToken) throw new Error('Google Drive authorization is not available.');
+                const {folder,files}=await driveListCurrent(true);
                 const blob=await makeCloudBackupBlob();
                 const metadata={name:'Current Database.mfbackup.json',mimeType:'application/json',parents:[folder]};
                 let resp;
@@ -8781,10 +8870,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(!sr.ok) throw new Error('Timestamped recovery point upload '+sr.status);
                 const stampResult=await sr.json();
                 localStorage.setItem('MF_LAST_DRIVE_RESTORE_POINT', JSON.stringify({id:stampResult.id,name:stampName,modifiedTime:stampResult.modifiedTime||stamp.toISOString()}));
+                localStorage.setItem(MF_LAST_DRIVE_BACKUP_AT_KEY,stamp.toISOString());
 
                 markCloudSynced();
                 document.getElementById('sync-target-text').innerText='Google Drive Backup Secured';
-                const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Last encrypted backup: '+new Date().toLocaleString('en-IN');
+                mfRefreshDriveBackupUi();
                 updateSecureCloudStatus('🟢 Google Drive encrypted backup is up to date.');
                 if(!background) alert('Encrypted Google Drive backup completed successfully.');
                 return true;
@@ -8842,33 +8932,26 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             try{
                 const clientId=(document.getElementById('google-client-id').value||'').trim();
                 if(!clientId) return alert('Please enter your Google OAuth Web Client ID.');
-                const pin=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
-                if(!pin) return alert('Enter your Cloud Encryption PIN before connecting Google Drive.');
-                mfCloudPinMemory=pin;
-                const cb=document.getElementById('cloud-pin-remember'); if(cb) cb.checked=true;
-                // CONNECT ONLY: after PIN validation, connect OAuth but do not read, decrypt, reconcile, restore, or upload Drive data.
+                // CONNECT ONLY: this action establishes/validates Drive authorization. It never
+                // reads, decrypts, reconciles, restores, or uploads the business database.
+                // The Cloud Encryption PIN belongs only to Backup/Restore.
                 localStorage.setItem('MF_GOOGLE_CLIENT_ID',clientId);
                 await getGoogleToken(true);
                 googleDriveFolderId=null; googleDriveFileId=null;
-                // Verify the token against the actual Drive API before reporting success.
-                // This prevents a false "connected" message when OAuth succeeded but Drive
-                // access itself is not usable. The folder is app-owned under drive.file scope.
                 await verifyGoogleDriveConnectionForUser();
+                localStorage.setItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY,'1');
                 document.getElementById('sync-target-text').innerText='Google Drive Connected';
-                const backedUp=await syncNowToGoogleDrive(false);
-                if(!backedUp) throw new Error('Google authorization succeeded, but the Drive backup could not be verified. Your local data was not changed.');
-                updateSecureCloudStatus('🟢 Google Drive connected and verified. Encrypted manual backup is ready.');
-                /* Drive auto-sync disabled by production policy. */
-                alert('Google Drive connected successfully and verified. The encrypted backup has been created/updated, and future saves remain local + Firebase automatic; Google Drive backups are manual.');
+                updateSecureCloudStatus('🟢 Google Drive connected and verified. Manual encrypted backup is ready; no backup was created during Connect.');
+                alert('Google Drive connected successfully and verified. No backup was created during Connect. Use “Backup to Google Drive” whenever you want to create an encrypted backup.');
             }catch(err){ alert('Google Drive connection failed: '+err.message); }
         }
         async function restoreLatestFromGoogleDrive(){
             try{
                 const pin=getCloudPin(); if(!pin) return alert('Enter the Cloud Encryption PIN before restoring a Google Drive backup.');
                 if(!googleAccessToken){
-                    await getGoogleToken(true);
+                    await mfEnsureGoogleAccessForUser();
                 }
-                const {files}=await driveListCurrent();
+                const {files}=await driveListCurrent(true);
                 if(!files.length) return alert('No encrypted cloud database backup found in Google Drive.');
                 if(!confirm('Restore the latest encrypted Google Drive database? Your current device data will first be preserved in local version history.')) return;
                 try{ const safety={id:'pre-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
@@ -8913,7 +8996,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const pin=getCloudPin();
                 if(!pin) return alert('Enter the Cloud Encryption PIN before viewing Google Drive timestamped restore points.');
                 if(!googleAccessToken){
-                    await getGoogleToken(true);
+                    await mfEnsureGoogleAccessForUser();
                 }
                 const {files}=await listDriveTimestampedRestorePoints();
                 closeDriveRestorePointPicker();
@@ -9000,8 +9083,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             try{
                 const pin=getCloudPin();
                 if(!pin) return alert('Enter the Cloud Encryption PIN before restoring a Google Drive recovery snapshot.');
-                if(!googleAccessToken) await getGoogleToken(true);
-                const folder=await ensureDriveFolder();
+                if(!googleAccessToken) await mfEnsureGoogleAccessForUser();
+                const folder=await ensureDriveFolder(true);
                 const q=encodeURIComponent("name contains 'Snapshot_' and trashed=false and '"+folder+"' in parents");
                 const listResp=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=100');
                 const files=(await listResp.json()).files||[];
@@ -9070,6 +9153,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(modal) modal.classList.add('active');
             const savedId=localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'';
             const input=document.getElementById('google-client-id'); if(input) input.value=savedId;
+            mfRefreshDriveBackupUi();
             const fbCfg=document.getElementById('firebase-config-input'); if(fbCfg) fbCfg.value=localStorage.getItem('MF_FIREBASE_CONFIG')||'';
             const fbCode=document.getElementById('firebase-sync-code'); if(fbCode) fbCode.value=localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'';
             renderAppLockSection();
