@@ -8578,7 +8578,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const clientId=(document.getElementById("google-client-id")?.value||localStorage.getItem("MF_GOOGLE_CLIENT_ID")||"").trim();
             if(!clientId) throw new Error("Enter your Google OAuth Web Client ID first.");
             if(location.protocol==='file:') throw new Error("Direct Google OAuth needs an HTTPS web origin. Host this HTML as a secure web app first.");
-            await mfWaitForGoogleIdentityServices();
+            // Interactive OAuth must be invoked directly from the user action. Even an
+            // immediately-resolved await can yield to a microtask and lose Chrome's popup
+            // user-gesture permission. The user-action helper preflights GIS synchronously.
+            if(interactive){
+                if(!(window.google && google.accounts && google.accounts.oauth2)){
+                    throw new Error("Google authorization is still loading. Please wait a moment and try again.");
+                }
+            }else{
+                await mfWaitForGoogleIdentityServices();
+            }
             if(!interactive && googleAccessToken && googleTokenExpiresAt && Date.now() < googleTokenExpiresAt-60000) return googleAccessToken;
 
             // One token client for the whole app. The callback is registered at init time,
@@ -8619,9 +8628,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const promise=new Promise((resolve,reject)=>{resolvePending=resolve;rejectPending=reject;});
             googleTokenPending={promise,resolve:resolvePending,reject:rejectPending};
             try{
-                // Manual Connect is the only user-visible OAuth path. An empty prompt lets
-                // Google reuse an already-approved grant instead of forcing consent every time.
-                // Background renewal uses prompt=none and is never allowed to open UI.
+                // IMPORTANT: when interactive=true this call is made directly from the
+                // explicit Connect/Backup/Restore action. Do not insert an await between
+                // that user gesture and requestAccessToken(), otherwise Chrome may reject
+                // the OAuth window with popup_failed_to_open. prompt='' lets Google reuse
+                // an existing grant without forcing consent in the normal case.
+                // Background code passes interactive=false and uses prompt=none only when
+                // explicitly permitted; it never opens a user-visible popup.
                 googleTokenClient.requestAccessToken({prompt:interactive?'':'none'});
             }catch(e){
                 const pending=googleTokenPending;
@@ -8631,13 +8644,22 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             return promise;
         }
 
-        // User-triggered Drive actions use this order: live token -> silent grant reuse ->
-        // interactive authorization only if Google genuinely requires user attention.
-        // No page-load, timer, save, visibility, or online event calls this helper.
+        // User-triggered Drive actions must preserve the browser's user-gesture context.
+        // IMPORTANT: do not await a silent OAuth request and then open an interactive popup;
+        // that can lose the click gesture and cause Chrome's popup_failed_to_open error.
+        // When Backup/Restore is explicitly clicked, request the token directly from that
+        // gesture. Google can reuse an already-approved grant without forcing consent.
         async function mfEnsureGoogleAccessForUser(){
             if(googleAccessToken && googleTokenExpiresAt && Date.now() < googleTokenExpiresAt-60000) return googleAccessToken;
-            try{ return await getGoogleToken(false); }
-            catch(silentErr){ return await getGoogleToken(true); }
+            const clientId=(document.getElementById("google-client-id")?.value||localStorage.getItem("MF_GOOGLE_CLIENT_ID")||"").trim();
+            if(!clientId) throw new Error("Enter your Google OAuth Web Client ID first.");
+            if(location.protocol==='file:') throw new Error("Direct Google OAuth needs an HTTPS web origin. Host this HTML as a secure web app first.");
+            if(!(window.google && google.accounts && google.accounts.oauth2)){
+                throw new Error("Google authorization is still loading. Please wait a moment and press Backup again.");
+            }
+            // No await before requestAccessToken(): preserve the click gesture so Chrome
+            // permits the Google authorization window after a page refresh.
+            return await getGoogleToken(true);
         }
 
         async function getGoogleTokenSilently(){
