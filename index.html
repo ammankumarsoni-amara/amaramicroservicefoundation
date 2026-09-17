@@ -2334,7 +2334,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="font-size:.66rem;color:#94a3b8;margin-top:6px;line-height:1.4;">The app never asks for or stores your Gmail password. Google OAuth grants the app the limited <b>drive.file</b> Drive scope needed for its own backup files.</div>
                 <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, host this app on your HTTPS domain.</div>
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required to connect, backup/restore)</label>
-                <input type="text" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for encrypted backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                <input type="text" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for encrypted backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password" oninput="onCloudPinInputChange()">
                 <label style="display:flex;align-items:center;gap:6px;font-size:.66rem;color:#94a3b8;margin-top:7px;cursor:pointer;">
                     <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Keep PIN active on this device (encrypted storage; raw PIN is never stored)
                 </label>
@@ -8760,10 +8760,41 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const cb=document.getElementById('cloud-pin-remember');
             if(cb?.checked) saveCloudPinNow(); else resetCloudPin();
         }
+        // SECURITY RULE: merely typing text into the PIN field NEVER activates the
+        // Cloud Encryption PIN. Only the explicit "Activate PIN" action may do that.
+        // Likewise, clearing/changing an already-active PIN immediately invalidates the
+        // old local readiness so Connect/Backup cannot silently keep using the old PIN.
         function getCloudPin(){
+            return String(mfCloudPinMemory||'').trim();
+        }
+        function onCloudPinInputChange(){
             const input=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
-            if(input) mfCloudPinMemory=input;
-            return mfCloudPinMemory;
+            const active=String(mfCloudPinMemory||'').trim();
+            if(!input){
+                if(active || mfGoogleDriveIsConfigured() || googleAccessToken){
+                    resetCloudPin();
+                }else{
+                    updateSecureCloudStatus();
+                }
+                return;
+            }
+            // A different value means the previously active PIN is no longer the PIN
+            // shown to the user. Invalidate the old activation immediately; the new PIN
+            // becomes active only after the user presses "Activate PIN".
+            if(active && input!==active){
+                mfCloudPinMemory='';
+                googleAccessToken=null; googleTokenExpiresAt=0; googleDriveFileId=null; googleDriveFolderId=null;
+                try{
+                    localStorage.removeItem('MF_CLOUD_PIN_WRAPPED');
+                    localStorage.removeItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY);
+                }catch(e){}
+                const cb=document.getElementById('cloud-pin-remember'); if(cb) cb.checked=false;
+                updateSecureCloudStatus('🟡 New Cloud Encryption PIN entered but not activated. Click "Activate PIN" before connecting Google Drive.',true);
+                return;
+            }
+            if(!active){
+                updateSecureCloudStatus('🟡 Cloud Encryption PIN entered but not active. Click "Activate PIN" before connecting Google Drive.',true);
+            }
         }
         async function sha256Hex(text){
             const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
@@ -8965,7 +8996,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             try{
                 if(!mfFirebaseUser) return alert('Please sign in to Firebase first. Google Drive connection is locked until the secure Firebase account is active.');
                 const pin=getCloudPin();
-                if(!pin) return alert('Activate the Cloud Encryption PIN first. The PIN is required to enable Google Drive for this app and to encrypt/decrypt backups.');
+                const visiblePin=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
+                if(!pin || !visiblePin || visiblePin!==pin) return alert('Activate the Cloud Encryption PIN first. Google Drive connection is locked until the active PIN is verified.');
                 const clientId=(document.getElementById('google-client-id').value||localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'').trim();
                 if(!clientId) return alert('Please enter your Google OAuth Web Client ID.');
                 // CONNECT ONLY: establish/validate Drive authorization. Never create, replace,
