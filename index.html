@@ -2333,7 +2333,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 </details>
                 <div style="font-size:.66rem;color:#94a3b8;margin-top:6px;line-height:1.4;">The app never asks for or stores your Gmail password. Google OAuth grants the app the limited <b>drive.file</b> Drive scope needed for its own backup files.</div>
                 <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, host this app on your HTTPS domain.</div>
-                <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required for backup/restore)</label>
+                <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required to connect, backup/restore)</label>
                 <input type="text" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for encrypted backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
                 <label style="display:flex;align-items:center;gap:6px;font-size:.66rem;color:#94a3b8;margin-top:7px;cursor:pointer;">
                     <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Keep PIN active on this device (encrypted storage; raw PIN is never stored)
@@ -2342,7 +2342,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     <button type="button" class="btn-header btn-blue" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;" onclick="saveCloudPinNow()"><i class="fa-solid fa-floppy-disk"></i> Activate PIN</button>
                     <button type="button" class="btn-header" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;background:#3f1d2e;color:#fb7185;border:1px solid rgba(251,113,133,.25);" onclick="resetCloudPin()"><i class="fa-solid fa-rotate-left"></i> Reset PIN</button>
                 </div>
-                <div style="font-size:.64rem;color:#94a3b8;margin-top:5px;line-height:1.35;">When set, the database sent to Google Drive is AES-GCM encrypted in the browser. Keep this PIN safe; without it, an encrypted cloud backup cannot be restored. <b>The PIN is kept active on this device using encrypted device storage; the raw PIN is never saved to browser storage.</b> <b>Reset PIN</b> clears it from the current session — do this if you're changing the PIN or using a shared device. If the box is ever empty during a sync, this app will now warn you instead of silently uploading an unencrypted backup.</div>
+                <div style="font-size:.64rem;color:#94a3b8;margin-top:5px;line-height:1.35;">When set, the database sent to Google Drive is AES-GCM encrypted in the browser. Google Drive connection is allowed only after Firebase sign-in and an active Cloud Encryption PIN are verified. Keep this PIN safe; without it, an encrypted cloud backup cannot be restored. <b>The PIN is kept active on this device using encrypted device storage; the raw PIN is never saved to browser storage.</b> <b>Reset PIN</b> clears it from the current session — do this if you're changing the PIN or using a shared device. If the box is ever empty during a sync, this app will now warn you instead of silently uploading an unencrypted backup.</div>
             </div>
 
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
@@ -3829,7 +3829,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     if (mfFirebaseAuthListenerAttached) return;
                     mfFirebaseAuthListenerAttached = true;
                     mfFirebaseAuth.onAuthStateChanged(user=>{
+                        const previousUid=mfFirebaseUser?.uid||'';
                         mfFirebaseUser=user||null;
+                        if(previousUid && previousUid!==String(user?.uid||'')){
+                            googleAccessToken=null; googleTokenExpiresAt=0; googleDriveFileId=null; googleDriveFolderId=null;
+                            try{ localStorage.removeItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY); }catch(e){}
+                        }
                         if(user) {
                             mfAuthStatus('🟢 Signed in: '+(user.email||user.uid));
                             if(mfSecureSyncEnabled && mfFirestoreDb && mfFirebaseSyncCode) {
@@ -3837,6 +3842,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 try{ if(cfgRaw) initFirebaseSync(JSON.parse(cfgRaw),mfFirebaseSyncCode,false); }catch(e){console.warn('Secure Firebase reconnect skipped',e);}
                             }
                         } else {
+                            googleAccessToken=null; googleTokenExpiresAt=0; googleDriveFileId=null; googleDriveFolderId=null;
                             mfAuthStatus('Not signed in.');
                             mfFirebaseInitKey='';
                             mfFirebaseListenerKey='';
@@ -3903,7 +3909,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 alert('Firebase account created and signed in. If your Firebase project requires email verification, verify it before using Secure Sync.');
             }catch(e){console.error(e);mfAuthStatus('⚠️ Account creation failed: '+(e.message||e),true);}
         }
-        async function mfAuthSignOut(){try{if(mfFirebaseAuth) await mfFirebaseAuth.signOut();}catch(e){console.error(e);}}
+        async function mfAuthSignOut(){try{if(mfFirebaseAuth) await mfFirebaseAuth.signOut(); googleAccessToken=null; googleTokenExpiresAt=0; googleDriveFileId=null; googleDriveFolderId=null; updateSecureCloudStatus();}catch(e){console.error(e);}}
         function mfCurrentCloudIdentity(){return mfFirebaseUser?{uid:mfFirebaseUser.uid,email:mfFirebaseUser.email||''}:null;}
         function mfSecurityStamp(){return {schema:'MF-SECURE-EDITION-1',clientVersion:'secure-edition-1',updatedByUid:mfFirebaseUser?.uid||null,updatedByDevice:mfFirebaseDeviceId,updatedAt:firebase?.firestore?.Timestamp?.now?firebase.firestore.Timestamp.now():new Date()};}
         function mfLocalAudit(action,detail){
@@ -4317,9 +4323,17 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function updateSecureCloudStatus(message,warning=false){
             const el=document.getElementById("secure-cloud-status"); if(!el) return;
             if(message){el.textContent=message;el.style.color=warning?'#fde68a':'#a7f3d0';return;}
+            if(!mfFirebaseUser){
+                el.textContent="🔒 Firebase sign-in is required before Google Drive can be connected or used.";
+                el.style.color='#fde68a'; return;
+            }
+            if(!getCloudPin()){
+                el.textContent="🔒 Activate the Cloud Encryption PIN before Google Drive can be connected or used.";
+                el.style.color='#fde68a'; return;
+            }
             if(googleAccessToken) el.textContent="🟢 Google Drive connected for this session — manual encrypted backup is ready.";
             else if(mfGoogleDriveIsConfigured()) el.textContent="🟢 Google Drive is configured on this device — manual encrypted backup is ready. Authorization is renewed only when you use Backup/Restore.";
-            else if(localStorage.getItem('MF_GOOGLE_CLIENT_ID') && getCloudPin()) el.textContent="🟢 Google Drive backup is configured — manual encrypted backup is ready.";
+            else if(localStorage.getItem('MF_GOOGLE_CLIENT_ID')) el.textContent="🟡 Cloud Encryption PIN is active. Connect Google Drive once on this device to enable manual backup.";
             else el.textContent="🟢 IndexedDB local database active. Use Backup to Google Drive for a manual encrypted off-device backup.";
         }
 
@@ -8725,13 +8739,22 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(cb) cb.checked=false;
                 return alert('Cloud Encryption PIN could not be securely persisted on this device. Your PIN was not saved. Please keep this page open and try again.');
             }
-            alert('Cloud Encryption PIN is securely saved for this device. Google Drive backups are manual; local + Firebase sync continue automatically. The raw PIN is not stored.');
+            updateSecureCloudStatus('🟢 Cloud Encryption PIN is active on this device. Sign in to Firebase and Connect Google Drive once before using manual backup.',false); alert('Cloud Encryption PIN is securely saved for this device. Sign in to Firebase and connect Google Drive once before creating an encrypted backup. The raw PIN is not stored.');
         }
         function resetCloudPin(){
+            const hadPin=!!getCloudPin();
             mfCloudPinMemory='';
-            try{ localStorage.removeItem('MF_CLOUD_PIN_WRAPPED'); }catch(e){}
+            googleAccessToken=null; googleTokenExpiresAt=0; googleDriveFileId=null; googleDriveFolderId=null;
+            try{
+                localStorage.removeItem('MF_CLOUD_PIN_WRAPPED');
+                // Do not revoke the Google account grant. This only removes this app's
+                // local readiness gate; the user must activate a PIN and explicitly Connect again.
+                localStorage.removeItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY);
+            }catch(e){}
             const input=document.getElementById('cloud-encryption-pin'); if(input) input.value='';
             const cb=document.getElementById('cloud-pin-remember'); if(cb) cb.checked=false;
+            updateSecureCloudStatus('🔒 Cloud Encryption PIN reset. Google Drive is locked until a new PIN is activated and Google Drive is explicitly reconnected. Existing Drive backups remain encrypted with the previous PIN.',true);
+            if(hadPin) mfLocalAudit('CLOUD_PIN_RESET','Google Drive local readiness was cleared; Google authorization was not revoked.');
         }
         async function onCloudPinRememberChange(){
             const cb=document.getElementById('cloud-pin-remember');
@@ -8826,10 +8849,20 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(cloudSyncBusy) return; cloudSyncBusy=true;
             try{
                 const pin=getCloudPin();
+                if(!mfFirebaseUser){
+                    updateSecureCloudStatus('🟡 Google Drive backup is locked — Firebase sign-in is required.',true);
+                    alert('Sign in to Firebase before creating a Google Drive backup.');
+                    return false;
+                }
                 if(!pin){
-                    updateSecureCloudStatus('🟡 Google Drive backup skipped — Cloud Encryption PIN is required.',true);
-                    if(!background) alert('Enter your Cloud Encryption PIN before creating a Google Drive backup.');
-                    return;
+                    updateSecureCloudStatus('🟡 Google Drive backup is locked — Cloud Encryption PIN is required.',true);
+                    alert('Activate your Cloud Encryption PIN before creating a Google Drive backup.');
+                    return false;
+                }
+                if(!mfGoogleDriveIsConfigured()){
+                    updateSecureCloudStatus('🟡 Google Drive backup is locked — connect Google Drive once on this device.',true);
+                    alert('Connect Google Drive once before creating a backup. No backup was created.');
+                    return false;
                 }
                 if(!googleAccessToken){
                     if(background){
@@ -8930,23 +8963,27 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         async function connectGoogleDrive(){
             try{
-                const clientId=(document.getElementById('google-client-id').value||'').trim();
+                if(!mfFirebaseUser) return alert('Please sign in to Firebase first. Google Drive connection is locked until the secure Firebase account is active.');
+                const pin=getCloudPin();
+                if(!pin) return alert('Activate the Cloud Encryption PIN first. The PIN is required to enable Google Drive for this app and to encrypt/decrypt backups.');
+                const clientId=(document.getElementById('google-client-id').value||localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'').trim();
                 if(!clientId) return alert('Please enter your Google OAuth Web Client ID.');
-                // CONNECT ONLY: this action establishes/validates Drive authorization. It never
-                // reads, decrypts, reconciles, restores, or uploads the business database.
-                // The Cloud Encryption PIN belongs only to Backup/Restore.
+                // CONNECT ONLY: establish/validate Drive authorization. Never create, replace,
+                // read, decrypt, reconcile, restore, or upload a business backup here.
                 localStorage.setItem('MF_GOOGLE_CLIENT_ID',clientId);
                 await getGoogleToken(true);
                 googleDriveFolderId=null; googleDriveFileId=null;
                 await verifyGoogleDriveConnectionForUser();
                 localStorage.setItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY,'1');
                 document.getElementById('sync-target-text').innerText='Google Drive Connected';
-                updateSecureCloudStatus('🟢 Google Drive connected and verified. Manual encrypted backup is ready; no backup was created during Connect.');
-                alert('Google Drive connected successfully and verified. No backup was created during Connect. Use “Backup to Google Drive” whenever you want to create an encrypted backup.');
+                updateSecureCloudStatus('🟢 Google Drive connected and verified. No backup was created. Use “Backup to Google Drive” only when you want to create an encrypted backup.');
+                alert('Google Drive connected successfully and verified. No backup was created. Your encrypted backup remains a separate manual action.');
             }catch(err){ alert('Google Drive connection failed: '+err.message); }
         }
         async function restoreLatestFromGoogleDrive(){
             try{
+                if(!mfFirebaseUser) return alert('Please sign in to Firebase before using Google Drive restore.');
+                if(!mfGoogleDriveIsConfigured()) return alert('Connect Google Drive once on this device before using Google Drive restore.');
                 const pin=getCloudPin(); if(!pin) return alert('Enter the Cloud Encryption PIN before restoring a Google Drive backup.');
                 if(!googleAccessToken){
                     await mfEnsureGoogleAccessForUser();
@@ -8993,6 +9030,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(mfDriveRestorePickerBusy) return;
             mfDriveRestorePickerBusy=true;
             try{
+                if(!mfFirebaseUser) return alert('Please sign in to Firebase before using Google Drive restore.');
+                if(!mfGoogleDriveIsConfigured()) return alert('Connect Google Drive once on this device before using Google Drive restore.');
                 const pin=getCloudPin();
                 if(!pin) return alert('Enter the Cloud Encryption PIN before viewing Google Drive timestamped restore points.');
                 if(!googleAccessToken){
@@ -9081,6 +9120,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         async function restoreLatestRecoverySnapshotFromGoogleDrive(){
             try{
+                if(!mfFirebaseUser) return alert('Please sign in to Firebase before using Google Drive restore.');
+                if(!mfGoogleDriveIsConfigured()) return alert('Connect Google Drive once on this device before using Google Drive restore.');
                 const pin=getCloudPin();
                 if(!pin) return alert('Enter the Cloud Encryption PIN before restoring a Google Drive recovery snapshot.');
                 if(!googleAccessToken) await mfEnsureGoogleAccessForUser();
