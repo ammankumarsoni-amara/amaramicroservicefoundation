@@ -2488,7 +2488,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             for (let yr = current - 50; yr <= current + 49; yr++) y.innerHTML += `<option value="${yr}">${yr}</option>`;
         }
 
-        let state = JSON.parse(localStorage.getItem("MF_OPEX_PRO_DB")) || {
+        let state = (()=>{try{const raw=localStorage.getItem("MF_OPEX_PRO_DB");if(raw&&raw.length<=5000000)return JSON.parse(raw);}catch(e){}return null;})() || {
             bizName: "My Finance Company",
             companyProfile: {
                 legalName: "",
@@ -2697,7 +2697,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         // ================= SECURE STORAGE FOUNDATION =================
         const MF_IDB_NAME = "MF_ENTERPRISE_SECURE_DB";
-        const MF_IDB_VERSION = 4;
+        const MF_IDB_VERSION = 5;
         const MF_IDB_STORE = "snapshots";
         const MF_IDB_HISTORY_STORE = "history";
         let mfDb = null;
@@ -2728,13 +2728,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     // Scalable entity stores: the legacy snapshot/history stores remain untouched.
                     const mk=(name,opts)=>{ if(!db.objectStoreNames.contains(name)) return db.createObjectStore(name,opts||{keyPath:"id"}); return null; };
                     const loans=mk('scalable_loans',{keyPath:'id'}); if(loans && !loans.indexNames.contains('product')) loans.createIndex('product','product',{unique:false}); if(loans && !loans.indexNames.contains('scaleStatus')) loans.createIndex('scaleStatus','_scaleStatus',{unique:false});
-                    const payments=mk('scalable_payments',{keyPath:'id'}); if(payments && !payments.indexNames.contains('loanId')) payments.createIndex('loanId','loanId',{unique:false});
+                    const payments=mk('scalable_payments',{keyPath:'id'}); if(payments && !payments.indexNames.contains('loanId')) payments.createIndex('loanId','loanId',{unique:false}); if(payments && !payments.indexNames.contains('date')) payments.createIndex('date','date',{unique:false});
                     const products=mk('scalable_products',{keyPath:'id'});
                     const staff=mk('scalable_staff',{keyPath:'id'});
                     const expenses=mk('scalable_expenses',{keyPath:'id'});
                     const borrowings=mk('scalable_borrowings',{keyPath:'id'});
                     const search=mk('scalable_search',{keyPath:'id'}); if(search && !search.indexNames.contains('token')) search.createIndex('token','token',{unique:false}); if(search && !search.indexNames.contains('loanId')) search.createIndex('loanId','loanId',{unique:false});
                     const queue=mk('scalable_sync_queue',{keyPath:'id'}); if(queue && !queue.indexNames.contains('status')) queue.createIndex('status','status',{unique:false});
+                    const due=mk('scalable_due_index',{keyPath:'id'});
+                    if(due && !due.indexNames.contains('dueDate')) due.createIndex('dueDate','dueDate',{unique:false});
+                    if(due && !due.indexNames.contains('status')) due.createIndex('status','status',{unique:false});
+                    if(due && !due.indexNames.contains('product')) due.createIndex('product','product',{unique:false});
+                    if(due && !due.indexNames.contains('collectorId')) due.createIndex('collectorId','collectorId',{unique:false});
+                    const aggregates=mk('scalable_aggregates',{keyPath:'id'});
                     mk('scalable_meta',{keyPath:'id'});
                 };
                 req.onsuccess=()=>{ mfDb=req.result; resolve(mfDb); };
@@ -3360,7 +3366,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }else if(idbHasData){
                     state=snap.state;
                     try{
-                        localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));
+                        mf100WriteLegacyCompat();
                         localStorage.setItem('MF_LOCAL_SAVED_AT',snap?.updatedAt||new Date().toISOString());
                     }catch(e){}
                 }else if(localState && localState.products){
@@ -3379,7 +3385,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // marker merely because the page was opened.
                 const startupSnapshot=await idbPutSnapshot();
                 try{
-                    localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));
+                    mf100WriteLegacyCompat();
                     localStorage.setItem('MF_LOCAL_SAVED_AT',startupSnapshot?.updatedAt||new Date().toISOString());
                 }catch(e){}
                 mfDbReady=true;
@@ -3769,7 +3775,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 mfSetKnownCloudVersion(pulledVersion);
                 try{ localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(pulledVersion)); localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint()); localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString()); }catch(e){}
                 mfLocalAudit('CLOUD_PULL','Secure cloud snapshot loaded after schema and ownership validation');
-                localStorage.setItem('MF_OPEX_PRO_DB', JSON.stringify(state));
+                mf100WriteLegacyCompat();
                 try{ localStorage.setItem('MF_LOCAL_SAVED_AT',new Date().toISOString()); }catch(e){}
                 idbPutSnapshot().finally(() => { renderAll(); setFirebaseStatus('🟢 Loaded latest secure cloud data — ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})); });
             }).catch(err => { console.error(err); setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Pull'), true); });
@@ -9045,7 +9051,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(remoteUpdated > localUpdated + 2000){
                 try{ const conflict={id:'conflict-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(conflict);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); localStorage.setItem('MF_LAST_LOCAL_CONFLICT_AT',conflict.updatedAt); }catch(e){}
                 const r=await driveApi('files/'+remote.id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); await idbPutSnapshot(); try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state)); localStorage.setItem('MF_LOCAL_SAVED_AT',new Date().toISOString());}catch(e){}
+                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); await idbPutSnapshot(); try{mf100WriteLegacyCompat(); localStorage.setItem('MF_LOCAL_SAVED_AT',new Date().toISOString());}catch(e){}
                 markCloudSynced(); renderAll(); updateSecureCloudStatus('🟢 Latest encrypted Google Drive data loaded on this device.'); return;
             }
             if(localUpdated > remoteUpdated + 2000 || dirty){ await syncNowToGoogleDrive(background); return; }
@@ -9093,7 +9099,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(!confirm('Restore the latest encrypted Google Drive database? Your current device data will first be preserved in local version history.')) return;
                 try{ const safety={id:'pre-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
                 const r=await driveApi('files/'+files[0].id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state)); localStorage.setItem('MF_LOCAL_SAVED_AT',new Date().toISOString()); localStorage.removeItem('MF_LOCAL_DIRTY_AT'); localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));}catch(e){}
+                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); try{mf100WriteLegacyCompat(); localStorage.setItem('MF_LOCAL_SAVED_AT',new Date().toISOString()); localStorage.removeItem('MF_LOCAL_DIRTY_AT'); localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));}catch(e){}
                 renderAll(); updateSecureCloudStatus('🟢 Latest encrypted Google Drive backup restored and validated.'); const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Restored latest backup: '+new Date().toLocaleString('en-IN'); alert('Latest encrypted Google Drive backup restored successfully.'); closeModal('modal-cloud'); setTab('feed');
             }catch(err){alert('Cloud restore failed: '+(err?.message||err));}
         }
@@ -9203,7 +9209,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 normalizeCompanyProfile();
                 await idbPutSnapshot();
                 try{
-                    localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));
+                    mf100WriteLegacyCompat();
                     localStorage.removeItem('MF_LOCAL_DIRTY_AT');
                     localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));
                 }catch(e){}
@@ -9272,7 +9278,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 normalizeCompanyProfile();
                 await idbPutSnapshot();
                 try{
-                    localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));
+                    mf100WriteLegacyCompat();
                     localStorage.removeItem('MF_LOCAL_DIRTY_AT');
                     // Hold cloud reconciliation long enough for the restored local state to settle.
                     localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));
@@ -9428,7 +9434,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 state=(typeof structuredClone==='function')?structuredClone(rec.state):JSON.parse(JSON.stringify(rec.state)); mfScaleReinstallStateProxy(); mfScaleDirty.full=true;
                 normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();
                 await idbPutSnapshot();
-                try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));localStorage.setItem('MF_LOCAL_DIRTY_AT',new Date().toISOString());}catch(e){}
+                try{mf100WriteLegacyCompat();localStorage.setItem('MF_LOCAL_DIRTY_AT',new Date().toISOString());}catch(e){}
                 mfLastVersionFingerprint=mfStateFingerprint(state);
                 renderAll();
                 await renderBackupVersionList();
@@ -9482,7 +9488,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         if(confirm('Restore this backup?')){
                             state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts();
                             await idbPutSnapshot();
-                            try{localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));}catch(err){}
+                            try{mf100WriteLegacyCompat();}catch(err){}
                             renderAll(); alert('Database restored successfully into IndexedDB.'); closeModal('modal-cloud'); setTab('feed');
                         }
                     }else alert('Invalid backup file format!');
@@ -10216,5 +10222,354 @@ window.addEventListener('online',()=>{
 
 
 <!-- PRODUCTION-V12-APPLOCK-INDEPENDENT-FIREBASE-SELF-HEAL-UNLOCK-NONBLOCKING -->
+<script id="mf-100k-scalability-hardening">
+(function(){
+  'use strict';
+  /* ================= AMARA 100K SCALABILITY HARDENING =================
+     Additive layer: existing business calculations/forms/security remain authoritative.
+     Large-list reads use IndexedDB projections; analytics are cached; Firebase operational
+     sync is structured rather than a monolithic state document. */
+  const MF100_SCHEMA='AMARA-SCALABLE-2';
+  let mf100AnalyticsCache=null;
+  let mf100GrowthCache=null;
+  let mf100AnalyticsReady=false;
+  let mf100GrowthReady=false;
+  let mf100RebuildTimer=0;
+  let mf100UpcomingRun=0;
+  let mf100PriorityRun=0;
+  const mf100OriginalUpsertLoan=typeof mfScaleUpsertLoan==='function'?mfScaleUpsertLoan:null;
+  const mf100OriginalDeleteLoan=typeof mfScaleDeleteLocalLoan==='function'?mfScaleDeleteLocalLoan:null;
+
+  function mf100LoanDueRecord(loan){
+    if(!loan || loan.foreclosed || loan.postMaturitySettlement) return null;
+    const p=state.products?.[loan.product];
+    if(!p || !loan.disbursalDate || !Number(p.tenure)) return null;
+    const payments=Array.isArray(loan.payments)?loan.payments:[];
+    const byNo=new Set(), byDue=new Set();
+    for(const pay of payments){
+      const n=Number(pay?.installmentNo); if(Number.isFinite(n)&&n>0) byNo.add(n);
+      const d=String(pay?.dueDate||'').slice(0,10); if(/^\d{4}-\d{2}-\d{2}$/.test(d)) byDue.add(d);
+    }
+    let firstNo=0, firstDue='';
+    for(let i=1;i<=Number(p.tenure);i++){
+      const due=mfLoanScheduleDueIso(loan,i);
+      if(!byNo.has(i) && !byDue.has(due) && !payments[i-1]){ firstNo=i; firstDue=due; break; }
+    }
+    if(!firstNo) return null;
+    const today=mfIsoToday();
+    const status=firstDue<today?'OVERDUE':(firstDue===today?'DUE':'UPCOMING');
+    return {id:String(loan.id),loanId:String(loan.id),dueDate:firstDue,installmentNo:firstNo,status,product:String(loan.product||''),collectorId:String(loan.collectorId||''),collectorName:String(loan.collectorName||''),name:String(loan.name||''),phone:String(loan.phone||''),phone2:String(loan.phone2||''),guarantorPhone:String(loan.guarantorPhone||''),guarantorPhone2:String(loan.guarantorPhone2||loan.guarantorSecondaryPhone||''),emi:Number(p.emi)||0,totalDue:Number(mfLoanInstallmentAmount(loan,firstNo))||0,overdueDays:mfUpcomingOverdueDays(firstDue,today),pending:Math.max(0,Number(getLoanPending(loan))||0),updatedAt:new Date().toISOString()};
+  }
+  async function mf100PutDueRecord(loan){
+    if(!loan?.id) return;
+    const db=await openMfDb();
+    const rec=mf100LoanDueRecord(loan);
+    await new Promise((resolve,reject)=>{const tx=db.transaction('scalable_due_index','readwrite');const st=tx.objectStore('scalable_due_index'); if(rec) st.put(rec); else st.delete(String(loan.id)); tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error||new Error('Due index update failed'));});
+  }
+  if(mf100OriginalUpsertLoan){
+    mfScaleUpsertLoan=async function(loan){ await mf100OriginalUpsertLoan(loan); try{await mf100PutDueRecord(loan);}catch(e){console.warn('Due index update skipped:',e);} };
+  }
+  if(mf100OriginalDeleteLoan){
+    mfScaleDeleteLocalLoan=async function(id){ await mf100OriginalDeleteLoan(id); try{const db=await openMfDb();await new Promise((res,rej)=>{const tx=db.transaction('scalable_due_index','readwrite');tx.objectStore('scalable_due_index').delete(String(id));tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});}catch(e){} };
+  }
+
+  async function mf100RebuildDueIndex(){
+    const db=await openMfDb();
+    const loans=Array.isArray(state.loans)?state.loans:[];
+    await new Promise((resolve,reject)=>{const tx=db.transaction('scalable_due_index','readwrite');tx.objectStore('scalable_due_index').clear();tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
+    for(let start=0;start<loans.length;start+=250){
+      const batch=loans.slice(start,start+250), records=batch.map(mf100LoanDueRecord).filter(Boolean);
+      await new Promise((resolve,reject)=>{const tx=db.transaction('scalable_due_index','readwrite');const st=tx.objectStore('scalable_due_index');records.forEach(r=>st.put(r));tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Due index rebuild failed'));});
+      await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:40}):setTimeout(r,0));
+    }
+  }
+
+  async function mf100BuildAnalytics(){
+    // One authoritative pass. Existing reconciliation rules are reused verbatim so no
+    // financial calculation is reimplemented or silently changed.
+    const r=mfFinancialReconciliation();
+    const product={};
+    for(const [code,p] of Object.entries(state.products||{})) product[code]={total:0,disbursed:0,active:0,closed:0,foreclosed:0,due:0,overdue:0,settled:0};
+    for(const l of (state.loans||[])){
+      const code=String(l.product||''); const b=product[code]||(product[code]={total:0,disbursed:0,active:0,closed:0,foreclosed:0,due:0,overdue:0,settled:0});
+      const p=state.products?.[code]||{}; const st=mfLoanOperationalStatus(l); b.total++;b.disbursed+=Number(p.amount)||0;
+      if(st==='FORECLOSED')b.foreclosed++; else if(st==='SETTLED')b.settled++; else if(st==='CLOSED')b.closed++; else if(st==='DUE')b.due++; else if(st==='OVERDUE')b.overdue++; else b.active++;
+    }
+    const payload={schema:MF100_SCHEMA,updatedAt:new Date().toISOString(),reconciliation:r,product,loanCount:(state.loans||[]).length,sourceStateFingerprint:mfScaleHash(state)};
+    const db=await openMfDb();
+    await new Promise((resolve,reject)=>{const tx=db.transaction('scalable_aggregates','readwrite');tx.objectStore('scalable_aggregates').put({id:'portfolio',...payload});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Analytics cache write failed'));});
+    mf100AnalyticsCache=r; mf100AnalyticsReady=true;
+    return r;
+  }
+  async function mf100LoadAnalytics(){
+    try{const db=await openMfDb();const rec=await new Promise((res,rej)=>{const tx=db.transaction('scalable_aggregates','readonly');const q=tx.objectStore('scalable_aggregates').get('portfolio');q.onsuccess=()=>res(q.result||null);q.onerror=()=>rej(q.error);});if(rec?.reconciliation && Number(rec.loanCount)===Number(state.loans?.length||0) && String(rec.sourceStateFingerprint||'')===String(mfScaleHash(state))){mf100AnalyticsCache=rec.reconciliation;mf100AnalyticsReady=true;mf100LastProductAgg=rec.product||{};return rec.reconciliation;}}catch(e){}
+    return mf100BuildAnalytics();
+  }
+  function mf100ScheduleAnalyticsRebuild(){
+    clearTimeout(mf100RebuildTimer);mf100RebuildTimer=setTimeout(async()=>{try{await mf100BuildAnalytics();try{if(mf100OriginalBuildGrowth){mf100GrowthCache=mf100OriginalBuildGrowth();mfGrowthCache=mf100GrowthCache;mf100StaleGrowthCache=mf100GrowthCache;}renderKPIs();if(mfActiveTab==='all'&&typeof renderLoanMasterSummary==='function')renderLoanMasterSummary();}catch(e){}}catch(e){console.warn('Analytics rebuild skipped:',e);}},500);
+  }
+
+  /* Dashboard: cached portfolio aggregate. Fallback is retained only during first bootstrap. */
+  renderKPIs=function(){
+    const r=mf100AnalyticsReady&&mf100AnalyticsCache?mf100AnalyticsCache:mfFinancialReconciliation();
+    const set=(id,v)=>{const el=document.getElementById(id);if(el)el.innerText=v;};
+    set('kpi-disbursed','₹'+Number(r.disbursed||0).toLocaleString('en-IN'));
+    set('kpi-gross-profit','₹'+Number(r.gross||0).toLocaleString('en-IN'));
+    set('kpi-borrow-cost','-₹'+Number(r.lenderCost||0).toLocaleString('en-IN'));
+    set('kpi-opex-cost','-₹'+Number(r.opex||0).toLocaleString('en-IN'));
+    set('kpi-net-spread','₹'+Number(r.net||0).toLocaleString('en-IN'));
+    set('kpi-outstanding','₹'+Number(r.outstanding||0).toLocaleString('en-IN'));
+  };
+
+  renderLoanMasterSummary=function(){
+    const area=document.getElementById('loan-master-summary');if(!area)return;
+    const r=mf100AnalyticsCache;
+    if(!r){ return; }
+    const product=mf100LastProductAgg||{};
+    let cards=`<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-bottom:10px;"><div class="kpi-card" style="padding:8px 10px;"><div class="kpi-label" style="font-size:.6rem;">Total Loans</div><div class="kpi-val" style="font-size:1.05rem;color:#60a5fa;">${Number(r.loans||0).toLocaleString('en-IN')}</div></div><div class="kpi-card" style="padding:8px 10px;"><div class="kpi-label" style="font-size:.6rem;">Total Disbursed</div><div class="kpi-val" style="font-size:1.05rem;color:#34d399;">₹${Number(r.disbursed||0).toLocaleString('en-IN')}</div></div><div class="kpi-card" style="padding:8px 10px;"><div class="kpi-label" style="font-size:.6rem;">Active / Closed</div><div class="kpi-val" style="font-size:1.05rem;color:#fbbf24;">${Number(r.statusCounts?.ACTIVE||0)+Number(r.statusCounts?.DUE||0)+Number(r.statusCounts?.OVERDUE||0)} / ${Number(r.statusCounts?.CLOSED||0)}</div></div><div class="kpi-card" style="padding:8px 10px;"><div class="kpi-label" style="font-size:.6rem;">Foreclosed</div><div class="kpi-val" style="font-size:1.05rem;color:#c084fc;">${Number(r.statusCounts?.FORECLOSED||0)}</div></div></div><div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:12px;padding:10px 11px;"><div style="font-size:.78rem;font-weight:800;color:#fff;margin-bottom:8px;"><i class="fa-solid fa-chart-column" style="color:#60a5fa;"></i> Loan Product-wise Summary</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:7px;">`;
+    Object.keys(state.products||{}).forEach(code=>{const p=state.products[code],b=product[code]||{total:0,disbursed:0,active:0,closed:0,foreclosed:0};cards+=`<div style="background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);border-radius:9px;padding:9px;"><b style="color:#60a5fa;font-size:.8rem;">${financeEsc(p.name)}</b><div style="font-size:.69rem;color:#94a3b8;margin-top:4px;">${financeEsc(code)} · ₹${Number(p.amount||0).toLocaleString('en-IN')} loan</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:7px;font-size:.7rem;"><span>Total: <b style="color:#fff;">${Number(b.total||0).toLocaleString('en-IN')}</b></span><span>Disbursed: <b style="color:#34d399;">₹${Number(b.disbursed||0).toLocaleString('en-IN')}</b></span><span>Active: <b>${Number(b.active||0)+Number(b.due||0)+Number(b.overdue||0)}</b></span><span>Closed: <b style="color:#cbd5e1;">${Number(b.closed||0)+Number(b.settled||0)}</b></span><span>Foreclosed: <b style="color:#c084fc;">${Number(b.foreclosed||0)}</b></span></div></div>`;});
+    area.innerHTML=cards+'</div></div>';
+  };
+  let mf100LastProductAgg={};
+
+  /* Upcoming schedule: use the indexed next-unpaid due record to select candidate accounts.
+     Only selected candidate accounts are hydrated and their small contractual schedule is built. */
+  async function mf100CandidateLoansByDue(toIso,collector='ALL',product='ALL'){
+    const db=await openMfDb();
+    return await new Promise((resolve,reject)=>{const tx=db.transaction('scalable_due_index','readonly');const idx=tx.objectStore('scalable_due_index').index('dueDate');const req=idx.openCursor(IDBKeyRange.upperBound(toIso));const ids=[];req.onsuccess=e=>{const c=e.target.result;if(!c){resolve(ids);return;}const v=c.value;if((collector==='ALL'||String(v.collectorId)===String(collector))&&(product==='ALL'||String(v.product)===String(product)))ids.push(String(v.loanId));c.continue();};req.onerror=()=>reject(req.error||new Error('Due-date index read failed'));});
+  }
+  async function mf100CandidateLoansByPaidDate(fromIso,toIso){
+    const db=await openMfDb();
+    return await new Promise((resolve,reject)=>{const tx=db.transaction('scalable_payments','readonly');const idx=tx.objectStore('scalable_payments').index('date');const req=idx.openCursor(IDBKeyRange.bound(fromIso,toIso));const ids=new Set();req.onsuccess=e=>{const c=e.target.result;if(!c){resolve([...ids]);return;}if(c.value?.loanId)ids.add(String(c.value.loanId));c.continue();};req.onerror=()=>reject(req.error||new Error('Payment-date index read failed'));});
+  }
+  async function mf100GetLoansByIds(ids){return mfScaleGetLoansByIds(ids,{hydratePayments:true});}
+  function mf100ScheduleRowsInRange(loan,fromIso,toIso){
+    const p=state.products?.[loan?.product]; if(!loan||!p||!Number(p.tenure)||!loan.disbursalDate)return [];
+    const first=mfLoanFirstDueIso(loan), mode=mfProductFrequencyMode(p), rows=[];
+    let start=1,end=Number(p.tenure);
+    if(mode==='WEEKLY'||mode==='FORTNIGHTLY'||mode==='CUSTOM'||mode==='MONTHLY_30'){
+      const cycle=mfProductCycleDays(p), deltaStart=mfDaysBetween(first,fromIso), deltaEnd=mfDaysBetween(first,toIso);
+      start=Math.max(1,Math.floor(deltaStart/cycle)+1); end=Math.min(Number(p.tenure),Math.floor(deltaEnd/cycle)+1);
+    }else if(mode==='MONTHLY_CALENDAR'||mode==='M15FIXED'){
+      const a=String(first).match(/^(\d{4})-(\d{2})-(\d{2})$/), b=String(fromIso).match(/^(\d{4})-(\d{2})-(\d{2})$/), c=String(toIso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if(a&&b&&c){const fm=Number(a[1])*12+Number(a[2])-1, sm=Number(b[1])*12+Number(b[2])-1, em=Number(c[1])*12+Number(c[2])-1;start=Math.max(1,sm-fm+1-1);end=Math.min(Number(p.tenure),em-fm+1+1);}
+    }
+    start=Math.max(1,start-1);end=Math.min(Number(p.tenure),end+1);
+    const payments=Array.isArray(loan.payments)?loan.payments:[],byNo=new Map(),byDue=new Map();payments.forEach(pay=>{const n=Number(pay?.installmentNo);const d=String(pay?.dueDate||'').slice(0,10);if(Number.isFinite(n)&&n>0&&!byNo.has(n))byNo.set(n,pay);if(/^\d{4}-\d{2}-\d{2}$/.test(d)&&!byDue.has(d))byDue.set(d,pay);});
+    for(let i=start;i<=end;i++){const due=mfLoanScheduleDueIso(loan,i);if(due<fromIso||due>toIso)continue;const paid=byNo.get(i)||byDue.get(due)||payments[i-1]||null;rows.push({loan,product:p,no:i,dueDate:due,emi:Number(p.emi)||0,baseEmi:Number(p.emi)||0,totalDue:mfLoanInstallmentAmount(loan,i),preEmiInterest:i===1?mfLoanPreEmiDue(loan):0,principal:Number(p.principal)||0,interest:Number(p.interest)||0,paid:!!paid,paidRecord:paid||null});}
+    return rows;
+  }
+  renderUpcomingEmiSchedule=async function(){
+    const run=++mf100UpcomingRun;
+    const from=getUpcomingDateIso('from')||mfIsoToday(),to=getUpcomingDateIso('to')||from,status=document.getElementById('emi-schedule-status')?.value||'UPCOMING',q=(document.getElementById('emi-schedule-search')?.value||'').trim().toLowerCase(),collector=document.getElementById('emi-collector-filter')?.value||'ALL',today=mfIsoToday();
+    populateUpcomingCollectorFilter();
+    const area=document.getElementById('upcoming-emi-results');if(!area)return;
+    try{
+      if(!mfScaleSearchReady){area.innerHTML='<div class="upcoming-empty">Preparing scalable collection index…</div>';return;}
+      let ids=[];
+      if(status==='PAID') ids=await mf100CandidateLoansByPaidDate(from,to);
+      else if(status==='ALL') ids=[...new Set([...(await mf100CandidateLoansByDue(to,collector,'ALL')),...(await mf100CandidateLoansByPaidDate(from,to))])];
+      else ids=await mf100CandidateLoansByDue(to,collector,'ALL');
+      if(run!==mf100UpcomingRun)return;
+      const loans=await mf100GetLoansByIds(ids);
+      let rows=[];
+      for(const loan of loans){
+        const product=state.products?.[loan.product];if(!product||loan.foreclosed||loan.postMaturitySettlement)continue;
+        const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.guarantorPhone,loan.guarantorPhone2,loan.guarantorSecondaryPhone,loanCollectorName(loan),product.name].filter(Boolean).join(' ').toLowerCase();if(q&&!hay.includes(q))continue;
+        const schedule=mf100ScheduleRowsInRange(loan,from,to);for(const r of schedule){const rs=mfUpcomingStatus(r,today);if(status!=='ALL'&&rs!==status)continue;rows.push({...r,upcomingStatus:rs,overdueDays:mfUpcomingOverdueDays(r.dueDate,today)});}
+      }
+      rows.sort((a,b)=>a.dueDate.localeCompare(b.dueDate)||a.loan.name.localeCompare(b.loan.name));
+      if(run!==mf100UpcomingRun)return;
+      const summary=document.getElementById('upcoming-emi-summary');const total=rows.reduce((s,r)=>s+(Number(r.totalDue??r.emi)||0),0),clients=new Set(rows.map(r=>r.loan.id)).size,due=rows.filter(r=>r.upcomingStatus==='DUE'),overdue=rows.filter(r=>r.upcomingStatus==='OVERDUE'),upcoming=rows.filter(r=>r.upcomingStatus==='UPCOMING'),paid=rows.filter(r=>r.upcomingStatus==='PAID');
+      if(summary)summary.innerHTML=`<div class="upcoming-emi-mini"><small>EMIs in Range</small><b>${rows.length.toLocaleString('en-IN')}</b></div><div class="upcoming-emi-mini"><small>Clients</small><b>${clients.toLocaleString('en-IN')}</b></div><div class="upcoming-emi-mini"><small>Due Today</small><b style="color:#fbbf24;">${due.length.toLocaleString('en-IN')}</b></div><div class="upcoming-emi-mini"><small>Overdue</small><b style="color:#f87171;">${overdue.length.toLocaleString('en-IN')}</b></div><div class="upcoming-emi-mini"><small>Upcoming</small><b style="color:#fbbf24;">${upcoming.length.toLocaleString('en-IN')}</b></div><div style="grid-column:1/-1;font-size:.68rem;color:#94a3b8;padding:2px 3px;line-height:1.5;">Selected-range EMI total: <b style="color:#34d399;">₹${total.toLocaleString('en-IN')}</b> · Paid: ${paid.length.toLocaleString('en-IN')}</div>`;
+      renderUpcomingCollectorSummary(rows);
+      if(!rows.length){area.innerHTML='<div class="upcoming-empty"><i class="fa-solid fa-calendar-xmark" style="font-size:1.5rem;margin-bottom:7px;"></i><br>No EMI collection is scheduled in the selected range.</div>';await showCollectionPriority(true);return;}
+      const map=new Map();rows.forEach(r=>{const k=r.loan.id;if(!map.has(k))map.set(k,[]);map.get(k).push(r);});const customers=[...map.values()].sort((a,b)=>a[0].dueDate.localeCompare(b[0].dueDate)||a[0].loan.name.localeCompare(b[0].loan.name));const visibleCustomers=customers.slice(0,100);area.innerHTML=visibleCustomers.map(g=>mfCollectionCustomerCard(g[0],g)).join('')+(customers.length>visibleCustomers.length?`<div class="upcoming-priority-more" style="padding:10px;">Showing first 100 customer accounts for smooth display. ${customers.length-visibleCustomers.length} additional matching accounts remain in the indexed result and are available through export/filters.</div>`:'');await showCollectionPriority(true);
+    }catch(e){console.error('Scalable upcoming schedule failed:',e);area.innerHTML=`<div class="upcoming-empty" style="color:#f87171;">Scalable collection index could not be loaded. ${financeEsc(e.message||e)}</div>`;}
+  };
+
+  getCollectionPriorityRows=async function(){
+    const run=++mf100PriorityRun,today=mfIsoToday(),db=await openMfDb(),rows=[];let overdue=0,todayCount=0;
+    await new Promise((resolve,reject)=>{const tx=db.transaction('scalable_due_index','readonly');const idx=tx.objectStore('scalable_due_index').index('dueDate');const req=idx.openCursor(IDBKeyRange.upperBound(today));req.onsuccess=e=>{const c=e.target.result;if(!c){resolve();return;}const v=c.value;const dynamicStatus=String(v.dueDate)<today?'OVERDUE':(String(v.dueDate)===today?'DUE':'UPCOMING'); if(dynamicStatus==='OVERDUE'){overdue++;}else if(dynamicStatus==='DUE'){todayCount++;}if(dynamicStatus==='OVERDUE'||dynamicStatus==='DUE'){rows.push({...v,status:dynamicStatus,overdueDays:mfUpcomingOverdueDays(v.dueDate,today)});rows.sort((a,b)=>Number(b.overdueDays||0)-Number(a.overdueDays||0)||String(a.dueDate).localeCompare(String(b.dueDate))||String(a.name).localeCompare(String(b.name)));if(rows.length>5)rows.length=5;}c.continue();};req.onerror=()=>reject(req.error||new Error('Priority index read failed'));});
+    if(run!==mf100PriorityRun)return {rows:[],overdue:0,todayCount:0};
+    return {rows,overdue,todayCount};
+  };
+  showCollectionPriority=async function(){
+    const box=document.getElementById('upcoming-collection-priority');if(!box)return;try{const r=await getCollectionPriorityRows();const top=r.rows||[];box.innerHTML=`<div class="upcoming-priority-head"><div><div class="upcoming-priority-title"><i class="fa-solid fa-bolt" style="color:#fbbf24;margin-right:5px;"></i> Collection Priority</div><div class="upcoming-priority-sub">Oldest overdue first · then today's dues</div></div><div class="upcoming-priority-counts"><span class="priority-pill overdue">${r.overdue.toLocaleString('en-IN')} overdue</span><span class="priority-pill today">${r.todayCount.toLocaleString('en-IN')} today</span></div></div>${top.length?`<div class="upcoming-priority-list compact-list">${top.map(v=>`<div class="upcoming-priority-row compact-row"><div><div class="p-name">${financeEsc(v.name)}</div><div class="p-meta">${financeEsc(v.loanId)} · EMI #${v.installmentNo}</div></div><div class="p-date" style="color:${v.status==='OVERDUE'?'#f87171':'#fbbf24'};">${v.status==='OVERDUE'?`${v.overdueDays}d overdue`:'Due today'}</div><div class="p-amt">₹${Number(v.totalDue||v.emi||0).toLocaleString('en-IN')}</div><div class="p-phone">${financeEsc(mfContactText(v.phone,v.phone2))}${v.guarantorPhone||v.guarantorPhone2?` · G: ${financeEsc(mfGuarantorContactText({guarantorPhone:v.guarantorPhone,guarantorPhone2:v.guarantorPhone2}))}`:''}</div><button class="btn-collect-sm" onclick="openCollectModal('${recoverySafeId(v.loanId)}')">Collect</button></div>`).join('')}</div>`:'<div class="upcoming-empty compact-empty">No due or overdue EMI today.</div>'}${(r.overdue+r.todayCount)>5?`<div class="upcoming-priority-more">Showing 5 highest-priority cases.</div>`:''}`;}catch(e){console.warn('Priority render skipped:',e);}
+  };
+
+  const mf100OriginalBuildGrowth=typeof mfBuildGrowthCache==='function'?mfBuildGrowthCache:null;
+  let mf100StaleGrowthCache=null;
+  if(mf100OriginalBuildGrowth){
+    mfBuildGrowthCache=function(){
+      if(mf100GrowthCache) return mf100GrowthCache;
+      if(mf100StaleGrowthCache) return mf100StaleGrowthCache;
+      const x=mf100OriginalBuildGrowth();mf100GrowthCache=x;return x;
+    };
+  }
+  const mf100OriginalExecReport=typeof mfExecutiveReportData==='function'?mfExecutiveReportData:null;
+  mfExecutiveReportData=function(){
+    if(!mf100AnalyticsReady||!mf100AnalyticsCache||!mf100LastProductAgg) return mf100OriginalExecReport?mf100OriginalExecReport():null;
+    const r=mf100AnalyticsCache, d={...r,lenderUpfront:r.lenderUpfront||0,lenderCost:r.lenderCost||0,opex:r.opex||0,net:r.net||0};
+    const productRows=Object.keys(state.products||{}).map(code=>{const p=state.products[code]||{},b=mf100LastProductAgg[code]||{};const scheduled=(Number(p.emi)||0)*(Number(p.tenure)||0)*Number(b.total||0);return [p.name||code,Number(b.total||0),Number(b.disbursed||0),Number(p.emi)||0,Number(p.tenure)||0,scheduled,0];});
+    return {d,totalLoans:Number(r.loans||0),totalDisbursed:Number(r.disbursed||0),outstanding:Number(r.outstanding||0),active:Number(r.statusCounts?.ACTIVE||0),overdue:Number(r.statusCounts?.OVERDUE||0),dueToday:Number(r.statusCounts?.DUE||0),closed:Number(r.statusCounts?.CLOSED||0),settled:Number(r.statusCounts?.SETTLED||0),foreclosed:Number(r.statusCounts?.FORECLOSED||0),capitalBorrowed:Number(r.capitalBorrowed||0),principalRepaid:Number(r.principalRepaid||0),lenderInterest:Number(r.lenderInterest||0),lenderGst:Number(r.lenderGst||0),upfront:Number(r.lenderUpfront||0),remainingDebt:Number(r.remainingDebt||0),financingCost:Number(r.lenderCost||0),productRows,statusRows:[["Active / Current",Number(r.statusCounts?.ACTIVE||0)],["Due Today",Number(r.statusCounts?.DUE||0)],["Overdue",Number(r.statusCounts?.OVERDUE||0)],["Closed",Number(r.statusCounts?.CLOSED||0)],["Settled After Maturity",Number(r.statusCounts?.SETTLED||0)],["Foreclosed",Number(r.statusCounts?.FORECLOSED||0)]],reportDate:formatToIndianDate(new Date().toISOString().split('T')[0])};
+  };
+  function mf100WriteLegacyCompat(){try{if((state.loans?.length||0)<=5000)localStorage.setItem('MF_OPEX_PRO_DB',JSON.stringify(state));else localStorage.removeItem('MF_OPEX_PRO_DB');}catch(e){}}
+  /* Startup hook: build/read analytics and due index after durable storage is ready. */
+  const mf100OriginalInitialize=typeof initializeScalableDataLayer==='function'?initializeScalableDataLayer:null;
+  initializeScalableDataLayer=function(){
+    try{
+      const run=async()=>{try{
+        await mfScaleBuildLocalEntities(false);
+        await mf100LoadAnalytics();
+        const dueMeta=await mfScaleGetMeta('due_index').catch(()=>null);
+        const currentDueFingerprint=mfScaleHash(Array.isArray(state.loans)?state.loans:[]);
+        if(!dueMeta || String(dueMeta.sourceLoanFingerprint||'')!==String(currentDueFingerprint) || Number(dueMeta.loanCount||-1)!==Number(state.loans?.length||0)){
+          await mf100RebuildDueIndex();
+          await mfScalePutMeta({id:'due_index',schema:MF100_SCHEMA,sourceLoanFingerprint:currentDueFingerprint,loanCount:Number(state.loans?.length||0),updatedAt:new Date().toISOString()});
+        }
+        try{const rec=await mfScaleGetMeta('entity_mirror');if(rec)await mfScalePutMeta({...rec,schema:MF100_SCHEMA});}catch(e){}
+        try{mf100LastProductAgg=mf100AnalyticsCache?await (async()=>{const db=await openMfDb();return await new Promise(res=>{const tx=db.transaction('scalable_aggregates','readonly');const q=tx.objectStore('scalable_aggregates').get('portfolio');q.onsuccess=()=>res(q.result?.product||{});q.onerror=()=>res({});});})():{};}catch(e){}
+        try{renderKPIs();if(mfActiveTab==='all')renderLoanMasterSummary();if(mfActiveTab==='feed')renderUpcomingEmiSchedule();}catch(e){}
+        mfScaleScheduleMirror();
+      }catch(e){console.warn('100K scalable initialization skipped:',e);}};
+      if('requestIdleCallback' in window)requestIdleCallback(run,{timeout:1500});else setTimeout(run,250);
+    }catch(e){console.warn('100K scalable initialization skipped:',e);}
+  };
+
+  /* Save-path hardening: refresh scalable derived indexes after the authoritative IDB save,
+     but never serialize the giant compatibility LocalStorage copy here. */
+  const mf100OriginalPersist= persist;
+  persist=function(){
+    const now=new Date();
+    try{mfFinancialReconciliationCache=null;mfGrowthCache=null;}catch(e){}
+    try{localStorage.setItem('MF_LOCAL_DIRTY_AT',now.toISOString());localStorage.setItem('MF_LOCAL_SAVED_AT',now.toISOString());}catch(e){}
+    // Keep the legacy full-state LocalStorage copy only for small portfolios. Large portfolios
+    // must never stringify/write the entire database on every save; IndexedDB is authoritative.
+    try{if((state.loans?.length||0)<=5000) mf100WriteLegacyCompat();else localStorage.removeItem('MF_OPEX_PRO_DB');}catch(e){}
+    idbPutSnapshot().then(async()=>{
+      const el=document.getElementById('last-sync-time');if(el)el.innerHTML=`<i class="fa-solid fa-check text-success me-1"></i> Saved: ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+      try{await mfScaleBuildLocalEntities(false);}catch(e){console.warn('Scalable entity refresh skipped:',e);}
+      mf100ScheduleAnalyticsRebuild();
+      try{renderAll();}catch(e){}
+      queueAutomaticVersionedBackup();
+    }).catch(err=>{console.error('IndexedDB save failed',err);const el=document.getElementById('last-sync-time');if(el)el.innerHTML='<i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> Local save warning';try{renderAll();}catch(e){}}).finally(()=>{try{scheduleFirebasePush();}catch(e){}});
+  };
+
+  /* Firebase: existing structured mirror becomes the operational path. Keep the old root document
+     as a migration/fallback reader only; no new whole-state payloads are written. */
+  mfSecureEnvelope=function(version){return {ownerUid:mfFirebaseUser?.uid||null,updatedByDevice:mfFirebaseDeviceId,updatedAtLabel:new Date().toLocaleString('en-IN'),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),version:Number(version)||1,schemaVersion:MF100_SCHEMA,structured:true,stateFingerprint:mfLocalStateFingerprint()};};
+  pushStateToFirebase=async function(silent){
+    if(!mfFirestoreDb||!mfFirebaseSyncCode){if(!silent){setFirebaseStatus('⚠️ Connect Firebase first.',true);alert('Connect Firebase first.');}return;}
+    if(!mfFirebaseUser){if(!silent){setFirebaseStatus('🔒 Secure Sync requires Firebase sign-in first.',true);alert('Secure Sync requires Firebase sign-in first.');}return;}
+    try{
+      if(!mfScaleReady) await mfScaleBuildLocalEntities(false);
+      await mfScaleMirrorToFirebase();
+      const mirrorMeta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
+      if(mirrorMeta && mirrorMeta.bootstrapped===false){
+        try{await mfSecureFirebaseDoc().set({...mfSecureEnvelope(mfKnownCloudVersion()),structured:true,structuredBootstrapComplete:false},{merge:true});}catch(e){}
+        setFirebaseStatus('🟡 Firebase structured sync is continuing in the background…');
+        return;
+      }
+      const ref=mfSecureFirebaseDoc(),known=mfKnownCloudVersion();
+      const next=known+1;
+      await ref.set({...mfSecureEnvelope(next),structuredVersion:next},{merge:true});
+      mfSetKnownCloudVersion(next);try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
+      mfLocalAudit('CLOUD_PUSH','Structured Firestore mirror synchronized; root document contains metadata only');setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));if(!silent)mfShowTransientNotice('🟢 Firebase sync completed successfully.');
+    }catch(err){console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Push'),true);}
+  };
+  // Do not alter existing pull UI semantics until a structured read is available; the legacy
+  // reader remains a safe migration path for previously stored small snapshots.
+  let mf100StructuredMode=false;
+
+  /* Small compatibility guard: avoid eagerly parsing the giant LocalStorage database on startup.
+     IDB is tried first; LocalStorage is parsed only when no durable IDB snapshot exists. */
+  const mf100OriginalInitStorage=initializeSecureStorage;
+  initializeSecureStorage=async function(){
+    try{
+      const snap=await idbGetSnapshot();
+      if(snap?.state?.products){
+        state=snap.state;mfScaleReinstallStateProxy();normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();mfDbReady=true;markStorageReady();
+        const startupSnapshot=await idbPutSnapshot();try{localStorage.setItem('MF_LOCAL_SAVED_AT',startupSnapshot.updatedAt);}catch(e){}
+        renderAll();updateSecureCloudStatus();ensureInitialVersionedBackup();initializeScalableDataLayer();return;
+      }
+    }catch(e){/* fall through to proven legacy initializer */}
+    return mf100OriginalInitStorage();
+  };
+
+  /* After every dirty mirror update, refresh derived indexes in the background. */
+  const mf100OriginalMarkDirty=mfScaleMarkDirty;
+  mfScaleMarkDirty=function(kind,id){if(mfGrowthCache)mf100StaleGrowthCache=mfGrowthCache;mf100OriginalMarkDirty(kind,id);if(mf100StaleGrowthCache)mfGrowthCache=mf100StaleGrowthCache;if(kind==='loans'||kind==='products'||kind==='staff'||kind==='expenses'||kind==='borrowings')mf100ScheduleAnalyticsRebuild();};
+
+  window.addEventListener('load',()=>setTimeout(()=>{try{if(mfScaleReady){mf100LoadAnalytics().then(()=>{try{renderKPIs();}catch(e){}});}}catch(e){}},1200));
+})();
+
+</script>
+
+<script id="mf-100k-firebase-structured-hardening">
+(function(){
+  'use strict';
+  const mf100OriginalPull=typeof pullStateFromFirebase==='function'?pullStateFromFirebase:null;
+  const mf100OriginalListener=typeof startFirebaseListener==='function'?startFirebaseListener:null;
+  async function mf100FirestoreCollectionRows(kind){
+    const col=mfScaleStructuredCollection(kind); if(!col) throw new Error('Structured Firebase collection unavailable.');
+    const out=[]; let last=null;
+    while(true){
+      let q=col.orderBy(firebase.firestore.FieldPath.documentId()).limit(500);
+      if(last) q=q.startAfter(last);
+      const snap=await q.get(); if(snap.empty) break;
+      snap.forEach(d=>out.push({...d.data(),id:String(d.id)}));
+      last=snap.docs[snap.docs.length-1].id;
+      if(snap.size<500) break;
+      await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
+    }
+    return out;
+  }
+  async function mf100PullStructured(showConfirm){
+    if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser){alert('Connect Firebase first.');return;}
+    if(showConfirm&&!confirm('This will replace the data on THIS device with the latest structured secure cloud data. Continue?'))return;
+    const root=await mfSecureFirebaseDoc().get();if(!root.exists)throw new Error('No secure cloud metadata found.');
+    const meta=root.data()||{};if(meta.ownerUid&&meta.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
+    const [loanRows,productRows,staffRows,expenseRows,borrowingRows,paymentRows]=await Promise.all([
+      mf100FirestoreCollectionRows('loans'),mf100FirestoreCollectionRows('products'),mf100FirestoreCollectionRows('staff'),mf100FirestoreCollectionRows('expenses'),mf100FirestoreCollectionRows('borrowings'),mf100FirestoreCollectionRows('payments')
+    ]);
+    const products={};productRows.forEach(x=>{const id=String(x.id);delete x._ownerUid;delete x._scaleFingerprint;delete x._updatedAtLabel;delete x.id;products[id]=x;});
+    const loans=loanRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;delete y.id;y.id=String(x.id);y.payments=[];return y;});
+    const byLoan=new Map(loans.map(l=>[String(l.id),l]));
+    paymentRows.forEach(x=>{const l=byLoan.get(String(x.loanId));if(!l)return;const y={...x};delete y._ownerUid;delete y.loanId;delete y.paymentIndex;delete y.id;l.payments.push({paymentIndex:Number(x.paymentIndex)||0,...y});});
+    loans.forEach(l=>{l.payments.sort((a,b)=>(Number(a.paymentIndex)||0)-(Number(b.paymentIndex)||0));l.payments.forEach(p=>delete p.paymentIndex);});
+    state={...state,loans,products,staff:staffRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),expenses:expenseRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),borrowings:borrowingRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;})};
+    mfScaleReinstallStateProxy();mfScaleDirty.full=true;normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();
+    const v=Number(meta.version||0);mfSetKnownCloudVersion(v);
+    try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(v));localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
+    await idbPutSnapshot();
+    try{await mfScaleBuildLocalEntities(false);await mf100BuildAnalytics();await mf100RebuildDueIndex();await mfScalePutMeta({id:'due_index',schema:'AMARA-SCALABLE-2',sourceLoanFingerprint:mfScaleHash(state.loans||[]),loanCount:(state.loans||[]).length,updatedAt:new Date().toISOString()});}catch(e){console.warn('Structured local index rebuild after cloud pull skipped:',e);}
+    renderAll();setFirebaseStatus('🟢 Loaded latest structured Firebase data — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+  }
+  pullStateFromFirebase=function(showConfirm){
+    const ref=mfSecureFirebaseDoc();
+    if(!ref){return mf100OriginalPull?mf100OriginalPull(showConfirm):undefined;}
+    ref.get().then(doc=>{
+      const data=doc.exists?(doc.data()||{}):{};
+      if(data.structured){mf100PullStructured(showConfirm).catch(err=>{console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Pull'),true);});}
+      else if(mf100OriginalPull) mf100OriginalPull(showConfirm);
+    }).catch(err=>{console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure cloud check'),true);});
+  };
+  startFirebaseListener=function(){
+    if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return;
+    const listenerKey=String(mfFirebaseUser.uid||'')+'|'+String(mfFirebaseSyncCode||'');
+    if(mfFirebaseListenerUnsub&&mfFirebaseListenerKey===listenerKey)return;
+    if(mfFirebaseListenerUnsub){mfFirebaseListenerUnsub();mfFirebaseListenerUnsub=null;}
+    mfFirebaseListenerKey=listenerKey;
+    const ref=mfSecureFirebaseDoc();
+    mfFirebaseListenerUnsub=ref.onSnapshot(doc=>{
+      if(!doc.exists)return;const data=doc.data()||{};if(data.ownerUid&&data.ownerUid!==mfFirebaseUser.uid)return;
+      const v=Number(data.version||0);if(!v||v<=mfKnownCloudVersion()||data.updatedByDevice===mfFirebaseDeviceId)return;
+      if(!mfHasUnpushedLocalChanges()){pullStateFromFirebase(true);}else{setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);showFirebaseUpdateBanner(data.updatedAtLabel||'',v);}
+    },err=>{console.error('Firebase structured listener error',err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure Firebase listener'),true);});
+  };
+})();
+
+</script>
 </body>
 </html>
