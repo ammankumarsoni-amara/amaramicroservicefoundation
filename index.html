@@ -3909,7 +3909,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 alert('Firebase account created and signed in. If your Firebase project requires email verification, verify it before using Secure Sync.');
             }catch(e){console.error(e);mfAuthStatus('⚠️ Account creation failed: '+(e.message||e),true);}
         }
-        async function mfAuthSignOut(){try{if(mfFirebaseAuth) await mfFirebaseAuth.signOut(); googleAccessToken=null; googleTokenExpiresAt=0; googleDriveFileId=null; googleDriveFolderId=null; updateSecureCloudStatus();}catch(e){console.error(e);}}
+        async function mfAuthSignOut(){try{if(mfFirebaseAuth) await mfFirebaseAuth.signOut(); clearPersistedGoogleAccessToken(); googleDriveFileId=null; googleDriveFolderId=null; updateSecureCloudStatus();}catch(e){console.error(e);}}
         function mfCurrentCloudIdentity(){return mfFirebaseUser?{uid:mfFirebaseUser.uid,email:mfFirebaseUser.email||''}:null;}
         function mfSecurityStamp(){return {schema:'MF-SECURE-EDITION-1',clientVersion:'secure-edition-1',updatedByUid:mfFirebaseUser?.uid||null,updatedByDevice:mfFirebaseDeviceId,updatedAt:firebase?.firestore?.Timestamp?.now?firebase.firestore.Timestamp.now():new Date()};}
         function mfLocalAudit(action,detail){
@@ -4131,6 +4131,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // Cloud/Firebase restoration must never be allowed to block unlocking.
                 Promise.resolve().then(async () => {
                     try { await restoreCloudPinWrapped(); } catch(e) { console.warn('Cloud PIN restore after App Unlock skipped:', e); }
+                    try { await restoreGoogleAccessTokenWrapped(); } catch(e) { console.warn('Google Drive token restore after App Unlock skipped:', e); }
                     try {
                         const cfgRaw = localStorage.getItem('MF_FIREBASE_CONFIG');
                         const syncCode = localStorage.getItem('MF_FIREBASE_SYNC_CODE');
@@ -4244,10 +4245,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             // is already unlocked (or App Lock is not configured), then let the normal automatic
             // backup scheduler use it. With App Lock enabled, the PIN is restored after unlock.
             await restoreSavedCloudPin();
-            // After a refresh/reopen the short-lived access token is intentionally gone from memory.
-            // The persistent Drive configuration remains on this device, but no OAuth, Drive API
-            // call, upload, reconciliation, or popup is started automatically. A user-triggered
-            // Backup/Restore action silently reuses the existing Google grant when possible.
+            // Restore the encrypted, short-lived Google access token only when the device PIN is
+            // already available. This keeps normal reloads popup-free while never storing the raw
+            // OAuth token in browser storage. If the token is expired, it is discarded and the next
+            // explicit Backup/Restore action can authorize again.
+            try{ await restoreGoogleAccessTokenWrapped(); }catch(e){}
             try{ mfRefreshDriveBackupUi(); updateSecureCloudStatus(); }catch(e){}
             const inp = document.getElementById('app-lock-input');
             if (inp) inp.addEventListener('keyup', e => { if (e.key === 'Enter') attemptAppUnlock(); });
@@ -4332,7 +4334,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 el.style.color='#fde68a'; return;
             }
             if(googleAccessToken) el.textContent="🟢 Google Drive connected for this session — manual encrypted backup is ready.";
-            else if(mfGoogleDriveIsConfigured()) el.textContent="🟢 Google Drive is configured on this device — manual encrypted backup is ready. Authorization is renewed only when you use Backup/Restore.";
+            else if(mfGoogleDriveIsConfigured()) el.textContent="🟢 Google Drive is configured on this device — manual encrypted backup is ready. Authorization is reused from secure device storage when valid; Google is contacted again only when that authorization expires or is revoked.";
             else if(localStorage.getItem('MF_GOOGLE_CLIENT_ID')) el.textContent="🟡 Cloud Encryption PIN is active. Connect Google Drive once on this device to enable manual backup.";
             else el.textContent="🟢 IndexedDB local database active. Use Backup to Google Drive for a manual encrypted off-device backup.";
         }
@@ -8574,13 +8576,57 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 await new Promise(r=>setTimeout(r,50));
             }
         }
+        const MF_GOOGLE_ACCESS_TOKEN_WRAPPED_KEY='MF_GOOGLE_ACCESS_TOKEN_WRAPPED_V1';
+        async function persistGoogleAccessTokenWrapped(token,expiresAt,clientId){
+            if(!token || !expiresAt || !clientId) return false;
+            try{
+                const key=await mfGetDriveWrapKey(true);
+                if(!key) return false;
+                const iv=crypto.getRandomValues(new Uint8Array(12));
+                const payload=JSON.stringify({v:1,token:String(token),expiresAt:Number(expiresAt),clientId:String(clientId)});
+                const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(payload)));
+                localStorage.setItem(MF_GOOGLE_ACCESS_TOKEN_WRAPPED_KEY,JSON.stringify({v:1,iv:mfBytesToB64(iv),ct:mfBytesToB64(ct)}));
+                return true;
+            }catch(e){ return false; }
+        }
+        async function restoreGoogleAccessTokenWrapped(){
+            if(googleAccessToken && googleTokenExpiresAt && Date.now()<googleTokenExpiresAt-60000) return true;
+            if(!mfCloudPinMemory) return false;
+            try{
+                const raw=localStorage.getItem(MF_GOOGLE_ACCESS_TOKEN_WRAPPED_KEY);
+                if(!raw) return false;
+                const x=JSON.parse(raw);
+                if(!x || Number(x.v)!==1 || !x.iv || !x.ct) return false;
+                const key=await mfGetDriveWrapKey(false);
+                if(!key) return false;
+                const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:mfB64ToBytes(x.iv)},key,mfB64ToBytes(x.ct));
+                const data=JSON.parse(new TextDecoder().decode(plain));
+                const clientId=(document.getElementById('google-client-id')?.value||localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'').trim();
+                const exp=Number(data?.expiresAt)||0;
+                if(!data?.token || !exp || exp<=Date.now()+60000 || !clientId || String(data.clientId)!==clientId){
+                    localStorage.removeItem(MF_GOOGLE_ACCESS_TOKEN_WRAPPED_KEY);
+                    return false;
+                }
+                googleAccessToken=String(data.token);
+                googleTokenExpiresAt=exp;
+                return true;
+            }catch(e){
+                try{ localStorage.removeItem(MF_GOOGLE_ACCESS_TOKEN_WRAPPED_KEY); }catch(_e){}
+                return false;
+            }
+        }
+        function clearPersistedGoogleAccessToken(){
+            googleAccessToken=null; googleTokenExpiresAt=0;
+            try{ localStorage.removeItem(MF_GOOGLE_ACCESS_TOKEN_WRAPPED_KEY); }catch(e){}
+        }
+
         async function getGoogleToken(interactive=true){
             const clientId=(document.getElementById("google-client-id")?.value||localStorage.getItem("MF_GOOGLE_CLIENT_ID")||"").trim();
             if(!clientId) throw new Error("Enter your Google OAuth Web Client ID first.");
             if(location.protocol==='file:') throw new Error("Direct Google OAuth needs an HTTPS web origin. Host this HTML as a secure web app first.");
-            // Interactive OAuth must be invoked directly from the user action. Even an
-            // immediately-resolved await can yield to a microtask and lose Chrome's popup
-            // user-gesture permission. The user-action helper preflights GIS synchronously.
+            // Interactive OAuth must be invoked directly from the user action. The encrypted
+            // device-local access-token cache normally avoids this path after reloads; when Google
+            // authorization is genuinely required, the request is made from the explicit action.
             if(interactive){
                 if(!(window.google && google.accounts && google.accounts.oauth2)){
                     throw new Error("Google authorization is still loading. Please wait a moment and try again.");
@@ -8588,7 +8634,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             }else{
                 await mfWaitForGoogleIdentityServices();
             }
-            if(!interactive && googleAccessToken && googleTokenExpiresAt && Date.now() < googleTokenExpiresAt-60000) return googleAccessToken;
+            if(googleAccessToken && googleTokenExpiresAt && Date.now() < googleTokenExpiresAt-60000) return googleAccessToken;
+            if(await restoreGoogleAccessTokenWrapped()) return googleAccessToken;
+            if(!interactive && !googleAccessToken) return null;
 
             // One token client for the whole app. The callback is registered at init time,
             // exactly as Google documents, rather than being replaced after initialization.
@@ -8608,8 +8656,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             pending.reject(new Error(resp.error_description||resp.error));
                         }else if(resp && resp.access_token){
                             googleAccessToken=resp.access_token;
-                            googleTokenExpiresAt=Date.now()+Math.max(60,Number(resp.expires_in||3600))*1000;
+                            const ttl=Math.max(60,Number(resp.expires_in||3600));
+                            googleTokenExpiresAt=Date.now()+ttl*1000;
                             localStorage.setItem("MF_GOOGLE_CLIENT_ID",clientId);
+                            void persistGoogleAccessTokenWrapped(googleAccessToken,googleTokenExpiresAt,clientId);
                             pending.resolve(googleAccessToken);
                         }else{
                             pending.reject(new Error('Google did not return an access token.'));
@@ -8663,13 +8713,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         async function getGoogleTokenSilently(){
-            // HARD RULE: background code must never call Google OAuth. It may reuse only
-            // an access token that is already alive in this page session. This guarantees
-            // that saving a client/collection can never launch an account chooser, consent
-            // window, or verification popup. A genuinely expired token requires one explicit
-            // Connect Google Drive action by the user.
-            if(googleAccessToken && googleTokenExpiresAt && Date.now() < googleTokenExpiresAt-60000) return googleAccessToken;
-            googleAccessToken=null; googleTokenExpiresAt=0;
+            // Background code never opens Google UI. It may reuse the encrypted device-local
+            // access-token cache when it is still valid, but an expired token is discarded.
+            if(await restoreGoogleAccessTokenWrapped()) return googleAccessToken;
+            clearPersistedGoogleAccessToken();
             return null;
         }
 
@@ -8684,8 +8731,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             let headers=Object.assign({'Authorization':'Bearer '+googleAccessToken},options.headers||{});
             let r=await fetch('https://www.googleapis.com/drive/v3/'+path,Object.assign({},options,{headers}));
             if(r.status===401){
-                googleAccessToken=null;
-                googleTokenExpiresAt=0;
+                clearPersistedGoogleAccessToken();
                 if(interactive) await getGoogleToken(true);
                 else throw new Error('Google Drive authorization expired; one manual reconnect is required.');
                 headers=Object.assign({'Authorization':'Bearer '+googleAccessToken},options.headers||{});
@@ -8766,7 +8812,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function resetCloudPin(){
             const hadPin=!!getCloudPin();
             mfCloudPinMemory='';
-            googleAccessToken=null; googleTokenExpiresAt=0; googleDriveFileId=null; googleDriveFolderId=null;
+            clearPersistedGoogleAccessToken(); googleDriveFileId=null; googleDriveFolderId=null;
             try{
                 localStorage.removeItem('MF_CLOUD_PIN_WRAPPED');
                 // Do not revoke the Google account grant. This only removes this app's
