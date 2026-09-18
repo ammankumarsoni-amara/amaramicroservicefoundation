@@ -10587,5 +10587,122 @@ window.addEventListener('online',()=>{
 })();
 
 </script>
+<script id="mf-100k-cross-device-pull-final-fix">
+(function(){
+  'use strict';
+  /* FINAL CROSS-DEVICE SYNC HARDENING
+     Root cause addressed: structured Firebase bootstrap could finish in the
+     background without advancing the root metadata version, so a fresh device
+     saw version 0 == local version 0 and never initiated the structured pull.
+     A second guard explicitly pulls structured data onto an empty device even
+     when the bootstrap metadata version is still 0. No business calculations,
+     CSS, Google Drive flow, or local data schema is changed. */
+  const originalMirror = typeof mfScaleMirrorToFirebase==='function' ? mfScaleMirrorToFirebase : null;
+  const originalSchedule = typeof mfScaleScheduleMirror==='function' ? mfScaleScheduleMirror : null;
+  let finalMirrorRunning=false;
+  let finalMirrorFinalizeTimer=0;
+
+  async function finalizeStructuredRootIfComplete(requireTransition=false){
+    try{
+      if(!mfFirestoreDb || !mfFirebaseSyncCode || !mfFirebaseUser) return;
+      const meta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
+      if(!meta || meta.bootstrapped===false) return;
+      const ref=mfSecureFirebaseDoc();
+      const snap=await ref.get();
+      const current=snap.exists?(snap.data()||{}):{};
+      if(current.ownerUid && current.ownerUid!==mfFirebaseUser.uid) return;
+      const currentVersion=Number(current.version||0);
+      const localVersion=mfKnownCloudVersion();
+      const next=Math.max(1,currentVersion,localVersion)+1;
+      const fp=mfLocalStateFingerprint();
+      await ref.set({
+        ownerUid:mfFirebaseUser.uid,
+        updatedByDevice:mfFirebaseDeviceId,
+        updatedAtLabel:new Date().toLocaleString('en-IN'),
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+        version:next,
+        schemaVersion:'AMARA-SCALABLE-2',
+        structured:true,
+        structuredBootstrapComplete:true,
+        stateFingerprint:fp
+      },{merge:true});
+      mfSetKnownCloudVersion(next);
+      try{
+        localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',fp);
+        localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());
+        localStorage.removeItem('MF_LOCAL_DIRTY_AT');
+      }catch(e){}
+      setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+    }catch(e){
+      console.warn('Structured Firebase root finalization skipped:',e);
+    }
+  }
+
+  if(originalMirror){
+    mfScaleMirrorToFirebase=async function(){
+      if(finalMirrorRunning) return;
+      finalMirrorRunning=true;
+      let wasBootstrapped=null;
+      try{
+        try{ wasBootstrapped=(await mfScaleGetMeta('firebase_mirror').catch(()=>null))?.bootstrapped===true; }catch(e){}
+        await originalMirror();
+      }finally{
+        finalMirrorRunning=false;
+        clearTimeout(finalMirrorFinalizeTimer);
+        if(wasBootstrapped===false){
+          finalMirrorFinalizeTimer=setTimeout(()=>finalizeStructuredRootIfComplete(false),50);
+        }
+      }
+    };
+  }
+
+  /* Every scheduled mirror now also finalizes the root metadata once the
+     resumable structured bootstrap has actually completed. */
+  if(originalSchedule){
+    mfScaleScheduleMirror=function(){
+      clearTimeout(mfScaleMirrorTimer);
+      mfScaleMirrorTimer=setTimeout(async()=>{
+        try{ await mfScaleMirrorToFirebase(); }
+        catch(e){ console.warn('Structured cloud mirror skipped:',e); }
+        /* The wrapped mirror finalizes only when a bootstrap transition occurred. */
+      },2500);
+    };
+  }
+
+  /* Empty-device convergence guard. A brand-new browser may have Firebase
+     authentication/configuration but localVersion=0. If the secure root is
+     structured and cloud data exists, pull it even when cloud version is 0
+     (the old bootstrap path could legitimately leave version 0 temporarily).
+     Existing non-empty local databases are never silently overwritten here. */
+  const originalInit=typeof initFirebaseSync==='function' ? initFirebaseSync : null;
+  if(originalInit){
+    initFirebaseSync=function(cfg,syncCode,showAlerts){
+      const result=originalInit(cfg,syncCode,showAlerts);
+      Promise.resolve(result).then(()=>{
+        setTimeout(async()=>{
+          try{
+            if(!mfFirestoreDb || !mfFirebaseSyncCode || !mfFirebaseUser) return;
+            const hasLocalData=!!((Array.isArray(state?.loans)&&state.loans.length>0) || (state?.products&&Object.keys(state.products).length>0));
+            if(hasLocalData) return;
+            const root=await mfSecureFirebaseDoc().get();
+            if(!root.exists) return;
+            const data=root.data()||{};
+            if(!data.structured || data.structuredBootstrapComplete===false) return;
+            const [loanProbe,productProbe]=await Promise.all([
+              mfScaleStructuredCollection('loans').orderBy(firebase.firestore.FieldPath.documentId()).limit(1).get(),
+              mfScaleStructuredCollection('products').orderBy(firebase.firestore.FieldPath.documentId()).limit(1).get()
+            ]);
+            if(loanProbe.empty && productProbe.empty) return;
+            await mf100PullStructured(false);
+          }catch(e){
+            console.warn('Empty-device structured Firebase auto-pull skipped:',e);
+          }
+        },900);
+      }).catch(()=>{});
+      return result;
+    };
+  }
+})();
+</script>
 </body>
 </html>
