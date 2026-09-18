@@ -3392,8 +3392,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 markStorageReady();
                 localStorage.setItem("MF_OPEX_PRO_DB_META", JSON.stringify({migratedToIndexedDB:true,updatedAt:new Date().toISOString()}));
                 const now=new Date();
-                const el=document.getElementById("last-sync-time");
-                if(el) el.innerHTML=`<i class="fa-solid fa-database text-success me-1"></i> Local Saved: ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+                mfRefreshTopCloudLink();
                 renderAll();
                 updateSecureCloudStatus();
                 ensureInitialVersionedBackup();
@@ -4320,6 +4319,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function mfGoogleDriveIsConfigured(){
             try{ return localStorage.getItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY)==='1' && !!(localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'').trim(); }catch(e){ return false; }
         }
+        function mfRefreshTopCloudLink(){
+            const el=document.getElementById('last-sync-time'); if(!el) return;
+            try{
+                if(mfGoogleDriveIsConfigured()){
+                    el.innerHTML='<i class="fa-solid fa-circle-check text-success me-1"></i> Google Drive Connected';
+                    el.title='Google Drive is connected on this device. Open Cloud & Local Safe settings.';
+                }else{
+                    el.innerHTML='<i class="fa-solid fa-gear me-1"></i> Connect Gmail Drive';
+                    el.title='Open Cloud & Local Safe settings to connect Google Drive.';
+                }
+            }catch(e){}
+        }
         function mfRefreshDriveBackupUi(){
             const ds=document.getElementById('drive-last-sync'); if(!ds) return;
             try{
@@ -4329,6 +4340,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             }catch(e){}
         }
         function updateSecureCloudStatus(message,warning=false){
+            mfRefreshTopCloudLink();
             const el=document.getElementById("secure-cloud-status"); if(!el) return;
             if(message){el.textContent=message;el.style.color=warning?'#fde68a':'#a7f3d0';return;}
             if(!mfFirebaseUser){
@@ -9895,7 +9907,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             financeCurrentType=type; const d=getFinanceSnapshot(), area=document.getElementById('finance-detail-content'); let title='', headerHtml='', detailHtml='';
             if(type==='disbursed'){
                 title='Market Disbursed — Capital Given Detail';
-                const rows=d.disbursed.map(x=>{
+                // This report is about capital disbursements. A year/month/date filter must
+                // filter on the loan's disbursal date; loans with only a payment in the period
+                // must not appear as phantom disbursal rows with a blank date/mode.
+                const marketDisbursed=d.disbursed.filter(x=>x.includeDisb);
+                const rows=marketDisbursed.map(x=>{
                     const l=x.loan,p=x.p;
                     const paid=l.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((a,z)=>a+(Number(z.principal)||0),0)+(l.foreclosed?(Number(l.foreclosureData?.principalPaid)||0):0);
                     const out=l.foreclosed?0:getLoanPending(l);
@@ -9910,7 +9926,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     const disbCell=x.includeDisb?`<div class="finance-profile-cell"><b>${formatToIndianDate(l.disbursalDate)}</b><small>${financeEsc(mfDisbursalModeLabel(l.disbursalMode))}</small></div>`:`-`;
                     return [profile,contacts,productCell,disbCell,x.includeDisb?money(p.amount):'-',money(paid),money(out),`<span class="finance-status-pill ${status.toLowerCase()}">${status}</span>`];
                 });
-                headerHtml=financeHeader([['Accounts',d.disbursed.length],['Capital Given',money(d.disbursed.reduce((a,x)=>a+(x.includeDisb?x.p.amount:0),0))],['Principal Recovered',money(d.disbursed.reduce((a,x)=>a+x.loan.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((q,z)=>q+(Number(z.principal)||0),0),0))],['Current Outstanding',money(d.disbursed.reduce((a,x)=>a+(x.loan.foreclosed?0:getLoanPending(x.loan)),0))]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())}</div>`;
+                headerHtml=financeHeader([['Accounts',marketDisbursed.length],['Capital Given',money(marketDisbursed.reduce((a,x)=>a+(Number(x.p.amount)||0),0))],['Principal Recovered',money(marketDisbursed.reduce((a,x)=>a+x.loan.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((q,z)=>q+(Number(z.principal)||0),0),0))],['Current Outstanding',money(marketDisbursed.reduce((a,x)=>a+(x.loan.foreclosed?0:getLoanPending(x.loan)),0))]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())} · Market Disbursed includes loans whose disbursal date falls inside the selected period.</div>`;
                 detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Loan-wise Capital Disbursement</b><span class="finance-pill">Complete customer profile · all stored contact numbers</span></div>${financeTable(['Customer Profile','All Contact Numbers','Product','Disbursal','Capital Given','Principal Recovered','Outstanding','Status'],rows.map(r=>`<tr>${r.map((cell,i)=>`<td class="${i>=4&&i<=6?'finance-money-cell':''}">${cell}</td>`).join('')}</tr>`))}</div>`;
             } else if(type==='gross'){
                 title='Gross Revenue — Client-wise Revenue Detail';
@@ -10019,7 +10035,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(type==='gross') return d.disbursed.map(x=>[x.loan.id,x.loan.name,x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.includeDisb?x.p.fileCharge:0,x.interest,x.preEmiInterest,x.penalty,x.foreclosureFee,x.preClosureInterest,x.postMaturityInterest,x.settlementWaiver||0,x.totalProfit]);
             if(type==='lender') return d.lender.flatMap(x=>x.filteredRepayments.map(r=>[r.date,x.b.lenderName,r.principal,r.interest,r.gst||0,(Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0),r.mode||'']));
             if(type==='opex') return [...d.payroll.map(x=>[x.sp.date,x.st.name,'Payroll',x.sp.amount,x.sp.mode||'']),...d.expenses.map(x=>[x.date,x.category,x.desc,x.amount,x.mode||''])];
-            if(type==='disbursed') return d.disbursed.map(x=>[x.loan.id,x.loan.name,x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode),x.p.amount,(()=>{const fs=mfLoanOperationalStatus(x.loan);return (fs==='OVERDUE'||fs==='DUE')?'DUE':fs;})()]);
+            if(type==='disbursed') return d.disbursed.filter(x=>x.includeDisb).map(x=>[x.loan.id,x.loan.name,x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode),x.p.amount,(()=>{const fs=mfLoanOperationalStatus(x.loan);return (fs==='OVERDUE'||fs==='DUE')?'DUE':fs;})()]);
             return [['Gross Revenue',d.gross],['Lender Cost',d.lenderCost],['Staff Salaries',d.salaries],['General Expenses',d.generalExp],['TRUE IN-HAND NET SURPLUS',d.net]];
         }
         function exportFinanceDetailReport(){
@@ -10448,12 +10464,12 @@ window.addEventListener('online',()=>{
     // must never stringify/write the entire database on every save; IndexedDB is authoritative.
     try{if((state.loans?.length||0)<=5000) mf100WriteLegacyCompat();else localStorage.removeItem('MF_OPEX_PRO_DB');}catch(e){}
     idbPutSnapshot().then(async()=>{
-      const el=document.getElementById('last-sync-time');if(el)el.innerHTML=`<i class="fa-solid fa-check text-success me-1"></i> Saved: ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+      mfRefreshTopCloudLink();
       try{await mfScaleBuildLocalEntities(false);}catch(e){console.warn('Scalable entity refresh skipped:',e);}
       mf100ScheduleAnalyticsRebuild();
       try{renderAll();}catch(e){}
       queueAutomaticVersionedBackup();
-    }).catch(err=>{console.error('IndexedDB save failed',err);const el=document.getElementById('last-sync-time');if(el)el.innerHTML='<i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> Local save warning';try{renderAll();}catch(e){}}).finally(()=>{try{scheduleFirebasePush();}catch(e){}});
+    }).catch(err=>{console.error('IndexedDB save failed',err);mfRefreshTopCloudLink();try{renderAll();}catch(e){}}).finally(()=>{try{scheduleFirebasePush();}catch(e){}});
   };
 
   /* Firebase: existing structured mirror becomes the operational path. Keep the old root document
