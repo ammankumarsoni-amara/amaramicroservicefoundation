@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Loan Management</title>
-    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-09-13-SMOOTH-UI-V7-ADVANCED-RECOVERY-SEARCH-MARKET-DISBURSED-READABILITY-VERIFIED-MANUAL-GOOGLE-BACKUP-PERSISTENT-AUTH-SILENT-REAUTH">
+    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-09-13-SMOOTH-UI-V7-ADVANCED-RECOVERY-SEARCH-MARKET-DISBURSED-READABILITY-VERIFIED-MANUAL-GOOGLE-BACKUP-PERSISTENT-AUTH-SILENT-REAUTH-CROSS-DEVICE-FINGERPRINT-CONVERGENCE-FIX-2026-09-19">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -3243,10 +3243,6 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         async function mfScaleMirrorToFirebase(){
             if(!mfScaleReady || !mfFirebaseUser || !mfFirestoreDb || !mfFirebaseSyncCode) return;
-            // Never mirror local data upstream before the initial cloud reconciliation has
-            // completed. Without this guard, a mobile browser's stale IndexedDB/default data
-            // could be uploaded before the laptop's current Firebase data was pulled.
-            if(typeof mfFirebaseInitialSyncReady==='function' && !mfFirebaseInitialSyncReady()) return;
             const owner=mfFirebaseUser.uid;
             const meta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
             const full=!!mfScaleDirty.full || !meta?.bootstrapped;
@@ -3305,24 +3301,6 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // will thereafter use only dirty entities.
                 await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:true,bootstrapKind:'',bootstrapOffset:0,lastSyncAt:new Date().toISOString(),version:3}).catch(()=>{});
                 mfScaleResetDirty();
-                // If a restore/connect or manual Sync Now started a structured bootstrap,
-                // publish the root metadata only after every structured collection is complete.
-                // This makes the root fingerprint a trustworthy signal for other devices.
-                if(mfFirebaseRootCommitPending && mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser){
-                    try{
-                        const ref=mfSecureFirebaseDoc();
-                        const snap=await ref.get();
-                        const data=snap.exists?(snap.data()||{}):{};
-                        const next=Number(data.version||0)+1;
-                        await ref.set({...mfSecureEnvelope(next),structured:true,structuredBootstrapComplete:true,stateMeta:mf100CloudStateMeta()},{merge:true});
-                        mfSetKnownCloudVersion(next);
-                        try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');localStorage.removeItem('MF_FIREBASE_RESTORE_AUTHORITY');}catch(e){}
-                        mfFirebaseRootCommitPending=false;
-                        mfFirebaseMarkDeviceBootstrap();
-                        if(typeof mfFirebaseMarkInitialReady==='function') mfFirebaseMarkInitialReady();
-                        setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
-                    }catch(e){ console.warn('Structured root finalization skipped:',e); }
-                }
                 return;
             }
             const add=(kind,ids,rows)=>{const map=new Map((rows||[]).map(r=>[String(r?.id||r?.key||''),r]));for(const id of ids){const row=map.get(String(id));if(row)workKinds[kind].push({id:String(id),row});else workKinds[kind].push({id:String(id),deleted:true});}};
@@ -3443,16 +3421,6 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         localStorage.setItem('MF_DEVICE_ID', mfFirebaseDeviceId);
         let mfFirebasePushTimer = null;
         let mfIgnoreNextSnapshot = false;
-        // Cross-device startup guard: the scalable mirror must never upload this device's
-        // pre-existing IndexedDB state until Firebase has completed the first reconciliation.
-        // This is critical on a fresh/mobile device, where old local data must not overwrite
-        // the current laptop/cloud database before the cloud copy is pulled.
-        let mfFirebaseInitialSyncState = 'pending'; // pending | pulling | ready
-        let mfFirebaseInitialSyncKey = '';
-        let mfFirebaseRootCommitPending = false;
-        function mfFirebaseInitialSyncReady(){ return mfFirebaseInitialSyncState === 'ready'; }
-        function mfFirebaseMarkInitialReady(){ mfFirebaseInitialSyncState='ready'; }
-        function mfFirebaseMarkInitialPending(key){ mfFirebaseInitialSyncState='pending'; mfFirebaseInitialSyncKey=String(key||''); }
 
         function mfRefreshFirebaseSyncControls() {
             try {
@@ -3495,8 +3463,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         function connectFirebaseSync() {
             try {
-                const cfgRaw = ((document.getElementById('firebase-config-input')?.value || localStorage.getItem('MF_FIREBASE_CONFIG') || '')).trim();
-                const syncCode = ((document.getElementById('firebase-sync-code')?.value || localStorage.getItem('MF_FIREBASE_SYNC_CODE') || '')).trim();
+                const cfgRaw = (document.getElementById('firebase-config-input')?.value || '').trim();
+                const syncCode = (document.getElementById('firebase-sync-code')?.value || '').trim();
                 if (!cfgRaw || !syncCode) { alert('Please paste your Firebase config AND enter a Sync Code.'); return; }
 
                 const cfg = JSON.parse(cfgRaw);
@@ -3549,11 +3517,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             return '⚠️ ' + action + ' failed: ' + (err?.message || 'Unknown Firebase error.');
         }
 
-        function mfFirebaseBootstrapMarkerKey(){return 'MF_FIREBASE_BOOTSTRAPPED:'+String(mfFirebaseUser?.uid||'')+'|'+String(mfFirebaseSyncCode||'');}
-        function mfFirebaseHasDeviceBootstrap(){try{return localStorage.getItem(mfFirebaseBootstrapMarkerKey())==='1';}catch(e){return false;}}
-        function mfFirebaseMarkDeviceBootstrap(){try{localStorage.setItem(mfFirebaseBootstrapMarkerKey(),'1');}catch(e){}}
-
-        async function initFirebaseSync(cfg, syncCode, showAlerts) {
+        function initFirebaseSync(cfg, syncCode, showAlerts) {
             try {
                 if (!mfFirebaseApp) {
                     mfFirebaseApp = firebase.initializeApp(cfg);
@@ -3574,12 +3538,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }
                 const initKey = String(mfFirebaseUser.uid || '') + '|' + String(syncCode || '');
                 const sameInit = mfFirebaseInitKey === initKey;
-                if(!sameInit) mfFirebaseMarkInitialPending(initKey);
                 mfFirebaseInitKey = initKey;
                 if (!sameInit) setFirebaseStatus('🟢 Firebase connected — Secure Sync is active.');
                 startFirebaseListener();
                 const ref = mfSecureFirebaseDoc();
-                ref.get().then(async doc => {
+                ref.get().then(doc => {
                     if(doc.exists){
                         const data=doc.data()||{};
                         if(data.ownerUid && data.ownerUid!==mfFirebaseUser.uid){
@@ -3590,9 +3553,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         const localFp=mfLocalStateFingerprint();
                         const lastPushedFp=localStorage.getItem('MF_SECURE_LAST_PUSH_FINGERPRINT')||'';
                         const hasLocalData=Array.isArray(state?.loans)&&state.loans.length>0 || (state?.products && Object.keys(state.products).length>0);
-                        const restoreAuthority=localStorage.getItem('MF_FIREBASE_RESTORE_AUTHORITY')==='1';
-                        const bootstrapComplete=data.structured ? data.structuredBootstrapComplete!==false : true;
-                        const cloudStructuredFp=String(data.stateFingerprint||'');
+                        // A fresh device can legitimately know cloudVersion=0 even when its local
+                        // database is already the same database as the cloud copy (for example after
+                        // a GitHub deployment). Compare the actual cloud payload fingerprint before
+                        // declaring a local/cloud conflict. This prevents a false warning while still
+                        // refusing to overwrite genuinely different local data.
                         let cloudPayloadFp='';
                         try {
                             if(data.payload){
@@ -3600,62 +3565,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 cloudPayloadFp=mfStateFingerprintObject(cloudState);
                             }
                         } catch(e) { cloudPayloadFp=''; }
-                        const structuredSameDatabase=!!data.structured && !!cloudStructuredFp && !!localFp && cloudStructuredFp===localFp;
-                        const sameDatabase=(!!cloudPayloadFp && !!localFp && cloudPayloadFp===localFp) || structuredSameDatabase;
-
-                        // A Google Drive restore is an explicit local-authority operation. The
-                        // restored laptop must be allowed to publish that restored database once;
-                        // it must not immediately pull an older Firebase copy back over it.
-                        if(restoreAuthority){
-                            if(data.ownerUid && data.ownerUid!==mfFirebaseUser.uid){
-                                setFirebaseStatus('🔒 This secure business belongs to another account.',true);
-                                return;
-                            }
-                            mfFirebaseRootCommitPending=true;
-                            mfFirebaseMarkInitialReady();
-                            scheduleFirebasePush();
-                            setFirebaseStatus('🟢 Restored local data is ready to synchronize to Firebase.',false);
-                            return;
-                        }
-
-                        // While another device is still bootstrapping structured collections,
-                        // do not pull a partial database. The originating device will publish the
-                        // final root metadata when the bootstrap finishes; its listener then gives
-                        // this device a complete cloud version.
-                        if(data.structured && !bootstrapComplete){
-                            mfFirebaseInitialSyncState='pulling';
-                            setFirebaseStatus('🟡 Firebase data is still being prepared on the other device…');
-                            setTimeout(()=>{
-                                if(mfFirebaseUser && mfFirebaseSyncCode && mfFirebaseInitialSyncState!=='ready') initFirebaseSync(cfg,syncCode,false);
-                            },3000);
-                            return;
-                        }
-
-                        // First Firebase connection on this browser: cloud is the source for
-                        // the initial device copy. An old phone IndexedDB copy must not decide
-                        // whether the laptop database is downloaded.
-                        if(!showAlerts && data.structured && bootstrapComplete && !mfFirebaseHasDeviceBootstrap()){
-                            mfFirebaseInitialSyncState='pulling';
-                            try{
-                                await mf100PullStructured(false);
-                                mfFirebaseMarkDeviceBootstrap();
-                                mfFirebaseMarkInitialReady();
-                                setFirebaseStatus('🟢 Loaded latest structured Firebase data onto this device.',false);
-                            }catch(e){mfFirebaseInitialSyncState='pending';throw e;}
-                            return;
-                        }
-                        // After initial bootstrap, only pull a changed cloud database when this
-                        // device has no genuine unsynced local changes.
-                        if(!showAlerts && data.structured && cloudStructuredFp && localFp && cloudStructuredFp!==localFp && !mfHasUnpushedLocalChanges()){
-                            mfFirebaseInitialSyncState='pulling';
-                            try{
-                                await mf100PullStructured(false);
-                                mfFirebaseMarkDeviceBootstrap();
-                                mfFirebaseMarkInitialReady();
-                                setFirebaseStatus('🟢 Loaded latest structured Firebase data onto this device.',false);
-                            }catch(e){mfFirebaseInitialSyncState='pending';throw e;}
-                            return;
-                        }
+                        // Cross-device convergence hardening:
+                        // Structured Firebase stores the authoritative state fingerprint in the
+                        // root metadata document. A browser can remember the same version number
+                        // while its own IndexedDB contains an older/different local database.
+                        // Version equality alone must therefore NEVER be treated as proof that
+                        // the device has the current data.
+                        const structuredCloudFp = String(data.stateFingerprint || '').trim();
+                        const sameDatabase = (!!cloudPayloadFp && !!localFp && cloudPayloadFp===localFp)
+                            || (!!structuredCloudFp && !!localFp && structuredCloudFp===localFp);
 
                         if(sameDatabase && cloudVersion>0){
                             mfSetKnownCloudVersion(cloudVersion);
@@ -3665,44 +3583,48 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());
                                 localStorage.removeItem('MF_LOCAL_DIRTY_AT');
                             }catch(e){}
-                            mfFirebaseMarkDeviceBootstrap();
-                            mfFirebaseMarkInitialReady();
                             setFirebaseStatus('🟢 Secure Firebase is connected — automatic sync is active.',false);
                             return;
                         }
 
+                        // IMPORTANT: if the cloud fingerprint differs, converge the device even
+                        // when cloudVersion === localVersion. This is the exact case that could
+                        // leave a mobile browser showing its own old IndexedDB data while the
+                        // laptop had already saved a newer database.
+                        if(!showAlerts && data.structured && structuredCloudFp && localFp &&
+                           structuredCloudFp!==localFp && !mfHasUnpushedLocalChanges()){
+                            setFirebaseStatus('⏳ Loading the latest secure cloud data on this device…',false);
+                            pullStateFromFirebase(false);
+                            return;
+                        }
                         if(showAlerts){
-                            if(confirm('Secure cloud data already exists for this account. Load it onto THIS device now? Choose Cancel to keep this device data and upload it as the new secure cloud version.')){
-                                mfFirebaseInitialSyncState='pulling';
-                                try{
-                                    if(data.structured) await mf100PullStructured(false);
-                                    else if(mf100OriginalPull) await Promise.resolve(mf100OriginalPull(false));
-                                    mfFirebaseMarkDeviceBootstrap();
-                                    mfFirebaseMarkInitialReady();
-                                }catch(e){ mfFirebaseInitialSyncState='pending'; throw e; }
-                            }else{
-                                mfFirebaseMarkInitialReady();
-                                mfFirebaseRootCommitPending=true;
-                                pushStateToFirebase(false);
-                            }
+                            if(confirm('Secure cloud data already exists for this account. Load it onto THIS device now? Choose Cancel to keep this device data and upload it as the new secure cloud version.')) pullStateFromFirebase(false);
+                            else pushStateToFirebase(false);
+                        }else if(cloudVersion>localVersion && (!hasLocalData || !lastPushedFp || localFp===lastPushedFp)){
+                            // Safe automatic cross-device convergence: only replace local data when this device has no
+                            // unpushed local edits (or is effectively empty). A locally changed, unsynced database is never silently overwritten.
+                            pullStateFromFirebase(false);
                         }else if(cloudVersion>localVersion){
                             if(!mfHasUnpushedLocalChanges()){
-                                mfFirebaseInitialSyncState='pulling';
-                                try{
-                                    if(data.structured) await mf100PullStructured(false);
-                                    else if(mf100OriginalPull) await Promise.resolve(mf100OriginalPull(false));
-                                    mfFirebaseMarkInitialReady();
-                                }catch(e){ mfFirebaseInitialSyncState='pending'; throw e; }
+                                pullStateFromFirebase(true);
+                                setFirebaseStatus('🟢 Secure Firebase updated this device automatically.',false);
                             }else{
-                                mfFirebaseMarkInitialReady();
                                 setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);
                             }
                         }else if(cloudVersion===localVersion){
-                            mfFirebaseMarkInitialReady();
                             setFirebaseStatus('🟢 Secure Firebase is connected — automatic sync is active.',false);
                         }else{
-                            mfFirebaseMarkInitialReady();
+                            // Local device is ahead of the remembered cloud version; push automatically.
                             scheduleFirebasePush();
+                        }
+                    }else{
+                        const hasLocalData=Array.isArray(state?.loans)&&state.loans.length>0 || (state?.products && Object.keys(state.products).length>0);
+                        if(showAlerts){
+                            if(confirm('No secure cloud record exists yet for this account. Upload the data currently on THIS device to the new secure production record?')) pushStateToFirebase(false);
+                        }else if(hasLocalData){
+                            scheduleFirebasePush();
+                        }else{
+                            setFirebaseStatus('🟡 Secure Firebase is connected. No cloud record exists yet and this device has no business data to upload.',false);
                         }
                     }
                 }).catch(err => { console.error(err); setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Firebase connection check'), true); });
@@ -3735,9 +3657,26 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     setFirebaseStatus('🟢 Secure Firebase is connected — automatic sync is active.',false);
                     return;
                 }
+                const cloudFingerprint = String(data.stateFingerprint || '').trim();
+                const localFingerprint = mfLocalStateFingerprint();
+
+                // A newer fingerprint is authoritative even when the version number is
+                // unchanged locally. This prevents a stale mobile IndexedDB copy from being
+                // mistaken for the current cloud database.
+                if(cloudFingerprint && localFingerprint && cloudFingerprint !== localFingerprint){
+                    if(!mfHasUnpushedLocalChanges()){
+                        pullStateFromFirebase(false);
+                        setFirebaseStatus('🟢 Latest cloud data loaded automatically on this device.',false);
+                        return;
+                    }
+                    setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);
+                    showFirebaseUpdateBanner(data.updatedAtLabel || '', cloudVersion);
+                    return;
+                }
+
                 if(cloudVersion>mfKnownCloudVersion()){
                     if(!mfHasUnpushedLocalChanges()){
-                        pullStateFromFirebase(true);
+                        pullStateFromFirebase(false);
                         setFirebaseStatus('🟢 New cloud data loaded automatically.',false);
                         return;
                     }
@@ -9209,7 +9148,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(!confirm('Restore the latest encrypted Google Drive database? Your current device data will first be preserved in local version history.')) return;
                 try{ const safety={id:'pre-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
                 const r=await driveApi('files/'+files[0].id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); try{mf100WriteLegacyCompat(); localStorage.setItem('MF_LOCAL_SAVED_AT',new Date().toISOString()); localStorage.removeItem('MF_LOCAL_DIRTY_AT'); localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));; localStorage.setItem('MF_FIREBASE_RESTORE_AUTHORITY','1')}catch(e){}
+                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); try{mf100WriteLegacyCompat(); localStorage.setItem('MF_LOCAL_SAVED_AT',new Date().toISOString()); localStorage.removeItem('MF_LOCAL_DIRTY_AT'); localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));}catch(e){}
                 renderAll(); updateSecureCloudStatus('🟢 Latest encrypted Google Drive backup restored and validated.'); const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Restored latest backup: '+new Date().toLocaleString('en-IN'); alert('Latest encrypted Google Drive backup restored successfully.'); closeModal('modal-cloud'); setTab('feed');
             }catch(err){alert('Cloud restore failed: '+(err?.message||err));}
         }
@@ -9321,7 +9260,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 try{
                     mf100WriteLegacyCompat();
                     localStorage.removeItem('MF_LOCAL_DIRTY_AT');
-                    localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));; localStorage.setItem('MF_FIREBASE_RESTORE_AUTHORITY','1')
+                    localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));
                 }catch(e){}
                 renderAll();
                 updateSecureCloudStatus('🟢 Timestamped Google Drive backup restored and validated.');
@@ -9391,7 +9330,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     mf100WriteLegacyCompat();
                     localStorage.removeItem('MF_LOCAL_DIRTY_AT');
                     // Hold cloud reconciliation long enough for the restored local state to settle.
-                    localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));; localStorage.setItem('MF_FIREBASE_RESTORE_AUTHORITY','1')
+                    localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+120000));
                 }catch(e){}
                 renderAll();
                 updateSecureCloudStatus('🟢 Immutable Google Drive recovery snapshot restored locally. Cloud Current Database was not changed.',true);
@@ -10572,40 +10511,23 @@ window.addEventListener('online',()=>{
 
   /* Firebase: existing structured mirror becomes the operational path. Keep the old root document
      as a migration/fallback reader only; no new whole-state payloads are written. */
-  // Keep this helper in the same scope as pushStateToFirebase. It must not live inside the
-  // later structured-pull IIFE, otherwise the push path sees "mf100CloudStateMeta is not defined".
-  function mf100CloudStateMeta(){
-    return {
-      bizName:String(state?.bizName||''),
-      companyProfile:JSON.parse(JSON.stringify(state?.companyProfile||{})),
-      activeFilter:String(state?.activeFilter||'ALL'),
-      cloudWebhookUrl:String(state?.cloudWebhookUrl||''),
-      customCategories:Array.isArray(state?.customCategories)?JSON.parse(JSON.stringify(state.customCategories)):[]
-    };
-  }
   mfSecureEnvelope=function(version){return {ownerUid:mfFirebaseUser?.uid||null,updatedByDevice:mfFirebaseDeviceId,updatedAtLabel:new Date().toLocaleString('en-IN'),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),version:Number(version)||1,schemaVersion:MF100_SCHEMA,structured:true,stateFingerprint:mfLocalStateFingerprint()};};
   pushStateToFirebase=async function(silent){
     if(!mfFirestoreDb||!mfFirebaseSyncCode){if(!silent){setFirebaseStatus('⚠️ Connect Firebase first.',true);alert('Connect Firebase first.');}return;}
     if(!mfFirebaseUser){if(!silent){setFirebaseStatus('🔒 Secure Sync requires Firebase sign-in first.',true);alert('Secure Sync requires Firebase sign-in first.');}return;}
     try{
-      // A user-initiated Sync Now is an explicit local->cloud request, so it can open the
-      // initial mirror gate. Automatic startup mirroring remains blocked until reconciliation.
-      if(typeof mfFirebaseInitialSyncReady==='function' && !mfFirebaseInitialSyncReady()) mfFirebaseMarkInitialReady();
-      mfFirebaseRootCommitPending=true;
       if(!mfScaleReady) await mfScaleBuildLocalEntities(false);
       await mfScaleMirrorToFirebase();
       const mirrorMeta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
       if(mirrorMeta && mirrorMeta.bootstrapped===false){
-        try{await mfSecureFirebaseDoc().set({...mfSecureEnvelope(mfKnownCloudVersion()),structured:true,structuredBootstrapComplete:false,stateMeta:mf100CloudStateMeta()},{merge:true});}catch(e){}
+        try{await mfSecureFirebaseDoc().set({...mfSecureEnvelope(mfKnownCloudVersion()),structured:true,structuredBootstrapComplete:false},{merge:true});}catch(e){}
         setFirebaseStatus('🟡 Firebase structured sync is continuing in the background…');
         return;
       }
       const ref=mfSecureFirebaseDoc(),known=mfKnownCloudVersion();
       const next=known+1;
-      await ref.set({...mfSecureEnvelope(next),structuredVersion:next,stateMeta:mf100CloudStateMeta()},{merge:true});
-      mfSetKnownCloudVersion(next);try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');localStorage.removeItem('MF_FIREBASE_RESTORE_AUTHORITY');}catch(e){}
-      mfFirebaseRootCommitPending=false;
-      mfFirebaseMarkDeviceBootstrap();
+      await ref.set({...mfSecureEnvelope(next),structuredVersion:next},{merge:true});
+      mfSetKnownCloudVersion(next);try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
       mfLocalAudit('CLOUD_PUSH','Structured Firestore mirror synchronized; root document contains metadata only');setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));if(!silent)mfShowTransientNotice('🟢 Firebase sync completed successfully.');
     }catch(err){console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Push'),true);}
   };
@@ -10644,17 +10566,13 @@ window.addEventListener('online',()=>{
   const mf100OriginalListener=typeof startFirebaseListener==='function'?startFirebaseListener:null;
   async function mf100FirestoreCollectionRows(kind){
     const col=mfScaleStructuredCollection(kind); if(!col) throw new Error('Structured Firebase collection unavailable.');
-    const uid=String(mfFirebaseUser?.uid||''); if(!uid) throw new Error('Firebase account is not signed in on this device.');
-    const out=[]; let lastDoc=null;
+    const out=[]; let last=null;
     while(true){
-      // IMPORTANT: every structured read is owner-scoped. The previous build read the
-      // collection without the _ownerUid constraint, which can be rejected by production
-      // Firestore rules and made mobile appear connected while no business data arrived.
-      let q=col.where('_ownerUid','==',uid).limit(500);
-      if(lastDoc) q=q.startAfter(lastDoc);
+      let q=col.orderBy(firebase.firestore.FieldPath.documentId()).limit(500);
+      if(last) q=q.startAfter(last);
       const snap=await q.get(); if(snap.empty) break;
       snap.forEach(d=>out.push({...d.data(),id:String(d.id)}));
-      lastDoc=snap.docs[snap.docs.length-1];
+      last=snap.docs[snap.docs.length-1].id;
       if(snap.size<500) break;
       await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
     }
@@ -10673,23 +10591,13 @@ window.addEventListener('online',()=>{
     const byLoan=new Map(loans.map(l=>[String(l.id),l]));
     paymentRows.forEach(x=>{const l=byLoan.get(String(x.loanId));if(!l)return;const y={...x};delete y._ownerUid;delete y.loanId;delete y.paymentIndex;delete y.id;l.payments.push({paymentIndex:Number(x.paymentIndex)||0,...y});});
     loans.forEach(l=>{l.payments.sort((a,b)=>(Number(a.paymentIndex)||0)-(Number(b.paymentIndex)||0));l.payments.forEach(p=>delete p.paymentIndex);});
-    const cloudMeta=meta.stateMeta&&typeof meta.stateMeta==='object'?meta.stateMeta:null;
     state={...state,loans,products,staff:staffRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),expenses:expenseRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),borrowings:borrowingRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;})};
-    // Small root settings are stored in the secure root metadata document so mobile receives
-    // the same company identity/settings as the laptop without reintroducing a giant payload.
-    if(cloudMeta){
-      if(Object.prototype.hasOwnProperty.call(cloudMeta,'bizName')) state.bizName=String(cloudMeta.bizName||'');
-      if(cloudMeta.companyProfile&&typeof cloudMeta.companyProfile==='object') state.companyProfile=cloudMeta.companyProfile;
-      if(Object.prototype.hasOwnProperty.call(cloudMeta,'activeFilter')) state.activeFilter=String(cloudMeta.activeFilter||'ALL');
-      if(Object.prototype.hasOwnProperty.call(cloudMeta,'cloudWebhookUrl')) state.cloudWebhookUrl=String(cloudMeta.cloudWebhookUrl||'');
-      if(Array.isArray(cloudMeta.customCategories)) state.customCategories=cloudMeta.customCategories;
-    }
     mfScaleReinstallStateProxy();mfScaleDirty.full=true;normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();
     const v=Number(meta.version||0);mfSetKnownCloudVersion(v);
     try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(v));localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
     await idbPutSnapshot();
     try{await mfScaleBuildLocalEntities(false);await mf100BuildAnalytics();await mf100RebuildDueIndex();await mfScalePutMeta({id:'due_index',schema:'AMARA-SCALABLE-2',sourceLoanFingerprint:mfScaleHash(state.loans||[]),loanCount:(state.loans||[]).length,updatedAt:new Date().toISOString()});}catch(e){console.warn('Structured local index rebuild after cloud pull skipped:',e);}
-    renderAll();setFirebaseStatus('🟢 Loaded latest structured Firebase data — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));; if(typeof mfFirebaseMarkInitialReady==='function') mfFirebaseMarkInitialReady();
+    renderAll();setFirebaseStatus('🟢 Loaded latest structured Firebase data — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
   }
   pullStateFromFirebase=function(showConfirm){
     const ref=mfSecureFirebaseDoc();
@@ -10709,8 +10617,35 @@ window.addEventListener('online',()=>{
     const ref=mfSecureFirebaseDoc();
     mfFirebaseListenerUnsub=ref.onSnapshot(doc=>{
       if(!doc.exists)return;const data=doc.data()||{};if(data.ownerUid&&data.ownerUid!==mfFirebaseUser.uid)return;
-      const v=Number(data.version||0);if(!v||v<=mfKnownCloudVersion()||data.updatedByDevice===mfFirebaseDeviceId)return;
-      if(!mfHasUnpushedLocalChanges()){pullStateFromFirebase(true);}else{setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);showFirebaseUpdateBanner(data.updatedAtLabel||'',v);}
+      const v=Number(data.version||0);
+      if(data.updatedByDevice===mfFirebaseDeviceId)return;
+
+      const cloudFingerprint=String(data.stateFingerprint||'').trim();
+      const localFingerprint=mfLocalStateFingerprint();
+
+      // Production cross-device convergence: fingerprint mismatch is enough to trigger
+      // an automatic pull when this device has no unsynced local edits. Do not require the
+      // remembered version number to be greater, because a stale browser can have the same
+      // version number as the cloud while holding an older IndexedDB state.
+      if(cloudFingerprint && localFingerprint && cloudFingerprint!==localFingerprint){
+        if(!mfHasUnpushedLocalChanges()){
+          pullStateFromFirebase(false);
+          setFirebaseStatus('🟢 Latest cloud data loaded automatically on this device.',false);
+        }else{
+          setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);
+          showFirebaseUpdateBanner(data.updatedAtLabel||'',v);
+        }
+        return;
+      }
+
+      if(!v||v<=mfKnownCloudVersion())return;
+      if(!mfHasUnpushedLocalChanges()){
+        pullStateFromFirebase(false);
+        setFirebaseStatus('🟢 New cloud data loaded automatically.',false);
+      }else{
+        setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);
+        showFirebaseUpdateBanner(data.updatedAtLabel||'',v);
+      }
     },err=>{console.error('Firebase structured listener error',err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure Firebase listener'),true);});
   };
 })();
