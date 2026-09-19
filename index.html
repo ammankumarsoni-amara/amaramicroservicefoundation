@@ -3565,7 +3565,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 cloudPayloadFp=mfStateFingerprintObject(cloudState);
                             }
                         } catch(e) { cloudPayloadFp=''; }
-                        const sameDatabase = !!cloudPayloadFp && !!localFp && cloudPayloadFp===localFp;
+                        // Structured Secure Sync intentionally keeps the root document small, so it
+                        // no longer has the legacy full-state `payload`. Compare the authoritative
+                        // structured root fingerprint instead. This lets a fresh/mobile device detect
+                        // that its local IndexedDB state differs from the laptop's cloud state BEFORE
+                        // any local mirror is pushed upstream.
+                        const cloudStructuredFp=String(data.stateFingerprint||'');
+                        const structuredSameDatabase=!!data.structured && !!cloudStructuredFp && !!localFp && cloudStructuredFp===localFp;
+                        const sameDatabase=(!!cloudPayloadFp && !!localFp && cloudPayloadFp===localFp) || structuredSameDatabase;
                         if(sameDatabase && cloudVersion>0){
                             mfSetKnownCloudVersion(cloudVersion);
                             try{
@@ -3575,6 +3582,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 localStorage.removeItem('MF_LOCAL_DIRTY_AT');
                             }catch(e){}
                             setFirebaseStatus('🟢 Secure Firebase is connected — automatic sync is active.',false);
+                            return;
+                        }
+                        // Structured cross-device convergence: when Firebase already has a structured
+                        // state and this device's local fingerprint differs, a clean device must pull
+                        // the cloud state before its scalable mirror is allowed to push local defaults.
+                        // A genuinely dirty local device is never silently overwritten.
+                        if(!showAlerts && data.structured && cloudStructuredFp && localFp && cloudStructuredFp!==localFp && !mfHasUnpushedLocalChanges()){
+                            pullStateFromFirebase(false);
+                            setFirebaseStatus('🟢 Loaded latest structured Firebase data onto this device.',false);
                             return;
                         }
                         if(showAlerts){
@@ -10474,6 +10490,17 @@ window.addEventListener('online',()=>{
 
   /* Firebase: existing structured mirror becomes the operational path. Keep the old root document
      as a migration/fallback reader only; no new whole-state payloads are written. */
+  // Keep this helper in the same scope as pushStateToFirebase. It must not live inside the
+  // later structured-pull IIFE, otherwise the push path sees "mf100CloudStateMeta is not defined".
+  function mf100CloudStateMeta(){
+    return {
+      bizName:String(state?.bizName||''),
+      companyProfile:JSON.parse(JSON.stringify(state?.companyProfile||{})),
+      activeFilter:String(state?.activeFilter||'ALL'),
+      cloudWebhookUrl:String(state?.cloudWebhookUrl||''),
+      customCategories:Array.isArray(state?.customCategories)?JSON.parse(JSON.stringify(state.customCategories)):[]
+    };
+  }
   mfSecureEnvelope=function(version){return {ownerUid:mfFirebaseUser?.uid||null,updatedByDevice:mfFirebaseDeviceId,updatedAtLabel:new Date().toLocaleString('en-IN'),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),version:Number(version)||1,schemaVersion:MF100_SCHEMA,structured:true,stateFingerprint:mfLocalStateFingerprint()};};
   pushStateToFirebase=async function(silent){
     if(!mfFirestoreDb||!mfFirebaseSyncCode){if(!silent){setFirebaseStatus('⚠️ Connect Firebase first.',true);alert('Connect Firebase first.');}return;}
@@ -10544,15 +10571,6 @@ window.addEventListener('online',()=>{
       await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
     }
     return out;
-  }
-  function mf100CloudStateMeta(){
-    return {
-      bizName:String(state?.bizName||''),
-      companyProfile:JSON.parse(JSON.stringify(state?.companyProfile||{})),
-      activeFilter:String(state?.activeFilter||'ALL'),
-      cloudWebhookUrl:String(state?.cloudWebhookUrl||''),
-      customCategories:Array.isArray(state?.customCategories)?JSON.parse(JSON.stringify(state.customCategories)):[]
-    };
   }
   async function mf100PullStructured(showConfirm){
     if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser){alert('Connect Firebase first.');return;}
