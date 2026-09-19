@@ -3271,7 +3271,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         async function mfScaleMirrorToFirebase(){
             if(!mfScaleReady || !mfFirebaseUser || !mfFirestoreDb || !mfFirebaseSyncCode) return;
             const owner=mfFirebaseUser.uid;
-            const meta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
+            let meta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
             const full=!!mfScaleDirty.full || !meta?.bootstrapped;
             const workKinds={loans:[],products:[],staff:[],expenses:[],borrowings:[]};
             // A full restore is a REPLACEMENT of the cloud database, not a merge.
