@@ -3602,8 +3602,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         const cloudVersion=Number(data.version||0);
                         const localVersion=mfKnownCloudVersion();
                         const localFp=mfLocalStateFingerprint();
+                        const cloudStateFp=String(data.stateFingerprint||'');
+                        const structuredCloud=!!data.structured;
+                        const stateFingerprintMismatch=!!cloudStateFp && !!localFp && cloudStateFp!==localFp;
+                        const localIsEmpty=!((Array.isArray(state?.loans)&&state.loans.length>0) || (state?.products && Object.keys(state.products).length>0));
                         const lastPushedFp=localStorage.getItem('MF_SECURE_LAST_PUSH_FINGERPRINT')||'';
-                        const hasLocalData=Array.isArray(state?.loans)&&state.loans.length>0 || (state?.products && Object.keys(state.products).length>0);
+                        const hasLocalData=!localIsEmpty;
                         // A fresh device can legitimately know cloudVersion=0 even when its local
                         // database is already the same database as the cloud copy (for example after
                         // a GitHub deployment). Compare the actual cloud payload fingerprint before
@@ -3628,9 +3632,17 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             setFirebaseStatus('🟢 Secure Firebase is connected — automatic sync is active.',false);
                             return;
                         }
+                        /* Structured Firebase is authoritative for a device that has not made a local edit.
+                           Do NOT use only the remembered numeric version to decide whether to hydrate: a browser
+                           can be refreshed/redeployed with version already remembered while its IndexedDB contains
+                           the zero/default database. Compare the root stateFingerprint as well, and hydrate whenever
+                           the device is empty or its state differs from the cloud. */
                         if(showAlerts){
                             if(confirm('Secure cloud data already exists for this account. Load it onto THIS device now? Choose Cancel to keep this device data and upload it as the new secure cloud version.')) pullStateFromFirebase(false);
                             else pushStateToFirebase(false);
+                        }else if(structuredCloud && (localIsEmpty || stateFingerprintMismatch) && !mfHasUnpushedLocalChanges()){
+                            pullStateFromFirebase(false);
+                            setFirebaseStatus('🟢 Loading the current Firebase business database onto this device…',false);
                         }else if(cloudVersion>localVersion && (!hasLocalData || !lastPushedFp || localFp===lastPushedFp)){
                             // Safe automatic cross-device convergence: only replace local data when this device has no
                             // unpushed local edits (or is effectively empty). A locally changed, unsynced database is never silently overwritten.
@@ -10757,7 +10769,20 @@ window.addEventListener('online',()=>{
     mfFirebaseListenerUnsub=ref.onSnapshot(doc=>{
       if(!doc.exists)return;const data=doc.data()||{};if(data.ownerUid&&data.ownerUid!==mfFirebaseUser.uid)return;
       const v=Math.max(Number(data.version||0),Number(data.structuredVersion||0));
-      if(!v||v<=mfKnownCloudVersion()||data.updatedByDevice===mfFirebaseDeviceId)return;
+      if(data.updatedByDevice===mfFirebaseDeviceId)return;
+      const cloudFp=String(data.stateFingerprint||'');
+      const localFp=mfLocalStateFingerprint();
+      const fingerprintMismatch=!!cloudFp && !!localFp && cloudFp!==localFp;
+      const localEmpty=!((Array.isArray(state?.loans)&&state.loans.length>0) || (state?.products && Object.keys(state.products).length>0));
+      /* On refresh/redeployment the remembered cloud version can equal the Firestore version even though
+         this browser is showing an empty/default IndexedDB database. For structured cloud data, a fingerprint
+         mismatch is therefore a stronger hydration signal than version alone. */
+      if(data.structured && (localEmpty || fingerprintMismatch) && !mfHasUnpushedLocalChanges()){
+        pullStateFromFirebase(false);
+        setFirebaseStatus('🟢 Current Firebase business database loaded automatically.',false);
+        return;
+      }
+      if(!v||v<=mfKnownCloudVersion())return;
       if(!mfHasUnpushedLocalChanges()){pullStateFromFirebase(true);}else{setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);showFirebaseUpdateBanner(data.updatedAtLabel||'',v);}
     },err=>{console.error('Firebase structured listener error',err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure Firebase listener'),true);});
   };
