@@ -10489,7 +10489,7 @@ window.addEventListener('online',()=>{
       }
       const ref=mfSecureFirebaseDoc(),known=mfKnownCloudVersion();
       const next=known+1;
-      await ref.set({...mfSecureEnvelope(next),structuredVersion:next},{merge:true});
+      await ref.set({...mfSecureEnvelope(next),structuredVersion:next,appSettings:mf100CloudSettings()},{merge:true});
       mfSetKnownCloudVersion(next);try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
       mfLocalAudit('CLOUD_PUSH','Structured Firestore mirror synchronized; root document contains metadata only');setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));if(!silent)mfShowTransientNotice('🟢 Firebase sync completed successfully.');
     }catch(err){console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Push'),true);}
@@ -10555,6 +10555,7 @@ window.addEventListener('online',()=>{
     paymentRows.forEach(x=>{const l=byLoan.get(String(x.loanId));if(!l)return;const y={...x};delete y._ownerUid;delete y.loanId;delete y.paymentIndex;delete y.id;l.payments.push({paymentIndex:Number(x.paymentIndex)||0,...y});});
     loans.forEach(l=>{l.payments.sort((a,b)=>(Number(a.paymentIndex)||0)-(Number(b.paymentIndex)||0));l.payments.forEach(p=>delete p.paymentIndex);});
     state={...state,loans,products,staff:staffRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),expenses:expenseRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),borrowings:borrowingRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;})};
+    mf100ApplyCloudSettings(meta.appSettings||meta.settings);
     mfScaleReinstallStateProxy();mfScaleDirty.full=true;normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();
     const v=Number(meta.version||0);mfSetKnownCloudVersion(v);
     try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(v));localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
@@ -10581,7 +10582,7 @@ window.addEventListener('online',()=>{
     mfFirebaseListenerUnsub=ref.onSnapshot(doc=>{
       if(!doc.exists)return;const data=doc.data()||{};if(data.ownerUid&&data.ownerUid!==mfFirebaseUser.uid)return;
       const v=Number(data.version||0);if(!v||v<=mfKnownCloudVersion()||data.updatedByDevice===mfFirebaseDeviceId)return;
-      if(!mfHasUnpushedLocalChanges()){pullStateFromFirebase(true);}else{setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);showFirebaseUpdateBanner(data.updatedAtLabel||'',v);}
+      if(!mfHasUnpushedLocalChanges()){pullStateFromFirebase(false);setFirebaseStatus('🟢 New cloud data loaded automatically.',false);}else{setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);showFirebaseUpdateBanner(data.updatedAtLabel||'',v);}
     },err=>{console.error('Firebase structured listener error',err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure Firebase listener'),true);});
   };
 })();
@@ -10624,7 +10625,8 @@ window.addEventListener('online',()=>{
         schemaVersion:'AMARA-SCALABLE-2',
         structured:true,
         structuredBootstrapComplete:true,
-        stateFingerprint:fp
+        stateFingerprint:fp,
+        appSettings:mf100CloudSettings()
       },{merge:true});
       mfSetKnownCloudVersion(next);
       try{
@@ -10674,31 +10676,105 @@ window.addEventListener('online',()=>{
      structured and cloud data exists, pull it even when cloud version is 0
      (the old bootstrap path could legitimately leave version 0 temporarily).
      Existing non-empty local databases are never silently overwritten here. */
+  /* A fresh browser starts with three built-in products plus sample staff/expense
+     records. Those defaults are NOT the user's business database and must not block
+     the first cloud pull. At the same time, a device that contains real business
+     edits must never be silently overwritten. */
+  function mf100CloudSettings(){
+    const cp=state?.companyProfile&&typeof state.companyProfile==='object'?state.companyProfile:{};
+    return {
+      bizName:String(state?.bizName||'My Finance Company'),
+      companyProfile:mfScaleFirestoreSafe(mfScaleClone(cp)),
+      customCategories:Array.isArray(state?.customCategories)?mfScaleClone(state.customCategories):[],
+      activeFilter:String(state?.activeFilter||'ALL'),
+      cloudWebhookUrl:String(state?.cloudWebhookUrl||'')
+    };
+  }
+
+  function mf100ApplyCloudSettings(settings){
+    if(!settings||typeof settings!=='object') return;
+    if(settings.bizName!==undefined) state.bizName=String(settings.bizName||'My Finance Company');
+    if(settings.companyProfile&&typeof settings.companyProfile==='object') state.companyProfile=mfScaleClone(settings.companyProfile);
+    if(Array.isArray(settings.customCategories)) state.customCategories=mfScaleClone(settings.customCategories);
+    if(settings.activeFilter!==undefined) state.activeFilter=String(settings.activeFilter||'ALL');
+    if(settings.cloudWebhookUrl!==undefined) state.cloudWebhookUrl=String(settings.cloudWebhookUrl||'');
+  }
+
+  function mf100IsPristineLocalDevice(){
+    try{
+      const loans=Array.isArray(state?.loans)?state.loans:[];
+      const borrowings=Array.isArray(state?.borrowings)?state.borrowings:[];
+      const staff=Array.isArray(state?.staff)?state.staff:[];
+      const expenses=Array.isArray(state?.expenses)?state.expenses:[];
+      const products=state?.products&&typeof state.products==='object'?state.products:{};
+      if(loans.length||borrowings.length) return false;
+      const defaultProductKeys=['P-20K','P-30K','P-45K'];
+      const productKeys=Object.keys(products).sort();
+      if(productKeys.length!==defaultProductKeys.length || productKeys.some((k,i)=>k!==defaultProductKeys.slice().sort()[i])) return false;
+      const productBaseline={
+        'P-20K':['₹20,000 Weekly Loan',20000,1500,650,40,7,500,150,65],
+        'P-30K':['₹30,000 15-Days Loan',30000,2000,1700,24,15,1250,450,170],
+        'P-45K':['₹45,000 15-Days Loan',45000,2500,1750,36,15,1250,500,175]
+      };
+      for(const id of defaultProductKeys){
+        const p=products[id]||{};
+        if(String(p.name||'')!==productBaseline[id][0]) return false;
+        const vals=[p.amount,p.fileCharge,p.emi,p.tenure,p.days,p.principal,p.interest,p.penalty].map(Number);
+        if(vals.some((v,i)=>v!==productBaseline[id][i+1])) return false;
+      }
+      const defaultStaff=staff.length===1 && String(staff[0]?.id||'')==='ST-01' && String(staff[0]?.name||'')==='Mukesh Kumar' && String(staff[0]?.role||'')==='Collection & Field Agent' && Number(staff[0]?.salary||0)===15000 && String(staff[0]?.phone||'')==='9876500001' && String(staff[0]?.date||'')==='2026-08-01' && Array.isArray(staff[0]?.salaryPayments) && staff[0].salaryPayments.length===0;
+      if(!defaultStaff) return false;
+      const defaultExpenses=expenses.length===2 &&
+        expenses.some(e=>String(e?.id||'')==='EXP-101' && String(e?.category||'')==='Fuel / Travel' && Number(e?.amount||0)===350 && String(e?.desc||'')==='Field collection bike petrol' && String(e?.mode||'')==='Cash' && String(e?.date||'')==='2026-08-10') &&
+        expenses.some(e=>String(e?.id||'')==='EXP-102' && String(e?.category||'')==='Tea & Refreshments' && Number(e?.amount||0)===180 && String(e?.desc||'')==='Office tea & guest refreshments' && String(e?.mode||'')==='Cash' && String(e?.date||'')==='2026-08-12');
+      if(!defaultExpenses) return false;
+      if(String(state?.bizName||'My Finance Company')!=='My Finance Company') return false;
+      const cp=state?.companyProfile||{};
+      if(Object.keys(cp).some(k=>String(cp[k]||'').trim() && k!=='tagline') || String(cp.tagline||'Microfinance & Lending Solutions')!=='Microfinance & Lending Solutions') return false;
+      const defaultCats=['Fuel / Travel','Tea & Refreshments','Office Rent','Printing & Stationery','Mobile & Internet','Legal / Collection Charges'];
+      if(JSON.stringify(Array.isArray(state?.customCategories)?state.customCategories:[])!==JSON.stringify(defaultCats)) return false;
+      return true;
+    }catch(e){ return false; }
+  }
+
+  async function mf100AutoPullPristineDevice(){
+    if(!mf100IsPristineLocalDevice()) return false;
+    for(const waitMs of [900,2500,5500]){
+      try{
+        await new Promise(r=>setTimeout(r,waitMs));
+        if(!mfFirestoreDb || !mfFirebaseSyncCode || !mfFirebaseUser) continue;
+        if(!mf100IsPristineLocalDevice()) return false;
+        const root=await mfSecureFirebaseDoc().get();
+        if(!root.exists) continue;
+        const data=root.data()||{};
+        if(data.ownerUid && data.ownerUid!==mfFirebaseUser.uid) return false;
+        if(!data.structured || data.structuredBootstrapComplete===false) continue;
+        const [loanProbe,productProbe]=await Promise.all([
+          mfScaleStructuredCollection('loans').where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get(),
+          mfScaleStructuredCollection('products').where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get()
+        ]);
+        if(loanProbe.empty && productProbe.empty) continue;
+        await mf100PullStructured(false);
+        return true;
+      }catch(e){
+        console.warn('Pristine-device structured Firebase auto-pull retry skipped:',e);
+      }
+    }
+    return false;
+  }
+
+  const mf100PullUiWrapper=typeof pullStateFromFirebase==='function' ? pullStateFromFirebase : null;
+  if(mf100PullUiWrapper){
+    pullStateFromFirebase=function(showConfirm){
+      return mf100PullUiWrapper(mf100IsPristineLocalDevice()?false:showConfirm);
+    };
+  }
+
   const originalInit=typeof initFirebaseSync==='function' ? initFirebaseSync : null;
   if(originalInit){
     initFirebaseSync=function(cfg,syncCode,showAlerts){
-      const result=originalInit(cfg,syncCode,showAlerts);
-      Promise.resolve(result).then(()=>{
-        setTimeout(async()=>{
-          try{
-            if(!mfFirestoreDb || !mfFirebaseSyncCode || !mfFirebaseUser) return;
-            const hasLocalData=!!((Array.isArray(state?.loans)&&state.loans.length>0) || (state?.products&&Object.keys(state.products).length>0));
-            if(hasLocalData) return;
-            const root=await mfSecureFirebaseDoc().get();
-            if(!root.exists) return;
-            const data=root.data()||{};
-            if(!data.structured || data.structuredBootstrapComplete===false) return;
-            const [loanProbe,productProbe]=await Promise.all([
-              mfScaleStructuredCollection('loans').where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get(),
-              mfScaleStructuredCollection('products').where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get()
-            ]);
-            if(loanProbe.empty && productProbe.empty) return;
-            await mf100PullStructured(false);
-          }catch(e){
-            console.warn('Empty-device structured Firebase auto-pull skipped:',e);
-          }
-        },900);
-      }).catch(()=>{});
+      const result=originalInit(cfg,syncCode,false);
+      Promise.resolve(result).then(()=>{ void mf100AutoPullPristineDevice(); }).catch(()=>{});
       return result;
     };
   }
