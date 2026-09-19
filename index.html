@@ -10579,7 +10579,19 @@ window.addEventListener('online',()=>{
 
   /* Firebase: existing structured mirror becomes the operational path. Keep the old root document
      as a migration/fallback reader only; no new whole-state payloads are written. */
-  mfSecureEnvelope=function(version){return {ownerUid:mfFirebaseUser?.uid||null,updatedByDevice:mfFirebaseDeviceId,updatedAtLabel:new Date().toLocaleString('en-IN'),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),version:Number(version)||1,schemaVersion:MF100_SCHEMA,structured:true,stateFingerprint:mfLocalStateFingerprint()};};
+  function mf100BuildCloudStateShell(){
+    // Structured collections carry the large operational datasets. The root document still needs
+    // the small application-level state so a fresh/other device reconstructs the same business
+    // identity instead of retaining whatever local/default company data it had.
+    return {
+      bizName: String(state?.bizName||'My Finance Company'),
+      companyProfile: mfScaleClone(state?.companyProfile||{}),
+      activeFilter: String(state?.activeFilter||'ALL'),
+      cloudWebhookUrl: String(state?.cloudWebhookUrl||''),
+      customCategories: Array.isArray(state?.customCategories) ? mfScaleClone(state.customCategories) : []
+    };
+  }
+  mfSecureEnvelope=function(version){return {ownerUid:mfFirebaseUser?.uid||null,updatedByDevice:mfFirebaseDeviceId,updatedAtLabel:new Date().toLocaleString('en-IN'),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),version:Number(version)||1,schemaVersion:MF100_SCHEMA,structured:true,structuredBootstrapComplete:true,stateShell:mf100BuildCloudStateShell(),stateFingerprint:mfLocalStateFingerprint()};};
   async function mf100CompleteStructuredMirror(){
     // A restore is a full local database replacement. Firebase must not publish a new
     // cloud version until every structured collection chunk has been written successfully.
@@ -10616,7 +10628,7 @@ window.addEventListener('online',()=>{
         const rootData=root.exists?(root.data()||{}):{};
         if(rootData.ownerUid && rootData.ownerUid!==mfFirebaseUser.uid) throw new Error('SECURITY_DENIED: this business belongs to another account.');
         next=Math.max(Number(rootData.version||0),Number(rootData.structuredVersion||0),Number(mfKnownCloudVersion()||0))+1;
-        tx.set(ref,{...mfSecureEnvelope(next),structured:true,structuredBootstrapComplete:true,structuredVersion:next},{merge:true});
+        tx.set(ref,{...mfSecureEnvelope(next),structured:true,structuredBootstrapComplete:true,structuredVersion:next,payload:firebase.firestore.FieldValue.delete()},{merge:true});
       });
       mfSetKnownCloudVersion(next);
       try{
@@ -10697,7 +10709,8 @@ window.addEventListener('online',()=>{
     const byLoan=new Map(loans.map(l=>[String(l.id),l]));
     paymentRows.forEach(x=>{const l=byLoan.get(String(x.loanId));if(!l)return;const y={...x};delete y._ownerUid;delete y.loanId;delete y.paymentIndex;delete y.id;l.payments.push({paymentIndex:Number(x.paymentIndex)||0,...y});});
     loans.forEach(l=>{l.payments.sort((a,b)=>(Number(a.paymentIndex)||0)-(Number(b.paymentIndex)||0));l.payments.forEach(p=>delete p.paymentIndex);});
-    state={...state,loans,products,staff:staffRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),expenses:expenseRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),borrowings:borrowingRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;})};
+    const cloudShell=(meta.stateShell&&typeof meta.stateShell==='object')?meta.stateShell:{};
+    state={...state,...mfScaleClone(cloudShell),loans,products,staff:staffRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),expenses:expenseRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),borrowings:borrowingRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;})};
     mfScaleReinstallStateProxy();mfScaleDirty.full=true;normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();
     const v=Number(meta.version||0);mfSetKnownCloudVersion(v);
     try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(v));localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
