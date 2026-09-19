@@ -3241,12 +3241,48 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(!mfFirestoreDb||!mfFirebaseSyncCode) return null;
             return mfFirestoreDb.collection('secure_microfinance_business').doc(mfFirebaseSyncCode).collection('structured_v1_'+kind);
         }
+        let mfScaleFullCloudResetStarted=false;
+        async function mfScaleClearStructuredCloud(){
+            const kinds=['loans','payments','products','staff','expenses','borrowings'];
+            for(const kind of kinds){
+                const col=mfScaleStructuredCollection(kind); if(!col) throw new Error('Structured Firebase collection unavailable: '+kind);
+                let last=null;
+                while(true){
+                    let q=col.orderBy(firebase.firestore.FieldPath.documentId()).limit(450);
+                    if(last) q=q.startAfter(last);
+                    const snap=await q.get();
+                    if(snap.empty) break;
+                    const batch=mfFirestoreDb.batch();
+                    snap.docs.forEach(d=>batch.delete(d.ref));
+                    await batch.commit();
+                    last=snap.docs[snap.docs.length-1].id;
+                    if(snap.size<450) break;
+                    await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
+                }
+            }
+        }
         async function mfScaleMirrorToFirebase(){
             if(!mfScaleReady || !mfFirebaseUser || !mfFirestoreDb || !mfFirebaseSyncCode) return;
             const owner=mfFirebaseUser.uid;
             const meta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
             const full=!!mfScaleDirty.full || !meta?.bootstrapped;
             const workKinds={loans:[],products:[],staff:[],expenses:[],borrowings:[]};
+            // A full restore is a REPLACEMENT of the cloud database, not a merge.
+            // Old structured documents must be removed first; otherwise a smaller restored
+            // database leaves stale loans/payments/products in Firebase and the other device
+            // correctly downloads those old records again. The reset happens only once per
+            // full-mirror run, while the root version remains unchanged until every new chunk
+            // is written and pushStateToFirebase() publishes the final commit marker.
+            if(full && !mfScaleFullCloudResetStarted){
+                mfScaleFullCloudResetStarted=true;
+                try{
+                    await mfScaleClearStructuredCloud();
+                    await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:false,bootstrapKind:'loans',bootstrapOffset:0,fullResetCompletedAt:new Date().toISOString(),version:3});
+                }catch(e){
+                    mfScaleFullCloudResetStarted=false;
+                    throw e;
+                }
+            }
             // First-time structured-cloud bootstrap is deliberately resumable and bounded.
             // It never attempts to push the entire business in one browser task. Existing
             // incremental updates continue to use the normal dirty-entity path below.
@@ -3300,6 +3336,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // All structured entity types are bootstrapped. Mark complete; normal saves
                 // will thereafter use only dirty entities.
                 await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:true,bootstrapKind:'',bootstrapOffset:0,lastSyncAt:new Date().toISOString(),version:3}).catch(()=>{});
+                mfScaleFullCloudResetStarted=false;
                 mfScaleResetDirty();
                 return;
             }
@@ -3325,6 +3362,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }catch(e){console.warn('Structured payment sync/cleanup skipped:',e);}
             }
             await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,lastSyncAt:new Date().toISOString(),bootstrapped:true,version:3}).catch(()=>{});
+            mfScaleFullCloudResetStarted=false;
             mfScaleResetDirty();
         }
         async function initializeScalableDataLayer(){
