@@ -10531,11 +10531,11 @@ window.addEventListener('online',()=>{
     const col=mfScaleStructuredCollection(kind); if(!col) throw new Error('Structured Firebase collection unavailable.');
     const out=[]; let last=null;
     while(true){
-      let q=col.orderBy(firebase.firestore.FieldPath.documentId()).limit(500);
+      let q=col.where('_ownerUid','==',mfFirebaseUser.uid).limit(500);
       if(last) q=q.startAfter(last);
       const snap=await q.get(); if(snap.empty) break;
       snap.forEach(d=>out.push({...d.data(),id:String(d.id)}));
-      last=snap.docs[snap.docs.length-1].id;
+      last=snap.docs[snap.docs.length-1];
       if(snap.size<500) break;
       await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
     }
@@ -10689,8 +10689,8 @@ window.addEventListener('online',()=>{
             const data=root.data()||{};
             if(!data.structured || data.structuredBootstrapComplete===false) return;
             const [loanProbe,productProbe]=await Promise.all([
-              mfScaleStructuredCollection('loans').orderBy(firebase.firestore.FieldPath.documentId()).limit(1).get(),
-              mfScaleStructuredCollection('products').orderBy(firebase.firestore.FieldPath.documentId()).limit(1).get()
+              mfScaleStructuredCollection('loans').where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get(),
+              mfScaleStructuredCollection('products').where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get()
             ]);
             if(loanProbe.empty && productProbe.empty) return;
             await mf100PullStructured(false);
