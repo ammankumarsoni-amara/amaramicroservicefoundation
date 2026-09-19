@@ -3580,10 +3580,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         if(showAlerts){
                             if(confirm('Secure cloud data already exists for this account. Load it onto THIS device now? Choose Cancel to keep this device data and upload it as the new secure cloud version.')) pullStateFromFirebase(false);
                             else pushStateToFirebase(false);
-                        }else if(cloudVersion>localVersion && (!hasLocalData || (typeof mf100IsPristineLocalDevice==='function' && mf100IsPristineLocalDevice()))){
-                            // Safe automatic cross-device convergence: only replace local data when this device is
-                            // genuinely empty/pristine. A real local business database is NEVER silently overwritten
-                            // merely because the cloud version is newer; this protects the authoritative laptop data.
+                        }else if(cloudVersion>localVersion && (!hasLocalData || !lastPushedFp || localFp===lastPushedFp)){
+                            // Safe automatic cross-device convergence: only replace local data when this device has no
+                            // unpushed local edits (or is effectively empty). A locally changed, unsynced database is never silently overwritten.
                             pullStateFromFirebase(false);
                         }else if(cloudVersion>localVersion){
                             if(!mfHasUnpushedLocalChanges()){
@@ -10476,20 +10475,74 @@ window.addEventListener('online',()=>{
   /* Firebase: existing structured mirror becomes the operational path. Keep the old root document
      as a migration/fallback reader only; no new whole-state payloads are written. */
   mfSecureEnvelope=function(version){return {ownerUid:mfFirebaseUser?.uid||null,updatedByDevice:mfFirebaseDeviceId,updatedAtLabel:new Date().toLocaleString('en-IN'),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),version:Number(version)||1,schemaVersion:MF100_SCHEMA,structured:true,stateFingerprint:mfLocalStateFingerprint()};};
+  async function mf100AuthoritativeFullSync(){
+    if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser) throw new Error('Firebase secure session is not ready.');
+    const owner=mfFirebaseUser.uid;
+    const kinds=['loans','products','staff','expenses','borrowings'];
+    const sources={
+      loans:Array.isArray(state.loans)?state.loans:[],
+      products:Object.entries(state.products||{}).map(([id,v])=>({...v,id:String(id)})),
+      staff:Array.isArray(state.staff)?state.staff:[],
+      expenses:Array.isArray(state.expenses)?state.expenses:[],
+      borrowings:Array.isArray(state.borrowings)?state.borrowings:[]
+    };
+    const localIds={};
+    for(const kind of kinds) localIds[kind]=new Set(sources[kind].map(x=>String(x?.id||x?.key||'')));
+    for(const kind of kinds){
+      const col=mfScaleStructuredCollection(kind); if(!col) continue;
+      for(let i=0;i<sources[kind].length;i+=450){
+        const batch=mfFirestoreDb.batch();
+        sources[kind].slice(i,i+450).forEach(row=>{
+          const id=String(row?.id||row?.key||`${kind.toUpperCase()}-${i}`);
+          batch.set(col.doc(id),{...mfScaleFirestoreSafe(mfScaleClone(row)),_ownerUid:owner,_scaleFingerprint:mfScaleHash(row),_updatedAtLabel:new Date().toLocaleString('en-IN')},{merge:true});
+        });
+        if(sources[kind].length) await batch.commit();
+        await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
+      }
+      const snap=await col.where('_ownerUid','==',owner).get();
+      const stale=snap.docs.filter(d=>!localIds[kind].has(String(d.id)));
+      for(let i=0;i<stale.length;i+=450){const b=mfFirestoreDb.batch();stale.slice(i,i+450).forEach(d=>b.delete(d.ref));await b.commit();}
+    }
+    const pcol=mfScaleStructuredCollection('payments');
+    if(pcol){
+      const localPaymentIds=new Set();
+      const loans=sources.loans;
+      for(const loan of loans){
+        const payments=Array.isArray(loan?.payments)?loan.payments:[];
+        for(let i=0;i<payments.length;i+=450){
+          const batch=mfFirestoreDb.batch();
+          payments.slice(i,i+450).forEach((pay,off)=>{const idx=i+off,id=String(loan.id)+'-'+idx;localPaymentIds.add(id);batch.set(pcol.doc(id),{...mfScaleFirestoreSafe(mfScaleClone(pay)),_ownerUid:owner,loanId:String(loan.id),paymentIndex:idx},{merge:true});});
+          if(payments.length) await batch.commit();
+          await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
+        }
+      }
+      const psnap=await pcol.where('_ownerUid','==',owner).get();
+      const stale=psnap.docs.filter(d=>!localPaymentIds.has(String(d.id)));
+      for(let i=0;i<stale.length;i+=450){const b=mfFirestoreDb.batch();stale.slice(i,i+450).forEach(d=>b.delete(d.ref));await b.commit();}
+    }
+    await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:true,bootstrapKind:'',bootstrapOffset:0,lastSyncAt:new Date().toISOString(),version:3}).catch(()=>{});
+  }
   pushStateToFirebase=async function(silent){
     if(!mfFirestoreDb||!mfFirebaseSyncCode){if(!silent){setFirebaseStatus('⚠️ Connect Firebase first.',true);alert('Connect Firebase first.');}return;}
     if(!mfFirebaseUser){if(!silent){setFirebaseStatus('🔒 Secure Sync requires Firebase sign-in first.',true);alert('Secure Sync requires Firebase sign-in first.');}return;}
     try{
       if(!mfScaleReady) await mfScaleBuildLocalEntities(false);
-      await mfScaleMirrorToFirebase();
-      const mirrorMeta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
-      if(mirrorMeta && mirrorMeta.bootstrapped===false){
-        try{await mfSecureFirebaseDoc().set({...mfSecureEnvelope(mfKnownCloudVersion()),structured:true,structuredBootstrapComplete:false},{merge:true});}catch(e){}
-        setFirebaseStatus('🟡 Firebase structured sync is continuing in the background…');
-        return;
+      if(!silent){
+        try{await idbPutVersionedBackup('BEFORE AUTHORITATIVE CLOUD SYNC',true);}catch(e){console.warn('Pre-cloud-sync safety snapshot skipped:',e);}
+        await mf100AuthoritativeFullSync();
+      }else{
+        await mfScaleMirrorToFirebase();
+        const mirrorMeta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
+        if(mirrorMeta && mirrorMeta.bootstrapped===false){
+          try{await mfSecureFirebaseDoc().set({...mfSecureEnvelope(mfKnownCloudVersion()),structured:true,structuredBootstrapComplete:false},{merge:true});}catch(e){}
+          setFirebaseStatus('🟡 Firebase structured sync is continuing in the background…');
+          return;
+        }
       }
       const ref=mfSecureFirebaseDoc(),known=mfKnownCloudVersion();
-      const next=known+1;
+      const rootSnap=await ref.get();
+      const cloudVersion=rootSnap.exists?Number(rootSnap.data()?.version||0):0;
+      const next=Math.max(known,cloudVersion)+1;
       await ref.set({...mfSecureEnvelope(next),structuredVersion:next,appSettings:(typeof window.mf100CloudSettings==='function'?window.mf100CloudSettings():{})},{merge:true});
       mfSetKnownCloudVersion(next);try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
       mfLocalAudit('CLOUD_PUSH','Structured Firestore mirror synchronized; root document contains metadata only');setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));if(!silent)mfShowTransientNotice('🟢 Firebase sync completed successfully.');
@@ -10737,41 +10790,21 @@ window.addEventListener('online',()=>{
         try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',localFp);localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
         return false;
       }
-      /* First initialization is device-role sensitive. A pristine/new mobile may
-         safely take the cloud business as its starting point. A laptop/browser that
-         already contains real business data must NEVER be silently replaced by a
-         different cloud snapshot. That was the dangerous convergence path behind
-         cross-device data appearing to change after deployment. */
+      /* A device that has never completed cloud initialization gets the cloud
+         business as its starting point. Preserve its current local state first
+         in the existing version-history store, so this onboarding pull cannot
+         destroy recoverable local work. If the device already has a confirmed
+         local push plus later edits, leave it alone and let normal conflict
+         handling surface the difference. */
       const firstInit=!baseline;
       const localConfirmed=!!lastPushFp && !!localFp && lastPushFp===localFp;
-      const pristine=typeof mf100IsPristineLocalDevice==='function' && mf100IsPristineLocalDevice();
-      if(firstInit && pristine){
-        try{ if(localFp) await idbPutVersionedBackup('BEFORE FIRST CLOUD SYNC',true); }
-        catch(e){console.warn('Pre-cloud-sync safety snapshot skipped:',e);}
+      if(firstInit && (!lastPushFp || localConfirmed)){
+        try{
+          if(localFp) await idbPutVersionedBackup('BEFORE FIRST CLOUD SYNC',true);
+        }catch(e){console.warn('Pre-cloud-sync safety snapshot skipped:',e);}
         await mf100PullStructured(false);
         mf100SetDeviceBaseline(Number(cloud.version||0),String(cloud.stateFingerprint||mfLocalStateFingerprint()));
         return true;
-      }
-      if(firstInit && !pristine){
-        /* Existing real business data is preserved. If the cloud is genuinely empty,
-           this device can safely seed the structured mirror; otherwise surface the
-           divergence and let the user choose the authoritative direction explicitly. */
-        let cloudHasRows=false;
-        try{
-          const probes=await Promise.all([
-            mfScaleStructuredCollection('loans').where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get(),
-            mfScaleStructuredCollection('products').where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get(),
-            mfScaleStructuredCollection('borrowings').where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get()
-          ]);
-          cloudHasRows=probes.some(x=>!x.empty);
-        }catch(e){ cloudHasRows=true; }
-        if(!cloudHasRows){
-          try{ await pushStateToFirebase(true); mf100SetDeviceBaseline(Number(mfKnownCloudVersion()||cloud.version||0),mfLocalStateFingerprint()); }
-          catch(e){ console.warn('Local authoritative cloud seed skipped:',e); }
-        }else{
-          setFirebaseStatus('🟡 Local business data preserved. Cloud and this device differ; no automatic overwrite was performed.',false);
-        }
-        return false;
       }
       if(baseline && cloudFp && baseline.fingerprint===cloudFp){
         mfSetKnownCloudVersion(Number(cloud.version||0));
@@ -10822,7 +10855,7 @@ window.addEventListener('online',()=>{
 
   async function mf100AutoPullPristineDevice(){
     if(!mf100IsPristineLocalDevice()) return false;
-    for(const waitMs of [600,1500,3000,6000,10000]){
+    for(const waitMs of [900,2500,5500]){
       try{
         await new Promise(r=>setTimeout(r,waitMs));
         if(!mfFirestoreDb || !mfFirebaseSyncCode || !mfFirebaseUser) continue;
