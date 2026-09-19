@@ -3319,9 +3319,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         const previousCount=mfScalePaymentCounts.has(String(loanId)) ? Number(mfScalePaymentCounts.get(String(loanId))) : NaN;
                         for(let i=0;i<payments.length;i+=450){const batch=mfFirestoreDb.batch();payments.slice(i,i+450).forEach((pay,off)=>{const idx=i+off;batch.set(col.doc(String(loan.id)+'-'+idx),{...mfScaleFirestoreSafe(mfScaleClone(pay)),_ownerUid:owner,loanId:String(loan.id),paymentIndex:idx},{merge:true});});await batch.commit();}
                         if(Number.isFinite(previousCount) && previousCount>payments.length){for(let start=payments.length;start<previousCount;start+=450){const b=mfFirestoreDb.batch();for(let idx=start;idx<Math.min(previousCount,start+450);idx++)b.delete(col.doc(String(loanId)+'-'+idx));await b.commit();}}
-                        else if(!Number.isFinite(previousCount)){const snap=await col.where('loanId','==',String(loanId)).get();const stale=snap.docs.filter(d=>Number(d.data()?.paymentIndex)>=payments.length);for(let i=0;i<stale.length;i+=450){const b=mfFirestoreDb.batch();stale.slice(i,i+450).forEach(d=>b.delete(d.ref));await b.commit();}}
+                        else if(!Number.isFinite(previousCount)){const snap=await col.where('_ownerUid','==',owner).where('loanId','==',String(loanId)).get();const stale=snap.docs.filter(d=>Number(d.data()?.paymentIndex)>=payments.length);for(let i=0;i<stale.length;i+=450){const b=mfFirestoreDb.batch();stale.slice(i,i+450).forEach(d=>b.delete(d.ref));await b.commit();}}
                         mfScalePaymentCounts.set(String(loanId),payments.length);
-                    }else{mfScalePaymentCounts.delete(String(loanId));const snap=await col.where('loanId','==',String(loanId)).get();for(let i=0;i<snap.docs.length;i+=450){const b=mfFirestoreDb.batch();snap.docs.slice(i,i+450).forEach(d=>b.delete(d.ref));await b.commit();}}
+                    }else{mfScalePaymentCounts.delete(String(loanId));const snap=await col.where('_ownerUid','==',owner).where('loanId','==',String(loanId)).get();for(let i=0;i<snap.docs.length;i+=450){const b=mfFirestoreDb.batch();snap.docs.slice(i,i+450).forEach(d=>b.delete(d.ref));await b.commit();}}
                 }catch(e){console.warn('Structured payment sync/cleanup skipped:',e);}
             }
             await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,lastSyncAt:new Date().toISOString(),bootstrapped:true,version:3}).catch(()=>{});
@@ -10489,7 +10489,7 @@ window.addEventListener('online',()=>{
       }
       const ref=mfSecureFirebaseDoc(),known=mfKnownCloudVersion();
       const next=known+1;
-      await ref.set({...mfSecureEnvelope(next),structuredVersion:next,appSettings:mf100CloudSettings()},{merge:true});
+      await ref.set({...mfSecureEnvelope(next),structuredVersion:next,appSettings:(typeof window.mf100CloudSettings==='function'?window.mf100CloudSettings():{})},{merge:true});
       mfSetKnownCloudVersion(next);try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
       mfLocalAudit('CLOUD_PUSH','Structured Firestore mirror synchronized; root document contains metadata only');setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));if(!silent)mfShowTransientNotice('🟢 Firebase sync completed successfully.');
     }catch(err){console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Push'),true);}
@@ -10555,7 +10555,7 @@ window.addEventListener('online',()=>{
     paymentRows.forEach(x=>{const l=byLoan.get(String(x.loanId));if(!l)return;const y={...x};delete y._ownerUid;delete y.loanId;delete y.paymentIndex;delete y.id;l.payments.push({paymentIndex:Number(x.paymentIndex)||0,...y});});
     loans.forEach(l=>{l.payments.sort((a,b)=>(Number(a.paymentIndex)||0)-(Number(b.paymentIndex)||0));l.payments.forEach(p=>delete p.paymentIndex);});
     state={...state,loans,products,staff:staffRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),expenses:expenseRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),borrowings:borrowingRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;})};
-    mf100ApplyCloudSettings(meta.appSettings||meta.settings);
+    window.mf100ApplyCloudSettings(meta.appSettings||meta.settings);
     mfScaleReinstallStateProxy();mfScaleDirty.full=true;normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();
     const v=Number(meta.version||0);mfSetKnownCloudVersion(v);
     try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(v));localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
@@ -10626,7 +10626,7 @@ window.addEventListener('online',()=>{
         structured:true,
         structuredBootstrapComplete:true,
         stateFingerprint:fp,
-        appSettings:mf100CloudSettings()
+        appSettings:(typeof window.mf100CloudSettings==='function'?window.mf100CloudSettings():{})
       },{merge:true});
       mfSetKnownCloudVersion(next);
       try{
@@ -10680,7 +10680,10 @@ window.addEventListener('online',()=>{
      records. Those defaults are NOT the user's business database and must not block
      the first cloud pull. At the same time, a device that contains real business
      edits must never be silently overwritten. */
-  function mf100CloudSettings(){
+  /* These helpers are consumed by the earlier structured Firebase push/pull layer.
+     Expose them on window so separate script/IIFE scopes cannot produce an
+     `... is not defined` regression when Sync Now runs after page load. */
+  window.mf100CloudSettings = function(){
     const cp=state?.companyProfile&&typeof state.companyProfile==='object'?state.companyProfile:{};
     return {
       bizName:String(state?.bizName||'My Finance Company'),
@@ -10689,16 +10692,16 @@ window.addEventListener('online',()=>{
       activeFilter:String(state?.activeFilter||'ALL'),
       cloudWebhookUrl:String(state?.cloudWebhookUrl||'')
     };
-  }
+  };
 
-  function mf100ApplyCloudSettings(settings){
+  window.mf100ApplyCloudSettings = function(settings){
     if(!settings||typeof settings!=='object') return;
     if(settings.bizName!==undefined) state.bizName=String(settings.bizName||'My Finance Company');
     if(settings.companyProfile&&typeof settings.companyProfile==='object') state.companyProfile=mfScaleClone(settings.companyProfile);
     if(Array.isArray(settings.customCategories)) state.customCategories=mfScaleClone(settings.customCategories);
     if(settings.activeFilter!==undefined) state.activeFilter=String(settings.activeFilter||'ALL');
     if(settings.cloudWebhookUrl!==undefined) state.cloudWebhookUrl=String(settings.cloudWebhookUrl||'');
-  }
+  };
 
   function mf100IsPristineLocalDevice(){
     try{
