@@ -10796,6 +10796,18 @@ window.addEventListener('online',()=>{
          destroy recoverable local work. If the device already has a confirmed
          local push plus later edits, leave it alone and let normal conflict
          handling surface the difference. */
+      /* Cloud is the authoritative business database for a device that has no
+         unpushed local work. If this device was previously initialized with an
+         old/default dataset, its baseline may exist even though its local data
+         no longer matches Firebase. Converge it to the verified cloud fingerprint
+         instead of leaving the stale local dataset in place. Preserve a recovery
+         snapshot first; genuinely newer local work is left for conflict handling. */
+      if(cloudFp && localFp && cloudFp!==localFp && !mfHasUnpushedLocalChanges()){
+        try{await idbPutVersionedBackup('BEFORE CLOUD SOURCE-OF-TRUTH CONVERGENCE',true);}catch(e){console.warn('Pre-cloud-convergence safety snapshot skipped:',e);}
+        await mf100PullStructured(false);
+        mf100SetDeviceBaseline(Number(cloud.version||0),String(cloud.stateFingerprint||mfLocalStateFingerprint()));
+        return true;
+      }
       const firstInit=!baseline;
       const localConfirmed=!!lastPushFp && !!localFp && lastPushFp===localFp;
       if(firstInit && (!lastPushFp || localConfirmed)){
