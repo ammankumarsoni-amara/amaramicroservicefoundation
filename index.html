@@ -10561,6 +10561,7 @@ window.addEventListener('online',()=>{
     try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(v));localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
     await idbPutSnapshot();
     try{await mfScaleBuildLocalEntities(false);await mf100BuildAnalytics();await mf100RebuildDueIndex();await mfScalePutMeta({id:'due_index',schema:'AMARA-SCALABLE-2',sourceLoanFingerprint:mfScaleHash(state.loans||[]),loanCount:(state.loans||[]).length,updatedAt:new Date().toISOString()});}catch(e){console.warn('Structured local index rebuild after cloud pull skipped:',e);}
+    mf100SetDeviceBaseline(v,mfLocalStateFingerprint());
     renderAll();setFirebaseStatus('🟢 Loaded latest structured Firebase data — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
   }
   pullStateFromFirebase=function(showConfirm){
@@ -10658,16 +10659,21 @@ window.addEventListener('online',()=>{
     };
   }
 
-  /* Every scheduled mirror now also finalizes the root metadata once the
-     resumable structured bootstrap has actually completed. */
+  /* Every scheduled mirror must advance the root metadata after the structured
+     entity writes complete. Without this, automatic saves could reach Firestore
+     collections while the root version stayed unchanged, so the other device's
+     listener had nothing to detect. Bootstrap remains resumable; finalization is
+     harmless while bootstrapping is incomplete and becomes the fast-sync signal
+     immediately after the structured mirror is complete. */
   if(originalSchedule){
     mfScaleScheduleMirror=function(){
       clearTimeout(mfScaleMirrorTimer);
       mfScaleMirrorTimer=setTimeout(async()=>{
-        try{ await mfScaleMirrorToFirebase(); }
-        catch(e){ console.warn('Structured cloud mirror skipped:',e); }
-        /* The wrapped mirror finalizes only when a bootstrap transition occurred. */
-      },2500);
+        try{
+          await mfScaleMirrorToFirebase();
+          await finalizeStructuredRootIfComplete(false);
+        }catch(e){ console.warn('Structured cloud mirror skipped:',e); }
+      },1500);
     };
   }
 
@@ -10702,6 +10708,59 @@ window.addEventListener('online',()=>{
     if(settings.activeFilter!==undefined) state.activeFilter=String(settings.activeFilter||'ALL');
     if(settings.cloudWebhookUrl!==undefined) state.cloudWebhookUrl=String(settings.cloudWebhookUrl||'');
   };
+
+  const MF100_DEVICE_BASELINE_KEY='MF_SECURE_DEVICE_BASELINE_V2';
+  function mf100GetDeviceBaseline(){
+    try{const raw=localStorage.getItem(MF100_DEVICE_BASELINE_KEY);return raw?JSON.parse(raw):null;}catch(e){return null;}
+  }
+  function mf100SetDeviceBaseline(version,fingerprint){
+    try{localStorage.setItem(MF100_DEVICE_BASELINE_KEY,JSON.stringify({version:Number(version)||0,fingerprint:String(fingerprint||''),setAt:new Date().toISOString()}));}catch(e){}
+  }
+
+  async function mf100InitialCloudConvergence(){
+    try{
+      if(!mfFirestoreDb || !mfFirebaseSyncCode || !mfFirebaseUser) return false;
+      const ref=mfSecureFirebaseDoc();
+      const snap=await ref.get();
+      if(!snap.exists) return false;
+      const cloud=snap.data()||{};
+      if(cloud.ownerUid && cloud.ownerUid!==mfFirebaseUser.uid) return false;
+      if(!cloud.structured || cloud.structuredBootstrapComplete===false) return false;
+      const localFp=mfLocalStateFingerprint();
+      const cloudFp=String(cloud.stateFingerprint||'');
+      const lastPushFp=localStorage.getItem('MF_SECURE_LAST_PUSH_FINGERPRINT')||'';
+      const baseline=mf100GetDeviceBaseline();
+      if(cloudFp && localFp && cloudFp===localFp){
+        mfSetKnownCloudVersion(Number(cloud.version||0));
+        mf100SetDeviceBaseline(Number(cloud.version||0),cloudFp);
+        try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',localFp);localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
+        return false;
+      }
+      /* A device that has never completed cloud initialization gets the cloud
+         business as its starting point. Preserve its current local state first
+         in the existing version-history store, so this onboarding pull cannot
+         destroy recoverable local work. If the device already has a confirmed
+         local push plus later edits, leave it alone and let normal conflict
+         handling surface the difference. */
+      const firstInit=!baseline;
+      const localConfirmed=!!lastPushFp && !!localFp && lastPushFp===localFp;
+      if(firstInit && (!lastPushFp || localConfirmed)){
+        try{
+          if(localFp) await idbPutVersionedBackup('BEFORE FIRST CLOUD SYNC',true);
+        }catch(e){console.warn('Pre-cloud-sync safety snapshot skipped:',e);}
+        await mf100PullStructured(false);
+        mf100SetDeviceBaseline(Number(cloud.version||0),String(cloud.stateFingerprint||mfLocalStateFingerprint()));
+        return true;
+      }
+      if(baseline && cloudFp && baseline.fingerprint===cloudFp){
+        mfSetKnownCloudVersion(Number(cloud.version||0));
+      }
+      return false;
+    }catch(e){
+      console.warn('Initial structured cloud convergence skipped:',e);
+      return false;
+    }
+  }
 
   function mf100IsPristineLocalDevice(){
     try{
@@ -10777,10 +10836,28 @@ window.addEventListener('online',()=>{
   if(originalInit){
     initFirebaseSync=function(cfg,syncCode,showAlerts){
       const result=originalInit(cfg,syncCode,false);
-      Promise.resolve(result).then(()=>{ void mf100AutoPullPristineDevice(); }).catch(()=>{});
+      Promise.resolve(result).then(async()=>{
+        try{startFirebaseListener();}catch(e){console.warn('Final structured listener attach skipped:',e);}
+        try{await mf100InitialCloudConvergence();}catch(e){console.warn('Initial cloud convergence skipped:',e);}
+        try{await mf100AutoPullPristineDevice();}catch(e){}
+      }).catch(()=>{});
       return result;
     };
   }
+
+  /* The page can auto-connect Firebase during an earlier startup script before
+     this final hardening IIFE is evaluated. In that case the wrapper above never
+     sees the original init call. Re-attach the structured listener and run the
+     same one-time convergence immediately when Firebase is already connected. */
+  setTimeout(async()=>{
+    try{
+      if(mfFirestoreDb&&mfFirebaseSyncCode&&mfFirebaseUser){
+        startFirebaseListener();
+        await mf100InitialCloudConvergence();
+        await mf100AutoPullPristineDevice();
+      }
+    }catch(e){console.warn('Final cross-device startup convergence skipped:',e);}
+  },300);
 })();
 </script>
 </body>
