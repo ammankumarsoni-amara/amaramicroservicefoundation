@@ -3243,19 +3243,26 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         let mfScaleFullCloudResetStarted=false;
         async function mfScaleClearStructuredCloud(){
+            // Clear only documents owned by the currently authenticated Firebase user.
+            // Older/foreign legacy documents are intentionally left untouched; the pull
+            // path also filters by _ownerUid, so they can never leak into this business.
+            // This keeps the secure Rules intact and prevents one legacy document from
+            // aborting an otherwise valid full restore.
+            const owner=mfFirebaseUser?.uid;
+            if(!owner) throw new Error('Firebase authentication is not ready for a secure cloud replacement.');
             const kinds=['loans','payments','products','staff','expenses','borrowings'];
             for(const kind of kinds){
                 const col=mfScaleStructuredCollection(kind); if(!col) throw new Error('Structured Firebase collection unavailable: '+kind);
                 let last=null;
                 while(true){
-                    let q=col.orderBy(firebase.firestore.FieldPath.documentId()).limit(450);
+                    let q=col.where('_ownerUid','==',owner).limit(450);
                     if(last) q=q.startAfter(last);
                     const snap=await q.get();
                     if(snap.empty) break;
                     const batch=mfFirestoreDb.batch();
                     snap.docs.forEach(d=>batch.delete(d.ref));
                     await batch.commit();
-                    last=snap.docs[snap.docs.length-1].id;
+                    last=snap.docs[snap.docs.length-1];
                     if(snap.size<450) break;
                     await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
                 }
@@ -10642,7 +10649,9 @@ window.addEventListener('online',()=>{
       if(!silent) mfShowTransientNotice('🟢 Firebase sync completed successfully.');
     }catch(err){
       console.error('Structured Secure Push failed:',err);
-      setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Push'),true);
+      try{mfScaleFullCloudResetStarted=false;}catch(e){}
+      const detail=err?.code ? ` [${err.code}]` : '';
+      setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Push')+detail,true);
       if(!silent) mfShowTransientNotice('⚠️ Firebase sync did not complete. Your local data was not discarded.');
     }finally{
       mfFirebasePushBusy=false;
@@ -10682,15 +10691,26 @@ window.addEventListener('online',()=>{
   'use strict';
   const mf100OriginalPull=typeof pullStateFromFirebase==='function'?pullStateFromFirebase:null;
   const mf100OriginalListener=typeof startFirebaseListener==='function'?startFirebaseListener:null;
+  let mf100MirrorBusy=false;
+  const mf100OriginalMirror=typeof mfScaleMirrorToFirebase==='function'?mfScaleMirrorToFirebase:null;
+  if(mf100OriginalMirror){
+    mfScaleMirrorToFirebase=async function(){
+      if(mf100MirrorBusy) return;
+      mf100MirrorBusy=true;
+      try{return await mf100OriginalMirror();}
+      finally{mf100MirrorBusy=false;}
+    };
+  }
   async function mf100FirestoreCollectionRows(kind){
     const col=mfScaleStructuredCollection(kind); if(!col) throw new Error('Structured Firebase collection unavailable.');
+    const owner=mfFirebaseUser?.uid; if(!owner) throw new Error('Firebase authentication is not ready.');
     const out=[]; let last=null;
     while(true){
-      let q=col.orderBy(firebase.firestore.FieldPath.documentId()).limit(500);
+      let q=col.where('_ownerUid','==',owner).limit(500);
       if(last) q=q.startAfter(last);
       const snap=await q.get(); if(snap.empty) break;
       snap.forEach(d=>out.push({...d.data(),id:String(d.id)}));
-      last=snap.docs[snap.docs.length-1].id;
+      last=snap.docs[snap.docs.length-1];
       if(snap.size<500) break;
       await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
     }
