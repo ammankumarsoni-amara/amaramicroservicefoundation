@@ -3809,6 +3809,39 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(note) note.textContent='Secure Sync is mandatory in the production build. Firebase Authentication + the production Firestore Rules are required for cloud reads/writes.';
             const cb=document.getElementById('mf-secure-sync-enabled'); if(cb) cb.checked=true;
         }
+        function mfHydrateFirebaseConnectionUi(){
+            try{
+                const cfg=String(localStorage.getItem('MF_FIREBASE_CONFIG')||'');
+                const code=String(localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'');
+                const cfgEl=document.getElementById('firebase-config-input');
+                const codeEl=document.getElementById('firebase-sync-code');
+                if(cfgEl && !String(cfgEl.value||'').trim() && cfg) cfgEl.value=cfg;
+                if(codeEl && !String(codeEl.value||'').trim() && code) codeEl.value=code;
+                if(code) mfFirebaseSyncCode=code;
+            }catch(e){}
+        }
+        function mfBindFirebaseConnectionPersistence(){
+            try{
+                const cfgEl=document.getElementById('firebase-config-input');
+                const codeEl=document.getElementById('firebase-sync-code');
+                if(cfgEl && !cfgEl.dataset.persistBound){
+                    cfgEl.dataset.persistBound='1';
+                    cfgEl.addEventListener('input',()=>{
+                        try{ localStorage.setItem('MF_FIREBASE_CONFIG',String(cfgEl.value||'')); }catch(e){}
+                    });
+                }
+                if(codeEl && !codeEl.dataset.persistBound){
+                    codeEl.dataset.persistBound='1';
+                    codeEl.addEventListener('input',()=>{
+                        try{
+                            const value=String(codeEl.value||'').trim();
+                            localStorage.setItem('MF_FIREBASE_SYNC_CODE',value);
+                            mfFirebaseSyncCode=value||null;
+                        }catch(e){}
+                    });
+                }
+            }catch(e){}
+        }
         function mfHydrateAuthUi(user){
             try{
                 const emailEl=document.getElementById('mf-auth-email');
@@ -3829,6 +3862,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         function mfInitAuth(){
             try{
+                mfHydrateFirebaseConnectionUi();
+                mfBindFirebaseConnectionPersistence();
                 if(typeof firebase==='undefined' || !firebase.auth) return;
                 // Cold-start fix: bootstrap the saved Firebase app before Auth persistence is attached.
                 if(!mfFirebaseApp){
@@ -3991,10 +4026,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             try{localStorage.setItem('MF_LOCAL_STATE_VERSION',JSON.stringify({at:new Date().toISOString(),fingerprint:mfLocalStateFingerprint()}));}catch(e){}
         }
         // Initialize Firebase Auth after the existing Firebase app has been created.
-        window.addEventListener('load',()=>setTimeout(()=>{try{mfHydrateAuthUi(mfFirebaseUser);}catch(e){};mfInitAuth();},0));
+        window.addEventListener('load',()=>setTimeout(()=>{
+            try{ mfHydrateFirebaseConnectionUi(); mfBindFirebaseConnectionPersistence(); mfHydrateAuthUi(mfFirebaseUser); }catch(e){}
+            mfInitAuth();
+        },0));
         // Safe production auto-connect: wait until secure core variables are initialized.
         window.addEventListener('load',()=>setTimeout(()=>{
             try{
+                mfHydrateFirebaseConnectionUi();
                 const cfgRaw=localStorage.getItem('MF_FIREBASE_CONFIG');
                 const syncCode=localStorage.getItem('MF_FIREBASE_SYNC_CODE');
                 if(cfgRaw && syncCode && typeof firebase!=='undefined') initFirebaseSync(JSON.parse(cfgRaw),syncCode,false);
