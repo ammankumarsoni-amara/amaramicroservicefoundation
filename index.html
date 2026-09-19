@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Loan Management</title>
-    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-09-13-SMOOTH-UI-V7-ADVANCED-RECOVERY-SEARCH-MARKET-DISBURSED-READABILITY-VERIFIED-MANUAL-GOOGLE-BACKUP-PERSISTENT-AUTH-SILENT-REAUTH-CROSS-DEVICE-FINGERPRINT-CONVERGENCE-FIX-2026-09-19">
+    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-09-13-SMOOTH-UI-V7-ADVANCED-RECOVERY-SEARCH-MARKET-DISBURSED-READABILITY-VERIFIED-MANUAL-GOOGLE-BACKUP-PERSISTENT-AUTH-SILENT-REAUTH">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -2286,7 +2286,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div id="mf-auth-status" style="font-size:.68rem;color:#94a3b8;margin-bottom:7px;">Not signed in.</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
                     <input id="mf-auth-email" type="email" placeholder="Account email" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="off">
-                    <input id="mf-auth-key" type="text" placeholder="Secure account credential" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="new-password">
+                    <input id="mf-auth-key" type="password" placeholder="Enter password only when signing in" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="current-password">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:7px;">
                     <button type="button" class="btn-header btn-green" style="justify-content:center;" onclick="mfAuthSignIn()"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
@@ -3420,6 +3420,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         let mfFirebaseDeviceId = localStorage.getItem('MF_DEVICE_ID') || ('DEV-' + Math.random().toString(36).slice(2, 10));
         localStorage.setItem('MF_DEVICE_ID', mfFirebaseDeviceId);
         let mfFirebasePushTimer = null;
+        let mfFirebasePushBusy = false;
         let mfIgnoreNextSnapshot = false;
 
         function mfRefreshFirebaseSyncControls() {
@@ -3565,16 +3566,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 cloudPayloadFp=mfStateFingerprintObject(cloudState);
                             }
                         } catch(e) { cloudPayloadFp=''; }
-                        // Cross-device convergence hardening:
-                        // Structured Firebase stores the authoritative state fingerprint in the
-                        // root metadata document. A browser can remember the same version number
-                        // while its own IndexedDB contains an older/different local database.
-                        // Version equality alone must therefore NEVER be treated as proof that
-                        // the device has the current data.
-                        const structuredCloudFp = String(data.stateFingerprint || '').trim();
-                        const sameDatabase = (!!cloudPayloadFp && !!localFp && cloudPayloadFp===localFp)
-                            || (!!structuredCloudFp && !!localFp && structuredCloudFp===localFp);
-
+                        const sameDatabase = !!cloudPayloadFp && !!localFp && cloudPayloadFp===localFp;
                         if(sameDatabase && cloudVersion>0){
                             mfSetKnownCloudVersion(cloudVersion);
                             try{
@@ -3584,17 +3576,6 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 localStorage.removeItem('MF_LOCAL_DIRTY_AT');
                             }catch(e){}
                             setFirebaseStatus('🟢 Secure Firebase is connected — automatic sync is active.',false);
-                            return;
-                        }
-
-                        // IMPORTANT: if the cloud fingerprint differs, converge the device even
-                        // when cloudVersion === localVersion. This is the exact case that could
-                        // leave a mobile browser showing its own old IndexedDB data while the
-                        // laptop had already saved a newer database.
-                        if(!showAlerts && data.structured && structuredCloudFp && localFp &&
-                           structuredCloudFp!==localFp && !mfHasUnpushedLocalChanges()){
-                            setFirebaseStatus('⏳ Loading the latest secure cloud data on this device…',false);
-                            pullStateFromFirebase(false);
                             return;
                         }
                         if(showAlerts){
@@ -3657,26 +3638,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     setFirebaseStatus('🟢 Secure Firebase is connected — automatic sync is active.',false);
                     return;
                 }
-                const cloudFingerprint = String(data.stateFingerprint || '').trim();
-                const localFingerprint = mfLocalStateFingerprint();
-
-                // A newer fingerprint is authoritative even when the version number is
-                // unchanged locally. This prevents a stale mobile IndexedDB copy from being
-                // mistaken for the current cloud database.
-                if(cloudFingerprint && localFingerprint && cloudFingerprint !== localFingerprint){
-                    if(!mfHasUnpushedLocalChanges()){
-                        pullStateFromFirebase(false);
-                        setFirebaseStatus('🟢 Latest cloud data loaded automatically on this device.',false);
-                        return;
-                    }
-                    setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);
-                    showFirebaseUpdateBanner(data.updatedAtLabel || '', cloudVersion);
-                    return;
-                }
-
                 if(cloudVersion>mfKnownCloudVersion()){
                     if(!mfHasUnpushedLocalChanges()){
-                        pullStateFromFirebase(false);
+                        pullStateFromFirebase(true);
                         setFirebaseStatus('🟢 New cloud data loaded automatically.',false);
                         return;
                     }
@@ -3845,6 +3809,24 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(note) note.textContent='Secure Sync is mandatory in the production build. Firebase Authentication + the production Firestore Rules are required for cloud reads/writes.';
             const cb=document.getElementById('mf-secure-sync-enabled'); if(cb) cb.checked=true;
         }
+        function mfHydrateAuthUi(user){
+            try{
+                const emailEl=document.getElementById('mf-auth-email');
+                const passwordEl=document.getElementById('mf-auth-key');
+                if(user?.email){
+                    localStorage.setItem('MF_FIREBASE_AUTH_EMAIL',String(user.email));
+                    if(emailEl && !String(emailEl.value||'').trim()) emailEl.value=String(user.email);
+                    if(passwordEl){
+                        passwordEl.value='';
+                        passwordEl.placeholder='Firebase session restored — password not stored in this app';
+                        passwordEl.setAttribute('autocomplete','current-password');
+                    }
+                }else if(emailEl && !String(emailEl.value||'').trim()){
+                    emailEl.value=localStorage.getItem('MF_FIREBASE_AUTH_EMAIL')||'';
+                    if(passwordEl) passwordEl.placeholder='Enter password only when signing in';
+                }
+            }catch(e){}
+        }
         function mfInitAuth(){
             try{
                 if(typeof firebase==='undefined' || !firebase.auth) return;
@@ -3873,6 +3855,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     mfFirebaseAuth.onAuthStateChanged(user=>{
                         const previousUid=mfFirebaseUser?.uid||'';
                         mfFirebaseUser=user||null;
+                        mfHydrateAuthUi(mfFirebaseUser);
                         if(previousUid && previousUid!==String(user?.uid||'')){
                             googleAccessToken=null; googleTokenExpiresAt=0; googleDriveFileId=null; googleDriveFolderId=null;
                             try{ localStorage.removeItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY); }catch(e){}
@@ -3925,6 +3908,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const email=(document.getElementById('mf-auth-email')?.value||'').trim();
                 const password=document.getElementById('mf-auth-key')?.value||'';
                 if(!email||!password){alert('Enter your account email and password.');mfAuthStatus('Not signed in.');return;}
+                try{ localStorage.setItem('MF_FIREBASE_AUTH_EMAIL',email); }catch(e){}
                 const cred=await mfFirebaseAuth.signInWithEmailAndPassword(email,password);
                 mfFirebaseUser=cred.user||null;
                 mfAuthStatus('🟢 Signed in: '+(mfFirebaseUser?.email||mfFirebaseUser?.uid||email));
@@ -3947,6 +3931,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const password=document.getElementById('mf-auth-key')?.value||'';
                 if(!email||!password){alert('Enter an email and a strong password.');return;}
                 if(password.length<8){alert('Use at least 8 characters for the Firebase account password.');return;}
+                try{ localStorage.setItem('MF_FIREBASE_AUTH_EMAIL',email); }catch(e){}
                 await mfFirebaseAuth.createUserWithEmailAndPassword(email,password);
                 alert('Firebase account created and signed in. If your Firebase project requires email verification, verify it before using Secure Sync.');
             }catch(e){console.error(e);mfAuthStatus('⚠️ Account creation failed: '+(e.message||e),true);}
@@ -4006,7 +3991,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             try{localStorage.setItem('MF_LOCAL_STATE_VERSION',JSON.stringify({at:new Date().toISOString(),fingerprint:mfLocalStateFingerprint()}));}catch(e){}
         }
         // Initialize Firebase Auth after the existing Firebase app has been created.
-        window.addEventListener('load',()=>setTimeout(mfInitAuth,0));
+        window.addEventListener('load',()=>setTimeout(()=>{try{mfHydrateAuthUi(mfFirebaseUser);}catch(e){};mfInitAuth();},0));
         // Safe production auto-connect: wait until secure core variables are initialized.
         window.addEventListener('load',()=>setTimeout(()=>{
             try{
@@ -9349,6 +9334,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(modal) modal.classList.add('active');
             const savedId=localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'';
             const input=document.getElementById('google-client-id'); if(input) input.value=savedId;
+            try{ const authEmail=document.getElementById('mf-auth-email'); if(authEmail && !authEmail.value) authEmail.value=localStorage.getItem('MF_FIREBASE_AUTH_EMAIL')||mfFirebaseUser?.email||''; }catch(e){}
             mfRefreshDriveBackupUi();
             const fbCfg=document.getElementById('firebase-config-input'); if(fbCfg) fbCfg.value=localStorage.getItem('MF_FIREBASE_CONFIG')||'';
             const fbCode=document.getElementById('firebase-sync-code'); if(fbCode) fbCode.value=localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'';
@@ -10512,24 +10498,62 @@ window.addEventListener('online',()=>{
   /* Firebase: existing structured mirror becomes the operational path. Keep the old root document
      as a migration/fallback reader only; no new whole-state payloads are written. */
   mfSecureEnvelope=function(version){return {ownerUid:mfFirebaseUser?.uid||null,updatedByDevice:mfFirebaseDeviceId,updatedAtLabel:new Date().toLocaleString('en-IN'),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),version:Number(version)||1,schemaVersion:MF100_SCHEMA,structured:true,stateFingerprint:mfLocalStateFingerprint()};};
+  async function mf100CompleteStructuredMirror(){
+    // A restore is a full local database replacement. Firebase must not publish a new
+    // cloud version until every structured collection chunk has been written successfully.
+    // This is the critical cross-device convergence fix: the root version is the commit
+    // marker that mobile/laptop listeners use to know a complete cloud database is ready.
+    if(!mfScaleReady) await mfScaleBuildLocalEntities(false);
+    for(let guard=0; guard<10000; guard++){
+      clearTimeout(mfScaleMirrorTimer);
+      await mfScaleMirrorToFirebase();
+      const meta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
+      if(meta?.bootstrapped) return true;
+      await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
+    }
+    throw new Error('Firebase structured mirror did not finish within the safety limit.');
+  }
   pushStateToFirebase=async function(silent){
     if(!mfFirestoreDb||!mfFirebaseSyncCode){if(!silent){setFirebaseStatus('⚠️ Connect Firebase first.',true);alert('Connect Firebase first.');}return;}
     if(!mfFirebaseUser){if(!silent){setFirebaseStatus('🔒 Secure Sync requires Firebase sign-in first.',true);alert('Secure Sync requires Firebase sign-in first.');}return;}
+    if(mfFirebasePushBusy) return;
+    mfFirebasePushBusy=true;
+    const pushBtn=document.getElementById('mf-push-sync-btn');
+    const oldText=pushBtn?.innerHTML;
     try{
-      if(!mfScaleReady) await mfScaleBuildLocalEntities(false);
-      await mfScaleMirrorToFirebase();
-      const mirrorMeta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
-      if(mirrorMeta && mirrorMeta.bootstrapped===false){
-        try{await mfSecureFirebaseDoc().set({...mfSecureEnvelope(mfKnownCloudVersion()),structured:true,structuredBootstrapComplete:false},{merge:true});}catch(e){}
-        setFirebaseStatus('🟡 Firebase structured sync is continuing in the background…');
-        return;
-      }
-      const ref=mfSecureFirebaseDoc(),known=mfKnownCloudVersion();
-      const next=known+1;
-      await ref.set({...mfSecureEnvelope(next),structuredVersion:next},{merge:true});
-      mfSetKnownCloudVersion(next);try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
-      mfLocalAudit('CLOUD_PUSH','Structured Firestore mirror synchronized; root document contains metadata only');setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));if(!silent)mfShowTransientNotice('🟢 Firebase sync completed successfully.');
-    }catch(err){console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Push'),true);}
+      if(pushBtn){pushBtn.disabled=true;pushBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Syncing…';}
+      if(!silent) setFirebaseStatus('⏳ Preparing complete Firebase sync…');
+      await mf100CompleteStructuredMirror();
+      const ref=mfSecureFirebaseDoc();
+      let next=0;
+      // Final root write is the commit/visibility marker. Do this only after all structured
+      // entity/payment chunks are confirmed complete. A transaction prevents two devices from
+      // accidentally publishing the same version if they finish a mirror at nearly the same time.
+      await mfFirestoreDb.runTransaction(async tx=>{
+        const root=await tx.get(ref);
+        const rootData=root.exists?(root.data()||{}):{};
+        if(rootData.ownerUid && rootData.ownerUid!==mfFirebaseUser.uid) throw new Error('SECURITY_DENIED: this business belongs to another account.');
+        next=Math.max(Number(rootData.version||0),Number(rootData.structuredVersion||0),Number(mfKnownCloudVersion()||0))+1;
+        tx.set(ref,{...mfSecureEnvelope(next),structured:true,structuredBootstrapComplete:true,structuredVersion:next},{merge:true});
+      });
+      mfSetKnownCloudVersion(next);
+      try{
+        localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());
+        localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());
+        localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(next));
+        localStorage.removeItem('MF_LOCAL_DIRTY_AT');
+      }catch(e){}
+      mfLocalAudit('CLOUD_PUSH','Complete structured Firebase mirror committed; root version advanced only after all chunks finished');
+      setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+      if(!silent) mfShowTransientNotice('🟢 Firebase sync completed successfully.');
+    }catch(err){
+      console.error('Structured Secure Push failed:',err);
+      setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Push'),true);
+      if(!silent) mfShowTransientNotice('⚠️ Firebase sync did not complete. Your local data was not discarded.');
+    }finally{
+      mfFirebasePushBusy=false;
+      if(pushBtn){pushBtn.disabled=!(mfFirestoreDb&&mfFirebaseSyncCode&&mfFirebaseUser);if(oldText)pushBtn.innerHTML=oldText;}
+    }
   };
   // Do not alter existing pull UI semantics until a structured read is available; the legacy
   // reader remains a safe migration path for previously stored small snapshots.
@@ -10617,35 +10641,9 @@ window.addEventListener('online',()=>{
     const ref=mfSecureFirebaseDoc();
     mfFirebaseListenerUnsub=ref.onSnapshot(doc=>{
       if(!doc.exists)return;const data=doc.data()||{};if(data.ownerUid&&data.ownerUid!==mfFirebaseUser.uid)return;
-      const v=Number(data.version||0);
-      if(data.updatedByDevice===mfFirebaseDeviceId)return;
-
-      const cloudFingerprint=String(data.stateFingerprint||'').trim();
-      const localFingerprint=mfLocalStateFingerprint();
-
-      // Production cross-device convergence: fingerprint mismatch is enough to trigger
-      // an automatic pull when this device has no unsynced local edits. Do not require the
-      // remembered version number to be greater, because a stale browser can have the same
-      // version number as the cloud while holding an older IndexedDB state.
-      if(cloudFingerprint && localFingerprint && cloudFingerprint!==localFingerprint){
-        if(!mfHasUnpushedLocalChanges()){
-          pullStateFromFirebase(false);
-          setFirebaseStatus('🟢 Latest cloud data loaded automatically on this device.',false);
-        }else{
-          setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);
-          showFirebaseUpdateBanner(data.updatedAtLabel||'',v);
-        }
-        return;
-      }
-
-      if(!v||v<=mfKnownCloudVersion())return;
-      if(!mfHasUnpushedLocalChanges()){
-        pullStateFromFirebase(false);
-        setFirebaseStatus('🟢 New cloud data loaded automatically.',false);
-      }else{
-        setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);
-        showFirebaseUpdateBanner(data.updatedAtLabel||'',v);
-      }
+      const v=Math.max(Number(data.version||0),Number(data.structuredVersion||0));
+      if(!v||v<=mfKnownCloudVersion()||data.updatedByDevice===mfFirebaseDeviceId)return;
+      if(!mfHasUnpushedLocalChanges()){pullStateFromFirebase(true);}else{setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);showFirebaseUpdateBanner(data.updatedAtLabel||'',v);}
     },err=>{console.error('Firebase structured listener error',err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure Firebase listener'),true);});
   };
 })();
