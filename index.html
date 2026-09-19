@@ -3277,7 +3277,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 mfScaleFullCloudResetStarted=true;
                 try{
                     await mfScaleClearStructuredCloud();
+                    // IMPORTANT: this is a brand-new full replacement. Do not continue using
+                    // the previous firebase_mirror cursor after clearing the cloud. A stale
+                    // cursor could resume at products/staff/etc. and leave the restored loans
+                    // out of Firebase. Keep the fresh cursor in memory for this same call too.
                     await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:false,bootstrapKind:'loans',bootstrapOffset:0,fullResetCompletedAt:new Date().toISOString(),version:3});
+                    meta={id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:false,bootstrapKind:'loans',bootstrapOffset:0,version:3};
                 }catch(e){
                     mfScaleFullCloudResetStarted=false;
                     throw e;
