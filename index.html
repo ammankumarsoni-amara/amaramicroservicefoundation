@@ -3318,6 +3318,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         mfSetKnownCloudVersion(next);
                         try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');localStorage.removeItem('MF_FIREBASE_RESTORE_AUTHORITY');}catch(e){}
                         mfFirebaseRootCommitPending=false;
+                        mfFirebaseMarkDeviceBootstrap();
                         if(typeof mfFirebaseMarkInitialReady==='function') mfFirebaseMarkInitialReady();
                         setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
                     }catch(e){ console.warn('Structured root finalization skipped:',e); }
@@ -3548,6 +3549,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             return '⚠️ ' + action + ' failed: ' + (err?.message || 'Unknown Firebase error.');
         }
 
+        function mfFirebaseBootstrapMarkerKey(){return 'MF_FIREBASE_BOOTSTRAPPED:'+String(mfFirebaseUser?.uid||'')+'|'+String(mfFirebaseSyncCode||'');}
+        function mfFirebaseHasDeviceBootstrap(){try{return localStorage.getItem(mfFirebaseBootstrapMarkerKey())==='1';}catch(e){return false;}}
+        function mfFirebaseMarkDeviceBootstrap(){try{localStorage.setItem(mfFirebaseBootstrapMarkerKey(),'1');}catch(e){}}
+
         async function initFirebaseSync(cfg, syncCode, showAlerts) {
             try {
                 if (!mfFirebaseApp) {
@@ -3626,18 +3631,29 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             return;
                         }
 
-                        // Existing structured cloud data is authoritative for a device that has not
-                        // explicitly restored locally. Pull it before enabling any upstream mirror.
-                        if(!showAlerts && data.structured && cloudStructuredFp && localFp && cloudStructuredFp!==localFp){
+                        // First Firebase connection on this browser: cloud is the source for
+                        // the initial device copy. An old phone IndexedDB copy must not decide
+                        // whether the laptop database is downloaded.
+                        if(!showAlerts && data.structured && bootstrapComplete && !mfFirebaseHasDeviceBootstrap()){
                             mfFirebaseInitialSyncState='pulling';
                             try{
                                 await mf100PullStructured(false);
+                                mfFirebaseMarkDeviceBootstrap();
                                 mfFirebaseMarkInitialReady();
                                 setFirebaseStatus('🟢 Loaded latest structured Firebase data onto this device.',false);
-                            }catch(e){
-                                mfFirebaseInitialSyncState='pending';
-                                throw e;
-                            }
+                            }catch(e){mfFirebaseInitialSyncState='pending';throw e;}
+                            return;
+                        }
+                        // After initial bootstrap, only pull a changed cloud database when this
+                        // device has no genuine unsynced local changes.
+                        if(!showAlerts && data.structured && cloudStructuredFp && localFp && cloudStructuredFp!==localFp && !mfHasUnpushedLocalChanges()){
+                            mfFirebaseInitialSyncState='pulling';
+                            try{
+                                await mf100PullStructured(false);
+                                mfFirebaseMarkDeviceBootstrap();
+                                mfFirebaseMarkInitialReady();
+                                setFirebaseStatus('🟢 Loaded latest structured Firebase data onto this device.',false);
+                            }catch(e){mfFirebaseInitialSyncState='pending';throw e;}
                             return;
                         }
 
@@ -3649,6 +3665,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());
                                 localStorage.removeItem('MF_LOCAL_DIRTY_AT');
                             }catch(e){}
+                            mfFirebaseMarkDeviceBootstrap();
                             mfFirebaseMarkInitialReady();
                             setFirebaseStatus('🟢 Secure Firebase is connected — automatic sync is active.',false);
                             return;
@@ -3660,6 +3677,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 try{
                                     if(data.structured) await mf100PullStructured(false);
                                     else if(mf100OriginalPull) await Promise.resolve(mf100OriginalPull(false));
+                                    mfFirebaseMarkDeviceBootstrap();
                                     mfFirebaseMarkInitialReady();
                                 }catch(e){ mfFirebaseInitialSyncState='pending'; throw e; }
                             }else{
@@ -10587,6 +10605,7 @@ window.addEventListener('online',()=>{
       await ref.set({...mfSecureEnvelope(next),structuredVersion:next,stateMeta:mf100CloudStateMeta()},{merge:true});
       mfSetKnownCloudVersion(next);try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');localStorage.removeItem('MF_FIREBASE_RESTORE_AUTHORITY');}catch(e){}
       mfFirebaseRootCommitPending=false;
+      mfFirebaseMarkDeviceBootstrap();
       mfLocalAudit('CLOUD_PUSH','Structured Firestore mirror synchronized; root document contains metadata only');setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));if(!silent)mfShowTransientNotice('🟢 Firebase sync completed successfully.');
     }catch(err){console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Push'),true);}
   };
@@ -10631,7 +10650,7 @@ window.addEventListener('online',()=>{
       // IMPORTANT: every structured read is owner-scoped. The previous build read the
       // collection without the _ownerUid constraint, which can be rejected by production
       // Firestore rules and made mobile appear connected while no business data arrived.
-      let q=col.where('_ownerUid','==',uid).orderBy(firebase.firestore.FieldPath.documentId()).limit(500);
+      let q=col.where('_ownerUid','==',uid).limit(500);
       if(lastDoc) q=q.startAfter(lastDoc);
       const snap=await q.get(); if(snap.empty) break;
       snap.forEach(d=>out.push({...d.data(),id:String(d.id)}));
