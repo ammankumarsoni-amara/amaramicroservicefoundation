@@ -10635,6 +10635,29 @@ window.addEventListener('online',()=>{
     },2500);
   };
 
+  /* SAFE LOCAL/CLOUD DIRECTION GUARD
+     Decide the sync direction before any destructive structured-mirror cleanup.
+     - local populated + cloud structured empty => LOCAL -> CLOUD bootstrap
+     - local empty + cloud structured populated => CLOUD -> LOCAL pull
+     - both populated => normal version/conflict path
+  */
+  async function mfSafeSyncDirection(){
+    if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser) return 'unknown';
+    const localLoans=Array.isArray(state?.loans)?state.loans:[];
+    const root=await mfSecureFirebaseDoc().get();
+    if(!root.exists) return localLoans.length?'local-to-cloud':'unknown';
+    const meta=root.data()||{};
+    if(meta.ownerUid&&meta.ownerUid!==mfFirebaseUser.uid) throw new Error('SECURITY_DENIED: this secure business belongs to another account.');
+    if(!meta.structured) return localLoans.length?'local-to-cloud':'unknown';
+    const col=mfScaleStructuredCollection('loans');
+    if(!col) throw new Error('Structured Firebase collection unavailable.');
+    const snap=await col.where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get();
+    const cloudHasLoans=!snap.empty;
+    if(!localLoans.length && cloudHasLoans) return 'cloud-to-local';
+    if(localLoans.length && !cloudHasLoans) return 'local-to-cloud';
+    return cloudHasLoans?'both-populated':'unknown';
+  }
+
   /* Replace the explicit push with a bounded completion loop. Each call processes one
      resumable chunk; the loop continues until firebase_mirror.bootstrapped becomes true. */
   pushStateToFirebase=async function(silent){
@@ -10642,6 +10665,16 @@ window.addEventListener('online',()=>{
     if(!mfFirebaseUser){if(!silent){setFirebaseStatus('🔒 Secure Sync requires Firebase sign-in first.',true);alert('Secure Sync requires Firebase sign-in first.');}return;}
     try{
       if(!mfScaleReady)await mfScaleBuildLocalEntities(false);
+      const direction=await mfSafeSyncDirection();
+      if(direction==='cloud-to-local'){
+        setFirebaseStatus('☁️ Existing Firebase data found — loading it to this device…',false);
+        if(typeof pullStateFromFirebase==='function'){ await pullStateFromFirebase(false); return; }
+        throw new Error('CLOUD_PULL_UNAVAILABLE: Firebase pull function is not available.');
+      }
+      if(direction==='unknown' && (!Array.isArray(state?.loans)||!state.loans.length)){
+        setFirebaseStatus('🟡 No populated local or structured cloud loan data is available; nothing was uploaded.',true);
+        return;
+      }
       let guard=0,meta=null;
       do{
         await mfScaleMirrorToFirebase();
@@ -10659,26 +10692,43 @@ window.addEventListener('online',()=>{
   // reader remains a safe migration path for previously stored small snapshots.
   let mf100StructuredMode=false;
 
-  /* Small compatibility guard: avoid eagerly parsing the giant LocalStorage database on startup.
-     IDB is tried first; LocalStorage is parsed only when no durable IDB snapshot exists. */
+  /* Startup storage is reconciled by the core initializer. Do not add a second IDB-first
+     loader here: that wrapper could select an empty/stale IDB snapshot and overwrite a
+     freshly restored Google Drive state. */
   const mf100OriginalInitStorage=initializeSecureStorage;
-  initializeSecureStorage=async function(){
-    try{
-      const snap=await idbGetSnapshot();
-      if(snap?.state?.products){
-        state=snap.state;mfScaleReinstallStateProxy();normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();mfDbReady=true;markStorageReady();
-        const startupSnapshot=await idbPutSnapshot();try{localStorage.setItem('MF_LOCAL_SAVED_AT',startupSnapshot.updatedAt);}catch(e){}
-        renderAll();updateSecureCloudStatus();ensureInitialVersionedBackup();initializeScalableDataLayer();return;
-      }
-    }catch(e){/* fall through to proven legacy initializer */}
-    return mf100OriginalInitStorage();
-  };
+  initializeSecureStorage=async function(){ return mf100OriginalInitStorage(); };
 
   /* After every dirty mirror update, refresh derived indexes in the background. */
   const mf100OriginalMarkDirty=mfScaleMarkDirty;
   mfScaleMarkDirty=function(kind,id){if(mfGrowthCache)mf100StaleGrowthCache=mfGrowthCache;mf100OriginalMarkDirty(kind,id);if(mf100StaleGrowthCache)mfGrowthCache=mf100StaleGrowthCache;if(kind==='loans'||kind==='products'||kind==='staff'||kind==='expenses'||kind==='borrowings')mf100ScheduleAnalyticsRebuild();};
 
-  window.addEventListener('load',()=>setTimeout(()=>{try{if(mfScaleReady){mf100LoadAnalytics().then(()=>{try{renderKPIs();}catch(e){}});}}catch(e){}},1200));
+  async function mf100SafeBootstrapAfterRecovery(){
+    try{
+      const holdUntil=Number(localStorage.getItem('MF_RECOVERY_RESTORE_HOLD_UNTIL')||0);
+      if(!holdUntil || Date.now()>holdUntil) return;
+      if(!mfFirebaseUser||!mfFirestoreDb||!mfFirebaseSyncCode) return;
+      const localLoans=Array.isArray(state?.loans)?state.loans:[];
+      if(!localLoans.length) return;
+      const root=await mfSecureFirebaseDoc().get();
+      const meta=root.exists?(root.data()||{}):{};
+      if(meta.ownerUid&&meta.ownerUid!==mfFirebaseUser.uid) return;
+      if(!meta.structured){ await pushStateToFirebase(true); return; }
+      const col=mfScaleStructuredCollection('loans');
+      if(!col) return;
+      const snap=await col.where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get();
+      if(!snap.empty) return;
+      setFirebaseStatus('⏳ Restored local business found; securely bootstrapping it to Firebase…',false);
+      await pushStateToFirebase(true);
+    }catch(e){
+      console.warn('Safe restored-data Firebase bootstrap skipped:',e);
+      setFirebaseStatus(mfFirebaseErrorLabel(e,'Firebase bootstrap'),true);
+    }
+  }
+
+  window.addEventListener('load',()=>setTimeout(()=>{try{
+    if(mfScaleReady){mf100LoadAnalytics().then(()=>{try{renderKPIs();}catch(e){}});}
+    setTimeout(()=>mf100SafeBootstrapAfterRecovery(),900);
+  }catch(e){}},1200));
 })();
 
 </script>
@@ -10777,39 +10827,6 @@ window.addEventListener('online',()=>{
 
 </script>
 
-<script id="mf-v3-cloud-pull-safety-final">
-(function(){
-  'use strict';
-  /* Final safety rule: a structured cloud snapshot with zero loans is never allowed to
-     replace a device. This is intentionally independent of UI state or freshness heuristics. */
-  const originalPull=typeof pullStateFromFirebase==='function'?pullStateFromFirebase:null;
-  if(!originalPull)return;
-  pullStateFromFirebase=async function(showConfirm){
-    if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser){
-      return originalPull(showConfirm);
-    }
-    try{
-      const root=await mfSecureFirebaseDoc().get();
-      const meta=root.exists?(root.data()||{}):{};
-      if(meta.structured){
-        const col=mfScaleStructuredCollection('loans');
-        if(!col)throw new Error('Structured Firebase collection unavailable.');
-        const snap=await col.where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get();
-        if(snap.empty){
-          const msg='Firebase secure cloud has no owner-scoped loan data yet. Your device data was NOT replaced. Restore the populated business on the trusted device and sync that populated copy first.';
-          setFirebaseStatus('🟠 '+msg,true);
-          if(showConfirm)alert(msg);
-          return;
-        }
-      }
-      return await originalPull(showConfirm);
-    }catch(err){
-      console.error('V3 safe cloud pull blocked:',err);
-      setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure cloud pull'),true);
-      return;
-    }
-  };
-})();
-</script>
+
 </body>
 </html>
