@@ -2286,7 +2286,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div id="mf-auth-status" style="font-size:.68rem;color:#94a3b8;margin-bottom:7px;">Not signed in.</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
                     <input id="mf-auth-email" type="email" placeholder="Account email" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="off">
-                    <input id="mf-auth-key" type="password" placeholder="Enter password only when signing in" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="current-password">
+                    <input id="mf-auth-key" type="text" placeholder="Secure account credential" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="new-password">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:7px;">
                     <button type="button" class="btn-header btn-green" style="justify-content:center;" onclick="mfAuthSignIn()"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
@@ -3241,58 +3241,38 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(!mfFirestoreDb||!mfFirebaseSyncCode) return null;
             return mfFirestoreDb.collection('secure_microfinance_business').doc(mfFirebaseSyncCode).collection('structured_v1_'+kind);
         }
-        let mfScaleFullCloudResetStarted=false;
-        async function mfScaleClearStructuredCloud(){
-            // Clear only documents owned by the currently authenticated Firebase user.
-            // Older/foreign legacy documents are intentionally left untouched; the pull
-            // path also filters by _ownerUid, so they can never leak into this business.
-            // This keeps the secure Rules intact and prevents one legacy document from
-            // aborting an otherwise valid full restore.
-            const owner=mfFirebaseUser?.uid;
-            if(!owner) throw new Error('Firebase authentication is not ready for a secure cloud replacement.');
-            const kinds=['loans','payments','products','staff','expenses','borrowings'];
-            for(const kind of kinds){
-                const col=mfScaleStructuredCollection(kind); if(!col) throw new Error('Structured Firebase collection unavailable: '+kind);
-                let last=null;
-                while(true){
-                    let q=col.where('_ownerUid','==',owner).limit(450);
-                    if(last) q=q.startAfter(last);
-                    const snap=await q.get();
-                    if(snap.empty) break;
-                    const batch=mfFirestoreDb.batch();
-                    snap.docs.forEach(d=>batch.delete(d.ref));
-                    await batch.commit();
-                    last=snap.docs[snap.docs.length-1];
-                    if(snap.size<450) break;
-                    await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
-                }
-            }
-        }
         async function mfScaleMirrorToFirebase(){
             if(!mfScaleReady || !mfFirebaseUser || !mfFirestoreDb || !mfFirebaseSyncCode) return;
             const owner=mfFirebaseUser.uid;
             let meta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
             const full=!!mfScaleDirty.full || !meta?.bootstrapped;
             const workKinds={loans:[],products:[],staff:[],expenses:[],borrowings:[]};
-            // A full restore is a REPLACEMENT of the cloud database, not a merge.
-            // Old structured documents must be removed first; otherwise a smaller restored
-            // database leaves stale loans/payments/products in Firebase and the other device
-            // correctly downloads those old records again. The reset happens only once per
-            // full-mirror run, while the root version remains unchanged until every new chunk
-            // is written and pushStateToFirebase() publishes the final commit marker.
-            if(full && !mfScaleFullCloudResetStarted){
-                mfScaleFullCloudResetStarted=true;
-                try{
-                    await mfScaleClearStructuredCloud();
-                    // IMPORTANT: this is a brand-new full replacement. Do not continue using
-                    // the previous firebase_mirror cursor after clearing the cloud. A stale
-                    // cursor could resume at products/staff/etc. and leave the restored loans
-                    // out of Firebase. Keep the fresh cursor in memory for this same call too.
-                    await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:false,bootstrapKind:'loans',bootstrapOffset:0,fullResetCompletedAt:new Date().toISOString(),version:3});
-                    meta={id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:false,bootstrapKind:'loans',bootstrapOffset:0,version:3};
-                }catch(e){
-                    mfScaleFullCloudResetStarted=false;
-                    throw e;
+            /*
+             * A full restore is a replacement operation, not a merge.  The old mirror used
+             * merge:true for every document but never removed cloud records which no longer
+             * existed on the restored device.  That made a mobile pull legitimately fetch
+             * stale loans/expenses/staff from the previous cloud database.
+             *
+             * Cleanup is deliberately owner-scoped.  We never weaken Firestore Rules and we
+             * never attempt to delete another owner's/legacy unowned document.  Such documents
+             * are ignored by the structured pull below and cannot contaminate the device state.
+             */
+            if(full){
+                const cleanupFingerprint=mfLocalStateFingerprint();
+                if(String(meta?.cleanupFingerprint||'')!==String(cleanupFingerprint)){
+                    for(const kind of ['loans','payments','products','staff','expenses','borrowings']){
+                        const col=mfScaleStructuredCollection(kind); if(!col) continue;
+                        while(true){
+                            const snap=await col.where('_ownerUid','==',owner).limit(450).get();
+                            if(snap.empty) break;
+                            const batch=mfFirestoreDb.batch();
+                            snap.docs.forEach(d=>batch.delete(d.ref));
+                            await batch.commit();
+                            await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
+                        }
+                    }
+                    meta={...(meta||{}),cleanupFingerprint};
+                    await mfScalePutMeta(meta).catch(()=>{});
                 }
             }
             // First-time structured-cloud bootstrap is deliberately resumable and bounded.
@@ -3326,7 +3306,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     ki+=1; offset=0;
                 }
                 if(ki<kindOrder.length){
-                    await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:false,bootstrapKind:kindOrder[ki],bootstrapOffset:offset,lastSyncAt:new Date().toISOString(),version:3}).catch(()=>{});
+                    await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:false,bootstrapKind:kindOrder[ki],bootstrapOffset:offset,cleanupFingerprint:meta?.cleanupFingerprint||'',lastSyncAt:new Date().toISOString(),version:3}).catch(()=>{});
                     // Payments are bootstrapped only alongside loan chunks. This keeps each
                     // browser turn bounded while still separating payments from loan documents.
                     if(kindOrder[ki-1]==='loans' && refs.length){
@@ -3347,8 +3327,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }
                 // All structured entity types are bootstrapped. Mark complete; normal saves
                 // will thereafter use only dirty entities.
-                await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:true,bootstrapKind:'',bootstrapOffset:0,lastSyncAt:new Date().toISOString(),version:3}).catch(()=>{});
-                mfScaleFullCloudResetStarted=false;
+                await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,bootstrapped:true,bootstrapKind:'',bootstrapOffset:0,cleanupFingerprint:meta?.cleanupFingerprint||'',lastSyncAt:new Date().toISOString(),version:3}).catch(()=>{});
                 mfScaleResetDirty();
                 return;
             }
@@ -3373,8 +3352,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     }else{mfScalePaymentCounts.delete(String(loanId));const snap=await col.where('loanId','==',String(loanId)).get();for(let i=0;i<snap.docs.length;i+=450){const b=mfFirestoreDb.batch();snap.docs.slice(i,i+450).forEach(d=>b.delete(d.ref));await b.commit();}}
                 }catch(e){console.warn('Structured payment sync/cleanup skipped:',e);}
             }
-            await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,lastSyncAt:new Date().toISOString(),bootstrapped:true,version:3}).catch(()=>{});
-            mfScaleFullCloudResetStarted=false;
+            await mfScalePutMeta({id:'firebase_mirror',schema:MF_SCALE.schema,lastSyncAt:new Date().toISOString(),bootstrapped:true,cleanupFingerprint:meta?.cleanupFingerprint||'',version:3}).catch(()=>{});
             mfScaleResetDirty();
         }
         async function initializeScalableDataLayer(){
@@ -3470,7 +3448,6 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         let mfFirebaseDeviceId = localStorage.getItem('MF_DEVICE_ID') || ('DEV-' + Math.random().toString(36).slice(2, 10));
         localStorage.setItem('MF_DEVICE_ID', mfFirebaseDeviceId);
         let mfFirebasePushTimer = null;
-        let mfFirebasePushBusy = false;
         let mfIgnoreNextSnapshot = false;
 
         function mfRefreshFirebaseSyncControls() {
@@ -3602,12 +3579,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         const cloudVersion=Number(data.version||0);
                         const localVersion=mfKnownCloudVersion();
                         const localFp=mfLocalStateFingerprint();
-                        const cloudStateFp=String(data.stateFingerprint||'');
-                        const structuredCloud=!!data.structured;
-                        const stateFingerprintMismatch=!!cloudStateFp && !!localFp && cloudStateFp!==localFp;
-                        const localIsEmpty=!((Array.isArray(state?.loans)&&state.loans.length>0) || (state?.products && Object.keys(state.products).length>0));
                         const lastPushedFp=localStorage.getItem('MF_SECURE_LAST_PUSH_FINGERPRINT')||'';
-                        const hasLocalData=!localIsEmpty;
+                        const hasLocalData=Array.isArray(state?.loans)&&state.loans.length>0 || (state?.products && Object.keys(state.products).length>0);
                         // A fresh device can legitimately know cloudVersion=0 even when its local
                         // database is already the same database as the cloud copy (for example after
                         // a GitHub deployment). Compare the actual cloud payload fingerprint before
@@ -3620,7 +3593,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                                 cloudPayloadFp=mfStateFingerprintObject(cloudState);
                             }
                         } catch(e) { cloudPayloadFp=''; }
-                        const sameDatabase = !!cloudPayloadFp && !!localFp && cloudPayloadFp===localFp;
+                        const sameDatabase = (!!cloudPayloadFp && !!localFp && cloudPayloadFp===localFp)
+                            || (!!data.stateFingerprint && !!localFp && String(data.stateFingerprint)===String(localFp));
+                        const structuredFingerprintMismatch=!!data.structured && !!data.stateFingerprint && !!localFp && String(data.stateFingerprint)!==String(localFp);
                         if(sameDatabase && cloudVersion>0){
                             mfSetKnownCloudVersion(cloudVersion);
                             try{
@@ -3632,17 +3607,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             setFirebaseStatus('🟢 Secure Firebase is connected — automatic sync is active.',false);
                             return;
                         }
-                        /* Structured Firebase is authoritative for a device that has not made a local edit.
-                           Do NOT use only the remembered numeric version to decide whether to hydrate: a browser
-                           can be refreshed/redeployed with version already remembered while its IndexedDB contains
-                           the zero/default database. Compare the root stateFingerprint as well, and hydrate whenever
-                           the device is empty or its state differs from the cloud. */
                         if(showAlerts){
                             if(confirm('Secure cloud data already exists for this account. Load it onto THIS device now? Choose Cancel to keep this device data and upload it as the new secure cloud version.')) pullStateFromFirebase(false);
                             else pushStateToFirebase(false);
-                        }else if(structuredCloud && (localIsEmpty || stateFingerprintMismatch) && !mfHasUnpushedLocalChanges()){
+                        }else if(structuredFingerprintMismatch && !mfHasUnpushedLocalChanges()){
+                            // Structured cloud sync is authoritative for a device whose local
+                            // fingerprint differs from the committed cloud fingerprint. Version
+                            // equality is not enough: an older mobile browser can remember the
+                            // same cloud version while still holding a different local database.
                             pullStateFromFirebase(false);
-                            setFirebaseStatus('🟢 Loading the current Firebase business database onto this device…',false);
                         }else if(cloudVersion>localVersion && (!hasLocalData || !lastPushedFp || localFp===lastPushedFp)){
                             // Safe automatic cross-device convergence: only replace local data when this device has no
                             // unpushed local edits (or is effectively empty). A locally changed, unsynced database is never silently overwritten.
@@ -3871,61 +3844,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(note) note.textContent='Secure Sync is mandatory in the production build. Firebase Authentication + the production Firestore Rules are required for cloud reads/writes.';
             const cb=document.getElementById('mf-secure-sync-enabled'); if(cb) cb.checked=true;
         }
-        function mfHydrateFirebaseConnectionUi(){
-            try{
-                const cfg=String(localStorage.getItem('MF_FIREBASE_CONFIG')||'');
-                const code=String(localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'');
-                const cfgEl=document.getElementById('firebase-config-input');
-                const codeEl=document.getElementById('firebase-sync-code');
-                if(cfgEl && !String(cfgEl.value||'').trim() && cfg) cfgEl.value=cfg;
-                if(codeEl && !String(codeEl.value||'').trim() && code) codeEl.value=code;
-                if(code) mfFirebaseSyncCode=code;
-            }catch(e){}
-        }
-        function mfBindFirebaseConnectionPersistence(){
-            try{
-                const cfgEl=document.getElementById('firebase-config-input');
-                const codeEl=document.getElementById('firebase-sync-code');
-                if(cfgEl && !cfgEl.dataset.persistBound){
-                    cfgEl.dataset.persistBound='1';
-                    cfgEl.addEventListener('input',()=>{
-                        try{ localStorage.setItem('MF_FIREBASE_CONFIG',String(cfgEl.value||'')); }catch(e){}
-                    });
-                }
-                if(codeEl && !codeEl.dataset.persistBound){
-                    codeEl.dataset.persistBound='1';
-                    codeEl.addEventListener('input',()=>{
-                        try{
-                            const value=String(codeEl.value||'').trim();
-                            localStorage.setItem('MF_FIREBASE_SYNC_CODE',value);
-                            mfFirebaseSyncCode=value||null;
-                        }catch(e){}
-                    });
-                }
-            }catch(e){}
-        }
-        function mfHydrateAuthUi(user){
-            try{
-                const emailEl=document.getElementById('mf-auth-email');
-                const passwordEl=document.getElementById('mf-auth-key');
-                if(user?.email){
-                    localStorage.setItem('MF_FIREBASE_AUTH_EMAIL',String(user.email));
-                    if(emailEl && !String(emailEl.value||'').trim()) emailEl.value=String(user.email);
-                    if(passwordEl){
-                        passwordEl.value='';
-                        passwordEl.placeholder='Firebase session restored — password not stored in this app';
-                        passwordEl.setAttribute('autocomplete','current-password');
-                    }
-                }else if(emailEl && !String(emailEl.value||'').trim()){
-                    emailEl.value=localStorage.getItem('MF_FIREBASE_AUTH_EMAIL')||'';
-                    if(passwordEl) passwordEl.placeholder='Enter password only when signing in';
-                }
-            }catch(e){}
-        }
         function mfInitAuth(){
             try{
-                mfHydrateFirebaseConnectionUi();
-                mfBindFirebaseConnectionPersistence();
                 if(typeof firebase==='undefined' || !firebase.auth) return;
                 // Cold-start fix: bootstrap the saved Firebase app before Auth persistence is attached.
                 if(!mfFirebaseApp){
@@ -3952,7 +3872,6 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     mfFirebaseAuth.onAuthStateChanged(user=>{
                         const previousUid=mfFirebaseUser?.uid||'';
                         mfFirebaseUser=user||null;
-                        mfHydrateAuthUi(mfFirebaseUser);
                         if(previousUid && previousUid!==String(user?.uid||'')){
                             googleAccessToken=null; googleTokenExpiresAt=0; googleDriveFileId=null; googleDriveFolderId=null;
                             try{ localStorage.removeItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY); }catch(e){}
@@ -4005,7 +3924,6 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const email=(document.getElementById('mf-auth-email')?.value||'').trim();
                 const password=document.getElementById('mf-auth-key')?.value||'';
                 if(!email||!password){alert('Enter your account email and password.');mfAuthStatus('Not signed in.');return;}
-                try{ localStorage.setItem('MF_FIREBASE_AUTH_EMAIL',email); }catch(e){}
                 const cred=await mfFirebaseAuth.signInWithEmailAndPassword(email,password);
                 mfFirebaseUser=cred.user||null;
                 mfAuthStatus('🟢 Signed in: '+(mfFirebaseUser?.email||mfFirebaseUser?.uid||email));
@@ -4028,7 +3946,6 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const password=document.getElementById('mf-auth-key')?.value||'';
                 if(!email||!password){alert('Enter an email and a strong password.');return;}
                 if(password.length<8){alert('Use at least 8 characters for the Firebase account password.');return;}
-                try{ localStorage.setItem('MF_FIREBASE_AUTH_EMAIL',email); }catch(e){}
                 await mfFirebaseAuth.createUserWithEmailAndPassword(email,password);
                 alert('Firebase account created and signed in. If your Firebase project requires email verification, verify it before using Secure Sync.');
             }catch(e){console.error(e);mfAuthStatus('⚠️ Account creation failed: '+(e.message||e),true);}
@@ -4088,14 +4005,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             try{localStorage.setItem('MF_LOCAL_STATE_VERSION',JSON.stringify({at:new Date().toISOString(),fingerprint:mfLocalStateFingerprint()}));}catch(e){}
         }
         // Initialize Firebase Auth after the existing Firebase app has been created.
-        window.addEventListener('load',()=>setTimeout(()=>{
-            try{ mfHydrateFirebaseConnectionUi(); mfBindFirebaseConnectionPersistence(); mfHydrateAuthUi(mfFirebaseUser); }catch(e){}
-            mfInitAuth();
-        },0));
+        window.addEventListener('load',()=>setTimeout(mfInitAuth,0));
         // Safe production auto-connect: wait until secure core variables are initialized.
         window.addEventListener('load',()=>setTimeout(()=>{
             try{
-                mfHydrateFirebaseConnectionUi();
                 const cfgRaw=localStorage.getItem('MF_FIREBASE_CONFIG');
                 const syncCode=localStorage.getItem('MF_FIREBASE_SYNC_CODE');
                 if(cfgRaw && syncCode && typeof firebase!=='undefined') initFirebaseSync(JSON.parse(cfgRaw),syncCode,false);
@@ -9435,7 +9348,6 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(modal) modal.classList.add('active');
             const savedId=localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'';
             const input=document.getElementById('google-client-id'); if(input) input.value=savedId;
-            try{ const authEmail=document.getElementById('mf-auth-email'); if(authEmail && !authEmail.value) authEmail.value=localStorage.getItem('MF_FIREBASE_AUTH_EMAIL')||mfFirebaseUser?.email||''; }catch(e){}
             mfRefreshDriveBackupUi();
             const fbCfg=document.getElementById('firebase-config-input'); if(fbCfg) fbCfg.value=localStorage.getItem('MF_FIREBASE_CONFIG')||'';
             const fbCode=document.getElementById('firebase-sync-code'); if(fbCode) fbCode.value=localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'';
@@ -10598,77 +10510,34 @@ window.addEventListener('online',()=>{
 
   /* Firebase: existing structured mirror becomes the operational path. Keep the old root document
      as a migration/fallback reader only; no new whole-state payloads are written. */
-  function mf100BuildCloudStateShell(){
-    // Structured collections carry the large operational datasets. The root document still needs
-    // the small application-level state so a fresh/other device reconstructs the same business
-    // identity instead of retaining whatever local/default company data it had.
+  function mfStructuredStateShell(){
     return {
-      bizName: String(state?.bizName||'My Finance Company'),
-      companyProfile: mfScaleClone(state?.companyProfile||{}),
-      activeFilter: String(state?.activeFilter||'ALL'),
-      cloudWebhookUrl: String(state?.cloudWebhookUrl||''),
-      customCategories: Array.isArray(state?.customCategories) ? mfScaleClone(state.customCategories) : []
+      bizName:String(state?.bizName||''),
+      companyProfile:mfScaleFirestoreSafe(mfScaleClone(state?.companyProfile||{})),
+      activeFilter:String(state?.activeFilter||'ALL'),
+      cloudWebhookUrl:String(state?.cloudWebhookUrl||''),
+      customCategories:Array.isArray(state?.customCategories)?mfScaleFirestoreSafe(mfScaleClone(state.customCategories)):[]
     };
   }
-  mfSecureEnvelope=function(version){return {ownerUid:mfFirebaseUser?.uid||null,updatedByDevice:mfFirebaseDeviceId,updatedAtLabel:new Date().toLocaleString('en-IN'),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),version:Number(version)||1,schemaVersion:MF100_SCHEMA,structured:true,structuredBootstrapComplete:true,stateShell:mf100BuildCloudStateShell(),stateFingerprint:mfLocalStateFingerprint()};};
-  async function mf100CompleteStructuredMirror(){
-    // A restore is a full local database replacement. Firebase must not publish a new
-    // cloud version until every structured collection chunk has been written successfully.
-    // This is the critical cross-device convergence fix: the root version is the commit
-    // marker that mobile/laptop listeners use to know a complete cloud database is ready.
-    if(!mfScaleReady) await mfScaleBuildLocalEntities(false);
-    for(let guard=0; guard<10000; guard++){
-      clearTimeout(mfScaleMirrorTimer);
-      await mfScaleMirrorToFirebase();
-      const meta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
-      if(meta?.bootstrapped) return true;
-      await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
-    }
-    throw new Error('Firebase structured mirror did not finish within the safety limit.');
-  }
+  mfSecureEnvelope=function(version){return {ownerUid:mfFirebaseUser?.uid||null,updatedByDevice:mfFirebaseDeviceId,updatedAtLabel:new Date().toLocaleString('en-IN'),updatedAt:firebase.firestore.FieldValue.serverTimestamp(),version:Number(version)||1,schemaVersion:MF100_SCHEMA,structured:true,stateShell:mfStructuredStateShell(),stateFingerprint:mfLocalStateFingerprint()};};
   pushStateToFirebase=async function(silent){
     if(!mfFirestoreDb||!mfFirebaseSyncCode){if(!silent){setFirebaseStatus('⚠️ Connect Firebase first.',true);alert('Connect Firebase first.');}return;}
     if(!mfFirebaseUser){if(!silent){setFirebaseStatus('🔒 Secure Sync requires Firebase sign-in first.',true);alert('Secure Sync requires Firebase sign-in first.');}return;}
-    if(mfFirebasePushBusy) return;
-    mfFirebasePushBusy=true;
-    const pushBtn=document.getElementById('mf-push-sync-btn');
-    const oldText=pushBtn?.innerHTML;
     try{
-      if(pushBtn){pushBtn.disabled=true;pushBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Syncing…';}
-      if(!silent) setFirebaseStatus('⏳ Preparing complete Firebase sync…');
-      await mf100CompleteStructuredMirror();
-      const ref=mfSecureFirebaseDoc();
-      let next=0;
-      // Final root write is the commit/visibility marker. Do this only after all structured
-      // entity/payment chunks are confirmed complete. A transaction prevents two devices from
-      // accidentally publishing the same version if they finish a mirror at nearly the same time.
-      await mfFirestoreDb.runTransaction(async tx=>{
-        const root=await tx.get(ref);
-        const rootData=root.exists?(root.data()||{}):{};
-        if(rootData.ownerUid && rootData.ownerUid!==mfFirebaseUser.uid) throw new Error('SECURITY_DENIED: this business belongs to another account.');
-        next=Math.max(Number(rootData.version||0),Number(rootData.structuredVersion||0),Number(mfKnownCloudVersion()||0))+1;
-        tx.set(ref,{...mfSecureEnvelope(next),structured:true,structuredBootstrapComplete:true,structuredVersion:next,payload:firebase.firestore.FieldValue.delete()},{merge:true});
-      });
-      mfSetKnownCloudVersion(next);
-      try{
-        localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());
-        localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());
-        localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(next));
-        localStorage.removeItem('MF_LOCAL_DIRTY_AT');
-      }catch(e){}
-      mfLocalAudit('CLOUD_PUSH','Complete structured Firebase mirror committed; root version advanced only after all chunks finished');
-      setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
-      if(!silent) mfShowTransientNotice('🟢 Firebase sync completed successfully.');
-    }catch(err){
-      console.error('Structured Secure Push failed:',err);
-      try{mfScaleFullCloudResetStarted=false;}catch(e){}
-      const detail=err?.code ? ` [${err.code}]` : '';
-      setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Push')+detail,true);
-      if(!silent) mfShowTransientNotice('⚠️ Firebase sync did not complete. Your local data was not discarded.');
-    }finally{
-      mfFirebasePushBusy=false;
-      if(pushBtn){pushBtn.disabled=!(mfFirestoreDb&&mfFirebaseSyncCode&&mfFirebaseUser);if(oldText)pushBtn.innerHTML=oldText;}
-    }
+      if(!mfScaleReady) await mfScaleBuildLocalEntities(false);
+      await mfScaleMirrorToFirebase();
+      const mirrorMeta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
+      if(mirrorMeta && mirrorMeta.bootstrapped===false){
+        try{await mfSecureFirebaseDoc().set({...mfSecureEnvelope(mfKnownCloudVersion()),structured:true,structuredBootstrapComplete:false},{merge:true});}catch(e){}
+        setFirebaseStatus('🟡 Firebase structured sync is continuing in the background…');
+        return;
+      }
+      const ref=mfSecureFirebaseDoc(),known=mfKnownCloudVersion();
+      const next=known+1;
+      await ref.set({...mfSecureEnvelope(next),structuredVersion:next},{merge:true});
+      mfSetKnownCloudVersion(next);try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
+      mfLocalAudit('CLOUD_PUSH','Structured Firestore mirror synchronized; root document contains metadata only');setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));if(!silent)mfShowTransientNotice('🟢 Firebase sync completed successfully.');
+    }catch(err){console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Push'),true);}
   };
   // Do not alter existing pull UI semantics until a structured read is available; the legacy
   // reader remains a safe migration path for previously stored small snapshots.
@@ -10703,26 +10572,15 @@ window.addEventListener('online',()=>{
   'use strict';
   const mf100OriginalPull=typeof pullStateFromFirebase==='function'?pullStateFromFirebase:null;
   const mf100OriginalListener=typeof startFirebaseListener==='function'?startFirebaseListener:null;
-  let mf100MirrorBusy=false;
-  const mf100OriginalMirror=typeof mfScaleMirrorToFirebase==='function'?mfScaleMirrorToFirebase:null;
-  if(mf100OriginalMirror){
-    mfScaleMirrorToFirebase=async function(){
-      if(mf100MirrorBusy) return;
-      mf100MirrorBusy=true;
-      try{return await mf100OriginalMirror();}
-      finally{mf100MirrorBusy=false;}
-    };
-  }
   async function mf100FirestoreCollectionRows(kind){
     const col=mfScaleStructuredCollection(kind); if(!col) throw new Error('Structured Firebase collection unavailable.');
-    const owner=mfFirebaseUser?.uid; if(!owner) throw new Error('Firebase authentication is not ready.');
     const out=[]; let last=null;
     while(true){
-      let q=col.where('_ownerUid','==',owner).limit(500);
+      let q=col.orderBy(firebase.firestore.FieldPath.documentId()).limit(500);
       if(last) q=q.startAfter(last);
       const snap=await q.get(); if(snap.empty) break;
-      snap.forEach(d=>out.push({...d.data(),id:String(d.id)}));
-      last=snap.docs[snap.docs.length-1];
+      snap.forEach(d=>{const row=d.data()||{};if(!row._ownerUid||row._ownerUid===mfFirebaseUser.uid) out.push({...row,id:String(d.id)});});
+      last=snap.docs[snap.docs.length-1].id;
       if(snap.size<500) break;
       await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
     }
@@ -10741,8 +10599,14 @@ window.addEventListener('online',()=>{
     const byLoan=new Map(loans.map(l=>[String(l.id),l]));
     paymentRows.forEach(x=>{const l=byLoan.get(String(x.loanId));if(!l)return;const y={...x};delete y._ownerUid;delete y.loanId;delete y.paymentIndex;delete y.id;l.payments.push({paymentIndex:Number(x.paymentIndex)||0,...y});});
     loans.forEach(l=>{l.payments.sort((a,b)=>(Number(a.paymentIndex)||0)-(Number(b.paymentIndex)||0));l.payments.forEach(p=>delete p.paymentIndex);});
-    const cloudShell=(meta.stateShell&&typeof meta.stateShell==='object')?meta.stateShell:{};
-    state={...state,...mfScaleClone(cloudShell),loans,products,staff:staffRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),expenses:expenseRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;}),borrowings:borrowingRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;return y;})};
+    const shell=meta.stateShell&&typeof meta.stateShell==='object'?meta.stateShell:null;
+    state={...state,
+      ...(shell?{bizName:String(shell.bizName||state.bizName||'My Finance Company'),companyProfile:shell.companyProfile&&typeof shell.companyProfile==='object'?shell.companyProfile:(state.companyProfile||{}),activeFilter:String(shell.activeFilter||state.activeFilter||'ALL'),cloudWebhookUrl:String(shell.cloudWebhookUrl||state.cloudWebhookUrl||''),customCategories:Array.isArray(shell.customCategories)?shell.customCategories:(state.customCategories||[])}:{}),
+      loans,products,
+      staff:staffRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;delete y.id;return {...y,id:String(x.id)};}),
+      expenses:expenseRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;delete y.id;return {...y,id:String(x.id)};}),
+      borrowings:borrowingRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;delete y.id;return {...y,id:String(x.id)};})
+    };
     mfScaleReinstallStateProxy();mfScaleDirty.full=true;normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();
     const v=Number(meta.version||0);mfSetKnownCloudVersion(v);
     try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(v));localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
@@ -10768,20 +10632,12 @@ window.addEventListener('online',()=>{
     const ref=mfSecureFirebaseDoc();
     mfFirebaseListenerUnsub=ref.onSnapshot(doc=>{
       if(!doc.exists)return;const data=doc.data()||{};if(data.ownerUid&&data.ownerUid!==mfFirebaseUser.uid)return;
-      const v=Math.max(Number(data.version||0),Number(data.structuredVersion||0));
-      if(data.updatedByDevice===mfFirebaseDeviceId)return;
+      const v=Number(data.version||0);
       const cloudFp=String(data.stateFingerprint||'');
-      const localFp=mfLocalStateFingerprint();
-      const fingerprintMismatch=!!cloudFp && !!localFp && cloudFp!==localFp;
-      const localEmpty=!((Array.isArray(state?.loans)&&state.loans.length>0) || (state?.products && Object.keys(state.products).length>0));
-      /* On refresh/redeployment the remembered cloud version can equal the Firestore version even though
-         this browser is showing an empty/default IndexedDB database. For structured cloud data, a fingerprint
-         mismatch is therefore a stronger hydration signal than version alone. */
-      if(data.structured && (localEmpty || fingerprintMismatch) && !mfHasUnpushedLocalChanges()){
-        pullStateFromFirebase(false);
-        setFirebaseStatus('🟢 Current Firebase business database loaded automatically.',false);
-        return;
-      }
+      const localFp=String(mfLocalStateFingerprint()||'');
+      const fingerprintMismatch=!!cloudFp&&!!localFp&&cloudFp!==localFp;
+      if(data.updatedByDevice===mfFirebaseDeviceId && !fingerprintMismatch)return;
+      if(fingerprintMismatch && !mfHasUnpushedLocalChanges()){pullStateFromFirebase(true);return;}
       if(!v||v<=mfKnownCloudVersion())return;
       if(!mfHasUnpushedLocalChanges()){pullStateFromFirebase(true);}else{setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);showFirebaseUpdateBanner(data.updatedAtLabel||'',v);}
     },err=>{console.error('Firebase structured listener error',err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure Firebase listener'),true);});
