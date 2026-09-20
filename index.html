@@ -10733,9 +10733,55 @@ window.addEventListener('online',()=>{
     }
   }
 
+  async function mf100RepairCloudMirrorOnce(){
+    try{
+      if(!mfFirebaseUser||!mfFirestoreDb||!mfFirebaseSyncCode) return;
+      if(!mfScaleReady) await mfScaleBuildLocalEntities(false);
+      const localLoans=Array.isArray(state?.loans)?state.loans:[];
+      const root=await mfSecureFirebaseDoc().get();
+      if(!root.exists){
+        if(localLoans.length){
+          mfScaleDirty.full=true;
+          await pushStateToFirebase(true);
+        }
+        return;
+      }
+      const meta=root.data()||{};
+      if(meta.ownerUid&&meta.ownerUid!==mfFirebaseUser.uid) return;
+      if(!meta.structured){
+        if(localLoans.length){
+          mfScaleDirty.full=true;
+          await pushStateToFirebase(true);
+        }
+        return;
+      }
+      const col=mfScaleStructuredCollection('loans');
+      if(!col) return;
+      const snap=await col.where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get();
+      const cloudHasLoans=!snap.empty;
+      if(localLoans.length && !cloudHasLoans){
+        // Laptop/local business is populated but the structured cloud mirror is empty.
+        // Force a complete, owner-scoped mirror so a fresh mobile can pull the same data.
+        mfScaleDirty.full=true;
+        setFirebaseStatus('⏳ Secure cloud mirror is empty; safely restoring the local business to Firebase…',false);
+        await pushStateToFirebase(true);
+      }else if(!localLoans.length && cloudHasLoans){
+        // Fresh/empty device: cloud is populated, so converge local state from cloud.
+        await pullStateFromFirebase(false);
+      }
+    }catch(e){
+      console.warn('Safe cloud mirror reconciliation skipped:',e);
+      setFirebaseStatus(mfFirebaseErrorLabel(e,'Secure cloud reconciliation'),true);
+    }
+  }
+
   window.addEventListener('load',()=>setTimeout(()=>{try{
     if(mfScaleReady){mf100LoadAnalytics().then(()=>{try{renderKPIs();}catch(e){}});}
     setTimeout(()=>mf100SafeBootstrapAfterRecovery(),900);
+    // One read-only cloud check decides direction before any mirror cleanup. If the
+    // laptop has the real local business while the structured mirror is empty, it
+    // bootstraps cloud safely; if mobile is empty while cloud has records, it pulls.
+    setTimeout(()=>mf100RepairCloudMirrorOnce(),2600);
   }catch(e){}},1200));
 })();
 
