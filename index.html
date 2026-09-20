@@ -4505,82 +4505,6 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 .mf-print-page .finance-pill{background:#f1f5f9!important;color:#334155!important;border:1px solid #cbd5e1!important;}
                 @media print{body{width:auto;} .mf-print-page{max-width:none;} a{color:#111;text-decoration:none;} .upcoming-emi-table{font-size:8pt;} .priority-print-table{font-size:8pt;}}
             </style></head><body><main class="mf-print-page">${content}</main>
-
-<script id="mf-final-cloud-first-safety-fix">
-(function(){
-  'use strict';
-  /* FINAL CLOUD-FIRST SAFETY LAYER
-     Prevents an empty/fresh device from overwriting a populated Firebase business.
-     A mobile device with zero local loans must PULL an existing cloud business instead
-     of running the normal PUSH path. Existing populated-device push behaviour is kept.
-     This does not weaken Firestore Rules and does not touch business calculations/UI. */
-  const originalPush = (typeof pushStateToFirebase==='function') ? pushStateToFirebase : null;
-  if(!originalPush) return;
-
-  async function cloudHasExistingBusinessData(){
-    if(!mfFirestoreDb || !mfFirebaseSyncCode || !mfFirebaseUser) return {exists:false,known:false};
-    const ref=mfSecureFirebaseDoc();
-    const snap=await ref.get();
-    if(!snap.exists) return {exists:false,known:true};
-    const data=snap.data()||{};
-    if(data.ownerUid && data.ownerUid!==mfFirebaseUser.uid)
-      throw new Error('SECURITY_DENIED: this secure business belongs to another account.');
-    if(!data.structured) return {exists:true,known:true,hasData:!!data.payload};
-    const col=mfScaleStructuredCollection('loans');
-    if(!col) return {exists:true,known:true,hasData:true};
-    const q=await col.where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get();
-    return {exists:true,known:true,hasData:!q.empty,version:Number(data.version||0),structured:true};
-  }
-
-  pushStateToFirebase=async function(silent){
-    try{
-      const localLoans=Array.isArray(state?.loans)?state.loans:[];
-      const localHasRealData=localLoans.length>0;
-      const cloud=await cloudHasExistingBusinessData();
-
-      /* Critical rule: never let a fresh/empty browser erase a populated cloud business.
-         This is the exact failure mode seen when mobile Sync Now was pressed after a
-         timestamp restore on the laptop. */
-      if(!localHasRealData && cloud.known && cloud.hasData){
-        setFirebaseStatus('☁️ Existing Firebase data found — loading it to this device…',false);
-        if(typeof pullStateFromFirebase==='function'){
-          await pullStateFromFirebase(false);
-          return;
-        }
-        throw new Error('CLOUD_PULL_UNAVAILABLE: Firebase data exists but the cloud pull handler is unavailable.');
-      }
-
-      await originalPush(silent);
-    }catch(err){
-      console.error('Cloud-first sync guard:',err);
-      setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure Firebase sync'),true);
-    }
-  };
-
-  /* A fresh device may also reach the normal Firebase init path without pressing Sync Now.
-     If its local loan database is empty and the cloud already contains owner-scoped loans,
-     pull immediately. */
-  const originalInit = (typeof initFirebaseSync==='function') ? initFirebaseSync : null;
-  if(originalInit){
-    initFirebaseSync=async function(cfg,code,showAlerts){
-      await originalInit(cfg,code,showAlerts);
-      try{
-        if(!mfFirebaseUser||!mfFirestoreDb||!mfFirebaseSyncCode) return;
-        const localLoans=Array.isArray(state?.loans)?state.loans:[];
-        if(localLoans.length) return;
-        const cloud=await cloudHasExistingBusinessData();
-        if(cloud.hasData && typeof pullStateFromFirebase==='function'){
-          setFirebaseStatus('☁️ Existing business found — loading cloud data…',false);
-          await pullStateFromFirebase(false);
-        }
-      }catch(e){
-        console.warn('Cloud-first initial pull skipped:',e);
-      }
-    };
-  }
-})();
-</script>
-
 </body></html>`);
             w.document.close();
             return w;
@@ -5889,83 +5813,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         function getNpaExportRows(){return getNpaRows().map(x=>{const v=x._v;return [x.id,x.name,x.phone||'',x.phone2||'',x.guarantorPhone||'',(x.guarantorPhone2||x.guarantorSecondaryPhone||''),v.p.name||'',formatToIndianDate(x.disbursalDate),v.maturity?formatToIndianDate(v.maturity.toISOString().split('T')[0]):'',v.overdueDays,v.recoveryMonths,v.pending,v.settled?'SETTLED':x.foreclosed?'FORECLOSED':v.pending<=0?'CLOSED':v.npaWatch?'90+ DPD':'OVERDUE',x.collectorName||'',formatToIndianDate(x.postMaturitySettlement?.settlementDate),x.postMaturitySettlement?.calculatedSettlement||0,x.postMaturitySettlement?.actualReceived||0,x.postMaturitySettlement?.waiverAmount||0,x.postMaturitySettlement?.partialAmountAlreadyCollected||0,x.postMaturitySettlement?.mode||''];});}
         function exportNpaReportExcel(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}const wb=XLSX.utils.book_new();const headers=['Loan ID','Customer','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal Date','Maturity Date','DPD','Recovery Months','Contractual Pending','Status','Collector','Settlement Date','Calculated Settlement','Actual Received','Waiver','Partial Already Collected','Settlement Mode'];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['NPA & Recovery Report'],['Generated',new Date().toLocaleString('en-IN')],[],headers,...getNpaExportRows()]),'NPA_Recovery');XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_NPA_Recovery_Report.xlsx`);}
-        function printNpaReport(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}const rows=getNpaExportRows();const w=window.open('','_blank');if(!w){alert('Please allow pop-ups to print the report.');return;}w.document.write(`<html><head><title>NPA & Recovery Report - ${financeEsc(state.bizName)}</title><style>body{font-family:Arial,sans-serif;color:#111;padding:18px;font-size:10px}h1{font-size:18px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:5px;text-align:left}th{background:#eee}</style></head><body><h1>${financeEsc(state.bizName)} — NPA & Recovery Report</h1><div>Generated: ${new Date().toLocaleString('en-IN')}</div><table><thead><tr>${['Loan ID','Customer','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal','Maturity','DPD','Recovery Months','Pending','Status','Collector','Settlement Date','Calculated','Received','Waiver','Partial Collected','Mode'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${financeEsc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>
-<script id="mf-final-cloud-first-safety-fix">
-(function(){
-  'use strict';
-  /* FINAL CLOUD-FIRST SAFETY LAYER
-     Prevents an empty/fresh device from overwriting a populated Firebase business.
-     A mobile device with zero local loans must PULL an existing cloud business instead
-     of running the normal PUSH path. Existing populated-device push behaviour is kept.
-     This does not weaken Firestore Rules and does not touch business calculations/UI. */
-  const originalPush = (typeof pushStateToFirebase==='function') ? pushStateToFirebase : null;
-  if(!originalPush) return;
-
-  async function cloudHasExistingBusinessData(){
-    if(!mfFirestoreDb || !mfFirebaseSyncCode || !mfFirebaseUser) return {exists:false,known:false};
-    const ref=mfSecureFirebaseDoc();
-    const snap=await ref.get();
-    if(!snap.exists) return {exists:false,known:true};
-    const data=snap.data()||{};
-    if(data.ownerUid && data.ownerUid!==mfFirebaseUser.uid)
-      throw new Error('SECURITY_DENIED: this secure business belongs to another account.');
-    if(!data.structured) return {exists:true,known:true,hasData:!!data.payload};
-    const col=mfScaleStructuredCollection('loans');
-    if(!col) return {exists:true,known:true,hasData:true};
-    const q=await col.where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get();
-    return {exists:true,known:true,hasData:!q.empty,version:Number(data.version||0),structured:true};
-  }
-
-  pushStateToFirebase=async function(silent){
-    try{
-      const localLoans=Array.isArray(state?.loans)?state.loans:[];
-      const localHasRealData=localLoans.length>0;
-      const cloud=await cloudHasExistingBusinessData();
-
-      /* Critical rule: never let a fresh/empty browser erase a populated cloud business.
-         This is the exact failure mode seen when mobile Sync Now was pressed after a
-         timestamp restore on the laptop. */
-      if(!localHasRealData && cloud.known && cloud.hasData){
-        setFirebaseStatus('☁️ Existing Firebase data found — loading it to this device…',false);
-        if(typeof pullStateFromFirebase==='function'){
-          await pullStateFromFirebase(false);
-          return;
-        }
-        throw new Error('CLOUD_PULL_UNAVAILABLE: Firebase data exists but the cloud pull handler is unavailable.');
-      }
-
-      await originalPush(silent);
-    }catch(err){
-      console.error('Cloud-first sync guard:',err);
-      setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure Firebase sync'),true);
-    }
-  };
-
-  /* A fresh device may also reach the normal Firebase init path without pressing Sync Now.
-     If its local loan database is empty and the cloud already contains owner-scoped loans,
-     pull immediately. */
-  const originalInit = (typeof initFirebaseSync==='function') ? initFirebaseSync : null;
-  if(originalInit){
-    initFirebaseSync=async function(cfg,code,showAlerts){
-      await originalInit(cfg,code,showAlerts);
-      try{
-        if(!mfFirebaseUser||!mfFirestoreDb||!mfFirebaseSyncCode) return;
-        const localLoans=Array.isArray(state?.loans)?state.loans:[];
-        if(localLoans.length) return;
-        const cloud=await cloudHasExistingBusinessData();
-        if(cloud.hasData && typeof pullStateFromFirebase==='function'){
-          setFirebaseStatus('☁️ Existing business found — loading cloud data…',false);
-          await pullStateFromFirebase(false);
-        }
-      }catch(e){
-        console.warn('Cloud-first initial pull skipped:',e);
-      }
-    };
-  }
-})();
-</script>
-
-</body></html>`);w.document.close();w.onload=()=>{w.focus();w.print();};}
+        function printNpaReport(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}const rows=getNpaExportRows();const w=window.open('','_blank');if(!w){alert('Please allow pop-ups to print the report.');return;}w.document.write(`<html><head><title>NPA & Recovery Report - ${financeEsc(state.bizName)}</title><style>body{font-family:Arial,sans-serif;color:#111;padding:18px;font-size:10px}h1{font-size:18px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:5px;text-align:left}th{background:#eee}</style></head><body><h1>${financeEsc(state.bizName)} — NPA & Recovery Report</h1><div>Generated: ${new Date().toLocaleString('en-IN')}</div><table><thead><tr>${['Loan ID','Customer','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal','Maturity','DPD','Recovery Months','Pending','Status','Collector','Settlement Date','Calculated','Received','Waiver','Partial Collected','Mode'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${financeEsc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`);w.document.close();w.onload=()=>{w.focus();w.print();};}
 
         let recoveryStatusFilter='ALL';
         function setRecoveryStatusFilter(status){
@@ -10351,82 +10199,6 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 }
 </style>
 </head><body><h1>${financeEsc(title)}</h1><div>Period: ${financeEsc(period)} &nbsp; | &nbsp; Generated: ${new Date().toLocaleString('en-IN')}</div>${body}
-
-<script id="mf-final-cloud-first-safety-fix">
-(function(){
-  'use strict';
-  /* FINAL CLOUD-FIRST SAFETY LAYER
-     Prevents an empty/fresh device from overwriting a populated Firebase business.
-     A mobile device with zero local loans must PULL an existing cloud business instead
-     of running the normal PUSH path. Existing populated-device push behaviour is kept.
-     This does not weaken Firestore Rules and does not touch business calculations/UI. */
-  const originalPush = (typeof pushStateToFirebase==='function') ? pushStateToFirebase : null;
-  if(!originalPush) return;
-
-  async function cloudHasExistingBusinessData(){
-    if(!mfFirestoreDb || !mfFirebaseSyncCode || !mfFirebaseUser) return {exists:false,known:false};
-    const ref=mfSecureFirebaseDoc();
-    const snap=await ref.get();
-    if(!snap.exists) return {exists:false,known:true};
-    const data=snap.data()||{};
-    if(data.ownerUid && data.ownerUid!==mfFirebaseUser.uid)
-      throw new Error('SECURITY_DENIED: this secure business belongs to another account.');
-    if(!data.structured) return {exists:true,known:true,hasData:!!data.payload};
-    const col=mfScaleStructuredCollection('loans');
-    if(!col) return {exists:true,known:true,hasData:true};
-    const q=await col.where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get();
-    return {exists:true,known:true,hasData:!q.empty,version:Number(data.version||0),structured:true};
-  }
-
-  pushStateToFirebase=async function(silent){
-    try{
-      const localLoans=Array.isArray(state?.loans)?state.loans:[];
-      const localHasRealData=localLoans.length>0;
-      const cloud=await cloudHasExistingBusinessData();
-
-      /* Critical rule: never let a fresh/empty browser erase a populated cloud business.
-         This is the exact failure mode seen when mobile Sync Now was pressed after a
-         timestamp restore on the laptop. */
-      if(!localHasRealData && cloud.known && cloud.hasData){
-        setFirebaseStatus('☁️ Existing Firebase data found — loading it to this device…',false);
-        if(typeof pullStateFromFirebase==='function'){
-          await pullStateFromFirebase(false);
-          return;
-        }
-        throw new Error('CLOUD_PULL_UNAVAILABLE: Firebase data exists but the cloud pull handler is unavailable.');
-      }
-
-      await originalPush(silent);
-    }catch(err){
-      console.error('Cloud-first sync guard:',err);
-      setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure Firebase sync'),true);
-    }
-  };
-
-  /* A fresh device may also reach the normal Firebase init path without pressing Sync Now.
-     If its local loan database is empty and the cloud already contains owner-scoped loans,
-     pull immediately. */
-  const originalInit = (typeof initFirebaseSync==='function') ? initFirebaseSync : null;
-  if(originalInit){
-    initFirebaseSync=async function(cfg,code,showAlerts){
-      await originalInit(cfg,code,showAlerts);
-      try{
-        if(!mfFirebaseUser||!mfFirestoreDb||!mfFirebaseSyncCode) return;
-        const localLoans=Array.isArray(state?.loans)?state.loans:[];
-        if(localLoans.length) return;
-        const cloud=await cloudHasExistingBusinessData();
-        if(cloud.hasData && typeof pullStateFromFirebase==='function'){
-          setFirebaseStatus('☁️ Existing business found — loading cloud data…',false);
-          await pullStateFromFirebase(false);
-        }
-      }catch(e){
-        console.warn('Cloud-first initial pull skipped:',e);
-      }
-    };
-  }
-})();
-</script>
-
 </body></html>`); w.document.close(); w.onload=()=>{w.focus();w.print();};
         }
 
@@ -10968,7 +10740,6 @@ window.addEventListener('online',()=>{
 })();
 
 </script>
-
 <script id="mf-final-cloud-first-safety-fix">
 (function(){
   'use strict';
@@ -11001,9 +10772,6 @@ window.addEventListener('online',()=>{
       const localHasRealData=localLoans.length>0;
       const cloud=await cloudHasExistingBusinessData();
 
-      /* Critical rule: never let a fresh/empty browser erase a populated cloud business.
-         This is the exact failure mode seen when mobile Sync Now was pressed after a
-         timestamp restore on the laptop. */
       if(!localHasRealData && cloud.known && cloud.hasData){
         setFirebaseStatus('☁️ Existing Firebase data found — loading it to this device…',false);
         if(typeof pullStateFromFirebase==='function'){
@@ -11043,6 +10811,5 @@ window.addEventListener('online',()=>{
   }
 })();
 </script>
-
 </body>
 </html>
