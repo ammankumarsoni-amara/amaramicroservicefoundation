@@ -3719,7 +3719,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }
                 if(cloudVersion>mfKnownCloudVersion()){
                     if(!mfHasUnpushedLocalChanges()){
-                        pullStateFromFirebase(true);
+                        /* Automatic listener pulls are silent. The confirmation dialog is
+                           reserved for the user-initiated Pull Latest button. */
+                        pullStateFromFirebase(false);
                         setFirebaseStatus('🟢 New cloud data loaded automatically.',false);
                         return;
                     }
