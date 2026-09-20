@@ -3621,8 +3621,17 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         const sameDatabase = (!!cloudPayloadFp && !!localFp && cloudPayloadFp===localFp)
                             || (!!data.stateFingerprint && !!localFp && String(data.stateFingerprint)===String(localFp));
                         const structuredFingerprintMismatch=!!data.structured && !!data.stateFingerprint && !!localFp && String(data.stateFingerprint)!==String(localFp);
+                        const recoveryHoldUntil=Number(localStorage.getItem('MF_RECOVERY_RESTORE_HOLD_UNTIL')||0);
+                        const recoveryLocalAuthoritative=recoveryHoldUntil>Date.now() && !!(state?.loans?.length);
                         const freshDeviceWithStructuredCloud=!!data.structured && !!data.stateFingerprint && mfIsFreshLocalDatabase();
-                        if(freshDeviceWithStructuredCloud){
+                        if(recoveryLocalAuthoritative){
+                            // A Google Drive timestamp restore is an explicit recovery action.
+                            // During the recovery hold the restored laptop state is authoritative;
+                            // never pull an older Firebase mirror back over it.
+                            mfScaleDirty.full=true;
+                            setFirebaseStatus('⏳ Restored local business is authoritative; securely updating Firebase…',false);
+                            return pushStateToFirebase(true);
+                        }else if(freshDeviceWithStructuredCloud){
                             // A fresh browser performs exactly one structured pull. Await it so
                             // initialization cannot finish and arm the live listener while the
                             // pull is still in flight. If the structured mirror is empty/incomplete,
@@ -10738,6 +10747,14 @@ window.addEventListener('online',()=>{
       if(!mfFirebaseUser||!mfFirestoreDb||!mfFirebaseSyncCode) return;
       if(!mfScaleReady) await mfScaleBuildLocalEntities(false);
       const localLoans=Array.isArray(state?.loans)?state.loans:[];
+      const recoveryHoldUntil=Number(localStorage.getItem('MF_RECOVERY_RESTORE_HOLD_UNTIL')||0);
+      if(recoveryHoldUntil>Date.now() && localLoans.length){
+        // A Drive-restored laptop must not be pulled back to an older cloud snapshot.
+        mfScaleDirty.full=true;
+        setFirebaseStatus('⏳ Restored local business is authoritative; securely updating Firebase…',false);
+        await pushStateToFirebase(true);
+        return;
+      }
       const root=await mfSecureFirebaseDoc().get();
       if(!root.exists){
         if(localLoans.length){
@@ -10910,7 +10927,10 @@ window.addEventListener('online',()=>{
       const cloudFp=String(data.stateFingerprint||'');
       const localFp=String(mfLocalStateFingerprint()||'');
       const fingerprintMismatch=!!cloudFp&&!!localFp&&cloudFp!==localFp;
+      const recoveryHoldUntil=Number(localStorage.getItem('MF_RECOVERY_RESTORE_HOLD_UNTIL')||0);
+      const recoveryLocalAuthoritative=recoveryHoldUntil>Date.now() && !!(state?.loans?.length);
       if(data.updatedByDevice===mfFirebaseDeviceId && !fingerprintMismatch)return;
+      if(recoveryLocalAuthoritative)return;
       /* Live listener is never allowed to open a destructive replace-data confirmation.
          A listener-triggered pull must be silent and must pass the empty-cloud safety guard
          above. User-initiated 'Pull Latest' keeps its existing confirmation dialog. */
