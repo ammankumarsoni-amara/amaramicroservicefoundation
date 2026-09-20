@@ -9214,7 +9214,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 try{ const safety={id:'pre-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
                 const r=await driveApi('files/'+files[0].id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
                 state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); try{mf100WriteLegacyCompat(); localStorage.setItem('MF_LOCAL_SAVED_AT',new Date().toISOString()); localStorage.removeItem('MF_LOCAL_DIRTY_AT'); localStorage.setItem('MF_RECOVERY_RESTORE_HOLD_UNTIL',String(Date.now()+1800000));localStorage.setItem('MF_RECOVERY_AUTHORITATIVE_FP',mfLocalStateFingerprint());}catch(e){}
-                renderAll(); updateSecureCloudStatus('🟢 Latest encrypted Google Drive backup restored and validated.'); const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Restored latest backup: '+new Date().toLocaleString('en-IN'); alert('Latest encrypted Google Drive backup restored successfully.'); closeModal('modal-cloud'); setTab('feed');
+                renderAll(); updateSecureCloudStatus('🟢 Latest encrypted Google Drive backup restored and validated.'); const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Restored latest backup: '+new Date().toLocaleString('en-IN'); alert('Latest encrypted Google Drive backup restored successfully.'); closeModal('modal-cloud'); setTab('feed'); setTimeout(()=>mf100PublishRecoveryAuthoritative(),100);
             }catch(err){alert('Cloud restore failed: '+(err?.message||err));}
         }
 
@@ -9333,6 +9333,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 alert('Timestamped Google Drive backup restored successfully:\\n\\n'+when);
                 closeModal('modal-cloud');
                 setTab('feed');
+                setTimeout(()=>mf100PublishRecoveryAuthoritative(),100);
             }catch(err){
                 alert('Timestamped cloud restore failed: '+(err?.message||err));
             }
@@ -9399,7 +9400,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }catch(e){}
                 renderAll();
                 updateSecureCloudStatus('🟢 Immutable Google Drive recovery snapshot restored locally. Cloud Current Database was not changed.',true);
-                alert('Recovery snapshot restored successfully.\n\nSnapshot: '+(used.name||when)+'\n\nYour Google Drive Current Database was NOT changed.');
+                alert('Recovery snapshot restored successfully.\n\nSnapshot: '+(used.name||when)+'\n\nYour Google Drive Current Database was NOT changed.'); setTimeout(()=>mf100PublishRecoveryAuthoritative(),100);
             }catch(err){
                 console.error('Recovery restore failed',err);
                 alert('Recovery snapshot restore failed: '+err.message);
@@ -10638,8 +10639,7 @@ window.addEventListener('online',()=>{
         localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',fp);
         localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());
         localStorage.removeItem('MF_LOCAL_DIRTY_AT');
-        const recoveryFp=String(localStorage.getItem('MF_RECOVERY_AUTHORITATIVE_FP')||'');
-        if(recoveryFp&&recoveryFp===fp) localStorage.removeItem('MF_RECOVERY_AUTHORITATIVE_FP');
+        // Recovery marker is cleared only after mf100PublishRecoveryAuthoritative verifies the server root fingerprint.
       }catch(e){}
       setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
     }catch(e){console.warn('Structured Firebase root finalization skipped:',e);}
@@ -10729,6 +10729,55 @@ window.addEventListener('online',()=>{
   /* After every dirty mirror update, refresh derived indexes in the background. */
   const mf100OriginalMarkDirty=mfScaleMarkDirty;
   mfScaleMarkDirty=function(kind,id){if(mfGrowthCache)mf100StaleGrowthCache=mfGrowthCache;mf100OriginalMarkDirty(kind,id);if(mf100StaleGrowthCache)mfGrowthCache=mf100StaleGrowthCache;if(kind==='loans'||kind==='products'||kind==='staff'||kind==='expenses'||kind==='borrowings')mf100ScheduleAnalyticsRebuild();};
+
+  /* RECOVERY AUTHORITATIVE PUBLISHER
+     A Drive restore must not depend on the normal dirty-timer/auth/listener race. The restored
+     snapshot is explicitly published to the structured mirror and verified against the root
+     fingerprint before the recovery marker is released. This is the only automatic cloud write
+     introduced by recovery; normal app sync remains unchanged. */
+  let mf100RecoveryPublishBusy=false;
+  async function mf100PublishRecoveryAuthoritative(){
+    if(mf100RecoveryPublishBusy)return;
+    mf100RecoveryPublishBusy=true;
+    try{
+      const targetFp=String(localStorage.getItem('MF_RECOVERY_AUTHORITATIVE_FP')||'');
+      const started=Date.now();
+      if(!targetFp)return;
+      while(Date.now()-started<120000){
+        if(!mfFirebaseUser||!mfFirestoreDb||!mfFirebaseSyncCode){await new Promise(r=>setTimeout(r,1500));continue;}
+        const currentFp=String(mfLocalStateFingerprint()||'');
+        if(!currentFp||currentFp!==targetFp){
+          // The restored state was changed after the marker was created. Refresh the marker
+          // to the current durable state rather than publishing a stale fingerprint.
+          localStorage.setItem('MF_RECOVERY_AUTHORITATIVE_FP',currentFp);
+        }
+        mfScaleDirty.full=true;
+        await pushStateToFirebase(true);
+        const root=await mfSecureFirebaseDoc().get();
+        const meta=root.exists?(root.data()||{}):{};
+        const wanted=String(localStorage.getItem('MF_RECOVERY_AUTHORITATIVE_FP')||'');
+        const serverFp=String(meta.stateFingerprint||'');
+        const mirror=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
+        if(meta.structured===true && mirror?.bootstrapped===true && wanted && serverFp===wanted){
+          try{
+            localStorage.removeItem('MF_RECOVERY_AUTHORITATIVE_FP');
+            localStorage.removeItem('MF_RECOVERY_RESTORE_HOLD_UNTIL');
+            localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',wanted);
+            localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());
+          }catch(e){}
+          setFirebaseStatus('🟢 Restored latest business data is securely committed to Firebase.',false);
+          return true;
+        }
+        await new Promise(r=>setTimeout(r,1200));
+      }
+      setFirebaseStatus('🟡 Restored local data is preserved. Firebase publish is still pending; no cloud pull will replace it.',false);
+      return false;
+    }catch(e){
+      console.warn('Recovery authoritative publish skipped:',e);
+      setFirebaseStatus(mfFirebaseErrorLabel(e,'Recovery cloud publish'),true);
+      return false;
+    }finally{mf100RecoveryPublishBusy=false;}
+  }
 
   async function mf100SafeBootstrapAfterRecovery(){
     try{
