@@ -3387,11 +3387,20 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // the older IndexedDB copy and roll the device back. Prefer a populated local
                 // copy only when its durable save marker is newer (or, for legacy builds, when
                 // the old dirty marker is newer), then immediately reconcile both stores.
+                const localLoans=Array.isArray(localState?.loans)?localState.loans.length:0;
+                const idbLoans=Array.isArray(snap?.state?.loans)?snap.state.loans.length:0;
                 const localIsNewer=localHasData && Math.max(localSavedAt,localDirtyAt)>snapUpdated;
-                if(localIsNewer || (localHasData && !idbHasData)){
+                /* SAFETY: a populated restore must beat a stale/empty IndexedDB snapshot.
+                   A previous build could have left an empty IDB snapshot while the user had
+                   just restored a populated Google Drive database. Never let that stale empty
+                   snapshot erase the restored business on the next page load. */
+                const localIsPopulatedAndIdbEmpty=localLoans>0 && idbLoans===0;
+                if(localIsPopulatedAndIdbEmpty || localIsNewer || (localHasData && !idbHasData)){
                     state=localState;
                     await idbPutSnapshot();
                 }else if(idbHasData){
+                    /* If both copies contain real loans, keep the newer durable copy. If both
+                       are populated and timestamps are unavailable, IDB remains authoritative. */
                     state=snap.state;
                     try{
                         mf100WriteLegacyCompat();
@@ -3614,12 +3623,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         const structuredFingerprintMismatch=!!data.structured && !!data.stateFingerprint && !!localFp && String(data.stateFingerprint)!==String(localFp);
                         const freshDeviceWithStructuredCloud=!!data.structured && !!data.stateFingerprint && mfIsFreshLocalDatabase();
                         if(freshDeviceWithStructuredCloud){
-                            // A fresh browser must perform exactly one structured cloud pull and
-                            // STOP this initialization branch. The old flow continued into the
-                            // showAlerts block after starting the pull, which produced the
-                            // "replace data on THIS device" dialog and could route Cancel into
-                            // an unintended PUSH from the empty device.
-                            pullStateFromFirebase(false);
+                            // A fresh browser performs exactly one structured pull. Await it so
+                            // initialization cannot finish and arm the live listener while the
+                            // pull is still in flight. If the structured mirror is empty/incomplete,
+                            // the pull throws and the device remains untouched.
+                            pullStateFromFirebase(false).catch(err=>console.warn('Initial structured pull was not applied:',err));
                             return;
                         }else if(sameDatabase && cloudVersion>0){
                             mfSetKnownCloudVersion(cloudVersion);
@@ -4516,6 +4524,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 .mf-print-page .finance-pill{background:#f1f5f9!important;color:#334155!important;border:1px solid #cbd5e1!important;}
                 @media print{body{width:auto;} .mf-print-page{max-width:none;} a{color:#111;text-decoration:none;} .upcoming-emi-table{font-size:8pt;} .priority-print-table{font-size:8pt;}}
             </style></head><body><main class="mf-print-page">${content}</main>
+
+
 </body></html>`);
             w.document.close();
             return w;
@@ -10705,8 +10715,13 @@ window.addEventListener('online',()=>{
     // owner-scoped loan row. An empty result here means the mirror is incomplete or was
     // previously cleared; treating it as authoritative would make the device appear blank.
     const structuredComplete = meta.structuredBootstrapComplete===true || meta.structuredVersion!==undefined;
-    if(meta.structured && structuredComplete && loanRows.length===0 && mfIsFreshLocalDatabase()){
-      throw new Error('STRUCTURED_CLOUD_EMPTY: Firebase structured business is empty/incomplete; local device was not replaced. Restore/sync the populated business from a trusted device first.');
+    /* NEVER treat an empty structured mirror as authoritative. A root metadata document can
+       exist even when the entity collections were never successfully bootstrapped (or were
+       cleared by an older destructive sync). Replacing a device with zero loans is exactly
+       what caused the blank-dashboard regression. A real populated business must have loan
+       rows before a structured pull is allowed to replace local state. */
+    if(meta.structured && structuredComplete && loanRows.length===0){
+      throw new Error('STRUCTURED_CLOUD_EMPTY: Firebase secure cloud has no owner-scoped loan records. The device was NOT replaced. Restore the populated business on the trusted device and synchronize it to Firebase before pulling on another device.');
     }
     const products={};productRows.forEach(x=>{const id=String(x.id);delete x._ownerUid;delete x._scaleFingerprint;delete x._updatedAtLabel;delete x.id;products[id]=x;});
     const loans=loanRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;delete y.id;y.id=String(x.id);y.payments=[];return y;});
@@ -10762,5 +10777,39 @@ window.addEventListener('online',()=>{
 
 </script>
 
+<script id="mf-v3-cloud-pull-safety-final">
+(function(){
+  'use strict';
+  /* Final safety rule: a structured cloud snapshot with zero loans is never allowed to
+     replace a device. This is intentionally independent of UI state or freshness heuristics. */
+  const originalPull=typeof pullStateFromFirebase==='function'?pullStateFromFirebase:null;
+  if(!originalPull)return;
+  pullStateFromFirebase=async function(showConfirm){
+    if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser){
+      return originalPull(showConfirm);
+    }
+    try{
+      const root=await mfSecureFirebaseDoc().get();
+      const meta=root.exists?(root.data()||{}):{};
+      if(meta.structured){
+        const col=mfScaleStructuredCollection('loans');
+        if(!col)throw new Error('Structured Firebase collection unavailable.');
+        const snap=await col.where('_ownerUid','==',mfFirebaseUser.uid).limit(1).get();
+        if(snap.empty){
+          const msg='Firebase secure cloud has no owner-scoped loan data yet. Your device data was NOT replaced. Restore the populated business on the trusted device and sync that populated copy first.';
+          setFirebaseStatus('🟠 '+msg,true);
+          if(showConfirm)alert(msg);
+          return;
+        }
+      }
+      return await originalPull(showConfirm);
+    }catch(err){
+      console.error('V3 safe cloud pull blocked:',err);
+      setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure cloud pull'),true);
+      return;
+    }
+  };
+})();
+</script>
 </body>
 </html>
