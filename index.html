@@ -10712,5 +10712,68 @@ window.addEventListener('online',()=>{
 })();
 
 </script>
+<script id="mf-final-cloud-first-sync-now-fix">
+(function(){
+  'use strict';
+  /* FINAL CLOUD-FIRST MANUAL SYNC FIX
+     On a fresh/empty device, Sync Now must pull the existing secure cloud dataset
+     instead of pushing the HTML's seeded/default local dataset to Firebase.
+     Existing devices with real local business data retain the normal push path.
+     No business calculations or UI layout are changed. */
+  const originalPush=typeof pushStateToFirebase==='function'?pushStateToFirebase:null;
+  const originalPull=typeof pullStateFromFirebase==='function'?pullStateFromFirebase:null;
+  function isFreshSeededDevice(){
+    try{
+      const loans=Array.isArray(state?.loans)?state.loans.length:0;
+      const biz=String(state?.bizName||'').trim();
+      const cp=state?.companyProfile||{};
+      const legal=String(cp.legalName||'').trim();
+      const phone=String(cp.phone||'').trim();
+      const email=String(cp.email||'').trim();
+      const staff=Array.isArray(state?.staff)?state.staff:[];
+      const expenses=Array.isArray(state?.expenses)?state.expenses:[];
+      const defaultStaff=staff.length===1 && String(staff[0]?.id||'')==='ST-01';
+      const defaultExpenses=expenses.length===2 && expenses.every(x=>['EXP-101','EXP-102'].includes(String(x?.id||'')));
+      return loans===0 && (biz===''||biz==='My Finance Company') && !legal && !phone && !email && defaultStaff && defaultExpenses;
+    }catch(e){return false;}
+  }
+  async function smartSyncNow(silent){
+    if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser){
+      if(!silent){setFirebaseStatus('🔒 Connect Firebase and sign in first.',true);}
+      return;
+    }
+    try{
+      setFirebaseStatus('☁️ Checking secure Firebase data…',false);
+      const ref=mfSecureFirebaseDoc();
+      const snap=await ref.get();
+      if(!snap.exists){
+        if(originalPush) return originalPush(silent);
+        return;
+      }
+      const cloud=snap.data()||{};
+      if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid){
+        setFirebaseStatus('🔒 This secure business belongs to another account.',true);return;
+      }
+      const structured=!!cloud.structured;
+      const fresh=isFreshSeededDevice();
+      const cloudHasData=structured || !!cloud.payload || Number(cloud.version||0)>0;
+      if(fresh&&cloudHasData){
+        setFirebaseStatus('☁️ Loading the existing secure cloud data onto this device…',false);
+        if(originalPull) await originalPull(false);
+        return;
+      }
+      if(originalPush) return originalPush(silent);
+    }catch(err){
+      console.error('Cloud-first Sync Now failed:',err);
+      setFirebaseStatus(mfFirebaseErrorLabel(err,'Firebase Sync Now'),true);
+    }
+  }
+  pushStateToFirebase=smartSyncNow;
+  try{
+    const b=document.getElementById('mf-push-sync-btn');
+    if(b)b.onclick=function(e){e.preventDefault();smartSyncNow(false);};
+  }catch(e){}
+})();
+</script>
 </body>
 </html>
