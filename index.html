@@ -10539,6 +10539,73 @@ window.addEventListener('online',()=>{
       mfLocalAudit('CLOUD_PUSH','Structured Firestore mirror synchronized; root document contains metadata only');setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));if(!silent)mfShowTransientNotice('🟢 Firebase sync completed successfully.');
     }catch(err){console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Push'),true);}
   };
+  /* FINAL STRUCTURED SYNC COMPLETION GUARD
+     The scalable mirror writes collection chunks across multiple browser turns. The old
+     push path could return while bootstrap was still false, and the background continuation
+     did not advance the root version after the last chunk. A fresh mobile device could then
+     connect successfully but have no version change to trigger a pull.
+
+     This guard keeps the existing chunking intact, waits for every chunk during an explicit
+     Sync Now/push, and also finalizes the root after background mirror completion. No UI, loan
+     calculations, Google Drive flow, or Firestore Rules are changed. */
+  const mf100OriginalScaleMirror=mfScaleMirrorToFirebase;
+  let mf100MirrorFinalizeBusy=false;
+  async function mf100FinalizeStructuredRoot(){
+    if(mf100MirrorFinalizeBusy||!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return;
+    mf100MirrorFinalizeBusy=true;
+    try{
+      const meta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
+      if(!meta||meta.bootstrapped!==true)return;
+      const ref=mfSecureFirebaseDoc();
+      await mfFirestoreDb.runTransaction(async tx=>{
+        const snap=await tx.get(ref);
+        const data=snap.exists?(snap.data()||{}):{};
+        if(data.ownerUid&&data.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
+        const current=Number(data.version||0);
+        const known=mfKnownCloudVersion();
+        const next=Math.max(current,known)+1;
+        tx.set(ref,{...mfSecureEnvelope(next),structured:true,structuredBootstrapComplete:true,structuredVersion:next},{merge:true});
+        mfSetKnownCloudVersion(next);
+      });
+      const fp=mfLocalStateFingerprint();
+      try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',fp);localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
+      setFirebaseStatus('🟢 Securely synced to Firebase — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+    }catch(e){console.warn('Structured Firebase root finalization skipped:',e);}
+    finally{mf100MirrorFinalizeBusy=false;}
+  }
+  mfScaleMirrorToFirebase=async function(){
+    await mf100OriginalScaleMirror();
+  };
+
+  /* Background mirror completion must also advance the root metadata. */
+  mfScaleScheduleMirror=function(){
+    clearTimeout(mfScaleMirrorTimer);
+    mfScaleMirrorTimer=setTimeout(async()=>{
+      try{await mfScaleMirrorToFirebase();await mf100FinalizeStructuredRoot();}
+      catch(e){console.warn('Structured cloud mirror skipped:',e);}
+    },2500);
+  };
+
+  /* Replace the explicit push with a bounded completion loop. Each call processes one
+     resumable chunk; the loop continues until firebase_mirror.bootstrapped becomes true. */
+  pushStateToFirebase=async function(silent){
+    if(!mfFirestoreDb||!mfFirebaseSyncCode){if(!silent){setFirebaseStatus('⚠️ Connect Firebase first.',true);alert('Connect Firebase first.');}return;}
+    if(!mfFirebaseUser){if(!silent){setFirebaseStatus('🔒 Secure Sync requires Firebase sign-in first.',true);alert('Secure Sync requires Firebase sign-in first.');}return;}
+    try{
+      if(!mfScaleReady)await mfScaleBuildLocalEntities(false);
+      let guard=0,meta=null;
+      do{
+        await mfScaleMirrorToFirebase();
+        meta=await mfScaleGetMeta('firebase_mirror').catch(()=>null);
+        guard++;
+        if(meta&&meta.bootstrapped===false&&guard<10000)await new Promise(r=>setTimeout(r,0));
+      }while(meta&&meta.bootstrapped===false&&guard<10000);
+      if(meta&&meta.bootstrapped===false)throw new Error('SYNC_BOOTSTRAP_INCOMPLETE: Firebase structured sync did not finish.');
+      await mf100FinalizeStructuredRoot();
+      if(!silent)mfShowTransientNotice('🟢 Firebase sync completed successfully.');
+    }catch(err){console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Push'),true);}
+  };
+
   // Do not alter existing pull UI semantics until a structured read is available; the legacy
   // reader remains a safe migration path for previously stored small snapshots.
   let mf100StructuredMode=false;
