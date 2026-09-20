@@ -10765,6 +10765,39 @@ window.addEventListener('online',()=>{
         mfScaleDirty.full=true;
         setFirebaseStatus('⏳ Secure cloud mirror is empty; safely restoring the local business to Firebase…',false);
         await pushStateToFirebase(true);
+      }else if(localLoans.length && cloudHasLoans){
+        /*
+         * IMPORTANT CURRENT-DATA RECONCILIATION:
+         * The structured collections can be populated yet older than the authoritative
+         * laptop state. The previous repair only checked for an EMPTY cloud, so an older
+         * mirror could legitimately be served to a fresh mobile.
+         *
+         * Use the committed root fingerprint plus the local durable-save/dirty timestamp:
+         * - same fingerprint => already converged; do nothing.
+         * - different fingerprint AND this device has a newer local save => this device has
+         *   the newer authoritative state, so perform one complete owner-scoped mirror.
+         * This does not let a freshly pulled mobile push the old cloud data back, because
+         * its fingerprint matches the cloud root.
+         */
+        const localFp=String(mfLocalStateFingerprint()||'');
+        const cloudFp=String(meta.stateFingerprint||'');
+        let cloudUpdatedAt=0;
+        try{
+          if(meta.updatedAt&&typeof meta.updatedAt.toMillis==='function') cloudUpdatedAt=Number(meta.updatedAt.toMillis())||0;
+          else if(meta.updatedAt) cloudUpdatedAt=Date.parse(String(meta.updatedAt))||0;
+        }catch(e){}
+        let localSavedAt=0, localDirtyAt=0;
+        try{
+          localSavedAt=Date.parse(localStorage.getItem('MF_LOCAL_SAVED_AT')||'')||0;
+          localDirtyAt=Date.parse(localStorage.getItem('MF_LOCAL_DIRTY_AT')||'')||0;
+        }catch(e){}
+        const localNewerThanCloud=!!localSavedAt && localSavedAt>cloudUpdatedAt;
+        const localDirtyNewer=!!localDirtyAt && localDirtyAt>cloudUpdatedAt;
+        if(localFp && cloudFp && localFp!==cloudFp && (localNewerThanCloud||localDirtyNewer)){
+          mfScaleDirty.full=true;
+          setFirebaseStatus('⏳ Newer local business data found; securely updating Firebase…',false);
+          await pushStateToFirebase(true);
+        }
       }else if(!localLoans.length && cloudHasLoans){
         // Fresh/empty device: cloud is populated, so converge local state from cloud.
         await pullStateFromFirebase(false);
