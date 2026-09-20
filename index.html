@@ -3627,8 +3627,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             // initialization cannot finish and arm the live listener while the
                             // pull is still in flight. If the structured mirror is empty/incomplete,
                             // the pull throws and the device remains untouched.
-                            pullStateFromFirebase(false).catch(err=>console.warn('Initial structured pull was not applied:',err));
-                            return;
+                            /* IMPORTANT: wait for the first structured pull to finish before
+                               arming the live listener. The previous code fired the pull without
+                               awaiting/returning it, so the listener could race the initial read;
+                               that produced the exact 'blank first load, data after refresh' symptom. */
+                            return pullStateFromFirebase(false).catch(err=>{
+                                console.warn('Initial structured pull was not applied:',err);
+                            });
                         }else if(sameDatabase && cloudVersion>0){
                             mfSetKnownCloudVersion(cloudVersion);
                             try{
@@ -3648,15 +3653,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             // fingerprint differs from the committed cloud fingerprint. Version
                             // equality is not enough: an older mobile browser can remember the
                             // same cloud version while still holding a different local database.
-                            pullStateFromFirebase(false);
+                            return pullStateFromFirebase(false);
                         }else if(cloudVersion>localVersion && (!hasLocalData || !lastPushedFp || localFp===lastPushedFp)){
                             // Safe automatic cross-device convergence: only replace local data when this device has no
                             // unpushed local edits (or is effectively empty). A locally changed, unsynced database is never silently overwritten.
-                            pullStateFromFirebase(false);
+                            return pullStateFromFirebase(false);
                         }else if(cloudVersion>localVersion){
                             if(!mfHasUnpushedLocalChanges()){
-                                pullStateFromFirebase(true);
-                                setFirebaseStatus('🟢 Secure Firebase updated this device automatically.',false);
+                                return pullStateFromFirebase(false).then(()=>{
+                                    setFirebaseStatus('🟢 Secure Firebase updated this device automatically.',false);
+                                });
                             }else{
                                 setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);
                             }
@@ -10760,18 +10766,24 @@ window.addEventListener('online',()=>{
     const [loanRows,productRows,staffRows,expenseRows,borrowingRows,paymentRows]=await Promise.all([
       mf100FirestoreCollectionRows('loans'),mf100FirestoreCollectionRows('products'),mf100FirestoreCollectionRows('staff'),mf100FirestoreCollectionRows('expenses'),mf100FirestoreCollectionRows('borrowings'),mf100FirestoreCollectionRows('payments')
     ]);
-    // Never replace a fresh/valid local database with an empty structured cloud mirror.
-    // A completed structured business that contains real loans must have at least one
-    // owner-scoped loan row. An empty result here means the mirror is incomplete or was
-    // previously cleared; treating it as authoritative would make the device appear blank.
-    const structuredComplete = meta.structuredBootstrapComplete===true || meta.structuredVersion!==undefined;
-    /* NEVER treat an empty structured mirror as authoritative. A root metadata document can
-       exist even when the entity collections were never successfully bootstrapped (or were
-       cleared by an older destructive sync). Replacing a device with zero loans is exactly
-       what caused the blank-dashboard regression. A real populated business must have loan
-       rows before a structured pull is allowed to replace local state. */
-    if(meta.structured && structuredComplete && loanRows.length===0){
-      throw new Error('STRUCTURED_CLOUD_EMPTY: Firebase secure cloud has no owner-scoped loan records. The device was NOT replaced. Restore the populated business on the trusted device and synchronize it to Firebase before pulling on another device.');
+    /* HARD SAFETY: an empty structured cloud mirror is NEVER authoritative.
+       This is deliberately independent of structuredBootstrapComplete/structuredVersion.
+       Older builds could leave root metadata behind with structured=true while the entity
+       collections were empty or only partially bootstrapped. In that state, pulling zero
+       loans into a populated device silently blanked the dashboard.
+
+       Rule: if Firebase returns zero owner-scoped loan rows, do not replace the device.
+       If the device already has business loans, preserve them and let the safe direction
+       guard/bootstrap path repair Firebase instead. If both sides are empty, there is simply
+       nothing to pull. */
+    if(meta.structured && loanRows.length===0){
+      const localLoanCount=Array.isArray(state?.loans)?state.loans.length:0;
+      const msg=localLoanCount
+        ? '🟡 Firebase structured cloud is empty/incomplete. Local business data was preserved.'
+        : '🟡 Firebase structured cloud has no owner-scoped loan records. Device data was not replaced.';
+      setFirebaseStatus(msg,false);
+      console.warn('STRUCTURED_CLOUD_EMPTY: pull blocked to protect local data.',{localLoanCount,structuredBootstrapComplete:meta.structuredBootstrapComplete,structuredVersion:meta.structuredVersion});
+      return false;
     }
     const products={};productRows.forEach(x=>{const id=String(x.id);delete x._ownerUid;delete x._scaleFingerprint;delete x._updatedAtLabel;delete x.id;products[id]=x;});
     const loans=loanRows.map(x=>{const y={...x};delete y._ownerUid;delete y._scaleFingerprint;delete y._updatedAtLabel;delete y.id;y.id=String(x.id);y.payments=[];return y;});
@@ -10818,9 +10830,12 @@ window.addEventListener('online',()=>{
       const localFp=String(mfLocalStateFingerprint()||'');
       const fingerprintMismatch=!!cloudFp&&!!localFp&&cloudFp!==localFp;
       if(data.updatedByDevice===mfFirebaseDeviceId && !fingerprintMismatch)return;
-      if(fingerprintMismatch && !mfHasUnpushedLocalChanges()){pullStateFromFirebase(true);return;}
+      /* Live listener is never allowed to open a destructive replace-data confirmation.
+         A listener-triggered pull must be silent and must pass the empty-cloud safety guard
+         above. User-initiated 'Pull Latest' keeps its existing confirmation dialog. */
+      if(fingerprintMismatch && !mfHasUnpushedLocalChanges()){pullStateFromFirebase(false);return;}
       if(!v||v<=mfKnownCloudVersion())return;
-      if(!mfHasUnpushedLocalChanges()){pullStateFromFirebase(true);}else{setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);showFirebaseUpdateBanner(data.updatedAtLabel||'',v);}
+      if(!mfHasUnpushedLocalChanges()){pullStateFromFirebase(false);}else{setFirebaseStatus('🟡 Cloud has newer data. Review before syncing.',false);showFirebaseUpdateBanner(data.updatedAtLabel||'',v);}
     },err=>{console.error('Firebase structured listener error',err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure Firebase listener'),true);});
   };
 })();
