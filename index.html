@@ -11008,5 +11008,92 @@ window.addEventListener('online',()=>{
 </script>
 
 
+
+<script id="mf-final-cloud-pull-no-republish">
+(function(){
+  'use strict';
+  /* FINAL SYNC SAFETY:
+     A cloud pull is a READ operation. The pulled state must never be immediately mirrored
+     back to Firebase merely because scalable initialization marked the mirror dirty/full.
+     Older builds did exactly that on a fresh mobile: mobile pulled the old cloud snapshot,
+     then its background mirror uploaded that same old snapshot, which made the laptop fall
+     back to the old data on its next refresh.
+  */
+  let mf100CloudPullActive=false;
+  let mf100SuppressMirrorUntil=0;
+  const mf100OriginalScheduleMirror=typeof mfScaleScheduleMirror==='function'?mfScaleScheduleMirror:null;
+  const mf100OriginalMirror=typeof mfScaleMirrorToFirebase==='function'?mfScaleMirrorToFirebase:null;
+  const mf100OriginalPush=typeof pushStateToFirebase==='function'?pushStateToFirebase:null;
+  const mf100OriginalPull=typeof pullStateFromFirebase==='function'?pullStateFromFirebase:null;
+  const mf100OriginalMarkDirty=typeof mfScaleMarkDirty==='function'?mfScaleMarkDirty:null;
+
+  function mf100HoldMirror(ms){
+    mf100SuppressMirrorUntil=Date.now()+Number(ms||15000);
+    try{clearTimeout(mfScaleMirrorTimer);}catch(e){}
+  }
+  function mf100MirrorSuppressed(){return mf100CloudPullActive || Date.now()<mf100SuppressMirrorUntil;}
+
+  if(mf100OriginalScheduleMirror){
+    mfScaleScheduleMirror=function(){
+      if(mf100MirrorSuppressed()) return;
+      return mf100OriginalScheduleMirror();
+    };
+  }
+  if(mf100OriginalMirror){
+    mfScaleMirrorToFirebase=async function(){
+      if(mf100MirrorSuppressed()) return;
+      return mf100OriginalMirror.apply(this,arguments);
+    };
+  }
+  if(mf100OriginalPush){
+    pushStateToFirebase=async function(silent){
+      if(mf100CloudPullActive){
+        if(!silent) setFirebaseStatus('🟡 Cloud pull is still being applied; upload was safely skipped.',false);
+        return;
+      }
+      return mf100OriginalPush.apply(this,arguments);
+    };
+  }
+  if(mf100OriginalMarkDirty){
+    mfScaleMarkDirty=function(kind,id){
+      /* A real local edit after a cloud pull is allowed to resume normal mirroring. */
+      if(!mf100CloudPullActive) mf100SuppressMirrorUntil=0;
+      return mf100OriginalMarkDirty.apply(this,arguments);
+    };
+  }
+
+  if(mf100OriginalPull){
+    pullStateFromFirebase=async function(showConfirm){
+      if(mf100CloudPullActive) return;
+      mf100CloudPullActive=true;
+      try{
+        try{clearTimeout(mfScaleMirrorTimer);}catch(e){}
+        const result=await mf100OriginalPull.apply(this,arguments);
+        /* A pull has now made local state identical to the committed cloud snapshot.
+           Explicitly clear all scalable dirty flags and prevent startup/background
+           initialization from re-uploading the just-pulled state. */
+        try{mfScaleResetDirty();}catch(e){}
+        try{localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
+        mf100HoldMirror(20000);
+        return result;
+      }finally{
+        mf100CloudPullActive=false;
+      }
+    };
+  }
+
+  /* Expose a read-only diagnostic hook for future verification; it performs no writes. */
+  window.mfFinalSyncState=function(){
+    return {
+      cloudPullActive:mf100CloudPullActive,
+      suppressMirrorUntil:mf100SuppressMirrorUntil,
+      knownCloudVersion:typeof mfKnownCloudVersion==='function'?mfKnownCloudVersion():0,
+      localFingerprint:typeof mfLocalStateFingerprint==='function'?mfLocalStateFingerprint():'',
+      recoveryFingerprint:localStorage.getItem('MF_RECOVERY_AUTHORITATIVE_FP')||''
+    };
+  };
+})();
+</script>
+
 </body>
 </html>
