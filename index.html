@@ -3545,6 +3545,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             return '⚠️ ' + action + ' failed: ' + (err?.message || 'Unknown Firebase error.');
         }
 
+        function mfIsFreshLocalDatabase(){
+            try{
+                const loanCount=Array.isArray(state?.loans)?state.loans.length:0;
+                const name=String(state?.bizName||'').trim();
+                const companyName=String(state?.companyProfile?.legalName||'').trim();
+                const isSeedName=!name || name==='My Finance Company';
+                const isSeedCompany=!companyName;
+                // A newly opened browser may already contain seeded products/staff/expenses.
+                // Those seed records are NOT evidence that this device has the user's business.
+                return loanCount===0 && isSeedName && isSeedCompany;
+            }catch(e){return false;}
+        }
+
         function initFirebaseSync(cfg, syncCode, showAlerts) {
             try {
                 if (!mfFirebaseApp) {
@@ -3596,7 +3609,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         const sameDatabase = (!!cloudPayloadFp && !!localFp && cloudPayloadFp===localFp)
                             || (!!data.stateFingerprint && !!localFp && String(data.stateFingerprint)===String(localFp));
                         const structuredFingerprintMismatch=!!data.structured && !!data.stateFingerprint && !!localFp && String(data.stateFingerprint)!==String(localFp);
-                        if(sameDatabase && cloudVersion>0){
+                        const freshDeviceWithStructuredCloud=!!data.structured && !!data.stateFingerprint && mfIsFreshLocalDatabase();
+                        if(freshDeviceWithStructuredCloud){
+                            // Seeded products/staff/expenses on a fresh browser must never block
+                            // the first cloud pull. Firebase is the source for an already-existing
+                            // business when this device has no real customer/loan data.
+                            pullStateFromFirebase(false);
+                        }else if(sameDatabase && cloudVersion>0){
                             mfSetKnownCloudVersion(cloudVersion);
                             try{
                                 localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',localFp);
@@ -5848,7 +5867,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             try{
                 pageData=await mfScaleRecoveryPageData({query:rawQuery,product:state.activeFilter||'ALL',status:recoveryStatusFilter||'ALL',page:mfScaleRecoveryPage,pageSize:MF_SCALE.recoveryPageSize});
             }catch(e){ console.warn('Scalable recovery page read skipped:',e); }
-            let filtered=pageData?null:state.loans.filter(l=>recoverySearchMatches(l,rawQuery));
+            // The authoritative in-memory state is the final safety net. A stale/missing
+            // IndexedDB search projection must never make a valid customer impossible to find.
+            let filtered=state.loans.filter(l=>recoverySearchMatches(l,rawQuery));
+            if(pageData && Number(pageData.total||0)>0){
+                // Keep the scalable result when it actually found matches.
+                filtered=null;
+            }else if(pageData){
+                // Broken/stale index: force the authoritative state fallback below.
+                pageData=null;
+            }
             if(filtered){
                 if(state.activeFilter!=='ALL')filtered=filtered.filter(l=>l.product===state.activeFilter);
                 if(recoveryStatusFilter!=='ALL')filtered=filtered.filter(l=>recoveryStatusFilter==='DUE'?getRecoveryStatus(l)==='DUE':getRecoveryStatus(l)===recoveryStatusFilter);
@@ -7938,7 +7966,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             }
             const matches = state.loans.filter(l => {
                 const p = state.products[l.product] || {};
-                return [l.id,l.name,l.phone,l.address,p.name,l.product].filter(Boolean).some(v => String(v).toLowerCase().includes(q));
+                return [l.id,l.name,l.phone,l.phone2,l.guarantorName,l.guarantorPhone,l.guarantorPhone2,l.guarantorSecondaryPhone,l.husbandName,l.husbandPhone,l.secondaryName,l.address,p.name,l.product].filter(Boolean).some(v => String(v).toLowerCase().includes(q));
             });
             populatePassbookDropdown(matches);
             if (results) {
@@ -10646,7 +10674,7 @@ window.addEventListener('online',()=>{
       let q=col.orderBy(firebase.firestore.FieldPath.documentId()).limit(500);
       if(last) q=q.startAfter(last);
       const snap=await q.get(); if(snap.empty) break;
-      snap.forEach(d=>{const row=d.data()||{};if(!row._ownerUid||row._ownerUid===mfFirebaseUser.uid) out.push({...row,id:String(d.id)});});
+      snap.forEach(d=>{const row=d.data()||{};if(row._ownerUid===mfFirebaseUser.uid) out.push({...row,id:String(d.id)});});
       last=snap.docs[snap.docs.length-1].id;
       if(snap.size<500) break;
       await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(r,{timeout:50}):setTimeout(r,0));
@@ -10678,7 +10706,7 @@ window.addEventListener('online',()=>{
     const v=Number(meta.version||0);mfSetKnownCloudVersion(v);
     try{localStorage.setItem('MF_SECURE_LAST_PUSH_FINGERPRINT',mfLocalStateFingerprint());localStorage.setItem('MF_SECURE_LAST_PUSH_AT',new Date().toISOString());localStorage.setItem('MF_SECURE_BANNER_ACK_VERSION',String(v));localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
     await idbPutSnapshot();
-    try{await mfScaleBuildLocalEntities(false);await mf100BuildAnalytics();await mf100RebuildDueIndex();await mfScalePutMeta({id:'due_index',schema:'AMARA-SCALABLE-2',sourceLoanFingerprint:mfScaleHash(state.loans||[]),loanCount:(state.loans||[]).length,updatedAt:new Date().toISOString()});}catch(e){console.warn('Structured local index rebuild after cloud pull skipped:',e);}
+    try{await mfScaleBuildLocalEntities(true);await mf100BuildAnalytics();await mf100RebuildDueIndex();await mfScalePutMeta({id:'due_index',schema:'AMARA-SCALABLE-2',sourceLoanFingerprint:mfScaleHash(state.loans||[]),loanCount:(state.loans||[]).length,updatedAt:new Date().toISOString()});}catch(e){console.warn('Structured local index rebuild after cloud pull skipped:',e);}
     renderAll();setFirebaseStatus('🟢 Loaded latest structured Firebase data — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
   }
   pullStateFromFirebase=function(showConfirm){
@@ -10711,69 +10739,6 @@ window.addEventListener('online',()=>{
   };
 })();
 
-</script>
-<script id="mf-final-cloud-first-sync-now-fix">
-(function(){
-  'use strict';
-  /* FINAL CLOUD-FIRST MANUAL SYNC FIX
-     On a fresh/empty device, Sync Now must pull the existing secure cloud dataset
-     instead of pushing the HTML's seeded/default local dataset to Firebase.
-     Existing devices with real local business data retain the normal push path.
-     No business calculations or UI layout are changed. */
-  const originalPush=typeof pushStateToFirebase==='function'?pushStateToFirebase:null;
-  const originalPull=typeof pullStateFromFirebase==='function'?pullStateFromFirebase:null;
-  function isFreshSeededDevice(){
-    try{
-      const loans=Array.isArray(state?.loans)?state.loans.length:0;
-      const biz=String(state?.bizName||'').trim();
-      const cp=state?.companyProfile||{};
-      const legal=String(cp.legalName||'').trim();
-      const phone=String(cp.phone||'').trim();
-      const email=String(cp.email||'').trim();
-      const staff=Array.isArray(state?.staff)?state.staff:[];
-      const expenses=Array.isArray(state?.expenses)?state.expenses:[];
-      const defaultStaff=staff.length===1 && String(staff[0]?.id||'')==='ST-01';
-      const defaultExpenses=expenses.length===2 && expenses.every(x=>['EXP-101','EXP-102'].includes(String(x?.id||'')));
-      return loans===0 && (biz===''||biz==='My Finance Company') && !legal && !phone && !email && defaultStaff && defaultExpenses;
-    }catch(e){return false;}
-  }
-  async function smartSyncNow(silent){
-    if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser){
-      if(!silent){setFirebaseStatus('🔒 Connect Firebase and sign in first.',true);}
-      return;
-    }
-    try{
-      setFirebaseStatus('☁️ Checking secure Firebase data…',false);
-      const ref=mfSecureFirebaseDoc();
-      const snap=await ref.get();
-      if(!snap.exists){
-        if(originalPush) return originalPush(silent);
-        return;
-      }
-      const cloud=snap.data()||{};
-      if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid){
-        setFirebaseStatus('🔒 This secure business belongs to another account.',true);return;
-      }
-      const structured=!!cloud.structured;
-      const fresh=isFreshSeededDevice();
-      const cloudHasData=structured || !!cloud.payload || Number(cloud.version||0)>0;
-      if(fresh&&cloudHasData){
-        setFirebaseStatus('☁️ Loading the existing secure cloud data onto this device…',false);
-        if(originalPull) await originalPull(false);
-        return;
-      }
-      if(originalPush) return originalPush(silent);
-    }catch(err){
-      console.error('Cloud-first Sync Now failed:',err);
-      setFirebaseStatus(mfFirebaseErrorLabel(err,'Firebase Sync Now'),true);
-    }
-  }
-  pushStateToFirebase=smartSyncNow;
-  try{
-    const b=document.getElementById('mf-push-sync-btn');
-    if(b)b.onclick=function(e){e.preventDefault();smartSyncNow(false);};
-  }catch(e){}
-})();
 </script>
 </body>
 </html>
