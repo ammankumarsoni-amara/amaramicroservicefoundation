@@ -3577,11 +3577,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     setFirebaseStatus('🔒 Secure Sync is waiting for Firebase sign-in.',true);
                     return;
                 }
+                // Keep the live listener behind the initial reconciliation. Otherwise the
+                // listener can race the initial pull and show the replace-data dialog on a
+                // fresh mobile before the initialization logic has finished deciding what to do.
+                window.mfFirebaseInitialSyncReady = false;
                 const initKey = String(mfFirebaseUser.uid || '') + '|' + String(syncCode || '');
                 const sameInit = mfFirebaseInitKey === initKey;
                 mfFirebaseInitKey = initKey;
                 if (!sameInit) setFirebaseStatus('🟢 Firebase connected — Secure Sync is active.');
-                startFirebaseListener();
                 const ref = mfSecureFirebaseDoc();
                 ref.get().then(doc => {
                     if(doc.exists){
@@ -3665,7 +3668,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             setFirebaseStatus('🟡 Secure Firebase is connected. No cloud record exists yet and this device has no business data to upload.',false);
                         }
                     }
-                }).catch(err => { console.error(err); setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Firebase connection check'), true); });
+                }).catch(err => { console.error(err); setFirebaseStatus(mfFirebaseErrorLabel(err, 'Secure Firebase connection check'), true); }).finally(() => {
+                    // Only after the initial cloud/local decision has completed may the live
+                    // listener react to later cloud changes.
+                    window.mfFirebaseInitialSyncReady = true;
+                    startFirebaseListener();
+                });
             } catch (e) {
                 console.error(e);
                 setFirebaseStatus('⚠️ Firebase connection failed: ' + e.message, true);
@@ -10722,12 +10730,13 @@ window.addEventListener('online',()=>{
   }
   pullStateFromFirebase=function(showConfirm){
     const ref=mfSecureFirebaseDoc();
-    if(!ref){return mf100OriginalPull?mf100OriginalPull(showConfirm):undefined;}
-    ref.get().then(doc=>{
+    if(!ref){return mf100OriginalPull?mf100OriginalPull(showConfirm):Promise.resolve();}
+    return ref.get().then(doc=>{
       const data=doc.exists?(doc.data()||{}):{};
-      if(data.structured){mf100PullStructured(showConfirm).catch(err=>{console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Structured Secure Pull'),true);});}
-      else if(mf100OriginalPull) mf100OriginalPull(showConfirm);
-    }).catch(err=>{console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure cloud check'),true);});
+      if(data.structured) return mf100PullStructured(showConfirm);
+      if(mf100OriginalPull) return mf100OriginalPull(showConfirm);
+      return undefined;
+    }).catch(err=>{console.error(err);setFirebaseStatus(mfFirebaseErrorLabel(err,'Secure cloud check'),true);throw err;});
   };
   startFirebaseListener=function(){
     if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return;
@@ -10737,6 +10746,7 @@ window.addEventListener('online',()=>{
     mfFirebaseListenerKey=listenerKey;
     const ref=mfSecureFirebaseDoc();
     mfFirebaseListenerUnsub=ref.onSnapshot(doc=>{
+      if(window.mfFirebaseInitialSyncReady!==true)return;
       if(!doc.exists)return;const data=doc.data()||{};if(data.ownerUid&&data.ownerUid!==mfFirebaseUser.uid)return;
       const v=Number(data.version||0);
       const cloudFp=String(data.stateFingerprint||'');
