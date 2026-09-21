@@ -3287,12 +3287,17 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     renderAll(); updateSecureCloudStatus(); ensureInitialVersionedBackup();
                 }
 
-                if(mfV2BaselineReady() && mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser){
+                // Firebase may have become ready before IndexedDB on a fresh mobile.
+                // Once local initialization finishes, always give the clean sync engine one
+                // automatic chance to adopt an already-verified cloud baseline. It is safe:
+                // mfV2Reconcile() can only adopt after server owner/fingerprint/count checks,
+                // and it never pushes an empty startup state during this bootstrap path.
+                if(mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser){
                     try{
                         await mfV2Reconcile(validLocalSnapshot?'local-ready':'server-bootstrap');
                         window.mfFirebaseInitialSyncReady=true;
                         startFirebaseListener();
-                        if(!validLocalSnapshot) markStorageReady();
+                        markStorageReady();
                         renderAll();
                     }catch(e){
                         if(validLocalSnapshot){
@@ -3484,21 +3489,49 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           return true;
         }
         async function mfV2AdoptVerifiedCloudBaseline(reason='cloud-bootstrap'){
-          // A verified baseline is a business/cloud property, not a device-local flag.
-          // A fresh mobile can therefore adopt an already-established secure cloud
-          // baseline after authentication, without performing a Drive restore first.
+          // FRESH-DEVICE BOOTSTRAP: a verified baseline is a business/cloud property,
+          // not a device-local Drive flag. A second device may read the existing secure
+          // cloud baseline, but it must prove ownership and verify the reconstructed
+          // structured data before adopting it. This path is READ-ONLY until verification
+          // succeeds; it can never push the phone's blank/default startup state.
           if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return false;
+          if(mfV2BaselineReady())return true;
           const root=await mfV2GetRootServer();
           if(!root.exists)return false;
           const cloud=root.data()||{};
           if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
           if(String(cloud.schemaVersion||'')!=='AMARA-SYNC-V2')return false;
-          const fp=String(cloud.stateFingerprint||'');
-          const counts=cloud.counts&&typeof cloud.counts==='object'?cloud.counts:{};
-          const total=Number(counts.loans||0)+Number(counts.products||0)+Number(counts.staff||0)+Number(counts.expenses||0)+Number(counts.borrowings||0)+Number(counts.payments||0);
-          if(!fp||total<=0)return false;
+          const expected=String(cloud.stateFingerprint||'');
+          if(!expected)return false;
+          const entities=await mfV2ReadEntities(mfFirebaseUser.uid);
+          const shell=cloud.shell&&typeof cloud.shell==='object'?cloud.shell:{};
+          const candidate={...shell,...entities};
+          const actualFingerprint=mfStateFingerprintObject(candidate);
+          if(actualFingerprint!==expected)throw new Error('SECURE_BOOTSTRAP_REJECTED: cloud structured data fingerprint does not match the secure cloud baseline. Local data was not overwritten.');
+          const expectedCounts=cloud.counts&&typeof cloud.counts==='object'?cloud.counts:{};
+          const actualCounts={
+            loans:Array.isArray(candidate.loans)?candidate.loans.length:0,
+            products:candidate.products&&typeof candidate.products==='object'?Object.keys(candidate.products).length:0,
+            staff:Array.isArray(candidate.staff)?candidate.staff.length:0,
+            expenses:Array.isArray(candidate.expenses)?candidate.expenses.length:0,
+            borrowings:Array.isArray(candidate.borrowings)?candidate.borrowings.length:0,
+            payments:Array.isArray(candidate.loans)?candidate.loans.reduce((n,l)=>n+(Array.isArray(l.payments)?l.payments.length:0),0):0
+          };
+          for(const k of Object.keys(actualCounts)){
+            if(expectedCounts[k]!==undefined && Number(expectedCounts[k])!==actualCounts[k])throw new Error('SECURE_BOOTSTRAP_REJECTED: cloud record count verification failed for '+k+'. Local data was not overwritten.');
+          }
+          state=candidate;
+          mfScaleReinstallStateProxy();
+          normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
+          const persisted=await idbPutSnapshot();
+          if(!persisted?.state || !localStorage.getItem('MF_V2_LOCAL_SNAPSHOT_READY'))throw new Error('SECURE_BOOTSTRAP_REJECTED: verified cloud data could not be committed to the protected local snapshot.');
           mfV2ArmBaseline();
-          try{localStorage.setItem('MF_V2_FINAL_CLEAN_CLOUD_VERSION',String(Number(cloud.version||0)));}catch(e){}
+          mfV2SetHash(expected);
+          mfSetKnownCloudVersion(Number(cloud.version||0));
+          mfV2ClearDirty();
+          try{localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
+          markStorageReady();
+          renderAll();
           return true;
         }
 
