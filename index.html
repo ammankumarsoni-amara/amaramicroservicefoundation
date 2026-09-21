@@ -902,6 +902,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
   .finance-status-pill.foreclosed{color:#6b21a8!important;background:#faf5ff!important;border-color:#d8b4fe!important;}
 }
 </style>
+<!-- AMARA V2 RESTORE-VERIFIED -->
 </head>
 <body>
 
@@ -2340,7 +2341,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="font-size:.66rem;color:#94a3b8;margin-top:6px;line-height:1.4;">The app never asks for or stores your Gmail password. Google OAuth grants the app the limited <b>drive.file</b> Drive scope needed for its own backup files.</div>
                 <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, host this app on your HTTPS domain.</div>
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required to connect, backup/restore)</label>
-                <input type="text" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for encrypted backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password" oninput="onCloudPinInputChange()">
+                <input type="password" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for encrypted backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password" oninput="onCloudPinInputChange()">
                 <label style="display:flex;align-items:center;gap:6px;font-size:.66rem;color:#94a3b8;margin-top:7px;cursor:pointer;">
                     <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Keep PIN active on this device (encrypted storage; raw PIN is never stored)
                 </label>
@@ -3247,9 +3248,22 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // Google Drive restore is the migration path into the new database.
                 normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
                 await idbPutSnapshot();
-                mfDbReady=true; markStorageReady();
+                mfDbReady=true;
+                mfV2LocalStateReady=true;
+                markStorageReady();
                 renderAll(); updateSecureCloudStatus(); ensureInitialVersionedBackup();
                 mfScaleReinstallStateProxy(); initializeScalableDataLayer();
+                // If Firebase/Auth became ready first during a hard reload, resume exactly
+                // once now that the restored local snapshot is authoritative for this device.
+                if(mfV2BaselineReady() && mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser){
+                    try{
+                        await mfV2Reconcile('local-ready');
+                        window.mfFirebaseInitialSyncReady=true;
+                        startFirebaseListener();
+                    }catch(e){
+                        mfV2SetStatus(mfV2Error(e,'Automatic sync resume'),true);
+                    }
+                }
             }catch(err){
                 console.error('Clean IndexedDB initialization failed',err);
                 mfDbReady=false; markStorageReady();
@@ -3281,6 +3295,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         let mfFirebaseInitKey='';
         let mfFirebaseListenerKey='';
         let mfFirebaseAuthListenerAttached=false;
+        // HARD RELOAD SAFETY: Firebase/Auth may become ready before IndexedDB finishes
+        // restoring the verified local business snapshot. Never let cloud reconciliation
+        // run against the startup/default state during that small window.
+        let mfV2LocalStateReady=false;
         window.mfFirebaseInitialSyncReady=false;
 
         function cryptoRandomId(){try{if(crypto?.getRandomValues){const a=new Uint32Array(2);crypto.getRandomValues(a);return a[0].toString(36)+a[1].toString(36);} }catch(e){} return Math.random().toString(36).slice(2,12);}
@@ -3373,6 +3391,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           delete out.payments; return out;
         }
         async function mfV2PullFromServer(showConfirm=false){
+          if(!mfV2LocalStateReady || !mfDbReady) throw new Error('Local database is still initializing. Please wait a moment and try again.');
           if(!mfV2BaselineReady()) throw new Error('V2 baseline is not initialized. Restore the verified Google Drive backup on this device first.');
           if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser) throw new Error('Connect Firebase and sign in first.');
           if(showConfirm&&!confirm('This will replace the data on THIS device with the latest NEW secure cloud database. Continue?')) return false;
@@ -3418,9 +3437,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           return true;
         }
         async function mfV2Reconcile(reason='auto'){
-          // HARD SAFETY GATE: a fresh V2 device must never read, create, overwrite,
-          // or reconcile against Firebase until a verified Google Drive/local baseline
-          // has explicitly armed MF_V2_BASELINE_READY.
+          // HARD SAFETY GATE: Firebase must never reconcile against the startup/default
+          // state. IndexedDB/local restore must finish first, then the verified baseline
+          // gate may permit cloud reconciliation.
+          if(!mfV2LocalStateReady || !mfDbReady)return false;
           if(!mfV2BaselineReady())return false;
           if(mfCleanSyncBusy||!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return false;
           mfCleanSyncBusy=true;
@@ -3444,6 +3464,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         async function pushStateToFirebase(silent=false){try{mfV2MarkDirty();return await mfV2Reconcile('manual');}catch(e){mfV2SetStatus(mfV2Error(e,'Sync Now'),true);if(!silent)alert(mfV2Error(e,'Sync Now'));}}
         async function pullStateFromFirebase(showConfirm=false){try{return await mfV2PullFromServer(!!showConfirm);}catch(e){mfV2SetStatus(mfV2Error(e,'Pull Latest'),true);if(showConfirm)alert(mfV2Error(e,'Pull Latest'));}}
         function startFirebaseListener(){
+          if(!mfV2LocalStateReady || !mfDbReady)return;
           if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return;
           if(mfFirebaseListenerUnsub){try{mfFirebaseListenerUnsub();}catch(e){}mfFirebaseListenerUnsub=null;}
           const key=String(mfFirebaseUser.uid)+'|'+mfFirebaseSyncCode;if(mfFirebaseListenerKey===key)return;mfFirebaseListenerKey=key;
@@ -3460,11 +3481,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             await mfV2EnsureFirebase(cfg);mfFirebaseSyncCode=String(syncCode||localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'');
             if(!mfFirebaseUser){mfV2SetStatus('🔒 Firebase connected. Sign in to continue.',true);return;}
             window.mfFirebaseInitialSyncReady=false;
-            if(mfV2BaselineReady()){
+            if(mfV2BaselineReady() && mfV2LocalStateReady && mfDbReady){
               await mfV2Reconcile('connect');
               window.mfFirebaseInitialSyncReady=true;
               startFirebaseListener();
               mfV2SetStatus('🟢 Secure Firebase connected and verified baseline is active.',false);
+            }else if(mfV2BaselineReady()){
+              mfV2SetStatus('🟡 Firebase connected. Restoring the verified local database before automatic sync.',false);
             }else{
               mfV2SetStatus('🟡 Firebase connection established. Waiting for the verified Google Drive baseline before any cloud reconciliation.',false);
             }
@@ -3512,11 +3535,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
             if(mfFirebaseUser){
               window.mfFirebaseInitialSyncReady=false;
-              if(mfV2BaselineReady()){
+              if(mfV2BaselineReady() && mfV2LocalStateReady && mfDbReady){
                 await mfV2Reconcile('connect');
                 window.mfFirebaseInitialSyncReady=true;
                 startFirebaseListener();
                 mfV2SetStatus('🟢 Secure Firebase connected and verified baseline is active.',false);
+              }else if(mfV2BaselineReady()){
+                mfV2SetStatus('🟡 Firebase connected. Restoring the verified local database before automatic sync.',false);
               }else{
                 mfV2SetStatus('🟡 Firebase connection established. Waiting for the verified Google Drive baseline before any cloud reconciliation.',false);
               }
@@ -3539,6 +3564,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             Array.isArray(state.loans) && state.products && Array.isArray(state.expenses) &&
             Array.isArray(state.staff) && Array.isArray(state.borrowings));
           if(!hasRestoredState) throw new Error('Verified Drive restore did not produce a complete business state. Cloud baseline was not changed.');
+          // Restore callers have already written the verified snapshot to IndexedDB.
+          // Mark local readiness before publishing so the baseline can never race the
+          // startup guard.
+          mfV2LocalStateReady=true;
           mfV2ArmBaseline();
           mfV2MarkDirty();
           await mfV2PushToServer(true);
@@ -9919,7 +9948,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 <script id="amara-clean-v2-startup">
 window.addEventListener('load',()=>setTimeout(()=>{try{initializeSecureStorage();}catch(e){console.error('Clean storage startup failed',e);}},50));
 window.addEventListener('online',()=>{try{
-  if(typeof mfV2BaselineReady==='function' && mfV2BaselineReady() && typeof mfV2Reconcile==='function') mfV2Reconcile('online');
+  if(typeof mfV2BaselineReady==='function' && mfV2BaselineReady() && typeof mfV2Reconcile==='function' && typeof mfV2LocalStateReady!=='undefined' && mfV2LocalStateReady) mfV2Reconcile('online');
 }catch(e){console.error('V2 online reconciliation guard',e);}});
 </script>
 </body>
