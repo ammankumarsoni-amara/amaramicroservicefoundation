@@ -2764,8 +2764,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         async function idbPutSnapshot(){
             const db=await openMfDb();
-            const payload={id:"current",version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; payload.stateFingerprint=mfStateFingerprintObject(payload.state);
+            const savedState=mfCloneStateForPersistence();
+            const hasBusinessData=!!(savedState && savedState.products && (
+                (Array.isArray(savedState.loans)?savedState.loans.length:0)+
+                (Array.isArray(savedState.borrowings)?savedState.borrowings.length:0)+
+                (Array.isArray(savedState.staff)?savedState.staff.length:0)+
+                (Array.isArray(savedState.expenses)?savedState.expenses.length:0)
+            ));
+            const payload={id:"current",version:1,updatedAt:new Date().toISOString(),state:savedState};
+            payload.stateFingerprint=mfStateFingerprintObject(payload.state);
             await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,"readwrite");tx.objectStore(MF_IDB_STORE).put(payload);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
+            if(hasBusinessData){
+                try{ localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_READY','1'); localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_HASH',String(payload.stateFingerprint||'')); }catch(e){}
+            }
             return payload;
         }
 
@@ -3241,21 +3252,36 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         async function initializeSecureStorage(){
             try{
                 const snap=await idbGetSnapshot();
-                const hasData=obj=>!!(obj && obj.products && ((Array.isArray(obj.loans)?obj.loans.length:0)+(Array.isArray(obj.borrowings)?obj.borrowings.length:0)+(Array.isArray(obj.staff)?obj.staff.length:0)+(Array.isArray(obj.expenses)?obj.expenses.length:0)));
-                if(snap?.state && hasData(snap.state)) state=snap.state;
-                // IMPORTANT: this clean build intentionally does NOT read MF_OPEX_PRO_DB,
-                // MF_LOCAL_DIRTY_AT or any previous application's business snapshot.
-                // Google Drive restore is the migration path into the new database.
+                const hasData=obj=>!!(obj && obj.products && (
+                    (Array.isArray(obj.loans)?obj.loans.length:0)+
+                    (Array.isArray(obj.borrowings)?obj.borrowings.length:0)+
+                    (Array.isArray(obj.staff)?obj.staff.length:0)+
+                    (Array.isArray(obj.expenses)?obj.expenses.length:0)
+                ));
+                const validLocalSnapshot=!!(snap?.state && hasData(snap.state));
+                if(validLocalSnapshot){
+                    state=snap.state;
+                    try{ localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_READY','1'); localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_HASH',String(snap.stateFingerprint||mfStateFingerprintObject(snap.state)||'')); }catch(e){}
+                }
+                // IMPORTANT: never write the startup/default in-memory state over a missing
+                // or unreadable restored snapshot. That was the reload-wipe failure: a fresh
+                // zero-state could be persisted before the verified Drive/local state was
+                // accepted, destroying the only local copy that should have survived reload.
+                // A blank first-run device is intentionally left unsnapshotted until real data
+                // or a verified Drive restore exists.
                 normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
-                await idbPutSnapshot();
                 mfDbReady=true;
                 mfV2LocalStateReady=true;
                 markStorageReady();
                 renderAll(); updateSecureCloudStatus(); ensureInitialVersionedBackup();
-                mfScaleReinstallStateProxy(); initializeScalableDataLayer();
-                // If Firebase/Auth became ready first during a hard reload, resume exactly
-                // once now that the restored local snapshot is authoritative for this device.
-                if(mfV2BaselineReady() && mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser){
+                // The previous build called initializeScalableDataLayer() here, but that
+                // function is not defined in the clean rebuild. Calling it aborted startup
+                // immediately after the snapshot work. The scalable layer is already rebuilt
+                // through its guarded data functions, so do not call a missing initializer.
+                try{ mfScaleReinstallStateProxy(); }catch(e){}
+                // If Firebase/Auth became ready first during a hard reload, resume only after
+                // the local snapshot has been loaded. Never let an empty startup state win.
+                if(validLocalSnapshot && mfV2BaselineReady() && mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser){
                     try{
                         await mfV2Reconcile('local-ready');
                         window.mfFirebaseInitialSyncReady=true;
@@ -3266,8 +3292,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }
             }catch(err){
                 console.error('Clean IndexedDB initialization failed',err);
-                mfDbReady=false; markStorageReady();
-                updateSecureCloudStatus('⚠️ Clean local database could not start. Google Drive restore remains available after storage is repaired.',true);
+                mfDbReady=false; mfV2LocalStateReady=false; markStorageReady();
+                updateSecureCloudStatus('⚠️ Clean local database could not start. No default state was written over the existing snapshot.',true);
             }
         }
 
@@ -8919,7 +8945,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(!confirm('Restore the latest encrypted Google Drive database? Your current device data will first be preserved in local version history.')) return;
                 try{ const safety={id:'pre-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
                 const r=await driveApi('files/'+files[0].id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot();
+                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
+                const persisted=await idbPutSnapshot();
+                if(!persisted?.state || !localStorage.getItem('MF_V2_LOCAL_SNAPSHOT_READY')) throw new Error('Restored data could not be committed to the protected local database. Cloud baseline was not changed.');
                 renderAll(); await mfV2PublishVerifiedDriveBaseline('latest-drive-restore'); updateSecureCloudStatus('🟢 Latest encrypted Google Drive backup restored, validated, and published as the new secure baseline.'); const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Restored latest backup: '+new Date().toLocaleString('en-IN'); alert('Latest encrypted Google Drive backup restored successfully and established as the new secure cloud baseline.'); closeModal('modal-cloud'); setTab('feed');
             }catch(err){alert('Cloud restore failed: '+(err?.message||err));}
         }
@@ -9025,7 +9053,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
                 state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true;
                 normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
-                await idbPutSnapshot();
+                const persisted=await idbPutSnapshot();
+                if(!persisted?.state || !localStorage.getItem('MF_V2_LOCAL_SNAPSHOT_READY')) throw new Error('Restored data could not be committed to the protected local database. Cloud baseline was not changed.');
                 renderAll();
                 await mfV2PublishVerifiedDriveBaseline('timestamped-drive-restore');
                 updateSecureCloudStatus('🟢 Timestamped Google Drive backup restored, validated, and published as the new secure cloud baseline.');
