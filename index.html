@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- AMARA V2 FINAL AUTH-FIXED: wait for persisted Firebase Auth user before connection state -->
 <!-- AMARA V2 FINAL AUDITED: baseline-gated Firebase reconciliation -->
     <script>document.documentElement.classList.add('mf-storage-loading');if(new URLSearchParams(location.search).get('mfqa')==='1')document.documentElement.classList.add('mf-qa-preview');</script>
     <meta charset="UTF-8">
@@ -3463,7 +3464,22 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         // A verified Google Drive restore must first arm MF_V2_BASELINE_READY.
         // This prevents stale cloud/local defaults from becoming authoritative merely by connecting.
         async function connectFirebaseSync(){
-          try{const raw=(document.getElementById('firebase-config-input')?.value||'').trim(),code=(document.getElementById('firebase-sync-code')?.value||'').trim();if(!raw||!code){alert('Please paste your Firebase config AND enter a Sync Code.');return;}const cfg=JSON.parse(raw);if(!cfg.projectId)throw new Error('Firebase config is missing projectId.');await mfV2EnsureFirebase(cfg);mfFirebaseSyncCode=code;await mfInitAuth();if(mfFirebaseUser){
+          try{const raw=(document.getElementById('firebase-config-input')?.value||'').trim(),code=(document.getElementById('firebase-sync-code')?.value||'').trim();if(!raw||!code){alert('Please paste your Firebase config AND enter a Sync Code.');return;}const cfg=JSON.parse(raw);if(!cfg.projectId)throw new Error('Firebase config is missing projectId.');await mfV2EnsureFirebase(cfg);mfFirebaseSyncCode=code;await mfInitAuth();
+            // AUTH RACE FIX: mfInitAuth installs Firebase's onAuthStateChanged asynchronously.
+            // The old path checked mfFirebaseUser immediately, so an already-signed-in browser
+            // could remain visually "Not connected yet". Wait briefly for the persisted user.
+            if(!mfFirebaseUser && mfFirebaseAuth?.currentUser){
+              mfFirebaseUser=mfFirebaseAuth.currentUser;
+            }
+            if(!mfFirebaseUser && mfFirebaseAuth){
+              const deadline=Date.now()+5000;
+              while(!mfFirebaseUser && Date.now()<deadline){
+                mfFirebaseUser=mfFirebaseAuth.currentUser||null;
+                if(mfFirebaseUser)break;
+                await new Promise(r=>setTimeout(r,100));
+              }
+            }
+            if(mfFirebaseUser){
             window.mfFirebaseInitialSyncReady=false;
             if(mfV2BaselineReady()){
               await mfV2Reconcile('connect');
@@ -3473,7 +3489,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             }else{
               mfV2SetStatus('🟡 Firebase connection established. No cloud reconciliation will run until the verified Google Drive baseline is restored.',false);
             }
-          }mfRefreshFirebaseSyncControls();}catch(e){console.error(e);mfV2SetStatus(mfV2Error(e,'Firebase connection'),true);alert(mfV2Error(e,'Firebase connection'));}
+          }else{
+            mfV2SetStatus('🔒 Firebase SDK initialized, but the signed-in Firebase user is not available yet. No cloud data was read or written.',true);
+          }
+          mfRefreshFirebaseSyncControls();}catch(e){console.error(e);mfV2SetStatus(mfV2Error(e,'Firebase connection'),true);alert(mfV2Error(e,'Firebase connection'));}
         }
         // Explicit recovery-baseline command. Google Drive restore code can call this after a verified restore.
         window.AMARA_SYNC_V2={version:'AMARA-SYNC-V2',initializeFromThisDevice:async function(){mfV2ArmBaseline();mfV2MarkDirty();return mfV2PushToServer(true);},push:()=>mfV2Reconcile('manual'),pull:()=>mfV2PullFromServer(false),status:()=>({connected:!!(mfFirestoreDb&&mfFirebaseSyncCode&&mfFirebaseUser),hash:mfV2Fingerprint(),cloudHash:mfV2LastHash()})};
