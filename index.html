@@ -2292,8 +2292,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="font-size:.66rem;color:#94a3b8;line-height:1.4;margin-bottom:8px;">Sign-in is the identity layer for the Secure Edition. It does not replace your App Lock PIN. Production Secure Sync is the default. Existing local data is preserved until you explicitly choose the cloud/local direction.</div>
                 <div id="mf-auth-status" style="font-size:.68rem;color:#94a3b8;margin-bottom:7px;">Not signed in.</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-                    <input id="mf-auth-email" type="email" placeholder="Account email" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="off">
-                    <input id="mf-auth-key" type="text" placeholder="Secure account credential" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="new-password">
+                    <input id="mf-auth-email" type="email" name="mf-account-email" placeholder="Account email" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="off" data-lpignore="true">
+                    <input id="mf-auth-key" type="text" name="mf-secure-credential" placeholder="Secure account credential" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;-webkit-text-security:disc;text-security:disc;" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:7px;">
                     <button type="button" class="btn-header btn-green" style="justify-content:center;" onclick="mfAuthSignIn()"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
