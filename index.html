@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- AMARA V2 STATUS-FIXED: restored secure Firebase status helper -->
 <!-- AMARA V2 FINAL CONNECTION-FIXED: authoritative Firebase Auth resolution -->
 <!-- AMARA V2 FINAL AUTH-FIXED: wait for persisted Firebase Auth user before connection state -->
 <!-- AMARA V2 FINAL AUDITED: baseline-gated Firebase reconciliation -->
@@ -3309,6 +3310,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function mfV2HasBusinessData(){return !!((state.loans||[]).length||(state.borrowings||[]).length||(state.products&&Object.keys(state.products).length)||(state.staff||[]).length||(state.expenses||[]).length);}
         function mfV2BaselineReady(){return localStorage.getItem('MF_V2_BASELINE_READY')==='1';}
         function mfV2ArmBaseline(){try{localStorage.setItem('MF_V2_BASELINE_READY','1');}catch(e){}}
+        // STATUS-FIX: restore the secure Firebase status helper used by V2 UI paths.
+        function setFirebaseStatus(msg,warn=false){
+          const el=document.getElementById('firebase-sync-status');
+          if(el){
+            el.textContent=String(msg||'');
+            el.style.color=warn?'#fde68a':'#a7f3d0';
+          }
+          try{mfRefreshFirebaseSyncControls();}catch(e){}
+        }
         function mfV2SetStatus(msg,warn=false){setFirebaseStatus(msg,warn);}
 
         async function mfV2EnsureFirebase(cfg){
