@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- AMARA V2 FINAL AUDITED: baseline-gated Firebase reconciliation -->
     <script>document.documentElement.classList.add('mf-storage-loading');if(new URLSearchParams(location.search).get('mfqa')==='1')document.documentElement.classList.add('mf-qa-preview');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -3317,9 +3318,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         function mfRefreshFirebaseSyncControls(){
           const connected=!!(mfFirestoreDb&&mfFirebaseSyncCode&&mfFirebaseUser);
+          const baseline=mfV2BaselineReady();
           const push=document.getElementById('mf-push-sync-btn'),pull=document.getElementById('mf-pull-sync-btn');
-          if(push){push.disabled=!connected;push.innerHTML='<i class="fa-solid fa-arrows-rotate"></i> Sync Now';}
-          if(pull)pull.disabled=!connected;
+          if(push){push.disabled=!(connected&&baseline);push.innerHTML='<i class="fa-solid fa-arrows-rotate"></i> Sync Now';}
+          if(pull)pull.disabled=!(connected&&baseline);
         }
         function mfFirebaseErrorLabel(err,action='Firebase operation'){return mfV2Error(err,action);}
         function mfSetKnownCloudVersion(v){try{localStorage.setItem('MF_V2_CLOUD_VERSION',String(Number(v)||0));}catch(e){}}
@@ -3359,6 +3361,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           delete out.payments; return out;
         }
         async function mfV2PullFromServer(showConfirm=false){
+          if(!mfV2BaselineReady()) throw new Error('V2 baseline is not initialized. Restore the verified Google Drive backup on this device first.');
           if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser) throw new Error('Connect Firebase and sign in first.');
           if(showConfirm&&!confirm('This will replace the data on THIS device with the latest NEW secure cloud database. Continue?')) return false;
           const root=await mfV2GetRootServer(); if(!root.exists) return false;
@@ -3375,6 +3378,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           return true;
         }
         async function mfV2PushToServer(force=false){
+          if(!mfV2BaselineReady()) throw new Error('V2 baseline is not initialized. Restore the verified Google Drive backup on this device first.');
           if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser) throw new Error('Connect Firebase and sign in first.');
           const localHash=mfV2Fingerprint(); const root=await mfV2GetRootServer(); const cloud=root.exists?(root.data()||{}):{};
           if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
@@ -3402,6 +3406,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           return true;
         }
         async function mfV2Reconcile(reason='auto'){
+          // HARD SAFETY GATE: a fresh V2 device must never read, create, overwrite,
+          // or reconcile against Firebase until a verified Google Drive/local baseline
+          // has explicitly armed MF_V2_BASELINE_READY.
+          if(!mfV2BaselineReady())return false;
           if(mfCleanSyncBusy||!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return false;
           mfCleanSyncBusy=true;
           try{
@@ -3439,11 +3447,33 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(cfg)localStorage.setItem('MF_FIREBASE_CONFIG',JSON.stringify(cfg));if(syncCode)localStorage.setItem('MF_FIREBASE_SYNC_CODE',String(syncCode));
             await mfV2EnsureFirebase(cfg);mfFirebaseSyncCode=String(syncCode||localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'');
             if(!mfFirebaseUser){mfV2SetStatus('🔒 Firebase connected. Sign in to continue.',true);return;}
-            window.mfFirebaseInitialSyncReady=false;await mfV2Reconcile('connect');window.mfFirebaseInitialSyncReady=true;startFirebaseListener();mfRefreshFirebaseSyncControls();
+            window.mfFirebaseInitialSyncReady=false;
+            if(mfV2BaselineReady()){
+              await mfV2Reconcile('connect');
+              window.mfFirebaseInitialSyncReady=true;
+              startFirebaseListener();
+              mfV2SetStatus('🟢 Secure Firebase connected and verified baseline is active.',false);
+            }else{
+              mfV2SetStatus('🟡 Firebase connection established. Waiting for the verified Google Drive baseline before any cloud reconciliation.',false);
+            }
+            mfRefreshFirebaseSyncControls();
           }catch(e){console.error(e);mfV2SetStatus(mfV2Error(e,'Firebase connection'),true);if(showAlerts)alert(mfV2Error(e,'Firebase connection'));}
         }
+        // SAFE-CONNECT V2: a fresh device never pulls/pushes during Firebase connection.
+        // A verified Google Drive restore must first arm MF_V2_BASELINE_READY.
+        // This prevents stale cloud/local defaults from becoming authoritative merely by connecting.
         async function connectFirebaseSync(){
-          try{const raw=(document.getElementById('firebase-config-input')?.value||'').trim(),code=(document.getElementById('firebase-sync-code')?.value||'').trim();if(!raw||!code){alert('Please paste your Firebase config AND enter a Sync Code.');return;}const cfg=JSON.parse(raw);if(!cfg.projectId)throw new Error('Firebase config is missing projectId.');await mfV2EnsureFirebase(cfg);mfFirebaseSyncCode=code;await mfInitAuth();if(mfFirebaseUser){window.mfFirebaseInitialSyncReady=false;await mfV2Reconcile('connect');window.mfFirebaseInitialSyncReady=true;startFirebaseListener();}mfRefreshFirebaseSyncControls();}catch(e){console.error(e);mfV2SetStatus(mfV2Error(e,'Firebase connection'),true);alert(mfV2Error(e,'Firebase connection'));}
+          try{const raw=(document.getElementById('firebase-config-input')?.value||'').trim(),code=(document.getElementById('firebase-sync-code')?.value||'').trim();if(!raw||!code){alert('Please paste your Firebase config AND enter a Sync Code.');return;}const cfg=JSON.parse(raw);if(!cfg.projectId)throw new Error('Firebase config is missing projectId.');await mfV2EnsureFirebase(cfg);mfFirebaseSyncCode=code;await mfInitAuth();if(mfFirebaseUser){
+            window.mfFirebaseInitialSyncReady=false;
+            if(mfV2BaselineReady()){
+              await mfV2Reconcile('connect');
+              window.mfFirebaseInitialSyncReady=true;
+              startFirebaseListener();
+              mfV2SetStatus('🟢 Secure Firebase connected and verified baseline is active.',false);
+            }else{
+              mfV2SetStatus('🟡 Firebase connection established. No cloud reconciliation will run until the verified Google Drive baseline is restored.',false);
+            }
+          }mfRefreshFirebaseSyncControls();}catch(e){console.error(e);mfV2SetStatus(mfV2Error(e,'Firebase connection'),true);alert(mfV2Error(e,'Firebase connection'));}
         }
         // Explicit recovery-baseline command. Google Drive restore code can call this after a verified restore.
         window.AMARA_SYNC_V2={version:'AMARA-SYNC-V2',initializeFromThisDevice:async function(){mfV2ArmBaseline();mfV2MarkDirty();return mfV2PushToServer(true);},push:()=>mfV2Reconcile('manual'),pull:()=>mfV2PullFromServer(false),status:()=>({connected:!!(mfFirestoreDb&&mfFirebaseSyncCode&&mfFirebaseUser),hash:mfV2Fingerprint(),cloudHash:mfV2LastHash()})};
@@ -8733,7 +8763,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(remoteUpdated > localUpdated + 2000){
                 try{ const conflict={id:'conflict-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(conflict);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); localStorage.setItem('MF_LAST_LOCAL_CONFLICT_AT',conflict.updatedAt); }catch(e){}
                 const r=await driveApi('files/'+remote.id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); mfV2ArmBaseline(); mfV2MarkDirty(); scheduleFirebasePush();
+                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); mfV2ArmBaseline(); mfV2MarkDirty(); try{mfRefreshFirebaseSyncControls();}catch(e){} scheduleFirebasePush();
                 markCloudSynced(); renderAll(); updateSecureCloudStatus('🟢 Latest encrypted Google Drive data loaded on this device. New secure cloud baseline will be published automatically.'); return;
             }
             if(localUpdated > remoteUpdated + 2000 || dirty){ await syncNowToGoogleDrive(background); return; }
