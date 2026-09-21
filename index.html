@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- AMARA V2 RESTORE-VERIFIED: Drive restore is the only path that establishes the new cloud baseline -->
 <!-- AMARA V2 FINAL CLEAN-BASELINE: empty seed + isolated namespace + authoritative Drive baseline -->
 <!-- AMARA V2 STATUS-FIXED: restored secure Firebase status helper -->
 <!-- AMARA V2 FINAL CONNECTION-FIXED: authoritative Firebase Auth resolution -->
@@ -3534,6 +3535,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         // normal reconcile that could choose to pull an older cloud snapshot.
         async function mfV2PublishVerifiedDriveBaseline(reason='drive-restore'){
           if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser) throw new Error('Connect Firebase and sign in before establishing the cloud baseline.');
+          const hasRestoredState = !!(state && typeof state==='object' &&
+            Array.isArray(state.loans) && state.products && Array.isArray(state.expenses) &&
+            Array.isArray(state.staff) && Array.isArray(state.borrowings));
+          if(!hasRestoredState) throw new Error('Verified Drive restore did not produce a complete business state. Cloud baseline was not changed.');
           mfV2ArmBaseline();
           mfV2MarkDirty();
           await mfV2PushToServer(true);
@@ -3544,7 +3549,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         // Explicit recovery-baseline command. Google Drive restore code can call this after a verified restore.
-        window.AMARA_SYNC_V2={version:'AMARA-SYNC-V2',initializeFromThisDevice:async function(){mfV2ArmBaseline();mfV2MarkDirty();return mfV2PushToServer(true);},push:()=>mfV2Reconcile('manual'),pull:()=>mfV2PullFromServer(false),status:()=>({connected:!!(mfFirestoreDb&&mfFirebaseSyncCode&&mfFirebaseUser),hash:mfV2Fingerprint(),cloudHash:mfV2LastHash()})};
+        window.AMARA_SYNC_V2={
+          version:'AMARA-SYNC-V2-FINAL-CLEAN',
+          initializeFromThisDevice:async function(){return mfV2PublishVerifiedDriveBaseline('explicit-baseline');},
+          push:()=>mfV2Reconcile('manual'),
+          pull:()=>mfV2PullFromServer(false),
+          status:()=>({connected:!!(mfFirestoreDb&&mfFirebaseSyncCode&&mfFirebaseUser),baseline:mfV2BaselineReady(),hash:mfV2Fingerprint(),cloudHash:mfV2LastHash()})
+        };
         // ================== END CLEAN FIREBASE SYNC ENGINE V2 ==================
 
 // ================== SECURE EDITION CORE ==================
@@ -8879,7 +8890,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(!confirm('Restore the latest encrypted Google Drive database? Your current device data will first be preserved in local version history.')) return;
                 try{ const safety={id:'pre-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
                 const r=await driveApi('files/'+files[0].id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); mfV2ArmBaseline(); mfV2MarkDirty();
+                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot();
                 renderAll(); await mfV2PublishVerifiedDriveBaseline('latest-drive-restore'); updateSecureCloudStatus('🟢 Latest encrypted Google Drive backup restored, validated, and published as the new secure baseline.'); const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Restored latest backup: '+new Date().toLocaleString('en-IN'); alert('Latest encrypted Google Drive backup restored successfully and established as the new secure cloud baseline.'); closeModal('modal-cloud'); setTab('feed');
             }catch(err){alert('Cloud restore failed: '+(err?.message||err));}
         }
@@ -9907,7 +9918,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
 <script id="amara-clean-v2-startup">
 window.addEventListener('load',()=>setTimeout(()=>{try{initializeSecureStorage();}catch(e){console.error('Clean storage startup failed',e);}},50));
-window.addEventListener('online',()=>{try{if(typeof mfV2Reconcile==='function')mfV2Reconcile('online');}catch(e){}});
+window.addEventListener('online',()=>{try{
+  if(typeof mfV2BaselineReady==='function' && mfV2BaselineReady() && typeof mfV2Reconcile==='function') mfV2Reconcile('online');
+}catch(e){console.error('V2 online reconciliation guard',e);}});
 </script>
 </body>
 </html>
