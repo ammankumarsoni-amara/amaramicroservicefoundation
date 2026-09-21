@@ -3483,12 +3483,34 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           mfV2SetStatus('🟢 Secure cloud updated from this device — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
           return true;
         }
+        async function mfV2AdoptVerifiedCloudBaseline(reason='cloud-bootstrap'){
+          // A verified baseline is a business/cloud property, not a device-local flag.
+          // A fresh mobile can therefore adopt an already-established secure cloud
+          // baseline after authentication, without performing a Drive restore first.
+          if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return false;
+          const root=await mfV2GetRootServer();
+          if(!root.exists)return false;
+          const cloud=root.data()||{};
+          if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
+          if(String(cloud.schemaVersion||'')!=='AMARA-SYNC-V2')return false;
+          const fp=String(cloud.stateFingerprint||'');
+          const counts=cloud.counts&&typeof cloud.counts==='object'?cloud.counts:{};
+          const total=Number(counts.loans||0)+Number(counts.products||0)+Number(counts.staff||0)+Number(counts.expenses||0)+Number(counts.borrowings||0)+Number(counts.payments||0);
+          if(!fp||total<=0)return false;
+          mfV2ArmBaseline();
+          try{localStorage.setItem('MF_V2_FINAL_CLEAN_CLOUD_VERSION',String(Number(cloud.version||0)));}catch(e){}
+          return true;
+        }
+
         async function mfV2Reconcile(reason='auto'){
           // HARD SAFETY GATE: Firebase must never reconcile against the startup/default
-          // state. IndexedDB/local restore must finish first, then the verified baseline
-          // gate may permit cloud reconciliation.
+          // state. IndexedDB/local restore must finish first. A fresh device may first
+          // adopt the already-verified cloud baseline; only then can reconciliation run.
           if(!mfV2LocalStateReady || !mfDbReady)return false;
-          if(!mfV2BaselineReady())return false;
+          if(!mfV2BaselineReady()){
+            try{if(!await mfV2AdoptVerifiedCloudBaseline('reconcile'))return false;}
+            catch(e){mfV2SetStatus(mfV2Error(e,'Secure cloud verification'),true);return false;}
+          }
           if(mfCleanSyncBusy||!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return false;
           mfCleanSyncBusy=true;
           try{
@@ -3528,22 +3550,26 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             await mfV2EnsureFirebase(cfg);mfFirebaseSyncCode=String(syncCode||localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'');
             if(!mfFirebaseUser){mfV2SetStatus('🔒 Firebase connected. Sign in to continue.',true);return;}
             window.mfFirebaseInitialSyncReady=false;
-            if(mfV2BaselineReady() && mfV2LocalStateReady && mfDbReady){
-              await mfV2Reconcile('connect');
-              window.mfFirebaseInitialSyncReady=true;
-              startFirebaseListener();
-              mfV2SetStatus('🟢 Secure Firebase connected and verified baseline is active.',false);
-            }else if(mfV2BaselineReady()){
-              mfV2SetStatus('🟡 Firebase connected. Restoring the verified local database before automatic sync.',false);
+            if(mfV2LocalStateReady && mfDbReady){
+              const adopted=mfV2BaselineReady() || await mfV2AdoptVerifiedCloudBaseline('firebase-connect');
+              if(adopted){
+                await mfV2Reconcile('connect');
+                window.mfFirebaseInitialSyncReady=true;
+                startFirebaseListener();
+                mfV2SetStatus('🟢 Secure Firebase connected. Verified cloud baseline loaded; automatic sync is active.',false);
+              }else{
+                mfV2SetStatus('🟡 Firebase connected. No verified cloud baseline was found yet; Google Drive recovery remains available.',false);
+              }
             }else{
-              mfV2SetStatus('🟡 Firebase connection established. Waiting for the verified Google Drive baseline before any cloud reconciliation.',false);
+              mfV2SetStatus('🟡 Firebase connected. Restoring the local database before automatic sync.',false);
             }
             mfRefreshFirebaseSyncControls();
           }catch(e){console.error(e);mfV2SetStatus(mfV2Error(e,'Firebase connection'),true);if(showAlerts)alert(mfV2Error(e,'Firebase connection'));}
         }
-        // SAFE-CONNECT V2: a fresh device never pulls/pushes during Firebase connection.
-        // A verified Google Drive restore must first arm MF_V2_BASELINE_READY.
-        // This prevents stale cloud/local defaults from becoming authoritative merely by connecting.
+        // SAFE-CONNECT V2: a fresh device never pushes startup/default data.
+        // It may read and adopt an already-established verified cloud baseline after
+        // Firebase Auth succeeds; Google Drive remains the recovery/baseline-establishment
+        // path when the secure cloud has not yet been initialized.
         async function connectFirebaseSync(){
           try{
             const raw=(document.getElementById('firebase-config-input')?.value||'').trim();
@@ -3582,15 +3608,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
             if(mfFirebaseUser){
               window.mfFirebaseInitialSyncReady=false;
-              if(mfV2BaselineReady() && mfV2LocalStateReady && mfDbReady){
-                await mfV2Reconcile('connect');
-                window.mfFirebaseInitialSyncReady=true;
-                startFirebaseListener();
-                mfV2SetStatus('🟢 Secure Firebase connected and verified baseline is active.',false);
-              }else if(mfV2BaselineReady()){
-                mfV2SetStatus('🟡 Firebase connected. Restoring the verified local database before automatic sync.',false);
+              if(mfV2LocalStateReady && mfDbReady){
+                const adopted=mfV2BaselineReady() || await mfV2AdoptVerifiedCloudBaseline('firebase-connect');
+                if(adopted){
+                  await mfV2Reconcile('connect');
+                  window.mfFirebaseInitialSyncReady=true;
+                  startFirebaseListener();
+                  mfV2SetStatus('🟢 Secure Firebase connected. Verified cloud baseline loaded; automatic sync is active.',false);
+                }else{
+                  mfV2SetStatus('🟡 Firebase connected. No verified cloud baseline was found yet; Google Drive recovery remains available.',false);
+                }
               }else{
-                mfV2SetStatus('🟡 Firebase connection established. Waiting for the verified Google Drive baseline before any cloud reconciliation.',false);
+                mfV2SetStatus('🟡 Firebase connected. Restoring the local database before automatic sync.',false);
               }
             }else{
               mfV2SetStatus('⚠️ Firebase initialized, but no Firebase Auth user was returned. No cloud data was read or written.',true);
