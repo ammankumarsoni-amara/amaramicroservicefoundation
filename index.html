@@ -3465,7 +3465,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser) throw new Error('Connect Firebase and sign in first.');
           const localHash=mfV2Fingerprint(); const root=await mfV2GetRootServer(); const cloud=root.exists?(root.data()||{}):{};
           if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
-          if(root.exists && cloud.stateFingerprint && cloud.stateFingerprint!==localHash && !force) throw new Error('SYNC_CONFLICT: secure cloud changed. Use Pull Latest or explicitly restore this device as the new baseline.');
+          const knownCloudHash=mfV2LastHash();
+          // Local edits are pushed when the cloud still equals the last acknowledged cloud version.
+          // Never compare a device clock with Firestore serverTimestamp(); mobile/laptop clock skew
+          // must not turn a legitimate local edit into an accidental pull of older cloud metadata.
+          if(root.exists && cloud.stateFingerprint && cloud.stateFingerprint!==localHash && !force && (!knownCloudHash || cloud.stateFingerprint!==knownCloudHash)) throw new Error('SYNC_CONFLICT: secure cloud changed on another device. Local changes were not overwritten.');
           const version=mfV2NextVersion(Number(cloud.version||0));
           // Firestore Rules require the parent business document to exist before any
           // structured_v1_* child collection can be written. Create/refresh the owner
@@ -3557,8 +3561,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const cloud=root.data()||{};
             if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
             if(String(cloud.stateFingerprint||'')===String(localHash)){mfV2SetHash(localHash);mfSetKnownCloudVersion(Number(cloud.version||0));mfV2ClearDirty();mfV2SetStatus('🟢 Laptop/mobile are synchronized with the new secure cloud.',false);return true;}
-            const dirty=mfV2DirtyAt(); const cloudMillis=cloud.updatedAt?.toMillis?cloud.updatedAt.toMillis():Date.parse(cloud.updatedAt?.toDate?.()?.toISOString?.()||cloud.updatedAtLabel||'')||0;
-            if(dirty && dirty>cloudMillis){await mfV2PushToServer(false);return true;}
+            const dirty=mfV2DirtyAt();
+            const knownCloudHash=mfV2LastHash();
+            // Deterministic conflict rule: if cloud is still the version this device last
+            // acknowledged, push the local edit. If cloud changed independently, pull it.
+            if(dirty && knownCloudHash && String(cloud.stateFingerprint||'')===String(knownCloudHash)){await mfV2PushToServer(false);return true;}
             await mfV2PullFromServer(false);return true;
           }finally{mfCleanSyncBusy=false;}
         }
