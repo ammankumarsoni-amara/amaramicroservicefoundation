@@ -3284,6 +3284,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // still being recovered. The existing loading CSS keeps the KPI values hidden.
                 if(validLocalSnapshot){
                     markStorageReady();
+                    syncCompanyNameField();
                     renderAll(); updateSecureCloudStatus(); ensureInitialVersionedBackup();
                 }
 
@@ -3563,16 +3564,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(String(cloud.stateFingerprint||'')===String(localHash)){mfV2SetHash(localHash);mfSetKnownCloudVersion(Number(cloud.version||0));mfV2ClearDirty();mfV2SetStatus('🟢 Laptop/mobile are synchronized with the new secure cloud.',false);return true;}
             const dirty=mfV2DirtyAt();
             const knownCloudHash=mfV2LastHash();
-            // Deterministic conflict rule: if cloud is still the version this device last
-            // acknowledged, push the local edit. If cloud changed independently, pull it.
+            // A dirty local edit is never silently discarded. If the cloud is still the
+            // version this device last acknowledged, push the local edit. If the cloud has
+            // independently changed, preserve the local edit and stop automatic reconciliation.
             if(dirty){
               if(knownCloudHash && String(cloud.stateFingerprint||'')===String(knownCloudHash)){
                 await mfV2PushToServer(false);
                 return true;
               }
-              // A local edit must never be silently discarded. If another device has
-              // changed the cloud since this device last acknowledged it, stop automatic
-              // reconciliation and preserve the local edit for explicit conflict review.
               mfV2SetStatus('🟠 Local changes are waiting: secure cloud changed on another device. Local data was preserved; no automatic overwrite occurred.',true);
               return false;
             }
@@ -4187,6 +4186,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         function persist(){
             const now=new Date();
+            try{ mfV2MarkDirty(); }catch(e){}
             try{ mfFinancialReconciliationCache=null; mfGrowthCache=null; }catch(e){}
             try{
                 localStorage.setItem("MF_LOCAL_DIRTY_AT", now.toISOString());
@@ -4517,7 +4517,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         // Calculations/state/security are untouched; only the DOM render scope is reduced.
         let mfActiveTab = 'feed';
         let mfRenderRaf = 0;
+        function syncCompanyNameField(){
+            const input=document.getElementById('biz-name');
+            if(!input) return;
+            const name=String(state?.bizName || state?.companyProfile?.legalName || '').trim();
+            if(input.value!==name) input.value=name;
+            document.title=name || 'Microfinance Management';
+        }
+
         function renderAll(){
+            syncCompanyNameField();
             renderKPIs();
             if (state.bizName) document.title = state.bizName;
             const tab = mfActiveTab || 'feed';
