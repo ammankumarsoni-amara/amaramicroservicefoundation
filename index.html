@@ -1,12 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- AMARA V2 RESTORE-VERIFIED: Drive restore is the only path that establishes the new cloud baseline -->
-<!-- AMARA V2 FINAL CLEAN-BASELINE: empty seed + isolated namespace + authoritative Drive baseline -->
-<!-- AMARA V2 STATUS-FIXED: restored secure Firebase status helper -->
-<!-- AMARA V2 FINAL CONNECTION-FIXED: authoritative Firebase Auth resolution -->
-<!-- AMARA V2 FINAL AUTH-FIXED: wait for persisted Firebase Auth user before connection state -->
-<!-- AMARA V2 FINAL AUDITED: baseline-gated Firebase reconciliation -->
+<!-- AMARA SYNC V2 — audited secure baseline/auth/status/reconciliation checkpoints -->
     <script>document.documentElement.classList.add('mf-storage-loading');if(new URLSearchParams(location.search).get('mfqa')==='1')document.documentElement.classList.add('mf-qa-preview');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -902,7 +897,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
   .finance-status-pill.foreclosed{color:#6b21a8!important;background:#faf5ff!important;border-color:#d8b4fe!important;}
 }
 </style>
-<!-- AMARA V2 RESTORE-VERIFIED -->
+<!-- AMARA SYNC V2 — verified secure restore baseline -->
 </head>
 <body>
 
@@ -3418,25 +3413,28 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         async function mfV2WriteEntities(ownerUid,version){
           const kinds={loans:mfV2EntityRows('loans'),products:mfV2EntityRows('products'),staff:mfV2EntityRows('staff'),expenses:mfV2EntityRows('expenses'),borrowings:mfV2EntityRows('borrowings'),payments:mfV2PaymentRows()};
-          for(const kind of MF_SYNC_V2_KINDS){
+          // Keep Firestore's 400-document batch safety limit, but write independent
+          // collections concurrently to remove serial network waits.
+          await Promise.all(MF_SYNC_V2_KINDS.map(async kind=>{
             const col=mfV2Col(kind); const rows=kinds[kind];
             for(let i=0;i<rows.length;i+=400){
               const batch=mfFirestoreDb.batch();
               rows.slice(i,i+400).forEach(e=>{const ref=col.doc(e.id);batch.set(ref,{...e.row,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp(),...(kind==='payments'?{loanId:e.loanId,paymentIndex:e.paymentIndex}:{})},{merge:true});});
               await batch.commit();
             }
-          }
+          }));
         }
         async function mfV2ReadEntities(ownerUid){
           const out={loans:[],products:{},staff:[],expenses:[],borrowings:[],payments:[]};
-          // FINAL AUTHORITY RULE: child collections are read from the Firestore server,
-          // never from a browser/cache snapshot. A cached/empty child query can otherwise
-          // reconstruct an empty state during a hard reload even when the cloud baseline
-          // is correct.
-          for(const kind of MF_SYNC_V2_KINDS){
-            const snap=await mfV2Col(kind).where('_ownerUid','==',ownerUid).get({source:'server'});
+          // Child collections remain authoritative server reads. They are independent,
+          // so fetch them in parallel instead of waiting for six network round-trips.
+          const snaps=await Promise.all(MF_SYNC_V2_KINDS.map(kind=>
+            mfV2Col(kind).where('_ownerUid','==',ownerUid).get({source:'server'})
+          ));
+          MF_SYNC_V2_KINDS.forEach((kind,index)=>{
+            const snap=snaps[index];
             snap.forEach(d=>{const x=mfV2SafeClone(d.data()||{});delete x._ownerUid;delete x._syncVersion;delete x._updatedAt;delete x.id; if(kind==='products')out.products[String(d.id)]=x;else if(kind==='payments')out.payments.push({...x,id:String(d.id)});else out[kind].push({...x,id:String(d.id)});});
-          }
+          });
           const byLoan=new Map(out.loans.map(l=>[String(l.id),l]));
           out.loans.forEach(l=>l.payments=[]);
           out.payments.sort((a,b)=>{const ai=Number(a.paymentIndex)||0,bi=Number(b.paymentIndex)||0;return String(a.loanId).localeCompare(String(b.loanId))||ai-bi;});
@@ -3482,11 +3480,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           // deleted loan/payment from reappearing on another device during a later pull.
           const currentIds={};
           for(const kind of MF_SYNC_V2_KINDS){currentIds[kind]=new Set((kind==='payments'?mfV2PaymentRows():mfV2EntityRows(kind)).map(x=>String(x.id)));}
-          for(const kind of MF_SYNC_V2_KINDS){
-            const snap=await mfV2Col(kind).where('_ownerUid','==',mfFirebaseUser.uid).get();
+          // Cleanup reads are independent; run them concurrently while keeping the
+          // same owner-scoped delete rules and 400-document batch limit.
+          await Promise.all(MF_SYNC_V2_KINDS.map(async kind=>{
+            const snap=await mfV2Col(kind).where('_ownerUid','==',mfFirebaseUser.uid).get({source:'server'});
             const stale=snap.docs.filter(d=>!currentIds[kind].has(String(d.id)));
             for(let i=0;i<stale.length;i+=400){const b=mfFirestoreDb.batch();stale.slice(i,i+400).forEach(d=>b.delete(d.ref));await b.commit();}
-          }
+          }));
           const meta={ownerUid:mfFirebaseUser.uid,version,schemaVersion:'AMARA-SYNC-V2',updatedByDevice:mfFirebaseDeviceId,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAtLabel:new Date().toLocaleString('en-IN'),stateFingerprint:localHash,counts:{loans:(state.loans||[]).length,products:Object.keys(state.products||{}).length,staff:(state.staff||[]).length,expenses:(state.expenses||[]).length,borrowings:(state.borrowings||[]).length,payments:(state.loans||[]).reduce((n,l)=>n+(Array.isArray(l.payments)?l.payments.length:0),0)},shell:mfV2Shell()};
           await rootRef.set(meta,{merge:true});
           mfV2SetHash(localHash);mfSetKnownCloudVersion(version);mfV2ClearDirty();
@@ -3578,7 +3578,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             await mfV2PullFromServer(false);return true;
           }finally{mfCleanSyncBusy=false;}
         }
-        function scheduleFirebasePush(){clearTimeout(mfFirebasePushTimer);mfV2MarkDirty();mfFirebasePushTimer=setTimeout(()=>mfV2Reconcile('scheduled').catch(e=>mfV2SetStatus(mfV2Error(e,'Automatic sync'),true)),1200);}
+        function scheduleFirebasePush(){clearTimeout(mfFirebasePushTimer);mfV2MarkDirty();mfFirebasePushTimer=setTimeout(()=>mfV2Reconcile('scheduled').catch(e=>mfV2SetStatus(mfV2Error(e,'Automatic sync'),true)),250);}
         async function pushStateToFirebase(silent=false){try{mfV2MarkDirty();return await mfV2Reconcile('manual');}catch(e){mfV2SetStatus(mfV2Error(e,'Sync Now'),true);if(!silent)alert(mfV2Error(e,'Sync Now'));}}
         async function pullStateFromFirebase(showConfirm=false){try{return await mfV2PullFromServer(!!showConfirm);}catch(e){mfV2SetStatus(mfV2Error(e,'Pull Latest'),true);if(showConfirm)alert(mfV2Error(e,'Pull Latest'));}}
         function startFirebaseListener(){
