@@ -3258,7 +3258,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     (Array.isArray(obj.staff)?obj.staff.length:0)+
                     (Array.isArray(obj.expenses)?obj.expenses.length:0)
                 ));
-                const validLocalSnapshot=!!(snap?.state && hasData(snap.state));
+                const validLocalSnapshot=!!(snap?.state && (hasData(snap.state) || String(snap.state.bizName||'').trim() || String(snap.state.companyProfile?.legalName||'').trim()));
 
                 if(validLocalSnapshot){
                     state=snap.state;
@@ -4294,7 +4294,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             normalizeCompanyProfile();
             const val=id=>(document.getElementById(id)?.value||'').trim();
             state.companyProfile={
-                legalName:val('cp-legal-name')||state.bizName||'My Finance Company', tagline:val('cp-tagline')||'Microfinance & Lending Solutions',
+                legalName:val('cp-legal-name')||state.bizName||'', tagline:val('cp-tagline')||'Microfinance & Lending Solutions',
                 address:val('cp-address'),cityState:val('cp-city-state'),phone:val('cp-phone'),email:val('cp-email'),website:val('cp-website'),
                 registrationNo:val('cp-registration'),gstin:val('cp-gstin'),licenseNo:val('cp-license')
             };
@@ -4306,7 +4306,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         function mfCompanyPrintHeader(extraTitle=''){
             normalizeCompanyProfile();
-            const c=state.companyProfile||{}, name=financeEsc(c.legalName||state.bizName||'My Finance Company');
+            const c=state.companyProfile||{}, name=financeEsc(String(c.legalName||state.bizName||'').trim());
             const lines=[c.address,c.cityState].filter(Boolean);
             const contacts=[c.phone?`Phone: ${financeEsc(c.phone)}`:'',c.email?`Email: ${financeEsc(c.email)}`:'',c.website?`Web: ${financeEsc(c.website)}`:''].filter(Boolean);
             const regs=[c.registrationNo?`Reg. No.: ${financeEsc(c.registrationNo)}`:'',c.gstin?`GSTIN: ${financeEsc(c.gstin)}`:'',c.licenseNo?`Licence / Registration: ${financeEsc(c.licenseNo)}`:''].filter(Boolean);
@@ -4364,7 +4364,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         document.getElementById("biz-name").value = state.bizName || "";
-        document.title = state.bizName || "Amara Micro Service Foundation";
+        document.title = state.bizName || 'Microfinance Management';
         initDmySelectors("fc");
         initDmySelectors("fc-fixed");
         initDmySelectors("pay-due");
@@ -4380,8 +4380,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         initDmySelectors("rp");
 
         function saveBizName() {
-            state.bizName = document.getElementById("biz-name").value || "My Finance Company";
-            document.title = state.bizName;
+            const value = (document.getElementById("biz-name")?.value || '').trim();
+            state.bizName = value;
+            normalizeCompanyProfile();
+            state.companyProfile.legalName = value;
+            document.title = value || 'Microfinance Management';
             persist();
         }
 
@@ -9487,7 +9490,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 ["AMARA MICRO SERVICE FOUNDATION — EXECUTIVE BUSINESS REPORT"],
                 ["Purpose","Management / Funding Discussion / CA Review"],
                 ["Important","Management information report — not audited financial statements or a statutory filing."],
-                ["Company",state.bizName||"My Finance Company"],
+                ["Company",state.bizName||''],
                 ["Report Date",r.reportDate],
                 [],
                 ["A. BUSINESS SNAPSHOT","VALUE"],
