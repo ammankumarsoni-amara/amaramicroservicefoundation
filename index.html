@@ -3259,41 +3259,58 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     (Array.isArray(obj.expenses)?obj.expenses.length:0)
                 ));
                 const validLocalSnapshot=!!(snap?.state && hasData(snap.state));
+
                 if(validLocalSnapshot){
                     state=snap.state;
-                    try{ localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_READY','1'); localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_HASH',String(snap.stateFingerprint||mfStateFingerprintObject(snap.state)||'')); }catch(e){}
+                    try{
+                        localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_READY','1');
+                        localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_HASH',String(snap.stateFingerprint||mfStateFingerprintObject(snap.state)||''));
+                    }catch(e){}
+                }else{
+                    // A missing local snapshot is never permission to push the startup/default
+                    // state. The verified Firebase baseline is the recovery authority here.
+                    try{
+                        localStorage.removeItem('MF_LOCAL_DIRTY_AT');
+                        localStorage.removeItem('MF_LOCAL_DIRTY_AT_V2');
+                    }catch(e){}
                 }
-                // IMPORTANT: never write the startup/default in-memory state over a missing
-                // or unreadable restored snapshot. That was the reload-wipe failure: a fresh
-                // zero-state could be persisted before the verified Drive/local state was
-                // accepted, destroying the only local copy that should have survived reload.
-                // A blank first-run device is intentionally left unsnapshotted until real data
-                // or a verified Drive restore exists.
+
                 normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
                 mfDbReady=true;
                 mfV2LocalStateReady=true;
-                markStorageReady();
-                renderAll(); updateSecureCloudStatus(); ensureInitialVersionedBackup();
-                // The previous build called initializeScalableDataLayer() here, but that
-                // function is not defined in the clean rebuild. Calling it aborted startup
-                // immediately after the snapshot work. The scalable layer is already rebuilt
-                // through its guarded data functions, so do not call a missing initializer.
                 try{ mfScaleReinstallStateProxy(); }catch(e){}
-                // If Firebase/Auth became ready first during a hard reload, resume only after
-                // the local snapshot has been loaded. Never let an empty startup state win.
-                if(validLocalSnapshot && mfV2BaselineReady() && mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser){
+
+                // Do not present a false zero dashboard while authoritative startup data is
+                // still being recovered. The existing loading CSS keeps the KPI values hidden.
+                if(validLocalSnapshot){
+                    markStorageReady();
+                    renderAll(); updateSecureCloudStatus(); ensureInitialVersionedBackup();
+                }
+
+                if(mfV2BaselineReady() && mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser){
                     try{
-                        await mfV2Reconcile('local-ready');
+                        await mfV2Reconcile(validLocalSnapshot?'local-ready':'server-bootstrap');
                         window.mfFirebaseInitialSyncReady=true;
                         startFirebaseListener();
+                        if(!validLocalSnapshot) markStorageReady();
+                        renderAll();
                     }catch(e){
-                        mfV2SetStatus(mfV2Error(e,'Automatic sync resume'),true);
+                        if(validLocalSnapshot){
+                            markStorageReady();
+                            updateSecureCloudStatus(mfV2Error(e,'Automatic sync resume'),true);
+                        }else{
+                            updateSecureCloudStatus(mfV2Error(e,'Secure cloud startup'),true);
+                        }
                     }
+                }else if(validLocalSnapshot){
+                    // Offline/local-only reopen: verified IndexedDB data remains usable.
+                    markStorageReady();
+                    renderAll();
                 }
             }catch(err){
-                console.error('Clean IndexedDB initialization failed',err);
-                mfDbReady=false; mfV2LocalStateReady=false; markStorageReady();
-                updateSecureCloudStatus('⚠️ Clean local database could not start. No default state was written over the existing snapshot.',true);
+                console.error('Clean authoritative storage initialization failed',err);
+                mfDbReady=false; mfV2LocalStateReady=false;
+                updateSecureCloudStatus('⚠️ Secure startup could not verify the local/cloud database. Existing data was not overwritten.',true);
             }
         }
 
@@ -3406,8 +3423,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         async function mfV2ReadEntities(ownerUid){
           const out={loans:[],products:{},staff:[],expenses:[],borrowings:[],payments:[]};
+          // FINAL AUTHORITY RULE: child collections are read from the Firestore server,
+          // never from a browser/cache snapshot. A cached/empty child query can otherwise
+          // reconstruct an empty state during a hard reload even when the cloud baseline
+          // is correct.
           for(const kind of MF_SYNC_V2_KINDS){
-            const snap=await mfV2Col(kind).where('_ownerUid','==',ownerUid).get();
+            const snap=await mfV2Col(kind).where('_ownerUid','==',ownerUid).get({source:'server'});
             snap.forEach(d=>{const x=mfV2SafeClone(d.data()||{});delete x._ownerUid;delete x._syncVersion;delete x._updatedAt;delete x.id; if(kind==='products')out.products[String(d.id)]=x;else if(kind==='payments')out.payments.push({...x,id:String(d.id)});else out[kind].push({...x,id:String(d.id)});});
           }
           const byLoan=new Map(out.loans.map(l=>[String(l.id),l]));
@@ -9979,6 +10000,12 @@ window.addEventListener('load',()=>setTimeout(()=>{try{initializeSecureStorage()
 window.addEventListener('online',()=>{try{
   if(typeof mfV2BaselineReady==='function' && mfV2BaselineReady() && typeof mfV2Reconcile==='function' && typeof mfV2LocalStateReady!=='undefined' && mfV2LocalStateReady) mfV2Reconcile('online');
 }catch(e){console.error('V2 online reconciliation guard',e);}});
+</script>
+
+<script id="amara-final-authority-sync">
+// AMARA FINAL AUTHORITY SYNC: Firestore server is the startup authority; IndexedDB is
+// only the verified local working snapshot; Google Drive remains backup/recovery.
+// No blank startup state may be pushed or accepted as authoritative.
 </script>
 </body>
 </html>
