@@ -2291,13 +2291,17 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function mfLoanContextHtml(source,type){
             if(!source) return '';
             const label=type==='TOP_UP'?'Top-up Loan':'Renewal Loan';
-            return `<b style="color:#93c5fd;">${label}</b> · New independent Loan Account · Customer history remains linked to <b>${financeEsc(source.name||'-')}</b> · Source Loan <b>${financeEsc(source.id||'-')}</b>. Old loan data will not be changed.`;
+            return `<b style="color:#93c5fd;">${label}</b> · New independent Loan Account · Main Loan Account <b>${financeEsc(source.id||'-')}</b> · Customer history remains linked to <b>${financeEsc(source.name||'-')}</b>. Old loan data will not be changed.`;
         }
         function openRelatedLoanModal(type){
             const id=document.getElementById('passbook-select')?.value;
             const source=(state.loans||[]).find(l=>l.id===id);
             if(!source){alert('Please select the source loan account first.');return;}
             const t=String(type||'TOP_UP').toUpperCase();
+            if(!mfIsMainLoan(source)){
+                alert(`Top-up / Renewal must be initiated from the Main Loan Account (${mfResolveMainLoanId(source)}). This loan remains an independent linked account.`);
+                return;
+            }
             if(t==='RENEWAL' && mfLoanStatusLabel(source)==='ACTIVE'){
                 alert('Renewal is available only after the existing loan account is completely closed, settled, or foreclosed.');
                 return;
@@ -2839,7 +2843,38 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             l.sourceLoanId=String(l.sourceLoanId||l.originLoanId||'').trim();
             l.customerKey=String(l.customerKey||mfMakeCustomerKey(l.name,l.phone));
             l.customerSequence=Number(l.customerSequence)||0;
+            // rootLoanId is the original/main loan account for this customer's loan family.
+            // It is deliberately separate from customerKey: customer identity remains unified,
+            // while every loan account keeps an independent financial/contact snapshot.
+            let rootId=String(l.rootLoanId||'').trim();
+            if(!rootId) rootId=l.sourceLoanId || l.id || '';
+            l.rootLoanId=rootId;
         }
+        function mfResolveMainLoanId(loan){
+            if(!loan) return '';
+            let id=String(loan.rootLoanId||loan.id||'').trim() || String(loan.id||'').trim();
+            const seen=new Set();
+            while(id && !seen.has(id)){
+                seen.add(id);
+                const cur=(state.loans||[]).find(x=>String(x.id)===id);
+                if(!cur) break;
+                const next=String(cur.rootLoanId||cur.sourceLoanId||'').trim();
+                if(!next || next===id) break;
+                id=next;
+            }
+            return id || String(loan.id||'');
+        }
+        function mfIsMainLoan(loan){
+            if(!loan) return false;
+            return String(loan.id||'')===String(mfResolveMainLoanId(loan)||'');
+        }
+        function mfMainLoanFor(loan){
+            const id=mfResolveMainLoanId(loan);
+            return (state.loans||[]).find(x=>String(x.id)===String(id)) || loan || null;
+        }
+        // Normalize the stored family pointer after all legacy loans have received their identity fields.
+        // This keeps every Top-up / Renewal directly anchored to the original Main Loan Account.
+        (state.loans||[]).forEach(l=>{ l.rootLoanId=mfResolveMainLoanId(l); });
         (state.loans || []).forEach(mfEnsureLoanIdentity);
 
         normalizeBorrowingCosts();
@@ -5903,51 +5938,110 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const countEl=document.getElementById('recovery-filter-count'); if(countEl)countEl.textContent=`${state.loans.length} loan accounts · Search to load matching customers`;
                 listDiv.innerHTML=`<div class="recovery-search-empty"><i class="fa-solid fa-magnifying-glass big"></i><b>Search a customer to open recovery actions</b></div>`; return;
             }
-            let pageData=null;
-            try{
-                pageData=await mfScaleRecoveryPageData({query:rawQuery,product:state.activeFilter||'ALL',status:recoveryStatusFilter||'ALL',page:mfScaleRecoveryPage,pageSize:MF_SCALE.recoveryPageSize});
-            }catch(e){ console.warn('Scalable recovery page read skipped:',e); }
-            // The authoritative in-memory state is the final safety net. A stale/missing
-            // IndexedDB search projection must never make a valid customer impossible to find.
-            let filtered=state.loans.filter(l=>recoverySearchMatches(l,rawQuery));
-            if(pageData && Number(pageData.total||0)>0){
-                // Keep the scalable result when it actually found matches.
-                filtered=null;
-            }else if(pageData){
-                // Broken/stale index: force the authoritative state fallback below.
-                pageData=null;
-            }
-            if(filtered){
-                if(state.activeFilter!=='ALL')filtered=filtered.filter(l=>l.product===state.activeFilter);
-                if(recoveryStatusFilter!=='ALL')filtered=filtered.filter(l=>recoveryStatusFilter==='DUE'?getRecoveryStatus(l)==='DUE':getRecoveryStatus(l)===recoveryStatusFilter);
-            }
-            const pageSize=MF_SCALE.recoveryPageSize;
-            const totalMatches=pageData?Number(pageData.total)||0:filtered.length;
-            const totalPages=Math.max(1,Math.ceil(totalMatches/pageSize)); mfScaleRecoveryPage=Math.min(mfScaleRecoveryPage,totalPages-1);
-            let pageLoans=pageData?pageData.rows:filtered.slice(mfScaleRecoveryPage*pageSize,mfScaleRecoveryPage*pageSize+pageSize);
-            if(pageData && mfScaleRecoveryPage !== Number(pageData.page||mfScaleRecoveryPage)){
-                pageData=await mfScaleRecoveryPageData({query:rawQuery,product:state.activeFilter||'ALL',status:recoveryStatusFilter||'ALL',page:mfScaleRecoveryPage,pageSize});
-                pageLoans=pageData?.rows||[];
-            }
-            const countEl=document.getElementById('recovery-filter-count'); if(countEl)countEl.textContent=`Found ${totalMatches} matching ${state.loans.length} loan accounts`;
-            if(!totalMatches){listDiv.innerHTML=`<div class="recovery-search-empty"><i class="fa-solid fa-user-slash big"></i><b>No matching customer</b></div>`;return;}
-            const head=document.createElement('div');head.className='recovery-result-head';head.innerHTML=`<span><i class="fa-solid fa-bolt" style="color:#60a5fa;margin-right:4px;"></i><b>${totalMatches}</b> customer result${totalMatches===1?'':'s'}</span><span>Page ${mfScaleRecoveryPage+1} / ${totalPages}</span>`;listDiv.appendChild(head);
-            pageLoans.forEach(loan=>{
-                const prod=state.products[loan.product]||{name:'Custom',amount:0,emi:0,tenure:0};
-                const settlementReceived=loan.postMaturitySettlement?Number(loan.postMaturitySettlement.actualReceived||0)+Number(loan.postMaturitySettlement.partialAmountAlreadyCollected||0):0;
-                const paidAmt=loan.payments.reduce((s,p)=>s+(Number(p.amount)||0),0)+settlementReceived,pending=getLoanPending(loan),paidCount=loan.postMaturitySettlement?prod.tenure:loan.payments.length,penaltyPaid=loan.payments.reduce((s,p)=>s+(Number(p.penalty)||0),0),partialCollected=loan.postMaturitySettlement?Number(loan.postMaturitySettlement.partialAmountAlreadyCollected||0):getLoanPartialSum(loan),view=getLoanRecoveryView(loan),status=getRecoveryStatus(loan);
-                const card=document.createElement('div');card.className='client-card recovery-search-card';
-                const opStatus=mfLoanOperationalStatus(loan); const statusBadge=opStatus==='FORECLOSED'?`<span class="badge-foreclosed">FORECLOSED</span>`:opStatus==='SETTLED'?`<span class="badge-paid">SETTLED</span>`:opStatus==='CLOSED'?`<span class="badge-paid">CLOSED</span>`:opStatus==='OVERDUE'?`<span class="badge-overdue">OVERDUE</span>`:opStatus==='DUE'?`<span class="badge-pending">DUE TODAY</span>`:`<span style="color:#f87171;font-weight:800;font-size:.82rem;">Due: ₹${pending.toLocaleString('en-IN')}</span>`;
-                const guarantorLine=loan.guarantorName?`<div style="font-size:.72rem;color:#94a3b8;margin-top:4px;"><i class="fa-solid fa-user-group me-1"></i> C/O / Guarantor: <b style="color:#fff;">${financeEsc(loan.guarantorName)}</b>${mfGuarantorContactText(loan)?` · ${financeEsc(mfGuarantorContactText(loan))}`:''}</div>`:'';
-                const extra=`${penaltyPaid>0?`<span style="color:#fbbf24;font-size:.7rem;margin-left:5px;">Penalty paid: ₹${penaltyPaid.toLocaleString('en-IN')}</span>`:''}${partialCollected>0&&!loan.postMaturitySettlement?`<div style="font-size:.7rem;color:#93c5fd;margin-top:4px;">Partial collected: <b>₹${partialCollected.toLocaleString('en-IN')}</b></div>`:''}`;
-                card.innerHTML=`<div class="client-header"><div><span class="loan-badge">${financeEsc(loan.id)}</span><b style="font-size:.95rem;margin-left:5px;color:#fff;">${financeEsc(loan.name)}</b><div style="font-size:.74rem;color:#94a3b8;margin-top:3px;"><i class="fa-solid fa-phone me-1"></i>${financeEsc(mfContactText(loan.phone,loan.phone2))} · <span style="color:#60a5fa;font-weight:700;">${financeEsc(prod.name)}</span>${extra}</div>${guarantorLine}</div><div style="text-align:right;">${statusBadge}<div style="margin-top:4px;"><button class="btn-edit-sm" onclick="openEditClientModal('${recoverySafeId(loan.id)}')"><i class="fa-solid fa-pen"></i> Edit</button></div></div></div><div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid rgba(255,255,255,.06);gap:10px;flex-wrap:wrap;"><div style="font-size:.74rem;color:#94a3b8;">Paid: <b style="color:#fff;">${paidCount}/${prod.tenure}</b> · ₹${paidAmt.toLocaleString('en-IN')} · Status: <b style="color:#cbd5e1;">${status}</b>${view.overdueDays>0?` · <span style="color:#f87171;">${view.overdueDays} days overdue</span>`:''}</div>${recoveryActionButton(loan,view)}</div>`;
-                listDiv.appendChild(card);
+
+            // Recovery is now customer-grouped, just like Statement & PDF. Search first finds
+            // matching loan accounts; then all loan accounts belonging to those customers are
+            // shown together so a customer with 10 loans never becomes 10 separate "customers".
+            let matchedLoans=state.loans.filter(l=>recoverySearchMatches(l,rawQuery));
+            if(state.activeFilter!=='ALL') matchedLoans=matchedLoans.filter(l=>l.product===state.activeFilter);
+            if(recoveryStatusFilter!=='ALL') matchedLoans=matchedLoans.filter(l=>recoveryStatusFilter==='DUE'?getRecoveryStatus(l)==='DUE':getRecoveryStatus(l)===recoveryStatusFilter);
+
+            const customerKeys=[];
+            const seenCustomers=new Set();
+            matchedLoans.forEach(l=>{
+                const key=String(l.customerKey||mfMakeCustomerKey(l.name||'',l.phone||''));
+                if(!seenCustomers.has(key)){seenCustomers.add(key);customerKeys.push(key);}
             });
+            const groups=customerKeys.map(key=>{
+                const allLoans=state.loans.filter(l=>String(l.customerKey||mfMakeCustomerKey(l.name||'',l.phone||''))===key);
+                const displayLoans=(state.activeFilter==='ALL'&&recoveryStatusFilter==='ALL')
+                    ? allLoans
+                    : allLoans.filter(l=>{
+                        if(state.activeFilter!=='ALL' && l.product!==state.activeFilter)return false;
+                        if(recoveryStatusFilter!=='ALL')return recoveryStatusFilter==='DUE'?getRecoveryStatus(l)==='DUE':getRecoveryStatus(l)===recoveryStatusFilter;
+                        return true;
+                    });
+                return {key,loans:displayLoans.slice().sort((a,b)=>String(a.disbursalDate||'').localeCompare(String(b.disbursalDate||''))||String(a.id).localeCompare(String(b.id)))};
+            }).filter(g=>g.loans.length);
+
+            const pageSize=Math.max(1,Number(MF_SCALE.recoveryPageSize)||20);
+            const totalCustomers=groups.length;
+            const totalLoanAccounts=groups.reduce((sum,g)=>sum+g.loans.length,0);
+            const totalPages=Math.max(1,Math.ceil(totalCustomers/pageSize));
+            mfScaleRecoveryPage=Math.min(mfScaleRecoveryPage,totalPages-1);
+            const pageGroups=groups.slice(mfScaleRecoveryPage*pageSize,mfScaleRecoveryPage*pageSize+pageSize);
+
+            const countEl=document.getElementById('recovery-filter-count');
+            if(countEl)countEl.textContent=`Found ${totalCustomers} customer${totalCustomers===1?'':'s'} · ${totalLoanAccounts} matching loan account${totalLoanAccounts===1?'':'s'}`;
+            if(!totalCustomers){
+                listDiv.innerHTML=`<div class="recovery-search-empty"><i class="fa-solid fa-user-slash big"></i><b>No matching customer</b></div>`;
+                return;
+            }
+
+            const head=document.createElement('div');
+            head.className='recovery-result-head';
+            head.innerHTML=`<span><i class="fa-solid fa-bolt" style="color:#60a5fa;margin-right:4px;"></i><b>${totalCustomers}</b> customer result${totalCustomers===1?'':'s'} · <b>${totalLoanAccounts}</b> loan account${totalLoanAccounts===1?'':'s'}</span><span>Page ${mfScaleRecoveryPage+1} / ${totalPages}</span>`;
+            listDiv.appendChild(head);
+
+            pageGroups.forEach((group,index)=>{
+                const rows=group.loans;
+                const first=rows[0]||{};
+                const contact=mfContactText(first.phone,first.phone2);
+                const newCount=rows.filter(x=>String(x.loanType||'NEW').toUpperCase()==='NEW').length;
+                const topCount=rows.filter(x=>String(x.loanType||'').toUpperCase()==='TOP_UP').length;
+                const renCount=rows.filter(x=>String(x.loanType||'').toUpperCase()==='RENEWAL').length;
+                const activeCount=rows.filter(x=>mfLoanStatusLabel(x)==='ACTIVE').length;
+                const mainLoan=mfMainLoanFor(first);
+                const groupId=`mf-recovery-customer-${mfRecoverySafeGroupKey(group.key)}-${mfScaleRecoveryPage}-${index}`;
+                const bodyId=`${groupId}-loans`,arrowId=`${groupId}-arrow`;
+                const wrap=document.createElement('div');
+                wrap.className='mf-passbook-customer-group mf-recovery-customer-group';
+                const loanRows=rows.map(loan=>{
+                    const prod=state.products[loan.product]||{name:'Custom',amount:0,emi:0,tenure:0};
+                    const settlementReceived=loan.postMaturitySettlement?Number(loan.postMaturitySettlement.actualReceived||0)+Number(loan.postMaturitySettlement.partialAmountAlreadyCollected||0):0;
+                    const paidAmt=(loan.payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0)+settlementReceived;
+                    const pending=getLoanPending(loan),paidCount=loan.postMaturitySettlement?prod.tenure:(loan.payments||[]).length;
+                    const penaltyPaid=(loan.payments||[]).reduce((s,p)=>s+(Number(p.penalty)||0),0);
+                    const partialCollected=loan.postMaturitySettlement?Number(loan.postMaturitySettlement.partialAmountAlreadyCollected||0):getLoanPartialSum(loan);
+                    const view=getLoanRecoveryView(loan),status=getRecoveryStatus(loan),opStatus=mfLoanOperationalStatus(loan);
+                    const statusBadge=opStatus==='FORECLOSED'?`<span class="badge-foreclosed">FORECLOSED</span>`:opStatus==='SETTLED'?`<span class="badge-paid">SETTLED</span>`:opStatus==='CLOSED'?`<span class="badge-paid">CLOSED</span>`:opStatus==='OVERDUE'?`<span class="badge-overdue">OVERDUE</span>`:opStatus==='DUE'?`<span class="badge-pending">DUE TODAY</span>`:`<span style="color:#f87171;font-weight:800;font-size:.78rem;">Due: ₹${pending.toLocaleString('en-IN')}</span>`;
+                    const relation=mfIsMainLoan(loan)
+                        ? `<span style="font-size:.6rem;color:#34d399;font-weight:800;">MAIN ACCOUNT</span>`
+                        : `<span style="font-size:.6rem;color:#94a3b8;font-weight:700;">Linked to Main ${financeEsc(mfResolveMainLoanId(loan))}</span>`;
+                    const penaltyText=penaltyPaid>0?`<span style="color:#fbbf24;font-size:.68rem;margin-left:5px;">Internal penalty ₹${penaltyPaid.toLocaleString('en-IN')}</span>`:'';
+                    const partialText=partialCollected>0&&!loan.postMaturitySettlement?`<div style="font-size:.68rem;color:#93c5fd;margin-top:3px;">Partial collected: <b>₹${partialCollected.toLocaleString('en-IN')}</b></div>`:'';
+                    return `<div class="mf-passbook-loan-row mf-recovery-loan-row">
+                        <div class="mf-passbook-loan-main" style="flex:1;min-width:220px;">
+                            <div class="mf-passbook-loan-title"><span class="mf-loan-type-badge">${mfLoanTypeLabel(loan)}</span><span>${financeEsc(loan.id)}</span><span style="color:#cbd5e1;">${financeEsc(prod.name||loan.product||'-')}</span>${statusBadge}</div>
+                            <div class="mf-passbook-loan-meta">${relation} · Disbursal ${formatToIndianDate(loan.disbursalDate)} · ₹${Number(prod.amount||0).toLocaleString('en-IN')} · Paid ${paidCount}/${prod.tenure} · ₹${paidAmt.toLocaleString('en-IN')} · Status ${financeEsc(status)}${view.overdueDays>0?` · ${view.overdueDays} days overdue`:''}${penaltyText}</div>
+                            ${partialText}
+                        </div>
+                        <div class="recovery-result-actions mf-recovery-group-actions">${recoveryActionButton(loan,view)}<button type="button" class="btn-edit-sm" onclick="openLoanFromProduct('${recoverySafeId(loan.id)}')"><i class="fa-solid fa-folder-open"></i> Open</button></div>
+                    </div>`;
+                }).join('');
+                wrap.innerHTML=`<button type="button" class="mf-passbook-customer-head" onclick="toggleRecoveryCustomerGroup('${recoverySafeId(bodyId)}','${recoverySafeId(arrowId)}')">
+                    <span class="arrow" id="${arrowId}"><i class="fa-solid fa-chevron-right"></i></span>
+                    <span style="min-width:0;flex:1;"><b style="font-size:.82rem;color:#fff;">${financeEsc(first.name||'Customer')}</b><div class="mf-passbook-customer-meta">${financeEsc(contact)} · ${rows.length} loan account${rows.length===1?'':'s'} · ${activeCount} active</div></span>
+                    <span style="font-size:.62rem;color:#94a3b8;white-space:nowrap;">NEW ${newCount} · TOP-UP ${topCount} · RENEWAL ${renCount}</span>
+                </button><div class="mf-passbook-loans" id="${bodyId}">${loanRows}</div>`;
+                listDiv.appendChild(wrap);
+            });
+
             if(totalPages>1){
                 const nav=document.createElement('div'); nav.style.cssText='display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0;';
                 nav.innerHTML=`<button type="button" class="btn-header btn-blue" ${mfScaleRecoveryPage===0?'disabled':''} onclick="mfRecoveryPageChange(-1)"><i class="fa-solid fa-chevron-left"></i> Previous</button><span style="font-size:.72rem;color:#94a3b8;font-weight:800;">Page ${mfScaleRecoveryPage+1} of ${totalPages}</span><button type="button" class="btn-header btn-blue" ${mfScaleRecoveryPage>=totalPages-1?'disabled':''} onclick="mfRecoveryPageChange(1)">Next <i class="fa-solid fa-chevron-right"></i></button>`;
                 listDiv.appendChild(nav);
             }
+        }
+
+        function mfRecoverySafeGroupKey(value){
+            return String(value||'group').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,70);
+        }
+        function toggleRecoveryCustomerGroup(bodyId,arrowId){
+            const body=document.getElementById(bodyId),arrow=document.getElementById(arrowId);
+            if(!body)return;
+            const open=body.classList.toggle('open');
+            if(arrow)arrow.innerHTML=open?'<i class="fa-solid fa-chevron-down"></i>':'<i class="fa-solid fa-chevron-right"></i>';
         }
 
         let mfRecoverySearchTimer=0;
@@ -6666,8 +6760,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(loanType==='RENEWAL' && sourceLoan && mfLoanStatusLabel(sourceLoan)==='ACTIVE'){ alert('Renewal requires the source loan to be completely closed, settled, or foreclosed.'); return; }
                 const newId = mfNextLoanId();
                 const customerKey=sourceLoan?.customerKey || mfFindCustomerKey(name,phone);
+                const mainLoanId=sourceLoan ? mfResolveMainLoanId(sourceLoan) : '';
                 const historyCount=(state.loans||[]).filter(x=>String(x.customerKey||'')===String(customerKey)).length;
-                state.loans.push({id:newId,name,phone,phone2,guarantorName,guarantorPhone,guarantorPhone2,collectorId,collectorName:collector?collector.name:"",address,product:prod,disbursalDate:date,disbursalMode,payments:[],foreclosed:false,foreclosureData:null,firstDueDate:firstDueDate||null,fixedDueDate:firstDueDate||null,preEmiDays,preEmiInterest,preEmiInterestReceived:0,preEmiDate:null,loanType,sourceLoanId:sourceLoan?.id||'',customerKey,customerSequence:historyCount+1});
+                state.loans.push({id:newId,name,phone,phone2,guarantorName,guarantorPhone,guarantorPhone2,collectorId,collectorName:collector?collector.name:"",address,product:prod,disbursalDate:date,disbursalMode,payments:[],foreclosed:false,foreclosureData:null,firstDueDate:firstDueDate||null,fixedDueDate:firstDueDate||null,preEmiDays,preEmiInterest,preEmiInterestReceived:0,preEmiDate:null,loanType,sourceLoanId:mainLoanId,rootLoanId:mainLoanId||newId,customerKey,customerSequence:historyCount+1});
             } else {
                 const id = document.getElementById("fc-id").value;
                 const loan = state.loans.find(l => l.id === id); if(!loan)return;
@@ -8117,17 +8212,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             }
 
             const docMode = document.getElementById("passbook-doc-mode")?.value || "STATEMENT";
+            const l = state.loans.find(x => x.id === id);
+            if(!l) return;
+            const isMainLoan=mfIsMainLoan(l);
+            if(editBtn) editBtn.style.display = "inline-flex";
+            if(topupBtn) topupBtn.style.display = isMainLoan ? "inline-flex" : "none";
+            if(renewalBtn) renewalBtn.style.display = isMainLoan && mfLoanStatusLabel(l)!=='ACTIVE' ? "inline-flex" : "none";
+            if(historyBtn) historyBtn.style.display = mfCustomerLoans(l.customerKey,l).length>1 ? "inline-flex" : "none";
             if (docMode === "SCHEDULE") {
                 renderEmiScheduleOnly(id, area, nocBtn);
                 return;
             }
 
-            const l = state.loans.find(x => x.id === id);
             const p = state.products[l.product];
-            if(editBtn) editBtn.style.display = "inline-flex";
-            if(topupBtn) topupBtn.style.display = "inline-flex";
-            if(renewalBtn) renewalBtn.style.display = mfLoanStatusLabel(l)==='ACTIVE' ? "none" : "inline-flex";
-            if(historyBtn) historyBtn.style.display = mfCustomerLoans(l.customerKey,l).length>1 ? "inline-flex" : "none";
             const postMaturity = l.postMaturitySettlement || null;
             const preEmiDue = mfLoanPreEmiDue(l);
             const preEmiInterest = mfLoanPreEmiCollected(l);
@@ -8294,7 +8391,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <div>
                             <h5 style="margin:0; font-weight:800; color:#fff;">${state.bizName}</h5>
                             <small style="color:#94a3b8;">Loan Statement & Amortization Schedule</small>
-                            <div style="margin-top:5px;"><span class="mf-loan-type-badge">${mfLoanTypeLabel(l)}</span>${l.sourceLoanId?` <span style="font-size:.64rem;color:#94a3b8;margin-left:4px;">Related to ${financeEsc(l.sourceLoanId)} · customer history linked</span>`:''}</div>
+                            <div style="margin-top:5px;"><span class="mf-loan-type-badge">${mfLoanTypeLabel(l)}</span>${mfIsMainLoan(l)?` <span style="font-size:.64rem;color:#34d399;margin-left:4px;font-weight:800;">MAIN ACCOUNT · Top-up / Renewal control account</span>`:` <span style="font-size:.64rem;color:#94a3b8;margin-left:4px;">Linked to Main Loan ${financeEsc(mfResolveMainLoanId(l))} · independent loan account</span>`}</div>
                         </div>
                         <div style="text-align:right;">
                             <span class="loan-badge" style="font-size:0.9rem; padding:3px 10px;">${l.id}</span>
@@ -9730,10 +9827,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const newLoans=loans.filter(l=>typeOf(l)==='NEW');
             const topUpLoans=loans.filter(l=>typeOf(l)==='TOP_UP');
             const renewalLoans=loans.filter(l=>typeOf(l)==='RENEWAL');
+            const newCustomerCount=new Set(newLoans.map(customerKeyOf)).size;
+            const topUpCustomerCount=new Set(topUpLoans.map(customerKeyOf)).size;
+            const renewalCustomerCount=new Set(renewalLoans.map(customerKeyOf)).size;
+            const advancementCustomerCount=new Set([...topUpLoans,...renewalLoans].map(customerKeyOf)).size;
             const loanTypeRows=[
-                ["NEW LOANS",newLoans.length,new Set(newLoans.map(customerKeyOf)).size],
-                ["TOP-UP LOANS",topUpLoans.length,new Set(topUpLoans.map(customerKeyOf)).size],
-                ["RENEWAL LOANS",renewalLoans.length,new Set(renewalLoans.map(customerKeyOf)).size]
+                ["NEW LOANS — New Loan Accounts",newLoans.length,newCustomerCount],
+                ["TOP-UP LOANS — Additional Accounts for Existing Customers",topUpLoans.length,topUpCustomerCount],
+                ["RENEWAL LOANS — New Accounts for Existing Customers",renewalLoans.length,renewalCustomerCount]
             ];
 
             return {
@@ -9744,9 +9845,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 financingCost:lenderInterest+lenderGst+upfront,
                 productRows,statusRows,loanTypeRows,
                 newLoanCount:newLoans.length,topUpLoanCount:topUpLoans.length,renewalLoanCount:renewalLoans.length,
-                newCustomerCount:new Set(newLoans.map(customerKeyOf)).size,
-                topUpCustomerCount:new Set(topUpLoans.map(customerKeyOf)).size,
-                renewalCustomerCount:new Set(renewalLoans.map(customerKeyOf)).size,
+                newCustomerCount,topUpCustomerCount,renewalCustomerCount,advancementCustomerCount,
                 reportDate:formatToIndianDate(new Date().toISOString().split('T')[0])
             };
         }
@@ -9812,8 +9911,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 ["New Loan Accounts",r.newLoanCount],
                 ["Top-up Loan Accounts",r.topUpLoanCount],
                 ["Renewal Loan Accounts",r.renewalLoanCount],
-                ["Distinct Customers Given Top-up",r.topUpCustomerCount],
-                ["Distinct Customers Given Renewal",r.renewalCustomerCount],
+                ["Existing Customers Receiving Top-up",r.topUpCustomerCount],
+                ["Existing Customers Receiving Renewal",r.renewalCustomerCount],
                 [],
                 ["G. REPORT INTERPRETATION"],
                 ["Gross Business Earnings","File charges + customer interest + penalties + foreclosure fees + pre-closure interest + post-maturity recovery interest + pre-EMI interest."],
@@ -9841,15 +9940,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             XLSX.utils.book_append_sheet(wb,wsPortfolio,'Portfolio_Overview');
 
             const loanTypes=[
-                ["LOAN TYPE / CUSTOMER ADVANCEMENT OVERVIEW"],
-                ["Loan Type","Loan Accounts","Distinct Customers"],
+                ["LOAN TYPE / CUSTOMER ADVANCEMENT — EXISTING CUSTOMER CONTINUITY"],
+                ["Loan Classification","Loan Accounts","Unique Customers in This Classification"],
                 ...r.loanTypeRows,
+                ["ADDITIONAL ACCOUNTS FOR EXISTING CUSTOMERS — TOP-UP + RENEWAL",r.topUpLoanCount+r.renewalLoanCount,r.advancementCustomerCount],
                 [],
-                ["Note","A customer can have multiple loan accounts. Loan Account count and Distinct Customer count are intentionally separate."]
+                ["Note","Top-up and Renewal are additional independent loan accounts for customers who already exist in the system. The customer count is a unique-customer count, not an account count; the same customer may receive multiple Top-ups and/or Renewals."]
             ];
             const wsLoanTypes=XLSX.utils.aoa_to_sheet(loanTypes);
             wsLoanTypes['!cols']=[{wch:38},{wch:18},{wch:22}];
-            wsLoanTypes['!autofilter']={ref:`A2:C${2+r.loanTypeRows.length}`};
+            wsLoanTypes['!autofilter']={ref:`A2:C${3+r.loanTypeRows.length}`};
             wsLoanTypes['!freeze']={xSplit:0,ySplit:2};
             XLSX.utils.book_append_sheet(wb,wsLoanTypes,'Loan_Type_Overview');
 
@@ -9989,8 +10089,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     <h2>4. Portfolio Status</h2>
                     <table><tbody><tr><th>Status</th><th>Loan Accounts</th></tr>${statusRows}</tbody></table>
                     <h2>5. Loan Type / Customer Advancement</h2>
-                    <table><tbody><tr><th>Loan Type</th><th>Loan Accounts</th><th>Distinct Customers</th></tr>${r.loanTypeRows.map(x=>`<tr><td>${financeEsc(x[0])}</td><td style="text-align:right">${x[1]}</td><td style="text-align:right">${x[2]}</td></tr>`).join('')}
-                    <tr class="total"><td>Top-up + Renewal Accounts</td><td style="text-align:right">${r.topUpLoanCount+r.renewalLoanCount}</td><td style="text-align:right">—</td></tr></tbody></table>
+                    <table><tbody><tr><th>Loan Classification</th><th>Loan Accounts</th><th>Unique Customers in Classification</th></tr>${r.loanTypeRows.map(x=>`<tr><td>${financeEsc(x[0])}</td><td style="text-align:right">${x[1]}</td><td style="text-align:right">${x[2]}</td></tr>`).join('')}
+                    <tr class="total"><td>Additional Accounts for Existing Customers — Top-up + Renewal</td><td style="text-align:right">${r.topUpLoanCount+r.renewalLoanCount}</td><td style="text-align:right">${r.advancementCustomerCount}</td></tr></tbody></table>
+                    <div style="margin-top:7px;font-size:9px;color:#475569;">Top-up / Renewal customer count represents unique customers who already had a customer/loan history in the system. One customer may hold multiple independent loan accounts.</div>
                     <div class="mf-exec-note"><b>Customer relationship:</b> one customer can hold multiple independent loan accounts; Top-up and Renewal remain separate loan accounts while consolidated history stays customer-linked.</div>
                     <h2>6. Portfolio by Product</h2>
                     <table><tbody><tr><th>Product</th><th>Accounts</th><th>Disbursed</th><th>Scheduled Payable</th><th>Outstanding</th></tr>${productRows || '<tr><td colspan="5">No product data available.</td></tr>'}</tbody></table>
@@ -10321,6 +10422,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 .recovery-search-card{border-color:rgba(96,165,250,.34)!important;box-shadow:0 8px 24px rgba(2,6,23,.18);}
 .recovery-search-card .recovery-result-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
 @media(max-width:600px){.recovery-search-panel{padding:8px}.recovery-search-main{min-height:50px}.recovery-search-hint{font-size:.61rem}.recovery-search-card .recovery-result-actions{justify-content:flex-start;width:100%;}}
+.mf-recovery-customer-group .mf-passbook-loan-row{align-items:flex-start;}
+.mf-recovery-customer-group .mf-recovery-group-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;min-width:220px;}
+.mf-recovery-customer-group .mf-recovery-group-actions .recovery-result-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;}
+@media(max-width:760px){.mf-recovery-customer-group .mf-passbook-customer-head{align-items:flex-start;}.mf-recovery-customer-group .mf-recovery-group-actions{width:100%;min-width:0;justify-content:flex-start;}.mf-recovery-customer-group .mf-recovery-group-actions .recovery-result-actions{justify-content:flex-start;}.mf-recovery-customer-group .mf-passbook-loan-row{flex-direction:column;}}
 </style>
 <style id="mf-finance-disbursed-profile-fix">
 .finance-profile-cell{display:flex;flex-direction:column;gap:3px;min-width:150px;line-height:1.2;}
