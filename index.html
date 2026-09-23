@@ -5783,7 +5783,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 </div>
             </section>`;
         }
-        function mfUpcomingCustomerBook(loanGroups){
+        function mfUpcomingCustomerBookMarkup(loanGroups){
             const first=loanGroups[0]?.[0], customer=first?.loan;
             if(!customer) return '';
             const allLoans=loanGroups.map(g=>g[0].loan);
@@ -5923,52 +5923,68 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             return rows.sort((a,b)=>b.overdueDays-a.overdueDays||a.dueDate.localeCompare(b.dueDate)||a.loan.name.localeCompare(b.loan.name));
         }
         function printUpcomingEmiSchedule(){
-            const from=getUpcomingDateIso('from')||mfIsoToday(), to=getUpcomingDateIso('to')||from,
-                  status=document.getElementById('emi-schedule-status')?.value||'UPCOMING',
-                  q=(document.getElementById('emi-schedule-search')?.value||'').trim().toLowerCase(),
-                  collector=document.getElementById('emi-collector-filter')?.value||'ALL',
-                  title='Staff Collection Sheet — Upcoming EMIs & Pending Recovery',
-                  books=mfUpcomingCustomerBook(from,to,status,q,collector);
-            const collectorLabel=collector==='ALL'?'All Collectors':collector==='UNASSIGNED'?'Unassigned':loanCollectorName({collectorId:collector});
-            let rangeTotal=0,previousTotal=0,penaltyTotal=0,unpaidRangeCount=0;
+            const printWindow=window.open('','_blank');
+            if(!printWindow){alert('Please allow pop-ups to print the document.');return;}
+            try{
+                const from=getUpcomingDateIso('from')||mfIsoToday(), to=getUpcomingDateIso('to')||from,
+                      status=document.getElementById('emi-schedule-status')?.value||'UPCOMING',
+                      q=(document.getElementById('emi-schedule-search')?.value||'').trim().toLowerCase(),
+                      collector=document.getElementById('emi-collector-filter')?.value||'ALL',
+                      title='Staff Collection Sheet — Upcoming EMIs & Pending Recovery',
+                      books=mfUpcomingCustomerBook(from,to,status,q,collector);
+                const collectorLabel=collector==='ALL'?'All Collectors':collector==='UNASSIGNED'?'Unassigned':loanCollectorName({collectorId:collector});
+                let rangeTotal=0,previousTotal=0,penaltyTotal=0,unpaidRangeCount=0;
 
-            const bodyRows=books.map(book=>{
-                const rows=book.loans;
-                const customer=rows[0].loan;
-                let customerRowSpan=rows.length, loanRows='';
-                rows.forEach((entry,idx)=>{
-                    const l=entry.loan,p=entry.product,current=entry.current.filter(r=>!r.paid),previous=entry.previous;
-                    const currentTotal=current.reduce((sum,r)=>sum+(Number(r.totalDue??r.emi)||0),0);
-                    const previousBalance=previous.reduce((sum,x)=>sum+x.balance,0);
-                    const previousPenalty=previous.reduce((sum,x)=>sum+x.penaltyDue,0);
-                    const collectNow=currentTotal+previousBalance+previousPenalty;
-                    rangeTotal+=currentTotal; unpaidRangeCount+=current.length; previousTotal+=previousBalance; penaltyTotal+=previousPenalty;
+                const bodyRows=books.map(book=>{
+                    const entries=book.loans||[];
+                    const customer=entries[0]?.loan||{};
+                    let loanRows='';
+                    entries.forEach((entry,idx)=>{
+                        const l=entry.loan,p=entry.product||state.products[l.product]||{},current=(entry.current||[]).filter(r=>!r.paid),previous=entry.previous||[];
+                        const currentTotal=current.reduce((sum,r)=>sum+(Number(r.totalDue??r.emi)||0),0);
+                        const previousBalance=previous.reduce((sum,x)=>sum+(Number(x.balance)||0),0);
+                        const previousPenalty=previous.reduce((sum,x)=>sum+(Number(x.penaltyDue)||0),0);
+                        const collectNow=currentTotal+previousBalance+previousPenalty;
+                        rangeTotal+=currentTotal; unpaidRangeCount+=current.length; previousTotal+=previousBalance; penaltyTotal+=previousPenalty;
 
-                    const currentText=current.length===1
-                        ? `#${current[0].no} · ${formatToIndianDate(current[0].dueDate)} · ₹${Number(current[0].totalDue??current[0].emi).toLocaleString('en-IN')}${current[0].upcomingStatus==='OVERDUE'?` · ${current[0].overdueDays} days overdue`:''}`
-                        : current.length>1
-                            ? `${current.length} EMIs (#${current[0].no}–#${current[current.length-1].no}) · ₹${currentTotal.toLocaleString('en-IN')}`
-                            : 'No current EMI in selected range';
-                    const prevText=previous.length
-                        ? `${previous.length} EMI${previous.length>1?'s':''} · ₹${previousBalance.toLocaleString('en-IN')} · ${formatToIndianDate(previous[0].dueDate)} → ${formatToIndianDate(previous[previous.length-1].dueDate)}`
-                        : 'None';
-                    const contacts=`Customer: ${financeEsc(mfContactText(l.phone,l.phone2))}${mfGuarantorContactText(l)?`<br>Guarantor: ${financeEsc(mfGuarantorContactText(l))}`:''}`;
-                    loanRows+=`<tr class="${previous.length?'attention-row':''}">
-                        ${idx===0?`<td rowspan="${customerRowSpan}" class="mf-customer-print-cell"><b>${financeEsc(customer.name)}</b><br><span class="muted">${financeEsc(mfContactText(customer.phone,customer.phone2))}</span><br><span class="muted">${customerRowSpan} loan account${customerRowSpan>1?'s':''}</span></td>`:''}
-                        <td><b>${financeEsc(mfLoanTypeLabel(l))} · ${financeEsc(l.id)}</b><br><span class="muted">${financeEsc(p.name||l.product)} · ${financeEsc(loanCollectorName(l))}</span><br><span class="muted">${contacts}</span></td>
-                        <td>${currentText}<br><span class="muted">Disbursed ${formatToIndianDate(l.disbursalDate)} · Maturity ${formatToIndianDate(mfLoanScheduleDueIso(l,Number(p.tenure)||0))}</span></td>
-                        <td>${prevText}</td>
-                        <td>${previousPenalty?'₹'+previousPenalty.toLocaleString('en-IN'):'₹0'}</td>
-                        <td class="money">₹${collectNow.toLocaleString('en-IN')}</td>
-                    </tr>`;
-                });
-                return loanRows;
-            }).join('');
+                        const currentText=current.length===1
+                            ? `#${current[0].no} · ${formatToIndianDate(current[0].dueDate)} · ₹${Number(current[0].totalDue??current[0].emi).toLocaleString('en-IN')}${current[0].upcomingStatus==='OVERDUE'?` · ${current[0].overdueDays} days overdue`:current[0].upcomingStatus==='DUE'?` · DUE TODAY`:''}`
+                            : current.length>1
+                                ? `${current.length} EMIs (#${current[0].no}–#${current[current.length-1].no}) · ₹${currentTotal.toLocaleString('en-IN')}`
+                                : 'No current EMI in selected range';
+                        const prevText=previous.length
+                            ? `${previous.length} EMI${previous.length>1?'s':''} · ₹${previousBalance.toLocaleString('en-IN')} · ${formatToIndianDate(previous[0].dueDate)} → ${formatToIndianDate(previous[previous.length-1].dueDate)}`
+                            : 'None';
+                        const customerContacts=mfContactText(l.phone,l.phone2);
+                        const guarantorContacts=mfGuarantorContactText(l);
+                        const contacts=`Customer: ${financeEsc(customerContacts)}${guarantorContacts?`<br>Guarantor: ${financeEsc(guarantorContacts)}`:''}`;
+                        loanRows+=`<tr class="${previous.length?'attention-row':''}">
+                            ${idx===0?`<td rowspan="${entries.length}" class="mf-customer-print-cell"><b>${financeEsc(customer.name||l.name||'-')}</b><br><span class="muted">${financeEsc(mfContactText(customer.phone,customer.phone2))}</span><br><span class="muted">${entries.length} loan account${entries.length>1?'s':''}</span></td>`:''}
+                            <td><b>${financeEsc(mfLoanTypeLabel(l))} · ${financeEsc(l.id)}</b><br><span class="muted">${financeEsc(p.name||l.product||'-')} · Collector: ${financeEsc(loanCollectorName(l))}</span><br><span class="muted">${contacts}</span></td>
+                            <td>${currentText}<br><span class="muted">Disbursed ${formatToIndianDate(l.disbursalDate)} · Maturity ${formatToIndianDate(mfLoanScheduleDueIso(l,Number(p.tenure)||0))}</span></td>
+                            <td>${prevText}</td>
+                            <td>${previousPenalty?'₹'+previousPenalty.toLocaleString('en-IN'):'₹0'}</td>
+                            <td class="money">₹${collectNow.toLocaleString('en-IN')}</td>
+                        </tr>`;
+                    });
+                    return loanRows;
+                }).join('');
 
-            const summary=`<div class="mf-print-summary-grid"><div><span>Period</span><b>${formatToIndianDate(from)} to ${formatToIndianDate(to)}</b></div><div><span>Collector</span><b>${financeEsc(collectorLabel)}</b></div><div><span>Unpaid EMIs in Range</span><b>${unpaidRangeCount} · ₹${rangeTotal.toLocaleString('en-IN')}</b></div><div><span>Previous Arrears</span><b>₹${previousTotal.toLocaleString('en-IN')}</b></div><div><span>Penalty Due</span><b>₹${penaltyTotal.toLocaleString('en-IN')}</b></div></div>`;
-            const note=`<div class="mf-print-note"><b>Staff collection rule:</b> Each customer is shown as one collection book. Every independent loan remains separately identified by Loan Type and Loan ID. Current selected-range EMIs and previous unpaid EMIs are shown separately. A loan with no current-range EMI but with older unpaid dues remains in the book under Previous Pending. Clear the oldest previous EMI first. “Collect Now” = previous EMI balance + previous penalty due + unpaid EMI(s) in the selected range.</div>`;
-            const table=books.length?`<table class="mf-collection-staff-table"><colgroup><col style="width:19%"><col style="width:23%"><col style="width:23%"><col style="width:20%"><col style="width:7%"><col style="width:8%"></colgroup><thead><tr><th>Customer / Contact</th><th>Loan Account / Contacts</th><th>Current / Selected Range</th><th>Previous Pending</th><th>Penalty Due</th><th>Collect Now</th></tr></thead><tbody>${bodyRows}</tbody></table>`:'<div class="mf-print-empty">No collection entries match the selected filters.</div>';
-            const w=mfPrintA4Shell(`${state.bizName} — ${title}`,mfCompanyPrintHeader(title)+summary+note+table); if(!w)return; w.onload=()=>{w.focus();setTimeout(()=>w.print(),80);};
+                const summary=`<div class="mf-print-summary-grid"><div><span>Period</span><b>${formatToIndianDate(from)} to ${formatToIndianDate(to)}</b></div><div><span>Collector</span><b>${financeEsc(collectorLabel)}</b></div><div><span>Unpaid EMIs in Range</span><b>${unpaidRangeCount} · ₹${rangeTotal.toLocaleString('en-IN')}</b></div><div><span>Previous Arrears</span><b>₹${previousTotal.toLocaleString('en-IN')}</b></div><div><span>Penalty Due</span><b>₹${penaltyTotal.toLocaleString('en-IN')}</b></div></div>`;
+                const note=`<div class="mf-print-note"><b>Staff collection rule:</b> Each customer is shown as one collection book. Every independent loan remains separately identified by Loan Type and Loan ID. Current selected-range EMIs and previous unpaid EMIs are shown separately. A loan with no current-range EMI but with older unpaid dues remains in the book under Previous Pending. Clear the oldest previous EMI first. “Collect Now” = previous EMI balance + previous penalty due + unpaid EMI(s) in the selected range.</div>`;
+                const table=books.length?`<table class="mf-collection-staff-table"><colgroup><col style="width:18%"><col style="width:23%"><col style="width:22%"><col style="width:20%"><col style="width:7%"><col style="width:10%"></colgroup><thead><tr><th>Customer / Contact</th><th>Loan Account / Contacts</th><th>Current / Selected Range</th><th>Previous Pending</th><th>Penalty Due</th><th>Collect Now</th></tr></thead><tbody>${bodyRows}</tbody></table>`:'<div class="mf-print-empty">No collection entries match the selected filters.</div>';
+                const content=mfCompanyPrintHeader(title)+summary+note+table;
+                printWindow.document.open();
+                printWindow.document.write(`<html><head><title>${financeEsc(`${state.bizName} — ${title}`)}</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+                    @page{size:A4 portrait;margin:10mm;}*{box-sizing:border-box;}html,body{margin:0;padding:0;background:#fff;color:#111;font-family:Arial,Helvetica,sans-serif;}body{font-size:9pt;line-height:1.35}.mf-print-page{width:100%;max-width:190mm;margin:0 auto}.mf-print-company-header{text-align:center;border-bottom:1.4px solid #111;padding:0 0 8px;margin:0 0 10px}.mf-print-company-name{font-size:17pt;font-weight:800}.mf-print-company-tagline{font-size:8.5pt;color:#444}.mf-print-company-line{font-size:7.8pt;color:#333;overflow-wrap:anywhere}.mf-print-doc-title{font-size:11pt;font-weight:800;text-transform:uppercase;margin-top:6px}.mf-print-summary-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-bottom:7px}.mf-print-summary-grid>div{border:1px solid #c7cdd5;border-radius:5px;padding:5px;min-width:0}.mf-print-summary-grid span{display:block;font-size:6.8pt;color:#666}.mf-print-summary-grid b{display:block;font-size:8pt;overflow-wrap:anywhere}.mf-print-note{font-size:7.5pt;color:#444;margin:6px 0}.mf-collection-staff-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:7.7pt}.mf-collection-staff-table th,.mf-collection-staff-table td{border:1px solid #999;padding:4px 5px;vertical-align:top;overflow-wrap:anywhere;word-break:normal}.mf-collection-staff-table th{background:#f0f2f5;font-weight:800}.mf-collection-staff-table .muted{color:#555;font-size:6.8pt}.mf-collection-staff-table .money{font-weight:800;text-align:right;white-space:nowrap}.mf-collection-staff-table .attention-row td{background:#fffaf0}.mf-print-empty{border:1px solid #aaa;padding:12px;text-align:center}@media print{body{width:auto}.mf-print-page{max-width:none}}
+                </style></head><body><main class="mf-print-page">${content}</main></body></html>`);
+                printWindow.document.close();
+                setTimeout(()=>{try{printWindow.focus();printWindow.print();}catch(e){console.error('Upcoming EMI print failed',e);}},250);
+            }catch(err){
+                console.error('Upcoming EMI print generation failed',err);
+                try{printWindow.close();}catch(e){}
+                alert('Upcoming EMI collection sheet could not be prepared. Please retry.');
+            }
         }
 
         // Customer Feed Rendering
@@ -8851,7 +8867,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <div><span style="color:#94a3b8;">Tenure:</span> ${p.tenure} EMIs (₹${p.emi} each)</div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Schedule Prepared On:</span> <b style="color:#fff;">${formatToIndianDate(new Date().toISOString().split('T')[0])}</b></div>
                     </div>
-                    ${l.guarantorName ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:0.8rem;"><span style="color:#94a3b8;">Guarantor:</span> <b style="color:#fff;">${l.guarantorName}</b>${l.guarantorPhone ? ` · <b style="color:#fff;">${l.guarantorPhone}</b>` : ''}</div>` : ''}
+                    ${l.guarantorName ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:0.8rem;"><span style="color:#94a3b8;">Guarantor:</span> <b style="color:#fff;">${l.guarantorName}</b>${mfGuarantorContactText(l) ? ` · <b style="color:#fff;">${financeEsc(mfGuarantorContactText(l))}</b>` : ''}</div>` : ''}
                 </div>
 
                 <!-- Schedule Table -->
@@ -8959,7 +8975,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     <p style="margin-bottom:12px;"><b>TO WHOMSOEVER IT MAY CONCERN</b></p>
 
                     <p style="margin-bottom:12px; text-align:justify;">
-                        This is to certify that <b>${l.name}</b>, residing at <b>${l.address || 'Registered Address'}</b> (Contact: <b>${l.phone}</b>), had availed a financial credit facility under the following terms:
+                        This is to certify that <b>${l.name}</b>, residing at <b>${l.address || 'Registered Address'}</b> (Contact(s): <b>${financeEsc(mfContactText(l.phone,l.phone2))}</b>), had availed a financial credit facility under the following terms:
                     </p>
 
                     <div style="background:#f8fafc; border:1px solid #000; padding:10px 14px; margin-bottom:14px; border-radius:6px;">
@@ -9006,7 +9022,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     <div class="noc-internal-company-header" style="text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px;"><h3 style="margin:0;font-weight:900;text-transform:uppercase;letter-spacing:1px;">${state.bizName}</h3><p style="margin:2px 0 0;font-size:.8rem;color:#475569;">Microfinance & Lending Solutions</p><h4 style="margin:12px 0 0;text-decoration:underline;font-weight:800;">NO DUES & POST-MATURITY SETTLEMENT CERTIFICATE</h4></div>
                     <div style="display:flex;justify-content:space-between;margin-bottom:14px;font-size:.85rem;"><div><b>Certificate No:</b> NOC-PMS/${new Date().getFullYear()}/${l.id.replace('L-','')}</div><div><b>Date:</b> ${todayStr}</div></div>
                     <p style="margin-bottom:12px;"><b>TO WHOMSOEVER IT MAY CONCERN</b></p>
-                    <p style="margin-bottom:12px;text-align:justify;">This is to certify that <b>${l.name}</b>, residing at <b>${l.address || 'Registered Address'}</b> (Contact: <b>${l.phone}</b>), had availed a financial credit facility under Loan Account <b>${l.id}</b> and the account remained outstanding beyond its stipulated contractual maturity.</p>
+                    <p style="margin-bottom:12px;text-align:justify;">This is to certify that <b>${l.name}</b>, residing at <b>${l.address || 'Registered Address'}</b> (Contact(s): <b>${financeEsc(mfContactText(l.phone,l.phone2))}</b>), had availed a financial credit facility under Loan Account <b>${l.id}</b> and the account remained outstanding beyond its stipulated contractual maturity.</p>
                     <div style="background:#f8fafc;border:1px solid #000;padding:10px 14px;margin-bottom:14px;border-radius:6px;"><table style="width:100%;border:none;text-align:left;font-size:.84rem;"><tr><td style="border:none;padding:4px 0"><b>Sanctioned Loan Amount:</b></td><td style="border:none;padding:4px 0">₹${p.amount.toLocaleString('en-IN')}</td></tr><tr><td style="border:none;padding:4px 0"><b>Pre-EMI Interest:</b></td><td style="border:none;padding:4px 0">₹${preEmiInterest.toLocaleString('en-IN',{maximumFractionDigits:2})}</td></tr><tr><td style="border:none;padding:4px 0"><b>Contractual Maturity Date:</b></td><td style="border:none;padding:4px 0">${formatToIndianDate(pm.maturityDate)}</td></tr><tr><td style="border:none;padding:4px 0"><b>Settlement Date:</b></td><td style="border:none;padding:4px 0">${formatToIndianDate(pm.settlementDate)}</td></tr><tr><td style="border:none;padding:4px 0"><b>Overdue Period:</b></td><td style="border:none;padding:4px 0">${pm.overdueDays} day(s) / ${pm.recoveryMonths} month(s)</td></tr><tr><td style="border:none;padding:4px 0"><b>Pending Contractual EMIs:</b></td><td style="border:none;padding:4px 0">${Number(pm.workingNote?.pendingEmis||0)} × ₹${Number(pm.workingNote?.emi||0).toLocaleString('en-IN')}</td></tr><tr><td style="border:none;padding:4px 0"><b>Pending Principal Component:</b></td><td style="border:none;padding:4px 0">₹${Number(pm.workingNote?.pendingPrincipal||0).toLocaleString('en-IN')}</td></tr><tr><td style="border:none;padding:4px 0"><b>Pending Contractual Interest Component:</b></td><td style="border:none;padding:4px 0">₹${Number(pm.workingNote?.pendingInterest||0).toLocaleString('en-IN')}</td></tr><tr><td style="border:none;padding:4px 0"><b>Contractual Pending at Settlement:</b></td><td style="border:none;padding:4px 0">₹${Number(pm.contractualPending||0).toLocaleString('en-IN')}</td></tr><tr><td style="border:none;padding:4px 0"><b>Post-Maturity Recovery Interest (Calculated):</b></td><td style="border:none;padding:4px 0">${Number(pm.recoveryMonths||0)} × ₹${Number(pm.recoveryRate||0).toLocaleString('en-IN')} = ₹${Number(pm.recoveryInterest||0).toLocaleString('en-IN')}</td></tr><tr><td style="border:none;padding:4px 0"><b>Post-Maturity Recovery Interest (Actually Received):</b></td><td style="border:none;padding:4px 0">₹${Number(pm.recoveryInterestReceived ?? pm.recoveryInterest ?? 0).toLocaleString('en-IN')}</td></tr><tr><td style="border:none;padding:4px 0"><b>Calculated Settlement:</b></td><td style="border:none;padding:4px 0">₹${Number(pm.calculatedSettlement||0).toLocaleString('en-IN')}</td></tr><tr><td style="border:none;padding:4px 0"><b>Actual Amount Received:</b></td><td style="border:none;padding:4px 0"><b>₹${Number(pm.actualReceived||0).toLocaleString('en-IN')}</b> (${financeEsc(pm.mode||'-')})</td></tr><tr><td style="border:none;padding:4px 0"><b>Waiver / Adjustment:</b></td><td style="border:none;padding:4px 0">₹${Number(pm.waiverAmount||0).toLocaleString('en-IN')}</td></tr></table></div>
                     ${preEmiInterest>0 ? `<p style="margin-bottom:12px;text-align:justify;"><b>Pre-EMI Interest Disclosure:</b> ₹${preEmiInterest.toLocaleString('en-IN',{maximumFractionDigits:2})} was calculated on the agreed proportionate 30-day basis and was attached to EMI #1 as an add-on; it was collected only with that first EMI and is included in the payment-mode record of EMI #1.</p>` : ''}
                     <p style="margin-bottom:12px;text-align:justify;">We hereby state that, after the contractual maturity date, the borrower and the company recorded a <b>post-maturity final settlement</b> based on the outstanding contractual dues and the applicable post-maturity recovery charge for the overdue period. The contractual pending amount was ₹${Number(pm.contractualPending||0).toLocaleString('en-IN')} and the applicable post-maturity recovery interest was ₹${Number(pm.recoveryInterest||0).toLocaleString('en-IN')}; accordingly, the calculated settlement was ₹${Number(pm.contractualPending||0).toLocaleString('en-IN')} + ₹${Number(pm.recoveryInterest||0).toLocaleString('en-IN')} = ₹${Number(pm.calculatedSettlement||0).toLocaleString('en-IN')}. Against this calculated amount, ₹${Number(pm.actualReceived||0).toLocaleString('en-IN')} was actually received and ₹${Number(pm.waiverAmount||0).toLocaleString('en-IN')} was waived/adjusted as a settlement concession.</p>
@@ -9030,7 +9046,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     <p style="margin-bottom:12px;"><b>TO WHOMSOEVER IT MAY CONCERN</b></p>
 
                     <p style="margin-bottom:12px; text-align:justify;">
-                        This is to certify that <b>${l.name}</b>, residing at <b>${l.address || 'Registered Address'}</b> (Contact: <b>${l.phone}</b>), was granted a credit facility under the following details:
+                        This is to certify that <b>${l.name}</b>, residing at <b>${l.address || 'Registered Address'}</b> (Contact(s): <b>${financeEsc(mfContactText(l.phone,l.phone2))}</b>), was granted a credit facility under the following details:
                     </p>
 
                     <div style="background:#f8fafc; border:1px solid #000; padding:10px 14px; margin-bottom:14px; border-radius:6px;">
