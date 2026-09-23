@@ -552,8 +552,66 @@
 .upcoming-day{margin-top:9px;border:1px solid rgba(255,255,255,.07);border-radius:10px;overflow:hidden;background:rgba(255,255,255,.025)}
 .upcoming-day-head{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;background:rgba(59,130,246,.08);font-size:.72rem;font-weight:800;color:#fff}
 .upcoming-emi-table{width:100%;border-collapse:collapse;min-width:760px;font-size:.68rem}.upcoming-emi-table th,.upcoming-emi-table td{padding:7px 8px;border-top:1px solid rgba(255,255,255,.055);text-align:left;white-space:nowrap}.upcoming-emi-table th{color:#94a3b8;font-size:.6rem;text-transform:uppercase}.upcoming-emi-table td{color:#e2e8f0}
-.upcoming-phone{color:#60a5fa;text-decoration:none;font-weight:700}.upcoming-amount{color:#34d399;font-weight:800}.upcoming-empty{padding:22px;text-align:center;color:#64748b;font-size:.75rem}
-.upcoming-date-box{display:flex;align-items:center;gap:5px}.upcoming-date-box>input[type="text"]{flex:1;min-width:0}.upcoming-date-btn{width:34px;height:34px;border:1px solid rgba(96,165,250,.35);border-radius:8px;background:rgba(59,130,246,.12);color:#93c5fd;cursor:pointer;flex:0 0 34px}.upcoming-date-picker-hidden{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important}.upcoming-priority{margin-top:10px;padding:10px;border:1px solid rgba(248,113,113,.22);border-radius:12px;background:linear-gradient(180deg,rgba(248,113,113,.06),rgba(15,23,42,.34))}.upcoming-priority-head{display:flex;justify-content:space-between;align-items:center;gap:8px}.upcoming-priority-title{font-weight:800;color:#fff;font-size:.8rem}.upcoming-priority-sub{font-size:.62rem;color:#94a3b8;margin-top:2px}.upcoming-priority-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}.upcoming-priority-mini{padding:7px 9px;border-radius:9px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06)}.upcoming-priority-mini small{display:block;color:#94a3b8;font-size:.58rem}.upcoming-priority-mini b{font-size:.92rem}.upcoming-priority-list{margin-top:8px;display:grid;gap:5px}.upcoming-priority-row{display:grid;grid-template-columns:1.55fr .85fr .7fr 1fr auto;gap:6px;align-items:center;padding:7px 8px;border-radius:8px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055);font-size:.64rem}.upcoming-priority-row .p-name{font-weight:800;color:#fff}.upcoming-priority-row .p-date{color:#fca5a5}.upcoming-priority-row .p-amt{color:#34d399;font-weight:800}.upcoming-priority-row .p-phone{color:#60a5fa}.upcoming-priority-more{margin-top:6px;text-align:center;color:#94a3b8;font-size:.6rem}@media(max-width:700px){.upcoming-emi-controls{grid-template-columns:1fr 1fr}.upcoming-emi-summary{grid-template-columns:1fr 1fr}.upcoming-priority-row{grid-template-columns:1.4fr .8fr .7fr auto}.upcoming-priority-row .p-phone{display:none}}
+.upcoming-phone{color:#60a5fa;text-decoration:none;font-weight:700}.upcoming-amount{color:#34d399;font-weight:800}.upcoming-empty{padding:22px;text-align:center;color:#64748b;font-size:.75rem}.upcoming-loan-emi-table-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.upcoming-date-box{display:flex;align-items:center;gap:5px}.upcoming-date-box>input[type="text"]{flex:1;min-width:0}.upcoming-date-btn{width:34px;height:34px;border:1px solid rgba(96,165,250,.35);border-radius:8px;background:rgba(59,130,246,.12);color:#93c5fd;cursor:pointer;flex:0 0 34px}.upcoming-date-picker-hidden{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important}
+/* Advanced collection-book presentation: classic, compact and mobile-safe. */
+.upcoming-customer-book{margin-top:9px;border:1px solid rgba(96,165,250,.20);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.018);}
+.upcoming-customer-head{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(180px,.9fr);gap:10px;padding:10px 11px;background:rgba(59,130,246,.07);align-items:start;}
+.upcoming-customer-name{font-weight:900;color:#fff;font-size:.80rem;line-height:1.25;overflow-wrap:anywhere;}
+.upcoming-customer-meta{font-size:.58rem;color:#94a3b8;margin-top:3px;line-height:1.35;overflow-wrap:anywhere;}
+.upcoming-customer-types{text-align:right;font-size:.58rem;color:#60a5fa;line-height:1.35;overflow-wrap:anywhere;}
+.upcoming-loan-book{padding:9px 10px;border-top:1px solid rgba(255,255,255,.07);}
+.upcoming-loan-head{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(150px,.9fr) minmax(150px,.9fr) auto;gap:7px;align-items:stretch;}
+.upcoming-loan-cell{min-width:0;padding:7px 8px;border-radius:8px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055);}
+.upcoming-loan-cell small{display:block;color:#64748b;font-size:.52rem;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px;}
+.upcoming-loan-cell b{display:block;color:#e2e8f0;font-size:.64rem;line-height:1.3;overflow-wrap:anywhere;}
+.upcoming-loan-cell .loan-main{color:#fff;font-size:.70rem;font-weight:900;}
+.upcoming-loan-cell .loan-sub{color:#94a3b8;font-size:.54rem;margin-top:2px;}
+.upcoming-loan-total{background:rgba(52,211,153,.07);border-color:rgba(52,211,153,.18);text-align:right;}
+.upcoming-loan-total strong{display:block;color:#34d399;font-size:.82rem;line-height:1.2;}
+.upcoming-loan-total span{display:block;color:#94a3b8;font-size:.52rem;margin-top:2px;}
+.upcoming-loan-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:7px;}
+.upcoming-loan-summary>div{min-width:0;padding:6px 7px;border-radius:8px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05);}
+.upcoming-loan-summary small{display:block;color:#64748b;font-size:.51rem;margin-bottom:2px;}
+.upcoming-loan-summary b{display:block;color:#e2e8f0;font-size:.62rem;line-height:1.3;overflow-wrap:anywhere;}
+.upcoming-loan-emi-table{width:100%;border-collapse:collapse;margin-top:7px;table-layout:fixed;}
+.upcoming-loan-emi-table th,.upcoming-loan-emi-table td{padding:6px 7px;border-top:1px solid rgba(255,255,255,.055);text-align:left;vertical-align:middle;font-size:.60rem;overflow-wrap:anywhere;}
+.upcoming-loan-emi-table th{color:#64748b;font-size:.50rem;text-transform:uppercase;font-weight:800;}
+.upcoming-loan-emi-table td{color:#e2e8f0;}
+.upcoming-loan-emi-table .emi-no{width:12%;font-weight:900;color:#fff;}
+.upcoming-loan-emi-table .emi-date{width:20%;white-space:nowrap;}
+.upcoming-loan-emi-table .emi-status{width:24%;}
+.upcoming-loan-emi-table .emi-amount{width:18%;white-space:nowrap;color:#34d399;font-weight:900;}
+.upcoming-loan-emi-table .emi-action{width:26%;text-align:right;}
+.upcoming-loan-emi-table .emi-action button{white-space:nowrap;}
+.upcoming-status-overdue{color:#f87171!important;font-weight:900;}
+.upcoming-status-due{color:#fbbf24!important;font-weight:900;}
+.upcoming-status-upcoming{color:#60a5fa!important;font-weight:900;}
+@media(max-width:700px){
+ .upcoming-customer-head{grid-template-columns:1fr;}
+ .upcoming-customer-types{text-align:left;}
+ .upcoming-loan-head{grid-template-columns:1fr 1fr;}
+ .upcoming-loan-total{text-align:left;}
+ .upcoming-loan-summary{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:420px){
+ .upcoming-loan-head{grid-template-columns:1fr;}
+ .upcoming-loan-summary{grid-template-columns:1fr;}
+ .upcoming-loan-emi-table{table-layout:auto;}
+ .upcoming-loan-emi-table th,.upcoming-loan-emi-table td{padding:6px 5px;font-size:.57rem;}
+ .upcoming-loan-emi-table .emi-no{width:auto;}
+ .upcoming-loan-emi-table .emi-date{width:auto;white-space:normal;}
+ .upcoming-loan-emi-table .emi-status{width:auto;}
+ .upcoming-loan-emi-table .emi-amount{width:auto;white-space:nowrap;}
+ .upcoming-loan-emi-table .emi-action{width:auto;text-align:left;}
+ .upcoming-loan-emi-table .emi-action button{font-size:.56rem;padding:5px 6px;}
+}
+/* Prevent narrow mobile columns from splitting financial values / DPD into vertical digits. */
+.table-wrap th:nth-child(6),.table-wrap td:nth-child(6){min-width:82px;white-space:nowrap;}
+.table-wrap td:nth-child(3),.table-wrap td:nth-child(5){white-space:nowrap;}
+.npa-row>div{min-width:0;overflow-wrap:anywhere;}
+.npa-row button{white-space:nowrap;}
+.upcoming-priority{margin-top:10px;padding:10px;border:1px solid rgba(248,113,113,.22);border-radius:12px;background:linear-gradient(180deg,rgba(248,113,113,.06),rgba(15,23,42,.34))}.upcoming-priority-head{display:flex;justify-content:space-between;align-items:center;gap:8px}.upcoming-priority-title{font-weight:800;color:#fff;font-size:.8rem}.upcoming-priority-sub{font-size:.62rem;color:#94a3b8;margin-top:2px}.upcoming-priority-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}.upcoming-priority-mini{padding:7px 9px;border-radius:9px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06)}.upcoming-priority-mini small{display:block;color:#94a3b8;font-size:.58rem}.upcoming-priority-mini b{font-size:.92rem}.upcoming-priority-list{margin-top:8px;display:grid;gap:5px}.upcoming-priority-row{display:grid;grid-template-columns:1.55fr .85fr .7fr 1fr auto;gap:6px;align-items:center;padding:7px 8px;border-radius:8px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055);font-size:.64rem}.upcoming-priority-row .p-name{font-weight:800;color:#fff}.upcoming-priority-row .p-date{color:#fca5a5}.upcoming-priority-row .p-amt{color:#34d399;font-weight:800}.upcoming-priority-row .p-phone{color:#60a5fa}.upcoming-priority-more{margin-top:6px;text-align:center;color:#94a3b8;font-size:.6rem}@media(max-width:700px){.upcoming-emi-controls{grid-template-columns:1fr 1fr}.upcoming-emi-summary{grid-template-columns:1fr 1fr}.upcoming-priority-row{grid-template-columns:1.4fr .8fr .7fr auto}.upcoming-priority-row .p-phone{display:none}}
 @media(max-width:420px){.upcoming-emi-controls{grid-template-columns:1fr}.upcoming-emi-head{display:block}.upcoming-emi-actions button{flex:1}.upcoming-priority-grid{grid-template-columns:1fr 1fr}.upcoming-priority-row{grid-template-columns:1fr auto auto}.upcoming-priority-row .p-date{font-size:.58rem}.upcoming-priority-row .p-amt{font-size:.62rem}}
 .mf-settlement-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.mf-settlement-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.mf-settlement-mini{padding:9px;border-radius:9px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}.mf-settlement-mini small{display:block;color:#94a3b8;font-size:.62rem}.mf-settlement-mini b{display:block;margin-top:3px;font-size:.95rem}.npa-controls{display:grid;grid-template-columns:1.2fr .9fr .9fr .9fr 1.4fr;gap:7px}.npa-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.npa-results{margin-top:10px}.npa-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-bottom:9px}.npa-row{display:grid;grid-template-columns:1.5fr .8fr .75fr .8fr .85fr 1fr auto;gap:7px;align-items:center;padding:8px;border:1px solid rgba(255,255,255,.06);border-radius:9px;background:rgba(255,255,255,.025);font-size:.68rem}.npa-row b{color:#fff}.npa-empty{padding:30px 16px;text-align:center;color:#64748b;border:1px dashed var(--border-subtle);border-radius:12px}.mf-vertical-controls{display:grid;gap:7px}
 @media(max-width:700px){.mf-settlement-grid,.mf-settlement-summary,.npa-summary{grid-template-columns:1fr 1fr}.npa-controls{grid-template-columns:1fr 1fr}.npa-row{grid-template-columns:1.4fr .8fr .75fr auto}.npa-row .npa-hide-mobile{display:none}}
@@ -5534,39 +5592,76 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const type=mfLoanTypeLabel(loan);
             const pending=rows.filter(r=>!r.paid);
             const dueTotal=pending.reduce((sum,r)=>sum+(Number(r.totalDue??r.emi)||0),0);
-            const contacts=`Customer: ${financeEsc(mfContactText(loan.phone,loan.phone2))}${mfGuarantorContactText(loan)?` · Guarantor: ${financeEsc(mfGuarantorContactText(loan))}`:''}`;
-            return `<div class="upcoming-loan-book" style="border-top:1px solid rgba(255,255,255,.07);padding:9px 10px;">
-                <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">
-                    <div>
-                        <div style="font-weight:800;color:#fff;font-size:.72rem;"><span class="mf-loan-type-badge">${financeEsc(type)}</span> ${financeEsc(loan.id)} · ${financeEsc(p.name||loan.product)}</div>
-                        <div style="font-size:.58rem;color:#94a3b8;margin-top:3px;">Linked to Main ${financeEsc(loan.rootLoanId||loan.id)} · Disbursed ${formatToIndianDate(loan.disbursalDate)} · Collector ${financeEsc(loanCollectorName(loan))}</div>
-                        <div style="font-size:.58rem;color:#60a5fa;margin-top:2px;">${contacts}</div>
+            const attention=mfCollectionAttentionForRow(rows[0]);
+            const previousItems=attention?.items||[];
+            const previousBalance=previousItems.reduce((sum,x)=>sum+(Number(x.balance)||0),0);
+            const previousPenalty=previousItems.reduce((sum,x)=>sum+(Number(x.penaltyDue)||0),0);
+            const previousTotal=previousBalance+previousPenalty;
+            const collectNow=previousTotal+dueTotal;
+            const statusFor=r=>r.upcomingStatus==='OVERDUE'?`<span class="upcoming-status-overdue">${r.overdueDays} days overdue</span>`:
+                r.upcomingStatus==='DUE'?`<span class="upcoming-status-due">DUE TODAY</span>`:
+                r.upcomingStatus==='PAID'?`<span style="color:#34d399;font-weight:900;">PAID</span>`:
+                `<span class="upcoming-status-upcoming">UPCOMING</span>`;
+            return `<section class="upcoming-loan-book">
+                <div class="upcoming-loan-head">
+                    <div class="upcoming-loan-cell">
+                        <small>Loan Account</small>
+                        <b class="loan-main"><span class="mf-loan-type-badge">${financeEsc(type)}</span> ${financeEsc(loan.id)}</b>
+                        <span class="loan-sub">${financeEsc(p.name||loan.product)} · Linked to Main ${financeEsc(loan.rootLoanId||loan.id)}</span>
                     </div>
-                    <div style="text-align:right;font-size:.6rem;"><b style="color:#34d399;">${pending.length} pending EMI${pending.length===1?'':'s'}</b><br><span style="color:#fbbf24;">₹${dueTotal.toLocaleString('en-IN')}</span></div>
+                    <div class="upcoming-loan-cell">
+                        <small>Customer Contacts</small>
+                        <b>${financeEsc(mfContactText(loan.phone,loan.phone2))}</b>
+                        <span class="loan-sub">Disbursed ${formatToIndianDate(loan.disbursalDate)}</span>
+                    </div>
+                    <div class="upcoming-loan-cell">
+                        <small>Guarantor Contacts</small>
+                        <b>${mfGuarantorContactText(loan)?financeEsc(mfGuarantorContactText(loan)):'-'}</b>
+                        <span class="loan-sub">Collector: ${financeEsc(loanCollectorName(loan))}</span>
+                    </div>
+                    <div class="upcoming-loan-cell upcoming-loan-total">
+                        <small>Collect Now</small>
+                        <strong>₹${collectNow.toLocaleString('en-IN')}</strong>
+                        <span>${pending.length} pending in selected view</span>
+                    </div>
                 </div>
-                <div class="upcoming-loan-emi-list" style="display:grid;gap:5px;margin-top:7px;">
-                    ${rows.map(r=>{
-                        const color=r.upcomingStatus==='OVERDUE'?'#f87171':r.upcomingStatus==='DUE'?'#fbbf24':r.upcomingStatus==='PAID'?'#34d399':'#60a5fa';
-                        const label=r.upcomingStatus==='OVERDUE'?`${r.overdueDays}d overdue`:r.upcomingStatus==='DUE'?'Due today':r.upcomingStatus==='PAID'?'Paid':'Upcoming';
-                        return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:7px;align-items:center;padding:6px 7px;border-radius:8px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055);font-size:.61rem;">
-                            <div><b style="color:#fff;">EMI #${r.no}</b> · ${formatToIndianDate(r.dueDate)}<div style="color:#94a3b8;font-size:.53rem;margin-top:2px;">${financeEsc(loan.id)} · ${financeEsc(type)}</div></div>
-                            <b style="color:${color};">${label}</b><b style="color:#34d399;">₹${Number(r.totalDue??r.emi).toLocaleString('en-IN')}</b>
-                            <button class="btn-collect-sm" onclick="openCollectModal('${financeEsc(loan.id)}')">Collect</button>
-                        </div>`;
-                    }).join('')}
+                <div class="upcoming-loan-summary">
+                    <div><small>Selected / Current EMI(s)</small><b>${pending.length?`${pending.length} EMI${pending.length===1?'':'s'} · ₹${dueTotal.toLocaleString('en-IN')}`:'None'}</b></div>
+                    <div><small>Previous Unpaid</small><b>${previousItems.length?`${previousItems.length} EMI${previousItems.length===1?'':'s'} · ₹${previousBalance.toLocaleString('en-IN')}`:'None'}</b></div>
+                    <div><small>Previous Penalty Due</small><b>₹${previousPenalty.toLocaleString('en-IN')}</b></div>
                 </div>
-            </div>`;
+                <div class="upcoming-loan-emi-table-wrap">
+                    <table class="upcoming-loan-emi-table">
+                        <thead><tr><th class="emi-no">EMI</th><th class="emi-date">Due Date</th><th class="emi-status">Status / DPD</th><th class="emi-amount">Amount</th><th class="emi-action">Action</th></tr></thead>
+                        <tbody>
+                        ${rows.map(r=>`<tr>
+                            <td class="emi-no">#${r.no}</td>
+                            <td class="emi-date">${formatToIndianDate(r.dueDate)}</td>
+                            <td class="emi-status">${statusFor(r)}</td>
+                            <td class="emi-amount">₹${Number(r.totalDue??r.emi).toLocaleString('en-IN')}</td>
+                            <td class="emi-action"><button class="btn-collect-sm" onclick="openCollectModal('${financeEsc(loan.id)}')">Collect EMI</button></td>
+                        </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </section>`;
         }
         function mfUpcomingCustomerBook(loanGroups){
             const first=loanGroups[0]?.[0], customer=first?.loan;
             if(!customer) return '';
             const allLoans=loanGroups.map(g=>g[0].loan);
             const totalPending=loanGroups.reduce((n,g)=>n+g.filter(r=>!r.paid).length,0);
-            const loanLabels=allLoans.map(l=>`${mfLoanTypeLabel(l)} ${l.id}`).join(' · ');
-            return `<article class="upcoming-customer-book" style="margin-top:9px;border:1px solid rgba(96,165,250,.18);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.018);">
-                <div style="padding:9px 10px;background:rgba(59,130,246,.07);display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">
-                    <div><div style="font-weight:800;color:#fff;font-size:.78rem;">${financeEsc(customer.name)}</div><div style="font-size:.58rem;color:#94a3b8;margin-top:2px;">${financeEsc(mfContactText(customer.phone,customer.phone2))} · ${allLoans.length} running loan account${allLoans.length===1?'':'s'} · ${totalPending} pending EMI${totalPending===1?'':'s'}</div></div>
-                    <div style="font-size:.58rem;color:#60a5fa;text-align:right;">${financeEsc(loanLabels)}</div>
+            const typeCounts={NEW:0,TOP_UP:0,RENEWAL:0};
+            allLoans.forEach(l=>{const t=String(l.loanType||'NEW').toUpperCase();if(typeCounts[t]!==undefined)typeCounts[t]++;});
+            const loanLabels=[
+                typeCounts.NEW?`NEW ${typeCounts.NEW}`:'',
+                typeCounts.TOP_UP?`TOP-UP ${typeCounts.TOP_UP}`:'',
+                typeCounts.RENEWAL?`RENEWAL ${typeCounts.RENEWAL}`:''
+            ].filter(Boolean).join(' · ');
+            return `<article class="upcoming-customer-book">
+                <div class="upcoming-customer-head">
+                    <div><div class="upcoming-customer-name">${financeEsc(customer.name)}</div><div class="upcoming-customer-meta">${financeEsc(mfContactText(customer.phone,customer.phone2))} · ${allLoans.length} loan account${allLoans.length===1?'':'s'} · ${totalPending} pending EMI${totalPending===1?'':'s'}</div></div>
+                    <div class="upcoming-customer-types">${financeEsc(loanLabels||'Loan Accounts')}</div>
                 </div>
                 ${loanGroups.map(g=>mfUpcomingLoanGroupCard(g[0].loan,g)).join('')}
             </article>`;
