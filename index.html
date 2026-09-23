@@ -521,7 +521,20 @@
         .mf-loan-history-card{border:1px solid var(--border-subtle);background:rgba(255,255,255,.035);border-radius:10px;padding:9px;min-width:0;}
         .mf-loan-history-card .muted{color:#94a3b8;font-size:.66rem;}
         .mf-loan-history-card .value{color:#fff;font-weight:800;font-size:.78rem;overflow-wrap:anywhere;}
-        @media(max-width:700px){.mf-loan-history-grid{grid-template-columns:1fr 1fr;}.mf-loan-actions .btn-header{flex:1 1 140px;justify-content:center;}#customer-history-summary .statement-box>div{grid-template-columns:1fr 1fr!important;}}
+        .mf-passbook-customer-group{border:1px solid rgba(96,165,250,.18);background:rgba(255,255,255,.025);border-radius:10px;margin-bottom:6px;overflow:hidden;}
+        .mf-passbook-customer-head{display:flex;align-items:center;gap:8px;width:100%;border:0;background:transparent;color:#fff;padding:10px 11px;text-align:left;cursor:pointer;}
+        .mf-passbook-customer-head:hover{background:rgba(96,165,250,.06);}
+        .mf-passbook-customer-head .arrow{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(96,165,250,.10);color:#93c5fd;flex:0 0 auto;}
+        .mf-passbook-customer-meta{font-size:.64rem;color:#94a3b8;margin-top:2px;}
+        .mf-passbook-loans{display:none;border-top:1px solid rgba(255,255,255,.07);padding:6px 8px 8px;}
+        .mf-passbook-loans.open{display:block;}
+        .mf-passbook-loan-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 9px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025);border-radius:8px;margin-top:4px;}
+        .mf-passbook-loan-row:hover{border-color:rgba(96,165,250,.25);}
+        .mf-passbook-loan-main{min-width:0;}
+        .mf-passbook-loan-title{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.72rem;color:#fff;font-weight:800;}
+        .mf-passbook-loan-meta{font-size:.62rem;color:#94a3b8;margin-top:3px;line-height:1.4;}
+        .mf-system-only-penalty{display:block;}
+        @media(max-width:700px){.mf-loan-history-grid{grid-template-columns:1fr 1fr;}.mf-loan-actions .btn-header{flex:1 1 140px;justify-content:center;}#customer-history-summary .statement-box>div{grid-template-columns:1fr 1fr!important;}.mf-passbook-loan-row{align-items:flex-start;flex-direction:column;}.mf-passbook-loan-row .btn-edit-sm{width:100%;justify-content:center;}}
 
 </style>
 
@@ -1301,7 +1314,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <span id="modal-client-heading">Create New Loan Account</span>
                 <i class="fa-solid fa-xmark" onclick="closeModal('modal-client')" style="cursor: pointer; color: #94a3b8;"></i>
             </div>
-            <form id="form-client" autocomplete="off" onsubmit="handleClientSubmit(event)">
+            <form id="form-client" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-dashlane-ignore="true" onsubmit="handleClientSubmit(event)">
                 <input type="hidden" id="fc-mode" value="ADD">
                 <input type="hidden" id="fc-id">
                 <input type="hidden" id="fc-source-loan-id">
@@ -1310,16 +1323,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
                 <div class="form-group">
                     <label>Customer Full Name *</label>
-                    <input type="text" id="fc-name" placeholder="e.g. Ramesh Sharma" required autocomplete="off">
+                    <input type="text" id="fc-name" placeholder="e.g. Ramesh Sharma" required autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-dashlane-ignore="true">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                     <div class="form-group" style="margin-bottom:0;">
                         <label>Primary Mobile Number *</label>
-                        <input type="tel" id="fc-phone" placeholder="9876543210" required autocomplete="off">
+                        <input type="tel" id="fc-phone" placeholder="9876543210" required autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-dashlane-ignore="true">
                     </div>
                     <div class="form-group" style="margin-bottom:0;">
                         <label>Secondary Mobile Number</label>
-                        <input type="tel" id="fc-phone2" placeholder="9876543211" autocomplete="off">
+                        <input type="tel" id="fc-phone2" placeholder="9876543211" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-dashlane-ignore="true">
                     </div>
                 </div>
                 <div style="font-size:.66rem;color:#64748b;line-height:1.4;margin-top:5px;margin-bottom:12px;">Keep a second contact number for collection coordination. Existing accounts remain unchanged.</div>
@@ -1330,16 +1343,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px; margin-top:10px;">
                     <div class="form-group" style="margin-bottom:0;">
                         <label>Guarantor Name</label>
-                        <input type="text" id="fc-guarantor-name" placeholder="e.g. Suresh Sharma" autocomplete="off">
+                        <input type="text" id="fc-guarantor-name" placeholder="e.g. Suresh Sharma" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-dashlane-ignore="true">
                     </div>
                     <div class="form-group" style="margin-bottom:0;">
                         <label>Guarantor Primary Mobile</label>
-                        <input type="tel" id="fc-guarantor-phone" placeholder="9876543212" autocomplete="off">
+                        <input type="tel" id="fc-guarantor-phone" placeholder="9876543212" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-dashlane-ignore="true">
                     </div>
                 </div>
                 <div class="form-group" style="margin-top:8px;margin-bottom:10px;">
                     <label>Guarantor Secondary Mobile</label>
-                    <input type="tel" id="fc-guarantor-phone2" placeholder="9876543213" autocomplete="off">
+                    <input type="tel" id="fc-guarantor-phone2" placeholder="9876543213" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-dashlane-ignore="true">
                 </div>
                 <div style="font-size:.66rem;color:#64748b;line-height:1.4;margin-top:5px;margin-bottom:12px;">Optional — store one or two guarantor contacts for recovery follow-up. Existing accounts remain unchanged.</div>
                 <div class="form-group">
@@ -2420,7 +2433,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div id="mf-auth-status" style="font-size:.68rem;color:#94a3b8;margin-bottom:7px;">Not signed in.</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
                     <input id="mf-auth-email" type="email" name="mf-account-email" placeholder="Account email" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
-                    <input id="mf-auth-key" type="text" name="mf-secure-credential" placeholder="Secure account credential" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;-webkit-text-security:disc;text-security:disc;" autocomplete="new-password" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
+                    <input id="mf-auth-key" type="text" name="mf-secure-credential" placeholder="Secure account credential" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.78rem;-webkit-text-security:disc;text-security:disc;" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-dashlane-ignore="true" data-form-type="other">
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:7px;">
                     <button type="button" class="btn-header btn-green" style="justify-content:center;" onclick="mfAuthSignIn()"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
@@ -2468,7 +2481,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="font-size:.66rem;color:#94a3b8;margin-top:6px;line-height:1.4;">The app never asks for or stores your Gmail password. Google OAuth grants the app the limited <b>drive.file</b> Drive scope needed for its own backup files.</div>
                 <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, host this app on your HTTPS domain.</div>
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required to connect, backup/restore)</label>
-                <input type="password" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for encrypted backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password" oninput="onCloudPinInputChange()">
+                <input type="text" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for encrypted backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;-webkit-text-security:disc;text-security:disc;" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-dashlane-ignore="true" data-form-type="other" oninput="onCloudPinInputChange()">
                 <label style="display:flex;align-items:center;gap:6px;font-size:.66rem;color:#94a3b8;margin-top:7px;cursor:pointer;">
                     <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Keep PIN active on this device (encrypted storage; raw PIN is never stored)
                 </label>
@@ -7297,7 +7310,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(!rows.length){
                 (loan.payments||[]).forEach((pay,i)=>{
                     const amt=Number(pay.penalty)||0;
-                    if(amt>0) rows.push({installmentNum:i+1,amount:amt,appliedDate:mfPenaltyAppliedDueDate(loan,idx+1,pay.penaltyAppliedDate||pay.date),receivedDate:pay.penaltyReceivedDate||pay.date,mode:pay.penaltyReceivedMode||pay.mode||'Cash',status:'received',_source:'payment',_idx:i});
+                    if(amt>0) rows.push({installmentNum:i+1,amount:amt,appliedDate:mfPenaltyAppliedDueDate(loan,i+1,pay.penaltyAppliedDate||pay.date),receivedDate:pay.penaltyReceivedDate||pay.date,mode:pay.penaltyReceivedMode||pay.mode||'Cash',status:'received',_source:'payment',_idx:i});
                 });
             }
             return rows.sort((a,b)=>String(a.receivedDate||a.appliedDate||'').localeCompare(String(b.receivedDate||b.appliedDate||'')));
@@ -7996,6 +8009,55 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             renderPassbookDetail();
         }
 
+        function mfPassbookCustomerGroupKey(loan){
+            return String(loan?.customerKey||mfMakeCustomerKey(loan?.name||'',loan?.phone||''));
+        }
+        function togglePassbookCustomerGroup(index){
+            const el=document.getElementById(`mf-pb-customer-loans-${index}`);
+            const arrow=document.getElementById(`mf-pb-customer-arrow-${index}`);
+            if(!el)return;
+            const open=el.classList.toggle('open');
+            if(arrow) arrow.innerHTML=open?'<i class="fa-solid fa-chevron-down"></i>':'<i class="fa-solid fa-chevron-right"></i>';
+        }
+        function mfPassbookGroupedResults(matches){
+            const groups=[];
+            const byKey=new Map();
+            matches.forEach(l=>{
+                const key=mfPassbookCustomerGroupKey(l);
+                if(!byKey.has(key)){const g={key,loans:[]};byKey.set(key,g);groups.push(g);}
+                byKey.get(key).loans.push(l);
+            });
+            return groups.slice(0,50).map((g,index)=>{
+                const rows=g.loans.slice().sort((a,b)=>String(a.disbursalDate||'').localeCompare(String(b.disbursalDate||''))||String(a.id).localeCompare(String(b.id)));
+                const first=rows[0]||{};
+                const contact=mfContactText(first.phone,first.phone2);
+                const newCount=rows.filter(x=>String(x.loanType||'NEW').toUpperCase()==='NEW').length;
+                const topCount=rows.filter(x=>String(x.loanType||'').toUpperCase()==='TOP_UP').length;
+                const renCount=rows.filter(x=>String(x.loanType||'').toUpperCase()==='RENEWAL').length;
+                const activeCount=rows.filter(x=>mfLoanStatusLabel(x)==='ACTIVE').length;
+                const customerLabel=first.name||'Customer';
+                const loanRows=rows.map(l=>{
+                    const p=state.products[l.product]||{};
+                    const status=mfLoanStatusLabel(l);
+                    return `<div class="mf-passbook-loan-row">
+                        <div class="mf-passbook-loan-main">
+                            <div class="mf-passbook-loan-title"><span class="mf-loan-type-badge">${mfLoanTypeLabel(l)}</span><span>${financeEsc(l.id)}</span><span style="color:#cbd5e1;">${financeEsc(p.name||l.product||'-')}</span><span style="color:${status==='ACTIVE'?'#34d399':'#94a3b8'};">${financeEsc(status)}</span></div>
+                            <div class="mf-passbook-loan-meta">Disbursal ${formatToIndianDate(l.disbursalDate)} · ₹${Number(p.amount||0).toLocaleString('en-IN')} · Outstanding ₹${Math.max(0,Number(getLoanPending(l))||0).toLocaleString('en-IN')}</div>
+                        </div>
+                        <button type="button" class="btn-edit-sm" onclick="selectPassbookLoan('${String(l.id).replace(/'/g,"\\'")}')"><i class="fa-solid fa-folder-open"></i> Open ${financeEsc(l.id)}</button>
+                    </div>`;
+                }).join('');
+                return `<div class="mf-passbook-customer-group">
+                    <button type="button" class="mf-passbook-customer-head" onclick="togglePassbookCustomerGroup(${index})">
+                        <span class="arrow" id="mf-pb-customer-arrow-${index}"><i class="fa-solid fa-chevron-right"></i></span>
+                        <span style="min-width:0;flex:1;"><b style="font-size:.82rem;color:#fff;">${financeEsc(customerLabel)}</b><div class="mf-passbook-customer-meta">${financeEsc(contact)} · ${rows.length} loan account${rows.length===1?'':'s'} · ${activeCount} active</div></span>
+                        <span style="font-size:.62rem;color:#94a3b8;white-space:nowrap;">NEW ${newCount} · TOP-UP ${topCount} · RENEWAL ${renCount}</span>
+                    </button>
+                    <div class="mf-passbook-loans" id="mf-pb-customer-loans-${index}">${loanRows}</div>
+                </div>`;
+            }).join('');
+        }
+
         function filterPassbookAccounts() {
             const input = document.getElementById('passbook-search');
             const results = document.getElementById('passbook-search-results');
@@ -8012,13 +8074,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             populatePassbookDropdown(matches);
             if (results) {
                 results.style.display='block';
-                results.innerHTML = matches.length ? matches.slice(0,50).map(l => {
-                    const p=state.products[l.product]||{}; const due=getLoanPending(l);
-                    return `<button type="button" onclick="selectPassbookLoan('${l.id}')" style="display:block;width:100%;text-align:left;border:1px solid rgba(255,255,255,.08);background:var(--bg-card);color:#fff;padding:9px 10px;margin-bottom:4px;border-radius:8px;cursor:pointer;">
-                        <div style="display:flex;justify-content:space-between;gap:8px;"><b style="font-size:.8rem;color:#60a5fa;">${l.name}</b><span style="font-size:.68rem;color:#94a3b8;">${l.id}</span></div>
-                        <div style="font-size:.68rem;color:#94a3b8;margin-top:2px;">${l.phone||''} · ${p.name||l.product||''} · Outstanding ₹${due.toLocaleString('en-IN')}</div>
-                    </button>`;
-                }).join('') : `<div style="padding:10px;color:#64748b;font-size:.75rem;background:var(--bg-card);border-radius:8px;">No matching customer / loan account found.</div>`;
+                results.innerHTML = matches.length ? mfPassbookGroupedResults(matches) : `<div style="padding:10px;color:#64748b;font-size:.75rem;background:var(--bg-card);border-radius:8px;">No matching customer / loan account found.</div>`;
             }
         }
 
@@ -8035,7 +8091,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(!area)return;
             const mode=document.getElementById('passbook-doc-mode')?.value||'STATEMENT';
             const title=mode==='SCHEDULE'?'EMI Repayment Schedule':'Loan Statement & Paid EMI Schedule';
-            const printRoot=document.createElement('div'); printRoot.innerHTML=area.innerHTML; printRoot.querySelectorAll('.statement-internal-company-header,.loan-card-internal-company-header').forEach(el=>el.remove()); const content=mfCompanyPrintHeader(title)+printRoot.innerHTML;
+            const printRoot=document.createElement('div'); printRoot.innerHTML=area.innerHTML; printRoot.querySelectorAll('.statement-internal-company-header,.loan-card-internal-company-header,.mf-system-only-penalty').forEach(el=>el.remove()); const content=mfCompanyPrintHeader(title)+printRoot.innerHTML;
             const w=mfPrintA4Shell(`${state.bizName} — ${title}`,content);
             if(!w)return;
             w.onload=()=>{w.focus();w.print();};
@@ -8078,6 +8134,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const totalPaidGross = l.payments.reduce((s, x) => s + x.amount, 0) + (l.foreclosed ? (Number(l.foreclosureData.settlementAmount)||0) + (Number(l.foreclosureData.partialAmountAlreadyCollected)||0) : (postMaturity ? (Number(postMaturity.actualReceived)||0) + (Number(postMaturity.partialAmountAlreadyCollected)||0) : 0));
             const pending = getLoanPending(l);
             const totalPenaltyCollected = l.payments.reduce((s, x) => s + (x.penalty || 0), 0);
+            const duePenalties = getDuePenalties(l);
+            const totalPenaltyDue = duePenalties.reduce((sum,x)=>sum+(Number(x.amount)||0),0);
             const settlementInterestReceived = postMaturity ? (Number(postMaturity.contractualInterestReceived)||0) : 0;
             const settlementPrincipalReceived = postMaturity ? Math.max(0,(Number(postMaturity.contractualPending)||0)-settlementInterestReceived) : 0;
             const settlementPartialPrincipal = postMaturity ? Math.min(Number(postMaturity.partialAmountAlreadyCollected||0),Math.max(0,Number(postMaturity.contractualPending||0))) : 0;
@@ -8259,8 +8317,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 ${mfCustomerLoans(l.customerKey,l).length>1 ? `<div class="statement-box no-print" style="padding:12px;border-radius:12px;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;"><b style="color:#fff;font-size:.84rem;"><i class="fa-solid fa-clock-rotate-left" style="color:#60a5fa;"></i> Customer Loan History</b><button class="btn-edit-sm" onclick="openCustomerHistoryModal()">Open Consolidated History</button></div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${mfCustomerLoans(l.customerKey,l).map(x=>`<span class="mf-loan-type-badge">${financeEsc(x.id)} · ${mfLoanTypeLabel(x)} · ${mfLoanStatusLabel(x)}</span>`).join('')}</div></div>` : ''}
 
                 <!-- Total Collected From This Client — Segregation Box (like Lender Cost Breakdown) -->
-                <div class="statement-box" style="background:var(--bg-card); padding:14px; border-radius:14px; border:1px solid var(--border-subtle); margin-bottom:12px;">
-                    <div style="font-weight:700; color:#fff; margin-bottom:10px; font-size:0.86rem;"><i class="fa-solid fa-receipt me-1" style="color:#34d399;"></i> Total Collected From This Client So Far</div>
+                <div class="statement-box mf-system-only-penalty" style="background:var(--bg-card); padding:14px; border-radius:14px; border:1px solid var(--border-subtle); margin-bottom:12px;">
+                    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+                        <div style="font-weight:700; color:#fff; font-size:0.86rem;"><i class="fa-solid fa-receipt me-1" style="color:#34d399;"></i> Internal Collection Accounting</div>
+                        <span style="font-size:.62rem;color:#fbbf24;font-weight:800;">NOT INCLUDED IN CUSTOMER PDF</span>
+                    </div>
+                    <div style="font-size:.68rem;color:#64748b;margin:-3px 0 10px;">Penalty information is retained for internal collection/revenue control only. Customer-facing statements never print this section.</div>
                     <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px;">
                         <div style="background:rgba(96,165,250,0.08); border:1px solid rgba(96,165,250,0.25); border-radius:9px; padding:9px; text-align:center;">
                             <div style="font-size:0.66rem; color:#94a3b8;">Principal</div>
@@ -8271,10 +8333,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             <div style="font-weight:800; color:#34d399; font-size:0.95rem;">₹${totalInterestCollected.toLocaleString('en-IN')}</div>
                         </div>
                         <button type="button" class="no-print" onclick="openPenaltyReceiptsModal('${l.id}')" style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:9px;padding:9px;text-align:center;color:inherit;cursor:pointer;">
-                            <div style="font-size:0.66rem;color:#94a3b8;">Penalty</div>
+                            <div style="font-size:0.66rem;color:#94a3b8;">Penalty Received</div>
                             <div style="font-weight:800;color:#fbbf24;font-size:0.95rem;">₹${totalPenaltyCollected.toLocaleString('en-IN')}</div>
-                            <div style="font-size:.58rem;color:#fbbf24;margin-top:2px;">View penalty receipts</div>
+                            <div style="font-size:.58rem;color:#fbbf24;margin-top:2px;">View / Edit Receipts</div>
                         </button>
+                        ${totalPenaltyDue>0 ? `<button type="button" class="no-print" onclick="openDuePenaltiesListModal('${l.id}')" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.24);border-radius:9px;padding:9px;text-align:center;color:inherit;cursor:pointer;">
+                            <div style="font-size:0.66rem;color:#94a3b8;">Penalty Due</div>
+                            <div style="font-weight:800;color:#fb7185;font-size:0.95rem;">₹${totalPenaltyDue.toLocaleString('en-IN')}</div>
+                            <div style="font-size:.58rem;color:#fb7185;margin-top:2px;">${duePenalties.length} pending · Receive / Edit</div>
+                        </button>` : ''}
                         <div style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.25);border-radius:9px;padding:9px;text-align:center;">
                             <div style="font-size:0.66rem;color:#94a3b8;">Pre-EMI Interest</div>
                             <div style="font-weight:800;color:#a78bfa;font-size:0.95rem;">₹${preEmiInterest.toLocaleString('en-IN',{maximumFractionDigits:2})}</div>
@@ -9658,6 +9725,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 ["Settled After Maturity",settled],
                 ["Foreclosed",foreclosed]
             ];
+            const typeOf=l=>String(l?.loanType||'NEW').toUpperCase();
+            const customerKeyOf=l=>String(l?.customerKey||mfMakeCustomerKey(l?.name||'',l?.phone||''));
+            const newLoans=loans.filter(l=>typeOf(l)==='NEW');
+            const topUpLoans=loans.filter(l=>typeOf(l)==='TOP_UP');
+            const renewalLoans=loans.filter(l=>typeOf(l)==='RENEWAL');
+            const loanTypeRows=[
+                ["NEW LOANS",newLoans.length,new Set(newLoans.map(customerKeyOf)).size],
+                ["TOP-UP LOANS",topUpLoans.length,new Set(topUpLoans.map(customerKeyOf)).size],
+                ["RENEWAL LOANS",renewalLoans.length,new Set(renewalLoans.map(customerKeyOf)).size]
+            ];
 
             return {
                 d,totalLoans,totalDisbursed,outstanding,
@@ -9665,7 +9742,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 capitalBorrowed,principalRepaid,lenderInterest,lenderGst,upfront,
                 remainingDebt:Math.max(0,capitalBorrowed-principalRepaid),
                 financingCost:lenderInterest+lenderGst+upfront,
-                productRows,statusRows,
+                productRows,statusRows,loanTypeRows,
+                newLoanCount:newLoans.length,topUpLoanCount:topUpLoans.length,renewalLoanCount:renewalLoans.length,
+                newCustomerCount:new Set(newLoans.map(customerKeyOf)).size,
+                topUpCustomerCount:new Set(topUpLoans.map(customerKeyOf)).size,
+                renewalCustomerCount:new Set(renewalLoans.map(customerKeyOf)).size,
                 reportDate:formatToIndianDate(new Date().toISOString().split('T')[0])
             };
         }
@@ -9727,7 +9808,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 ["E. PORTFOLIO STATUS","LOAN ACCOUNTS"],
                 ...r.statusRows,
                 [],
-                ["F. REPORT INTERPRETATION"],
+                ["F. LOAN TYPE / ADVANCEMENT OVERVIEW","COUNT"],
+                ["New Loan Accounts",r.newLoanCount],
+                ["Top-up Loan Accounts",r.topUpLoanCount],
+                ["Renewal Loan Accounts",r.renewalLoanCount],
+                ["Distinct Customers Given Top-up",r.topUpCustomerCount],
+                ["Distinct Customers Given Renewal",r.renewalCustomerCount],
+                [],
+                ["G. REPORT INTERPRETATION"],
                 ["Gross Business Earnings","File charges + customer interest + penalties + foreclosure fees + pre-closure interest + post-maturity recovery interest + pre-EMI interest."],
                 ["Lender Financing Cost","Lender interest + lender GST + upfront borrowing charges."],
                 ["OPEX","Staff salaries + general business expenses."],
@@ -9751,6 +9839,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             wsPortfolio['!autofilter']={ref:`A2:G${2+r.productRows.length}`};
             wsPortfolio['!freeze']={xSplit:0,ySplit:2};
             XLSX.utils.book_append_sheet(wb,wsPortfolio,'Portfolio_Overview');
+
+            const loanTypes=[
+                ["LOAN TYPE / CUSTOMER ADVANCEMENT OVERVIEW"],
+                ["Loan Type","Loan Accounts","Distinct Customers"],
+                ...r.loanTypeRows,
+                [],
+                ["Note","A customer can have multiple loan accounts. Loan Account count and Distinct Customer count are intentionally separate."]
+            ];
+            const wsLoanTypes=XLSX.utils.aoa_to_sheet(loanTypes);
+            wsLoanTypes['!cols']=[{wch:38},{wch:18},{wch:22}];
+            wsLoanTypes['!autofilter']={ref:`A2:C${2+r.loanTypeRows.length}`};
+            wsLoanTypes['!freeze']={xSplit:0,ySplit:2};
+            XLSX.utils.book_append_sheet(wb,wsLoanTypes,'Loan_Type_Overview');
 
             const collections=[
                 ["CUSTOMER-SIDE EARNINGS & RECOVERY SUMMARY"],
@@ -9887,7 +9988,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     </tbody></table>
                     <h2>4. Portfolio Status</h2>
                     <table><tbody><tr><th>Status</th><th>Loan Accounts</th></tr>${statusRows}</tbody></table>
-                    <h2>5. Portfolio by Product</h2>
+                    <h2>5. Loan Type / Customer Advancement</h2>
+                    <table><tbody><tr><th>Loan Type</th><th>Loan Accounts</th><th>Distinct Customers</th></tr>${r.loanTypeRows.map(x=>`<tr><td>${financeEsc(x[0])}</td><td style="text-align:right">${x[1]}</td><td style="text-align:right">${x[2]}</td></tr>`).join('')}
+                    <tr class="total"><td>Top-up + Renewal Accounts</td><td style="text-align:right">${r.topUpLoanCount+r.renewalLoanCount}</td><td style="text-align:right">—</td></tr></tbody></table>
+                    <div class="mf-exec-note"><b>Customer relationship:</b> one customer can hold multiple independent loan accounts; Top-up and Renewal remain separate loan accounts while consolidated history stays customer-linked.</div>
+                    <h2>6. Portfolio by Product</h2>
                     <table><tbody><tr><th>Product</th><th>Accounts</th><th>Disbursed</th><th>Scheduled Payable</th><th>Outstanding</th></tr>${productRows || '<tr><td colspan="5">No product data available.</td></tr>'}</tbody></table>
                     <div class="mf-exec-note"><b>Plain-English interpretation:</b> True In-Hand Net Surplus = Gross Business Earnings − Lender Financing Cost − Operating Expenses.</div>
                     <div class="mf-exec-note"><b>Privacy:</b> This executive report deliberately excludes customer names, loan IDs, customer/guarantor phone numbers and customer-level transaction rows.</div>
