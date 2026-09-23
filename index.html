@@ -1083,7 +1083,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             <div class="upcoming-emi-controls">
                 <div class="upcoming-emi-control date-control"><label>From Date</label><div class="upcoming-date-box"><input type="text" id="emi-schedule-from" placeholder="DD/MM/YYYY" inputmode="numeric" autocomplete="off" onblur="normalizeUpcomingDateInput('from')" onchange="renderUpcomingEmiSchedule()"><button type="button" class="upcoming-date-btn" onclick="pickUpcomingDate('from')" aria-label="Choose from date"><i class="fa-solid fa-calendar-days"></i></button><input type="date" id="emi-schedule-from-picker" class="upcoming-date-picker-hidden" tabindex="-1" aria-hidden="true" onchange="syncUpcomingPicker('from')"></div></div>
                 <div class="upcoming-emi-control date-control"><label>To Date</label><div class="upcoming-date-box"><input type="text" id="emi-schedule-to" placeholder="DD/MM/YYYY" inputmode="numeric" autocomplete="off" onblur="normalizeUpcomingDateInput('to')" onchange="renderUpcomingEmiSchedule()"><button type="button" class="upcoming-date-btn" onclick="pickUpcomingDate('to')" aria-label="Choose to date"><i class="fa-solid fa-calendar-days"></i></button><input type="date" id="emi-schedule-to-picker" class="upcoming-date-picker-hidden" tabindex="-1" aria-hidden="true" onchange="syncUpcomingPicker('to')"></div></div>
-                <div class="upcoming-emi-control"><label>Status</label><select id="emi-schedule-status" onchange="renderUpcomingEmiSchedule()"><option value="UPCOMING">Upcoming Only</option><option value="DUE">Due / Overdue</option><option value="PAID">Paid</option><option value="ALL">All in Range</option></select></div>
+                <div class="upcoming-emi-control"><label>Status</label><select id="emi-schedule-status" onchange="renderUpcomingEmiSchedule()"><option value="UPCOMING">Upcoming + Pending</option><option value="DUE">Due / Overdue</option><option value="PAID">Paid</option><option value="ALL">All in Range</option></select></div>
             </div>
             <div class="upcoming-emi-controls" style="margin-top:7px;grid-template-columns:1fr 1.6fr 1.2fr;">
                 <div class="upcoming-emi-control"><label>Quick View</label><select id="emi-schedule-quick" onchange="applyUpcomingQuickView()"><option value="7">Next 7 Days</option><option value="1">Today</option><option value="15">Next 15 Days</option><option value="30">Next 30 Days</option><option value="90">Next 90 Days</option><option value="MONTH">This Month</option><option value="YEAR">This Year</option></select></div>
@@ -5507,6 +5507,70 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div class="collection-client-actions"><button class="btn-edit-sm" onclick="openLoanFromProduct('${l.id}')">Statement</button>${currentUnpaid.length?`<button class="btn-collect-sm" onclick="openCollectModal('${l.id}')">Collect EMI</button>`:''}</div>
             </article>`;
         }
+        function mfUpcomingCustomerKey(loan){
+            return String(loan?.customerKey||mfMakeCustomerKey(loan?.name||'',loan?.phone||''));
+        }
+        function mfUpcomingRowMatchesFilters(loan,r,from,to,status,today,q){
+            const rowStatus=mfUpcomingStatus(r,today);
+            const isInRange=r.dueDate>=from&&r.dueDate<=to;
+            if(status==='DUE'){
+                if(rowStatus!=='DUE'&&rowStatus!=='OVERDUE') return null;
+            }else if(status==='UPCOMING'){
+                // Collection view: future EMIs in the selected horizon PLUS all
+                // still-unpaid overdue EMIs, so an overdue Top-up/Renewal never disappears.
+                if(rowStatus==='UPCOMING'){ if(!isInRange) return null; }
+                else if(rowStatus!=='DUE'&&rowStatus!=='OVERDUE') return null;
+            }else{
+                if(!isInRange) return null;
+                if(status!=='ALL'&&rowStatus!==status) return null;
+            }
+            const product=state.products[loan.product];
+            const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.guarantorPhone,loan.guarantorPhone2,loan.guarantorSecondaryPhone,loanCollectorName(loan),product?.name].filter(Boolean).join(' ').toLowerCase();
+            if(q&&!hay.includes(q)) return null;
+            return {...r,upcomingStatus:rowStatus,overdueDays:mfUpcomingOverdueDays(r.dueDate,today)};
+        }
+        function mfUpcomingLoanGroupCard(loan,rows){
+            const p=rows[0]?.product||state.products[loan.product]||{};
+            const type=mfLoanTypeLabel(loan);
+            const pending=rows.filter(r=>!r.paid);
+            const dueTotal=pending.reduce((sum,r)=>sum+(Number(r.totalDue??r.emi)||0),0);
+            const contacts=`Customer: ${financeEsc(mfContactText(loan.phone,loan.phone2))}${mfGuarantorContactText(loan)?` · Guarantor: ${financeEsc(mfGuarantorContactText(loan))}`:''}`;
+            return `<div class="upcoming-loan-book" style="border-top:1px solid rgba(255,255,255,.07);padding:9px 10px;">
+                <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+                    <div>
+                        <div style="font-weight:800;color:#fff;font-size:.72rem;"><span class="mf-loan-type-badge">${financeEsc(type)}</span> ${financeEsc(loan.id)} · ${financeEsc(p.name||loan.product)}</div>
+                        <div style="font-size:.58rem;color:#94a3b8;margin-top:3px;">Linked to Main ${financeEsc(loan.rootLoanId||loan.id)} · Disbursed ${formatToIndianDate(loan.disbursalDate)} · Collector ${financeEsc(loanCollectorName(loan))}</div>
+                        <div style="font-size:.58rem;color:#60a5fa;margin-top:2px;">${contacts}</div>
+                    </div>
+                    <div style="text-align:right;font-size:.6rem;"><b style="color:#34d399;">${pending.length} pending EMI${pending.length===1?'':'s'}</b><br><span style="color:#fbbf24;">₹${dueTotal.toLocaleString('en-IN')}</span></div>
+                </div>
+                <div class="upcoming-loan-emi-list" style="display:grid;gap:5px;margin-top:7px;">
+                    ${rows.map(r=>{
+                        const color=r.upcomingStatus==='OVERDUE'?'#f87171':r.upcomingStatus==='DUE'?'#fbbf24':r.upcomingStatus==='PAID'?'#34d399':'#60a5fa';
+                        const label=r.upcomingStatus==='OVERDUE'?`${r.overdueDays}d overdue`:r.upcomingStatus==='DUE'?'Due today':r.upcomingStatus==='PAID'?'Paid':'Upcoming';
+                        return `<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:7px;align-items:center;padding:6px 7px;border-radius:8px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055);font-size:.61rem;">
+                            <div><b style="color:#fff;">EMI #${r.no}</b> · ${formatToIndianDate(r.dueDate)}<div style="color:#94a3b8;font-size:.53rem;margin-top:2px;">${financeEsc(loan.id)} · ${financeEsc(type)}</div></div>
+                            <b style="color:${color};">${label}</b><b style="color:#34d399;">₹${Number(r.totalDue??r.emi).toLocaleString('en-IN')}</b>
+                            <button class="btn-collect-sm" onclick="openCollectModal('${financeEsc(loan.id)}')">Collect</button>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+        }
+        function mfUpcomingCustomerBook(loanGroups){
+            const first=loanGroups[0]?.[0], customer=first?.loan;
+            if(!customer) return '';
+            const allLoans=loanGroups.map(g=>g[0].loan);
+            const totalPending=loanGroups.reduce((n,g)=>n+g.filter(r=>!r.paid).length,0);
+            const loanLabels=allLoans.map(l=>`${mfLoanTypeLabel(l)} ${l.id}`).join(' · ');
+            return `<article class="upcoming-customer-book" style="margin-top:9px;border:1px solid rgba(96,165,250,.18);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.018);">
+                <div style="padding:9px 10px;background:rgba(59,130,246,.07);display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+                    <div><div style="font-weight:800;color:#fff;font-size:.78rem;">${financeEsc(customer.name)}</div><div style="font-size:.58rem;color:#94a3b8;margin-top:2px;">${financeEsc(mfContactText(customer.phone,customer.phone2))} · ${allLoans.length} running loan account${allLoans.length===1?'':'s'} · ${totalPending} pending EMI${totalPending===1?'':'s'}</div></div>
+                    <div style="font-size:.58rem;color:#60a5fa;text-align:right;">${financeEsc(loanLabels)}</div>
+                </div>
+                ${loanGroups.map(g=>mfUpcomingLoanGroupCard(g[0].loan,g)).join('')}
+            </article>`;
+        }
         function renderUpcomingEmiSchedule(){
             const from=getUpcomingDateIso('from')||mfIsoToday(), to=getUpcomingDateIso('to')||from;
             const status=document.getElementById('emi-schedule-status')?.value||'UPCOMING',
@@ -5517,57 +5581,38 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             let rows=[];
             state.loans.forEach(loan=>{
                 if(loan.foreclosed || loan.postMaturitySettlement || !collectorMatches(loan,collector))return;
-                const product=state.products[loan.product];
-                if(!product)return;
+                const product=state.products[loan.product]; if(!product)return;
                 mfLoanScheduleRows(loan).forEach(r=>{
-                    const rowStatus=mfUpcomingStatus(r,today);
-                    // Due / Overdue is one operational collection filter: include both
-                    // today's dues and earlier unpaid overdue EMIs. This prevents a
-                    // long-pending Top-up/Renewal account from disappearing from recovery
-                    // merely because the quick-view range starts today.
-                    const isInRange=r.dueDate>=from&&r.dueDate<=to;
-                    if(status==='DUE'){
-                        if(rowStatus!=='DUE'&&rowStatus!=='OVERDUE')return;
-                    }else{
-                        if(!isInRange)return;
-                        if(status!=='ALL'&&rowStatus!==status)return;
-                    }
-                    const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.guarantorPhone,loan.guarantorPhone2,loan.guarantorSecondaryPhone,loanCollectorName(loan),product.name].filter(Boolean).join(' ').toLowerCase();
-                    if(q&&!hay.includes(q))return;
-                    rows.push({...r,upcomingStatus:rowStatus,overdueDays:mfUpcomingOverdueDays(r.dueDate,today)});
+                    const matched=mfUpcomingRowMatchesFilters(loan,r,from,to,status,today,q);
+                    if(matched) rows.push(matched);
                 });
             });
-            rows.sort((a,b)=>a.dueDate.localeCompare(b.dueDate)||a.loan.name.localeCompare(b.loan.name));
+            rows.sort((a,b)=>a.dueDate.localeCompare(b.dueDate)||a.loan.name.localeCompare(b.loan.name)||String(a.loan.id).localeCompare(String(b.loan.id)));
             const summary=document.getElementById('upcoming-emi-summary'), area=document.getElementById('upcoming-emi-results');
             const total=rows.reduce((s,r)=>s+(Number(r.totalDue??r.emi)||0),0),
-                  clients=new Set(rows.map(r=>r.loan.id)).size,
+                  clients=new Set(rows.map(r=>mfUpcomingCustomerKey(r.loan))).size,
                   due=rows.filter(r=>r.upcomingStatus==='DUE'),
                   overdue=rows.filter(r=>r.upcomingStatus==='OVERDUE'),
                   upcoming=rows.filter(r=>r.upcomingStatus==='UPCOMING'),
                   paid=rows.filter(r=>r.upcomingStatus==='PAID'),
-                  attentionCustomers=new Set(rows.filter(r=>!!mfCollectionAttentionForRow(r)).map(r=>r.loan.id)).size,
+                  attentionCustomers=new Set(rows.filter(r=>!!mfCollectionAttentionForRow(r)).map(r=>mfUpcomingCustomerKey(r.loan))).size,
                   earlierOutstanding=Array.from(new Map(rows.map(r=>[r.loan.id,r])).values()).reduce((s,r)=>s+(mfCollectionAttentionForRow(r)?.totalToCollect||0),0);
             if(summary) summary.innerHTML=`
-                <div class="upcoming-emi-mini"><small>EMIs in Range</small><b>${rows.length}</b></div>
-                <div class="upcoming-emi-mini"><small>Clients</small><b>${clients}</b></div>
+                <div class="upcoming-emi-mini"><small>EMIs in Range / Pending</small><b>${rows.length}</b></div>
+                <div class="upcoming-emi-mini"><small>Customers</small><b>${clients}</b></div>
                 <div class="upcoming-emi-mini"><small>Due Today</small><b style="color:#fbbf24;">${due.length}</b></div>
                 <div class="upcoming-emi-mini"><small>Overdue</small><b style="color:#f87171;">${overdue.length}</b></div>
                 <div class="upcoming-emi-mini"><small>Upcoming</small><b style="color:#fbbf24;">${upcoming.length}</b></div>
-                <div style="grid-column:1/-1;font-size:.68rem;color:#94a3b8;padding:2px 3px;line-height:1.5;">
-                    Selected-range EMI total: <b style="color:#34d399;">₹${total.toLocaleString('en-IN')}</b>
-                    · Earlier pending incl. penalty: <b style="color:#fbbf24;">₹${earlierOutstanding.toLocaleString('en-IN')}</b>
-                    · Paid: ${paid.length}
-                    · <b style="color:#f87171;">${attentionCustomers} customer(s) have previous EMI dues</b>
-                </div>`;
+                <div style="grid-column:1/-1;font-size:.68rem;color:#94a3b8;padding:2px 3px;line-height:1.5;">Selected-range EMI total: <b style="color:#34d399;">₹${total.toLocaleString('en-IN')}</b> · Earlier pending incl. penalty: <b style="color:#fbbf24;">₹${earlierOutstanding.toLocaleString('en-IN')}</b> · Paid: ${paid.length} · <b style="color:#f87171;">${attentionCustomers} customer(s) have previous EMI dues</b></div>`;
             renderUpcomingCollectorSummary(rows);
-            if(!rows.length){
-                area.innerHTML=`<div class="upcoming-empty"><i class="fa-solid fa-calendar-xmark" style="font-size:1.5rem;margin-bottom:7px;"></i><br>No EMI collection is scheduled in the selected range.</div>`;
-                showCollectionPriority(true); return;
-            }
+            if(!rows.length){ area.innerHTML=`<div class="upcoming-empty"><i class="fa-solid fa-calendar-xmark" style="font-size:1.5rem;margin-bottom:7px;"></i><br>No EMI collection is scheduled in the selected range or pending overdue accounts.</div>`; showCollectionPriority(true); return; }
             const customerMap=new Map();
-            rows.forEach(r=>{const key=r.loan.id;if(!customerMap.has(key))customerMap.set(key,[]);customerMap.get(key).push(r);});
-            const customers=Array.from(customerMap.values()).sort((a,b)=>a[0].dueDate.localeCompare(b[0].dueDate)||a[0].loan.name.localeCompare(b[0].loan.name));
-            area.innerHTML=customers.map(group=>mfCollectionCustomerCard(group[0],group)).join('');
+            rows.forEach(r=>{const key=mfUpcomingCustomerKey(r.loan);if(!customerMap.has(key))customerMap.set(key,[]);customerMap.get(key).push(r);});
+            const customers=Array.from(customerMap.values()).map(group=>{
+                const loanMap=new Map(); group.forEach(r=>{if(!loanMap.has(r.loan.id))loanMap.set(r.loan.id,[]);loanMap.get(r.loan.id).push(r);});
+                return Array.from(loanMap.values()).sort((a,b)=>a[0].dueDate.localeCompare(b[0].dueDate)||String(a[0].loan.id).localeCompare(String(b[0].loan.id)));
+            }).sort((a,b)=>a[0][0].dueDate.localeCompare(b[0][0].dueDate)||a[0][0].loan.name.localeCompare(b[0][0].loan.name));
+            area.innerHTML=customers.map(groups=>mfUpcomingCustomerBook(groups)).join('');
             showCollectionPriority(true);
         }
 
@@ -5602,25 +5647,23 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(loan.foreclosed || loan.postMaturitySettlement || !collectorMatches(loan,collector))return;
                 const product=state.products[loan.product]; if(!product)return;
                 mfLoanScheduleRows(loan).forEach(r=>{
-                    if(r.dueDate<from||r.dueDate>to)return;
-                    const rs=mfUpcomingStatus(r,today); if(status!=='ALL'&&rs!==status)return;
-                    const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.guarantorPhone,loan.guarantorPhone2,loan.guarantorSecondaryPhone,loanCollectorName(loan),product.name].filter(Boolean).join(' ').toLowerCase();
-                    if(q&&!hay.includes(q))return;
-                    rows.push({...r,upcomingStatus:rs,overdueDays:mfUpcomingOverdueDays(r.dueDate,today)});
+                    const matched=mfUpcomingRowMatchesFilters(loan,r,from,to,status,today,q);
+                    if(matched) rows.push(matched);
                 });
             });
-            return rows.sort((a,b)=>a.dueDate.localeCompare(b.dueDate)||a.loan.name.localeCompare(b.loan.name));
+            return rows.sort((a,b)=>a.dueDate.localeCompare(b.dueDate)||a.loan.name.localeCompare(b.loan.name)||String(a.loan.id).localeCompare(String(b.loan.id)));
         }
         function getUpcomingCustomerGroups(){
             const rows=getUpcomingExportRows(), map=new Map();
-            rows.forEach(r=>{const key=r.loan.id;if(!map.has(key))map.set(key,[]);map.get(key).push(r);});
+            rows.forEach(r=>{const key=mfUpcomingCustomerKey(r.loan);if(!map.has(key))map.set(key,[]);map.get(key).push(r);});
             return Array.from(map.values());
         }
+
         function exportUpcomingEmiExcel(){
             if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}
             const rows=getUpcomingExportRows();
             const data=[[
-                'Customer','Loan ID','Collector','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Disbursal Mode','Product','Disbursal Date','Maturity Date',
+                'Customer','Loan Type','Loan ID','Collector','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Disbursal Mode','Product','Disbursal Date','Maturity Date',
                 'Current EMI No.','Current Due Date','Current EMI Amount','Status','Overdue Days',
                 'Previous Pending EMI Nos.','Previous Pending Balance','Previous Penalty Due','Previous Total Outstanding',
                 'Selected-Range EMI Total','Total to Clear Previous + Selected Range'
@@ -5633,14 +5676,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                       prevBalance=prev.reduce((s,x)=>s+x.balance,0), prevPenalty=prev.reduce((s,x)=>s+x.penaltyDue,0),
                       rangeTotal=group.reduce((s,r)=>s+(Number(r.totalDue??r.emi)||0),0);
                 group.forEach(r=>data.push([
-                    l.name,l.id,loanCollectorName(l),l.phone||'',l.phone2||'',l.guarantorPhone||'',(l.guarantorPhone2||l.guarantorSecondaryPhone||''),mfDisbursalModeLabel(l.disbursalMode),p.name||l.product,
+                    l.name,mfLoanTypeLabel(l),l.id,loanCollectorName(l),l.phone||'',l.phone2||'',l.guarantorPhone||'',(l.guarantorPhone2||l.guarantorSecondaryPhone||''),mfDisbursalModeLabel(l.disbursalMode),p.name||l.product,
                     l.disbursalDate,mfLoanScheduleDueIso(l,Number(p.tenure)||0),r.no,r.dueDate,Number(r.totalDue??r.emi)||0,
                     r.upcomingStatus,r.overdueDays,prev.map(x=>`#${x.no}`).join(', '),prevBalance,prevPenalty,prevBalance+prevPenalty,
                     rangeTotal,prevBalance+prevPenalty+rangeTotal
                 ]));
             });
             const wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet(data);
-            ws['!cols']=[18,12,18,15,15,16,16,28,24,13,13,10,13,15,14,12,24,18,16,22,20,28].map(w=>({wch:w}));
+            ws['!cols']=[18,16,12,18,15,15,16,16,28,24,13,13,10,13,15,14,12,24,18,16,22,20,28].map(w=>({wch:w}));
             XLSX.utils.book_append_sheet(wb,ws,'Collection_Sheet');
             XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_Upcoming_EMI_Collection.xlsx`);
         }
@@ -5653,19 +5696,27 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const rows=getUpcomingExportRows(), title='Staff Collection Sheet — Upcoming EMIs & Pending Recovery';
             const from=getUpcomingDateIso('from')||mfIsoToday(), to=getUpcomingDateIso('to')||from, collector=document.getElementById('emi-collector-filter')?.value||'ALL';
             const collectorLabel=collector==='ALL'?'All Collectors':collector==='UNASSIGNED'?'Unassigned':loanCollectorName({collectorId:collector});
-            const groups=new Map(); rows.forEach(r=>{if(!groups.has(r.loan.id))groups.set(r.loan.id,[]);groups.get(r.loan.id).push(r);});
-            const groupsArr=Array.from(groups.values()).sort((a,b)=>a[0].dueDate.localeCompare(b[0].dueDate)||a[0].loan.name.localeCompare(b[0].loan.name));
+            const loanMap=new Map(); rows.forEach(r=>{if(!loanMap.has(r.loan.id))loanMap.set(r.loan.id,[]);loanMap.get(r.loan.id).push(r);});
+            const customerMap=new Map();
+            Array.from(loanMap.values()).forEach(group=>{const key=mfUpcomingCustomerKey(group[0].loan);if(!customerMap.has(key))customerMap.set(key,[]);customerMap.get(key).push(group);});
+            const groupsArr=Array.from(customerMap.values()).sort((a,b)=>a[0][0].dueDate.localeCompare(b[0][0].dueDate)||a[0][0].loan.name.localeCompare(b[0][0].loan.name));
             let rangeTotal=0,previousTotal=0,penaltyTotal=0,unpaidRangeCount=0;
-            const bodyRows=groupsArr.map(group=>{
-                const first=group[0],l=first.loan,p=first.product,snap=mfCollectionCustomerSnapshot(first,group),a=snap.attention,current=group.filter(r=>!r.paid);
-                rangeTotal+=snap.selectedRangeEmiTotal; unpaidRangeCount+=current.length; previousTotal+=snap.earlierBalance; penaltyTotal+=snap.earlierPenalty;
-                const currentText=current.length===1?`#${current[0].no} · ${formatToIndianDate(current[0].dueDate)} · ₹${Number(current[0].totalDue??current[0].emi).toLocaleString('en-IN')}`:current.length?`${current.length} EMIs (#${current[0].no}–#${current[current.length-1].no}) · ₹${snap.selectedRangeEmiTotal.toLocaleString('en-IN')}`:'No unpaid EMI';
-                const prevText=a?`${snap.earlierItems.length} EMI${snap.earlierItems.length>1?'s':''} · ₹${snap.earlierBalance.toLocaleString('en-IN')} · ${formatToIndianDate(snap.earlierItems[0].dueDate)} → ${formatToIndianDate(snap.earlierItems[snap.earlierItems.length-1].dueDate)}`:'None';
-                return `<tr class="${a?'attention-row':''}"><td><b>${financeEsc(l.name)}</b><br><span class="muted">${financeEsc(l.id)} · ${financeEsc(loanCollectorName(l))}</span><br><span class="muted">Customer: ${financeEsc(mfContactText(l.phone,l.phone2))}${mfGuarantorContactText(l)?' · Guarantor: '+financeEsc(mfGuarantorContactText(l)):''}<br>Disbursal Mode: ${financeEsc(mfDisbursalModeLabel(l.disbursalMode))}</span></td><td>${currentText}<br><span class="muted">Disbursed ${formatToIndianDate(l.disbursalDate)} · Maturity ${formatToIndianDate(mfLoanScheduleDueIso(l,Number(p.tenure)||0))}</span></td><td>${prevText}</td><td>${snap.earlierPenalty?'₹'+snap.earlierPenalty.toLocaleString('en-IN'):'₹0'}</td><td class="money">₹${snap.combinedTotal.toLocaleString('en-IN')}</td></tr>`;
+            const bodyRows=groupsArr.map(loanGroups=>{
+                const customer=loanGroups[0][0].loan;
+                let customerRange=0,customerPrevious=0,customerPenalty=0,customerUnpaid=0;
+                const lines=loanGroups.map(group=>{
+                    const first=group[0],l=first.loan,p=first.product,snap=mfCollectionCustomerSnapshot(first,group),a=snap.attention,current=group.filter(r=>!r.paid);
+                    customerRange+=snap.selectedRangeEmiTotal; customerUnpaid+=current.length; customerPrevious+=snap.earlierBalance; customerPenalty+=snap.earlierPenalty;
+                    const currentText=current.length===1?`#${current[0].no} · ${formatToIndianDate(current[0].dueDate)} · ₹${Number(current[0].totalDue??current[0].emi).toLocaleString('en-IN')}`:current.length?`${current.length} EMIs (#${current[0].no}–#${current[current.length-1].no}) · ₹${snap.selectedRangeEmiTotal.toLocaleString('en-IN')}`:'No unpaid EMI';
+                    const prevText=a?`${snap.earlierItems.length} EMI${snap.earlierItems.length>1?'s':''} · ₹${snap.earlierBalance.toLocaleString('en-IN')} · ${formatToIndianDate(snap.earlierItems[0].dueDate)} → ${formatToIndianDate(snap.earlierItems[snap.earlierItems.length-1].dueDate)}`:'None';
+                    return `<div style="padding:6px 0;border-top:1px solid #ddd;"><b>${financeEsc(mfLoanTypeLabel(l))} · ${financeEsc(l.id)} · ${financeEsc(p.name||l.product)}</b><br><span class="muted">Current: ${currentText} · Previous: ${prevText} · Penalty: ₹${snap.earlierPenalty.toLocaleString('en-IN')} · Collect Now: ₹${snap.combinedTotal.toLocaleString('en-IN')}<br>Customer: ${financeEsc(mfContactText(l.phone,l.phone2))}${mfGuarantorContactText(l)?' · Guarantor: '+financeEsc(mfGuarantorContactText(l)):''} · Collector: ${financeEsc(loanCollectorName(l))}</span></div>`;
+                }).join('');
+                rangeTotal+=customerRange; unpaidRangeCount+=customerUnpaid; previousTotal+=customerPrevious; penaltyTotal+=customerPenalty;
+                return `<tr><td><b>${financeEsc(customer.name)}</b> · ${financeEsc(mfContactText(customer.phone,customer.phone2))} · ${loanGroups.length} loan account${loanGroups.length===1?'':'s'}${lines}</td></tr>`;
             }).join('');
             const summary=`<div class="mf-print-summary-grid"><div><span>Period</span><b>${formatToIndianDate(from)} to ${formatToIndianDate(to)}</b></div><div><span>Collector</span><b>${financeEsc(collectorLabel)}</b></div><div><span>Unpaid EMIs in Range</span><b>${unpaidRangeCount} · ₹${rangeTotal.toLocaleString('en-IN')}</b></div><div><span>Previous Arrears</span><b>₹${previousTotal.toLocaleString('en-IN')}</b></div><div><span>Penalty Due</span><b>₹${penaltyTotal.toLocaleString('en-IN')}</b></div></div>`;
             const note=`<div class="mf-print-note"><b>Staff collection rule:</b> Previous unpaid EMIs are shown separately from the selected-range EMI(s). Clear the oldest previous EMI first. “Collect Now” = previous EMI balance + previous penalty due + unpaid EMI(s) in the selected range.</div>`;
-            const table=groupsArr.length?`<table class="mf-collection-staff-table"><colgroup><col style="width:22%"><col style="width:28%"><col style="width:25%"><col style="width:10%"><col style="width:15%"></colgroup><thead><tr><th>Customer / Contact</th><th>Current / Selected Range</th><th>Previous Pending</th><th>Penalty Due</th><th>Collect Now</th></tr></thead><tbody>${bodyRows}</tbody></table>`:'<div class="mf-print-empty">No collection entries match the selected filters.</div>';
+            const table=groupsArr.length?`<table class="mf-collection-staff-table"><colgroup><col style="width:100%"></colgroup><thead><tr><th>Customer — Loan-wise Collection Book</th></tr></thead><tbody>${bodyRows}</tbody></table>`:'<div class="mf-print-empty">No collection entries match the selected filters.</div>';
             const w=mfPrintA4Shell(`${state.bizName} — ${title}`,mfCompanyPrintHeader(title)+summary+note+table); if(!w)return; w.onload=()=>{w.focus();setTimeout(()=>w.print(),80);};
         }
 
