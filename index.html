@@ -513,6 +513,16 @@
             *, *::before, *::after { animation: none !important; transition: none !important; }
             .printable-statement, .printable-statement * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
+        /* V6 Top-up / Renewal — compact, responsive, non-gimmicky controls */
+        .mf-loan-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+        .mf-loan-actions .btn-header{min-height:38px;}
+        .mf-loan-type-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;font-size:.64rem;font-weight:800;border:1px solid rgba(96,165,250,.25);background:rgba(96,165,250,.08);color:#93c5fd;}
+        .mf-loan-history-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;}
+        .mf-loan-history-card{border:1px solid var(--border-subtle);background:rgba(255,255,255,.035);border-radius:10px;padding:9px;min-width:0;}
+        .mf-loan-history-card .muted{color:#94a3b8;font-size:.66rem;}
+        .mf-loan-history-card .value{color:#fff;font-weight:800;font-size:.78rem;overflow-wrap:anywhere;}
+        @media(max-width:700px){.mf-loan-history-grid{grid-template-columns:1fr 1fr;}.mf-loan-actions .btn-header{flex:1 1 140px;justify-content:center;}#customer-history-summary .statement-box>div{grid-template-columns:1fr 1fr!important;}}
+
 </style>
 
 <style id="mf-upcoming-emi-css">
@@ -1221,8 +1231,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     </select>
                 </div>
                 <div class="passbook-actions">
-                    <button class="btn-header btn-purple no-print" id="btn-edit-passbook-loan" onclick="editSelectedPassbookLoan()" style="height: 40px; padding: 0 14px; display:none;"><i class="fa-solid fa-pen"></i> Edit Account</button>
-                    <button class="btn-header btn-blue" onclick="printPassbookStatement()" style="height: 40px; padding: 0 14px;"><i class="fa-solid fa-print"></i> Print / Download PDF</button>
+                    <div class="mf-loan-actions no-print">
+                        <button class="btn-header btn-purple" id="btn-edit-passbook-loan" onclick="editSelectedPassbookLoan()" style="height:40px;padding:0 14px;display:none;"><i class="fa-solid fa-pen"></i> Edit Account</button>
+                        <button class="btn-header btn-blue" id="btn-topup-passbook-loan" onclick="openTopUpLoanModal()" style="height:40px;padding:0 14px;display:none;"><i class="fa-solid fa-plus"></i> Top-up</button>
+                        <button class="btn-header btn-green" id="btn-renew-passbook-loan" onclick="openRenewalLoanModal()" style="height:40px;padding:0 14px;display:none;"><i class="fa-solid fa-rotate"></i> Renewal</button>
+                        <button class="btn-header" id="btn-customer-history" onclick="openCustomerHistoryModal()" style="height:40px;padding:0 14px;display:none;background:#334155;color:#fff;"><i class="fa-solid fa-clock-rotate-left"></i> Customer History</button>
+                    </div>
+                    <button class="btn-header btn-blue" onclick="printPassbookStatement()" style="height:40px;padding:0 14px;"><i class="fa-solid fa-print"></i> Print / Download PDF</button>
                     <button class="btn-header btn-green" id="btn-generate-noc" onclick="openNocModal()" style="height: 40px; padding: 0 14px; display: none;"><i class="fa-solid fa-certificate"></i> Generate NOC Certificate</button>
                 </div>
             </div>
@@ -1261,6 +1276,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             <th>Loan ID</th>
                             <th>Customer Name</th>
                             <th>Phone</th>
+                            <th>Loan Type</th>
                             <th>Plan</th>
                             <th>Disbursal Date</th>
                             <th>Loan Amount</th>
@@ -1288,6 +1304,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             <form id="form-client" autocomplete="off" onsubmit="handleClientSubmit(event)">
                 <input type="hidden" id="fc-mode" value="ADD">
                 <input type="hidden" id="fc-id">
+                <input type="hidden" id="fc-source-loan-id">
+                <input type="hidden" id="fc-loan-type" value="NEW">
+                <div id="fc-loan-context" style="display:none;margin-bottom:10px;padding:9px 10px;border:1px solid rgba(96,165,250,.25);background:rgba(96,165,250,.07);border-radius:10px;font-size:.72rem;line-height:1.45;"></div>
 
                 <div class="form-group">
                     <label>Customer Full Name *</label>
@@ -2211,6 +2230,119 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         </div>
     </div>
 
+    <!-- MODAL: CUSTOMER CONSOLIDATED LOAN HISTORY -->
+    <div class="modal-overlay" id="modal-customer-history">
+        <div class="modal-card" style="max-width:980px;width:min(980px,96vw);">
+            <div class="modal-title">
+                <span><i class="fa-solid fa-clock-rotate-left" style="color:#60a5fa;"></i> Customer Consolidated Loan History</span>
+                <i class="fa-solid fa-xmark" onclick="closeModal('modal-customer-history')" style="cursor:pointer;color:#94a3b8;"></i>
+            </div>
+            <div id="customer-history-summary" style="margin-bottom:10px;"></div>
+            <div id="customer-history-body" style="max-height:65vh;overflow:auto;"></div>
+            <div class="no-print" style="display:flex;justify-content:flex-end;gap:7px;margin-top:10px;flex-wrap:wrap;">
+                <button class="btn-header btn-blue" onclick="printCustomerHistory()"><i class="fa-solid fa-print"></i> Print / Save Customer History PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <script id="amara-topup-renewal-engine">
+        function mfLoanTypeLabel(loan){
+            const t=String(loan?.loanType||'NEW').toUpperCase();
+            return t==='TOP_UP'?'TOP-UP':t==='RENEWAL'?'RENEWAL':'NEW LOAN';
+        }
+        function mfLoanStatusLabel(loan){
+            if(!loan) return '-';
+            if(loan.foreclosed) return 'FORECLOSED';
+            if(loan.postMaturitySettlement) return 'SETTLED';
+            return getLoanPending(loan)<=0 ? 'CLOSED' : 'ACTIVE';
+        }
+        function mfCustomerLoans(customerKey, fallbackLoan){
+            const key=String(customerKey||fallbackLoan?.customerKey||'');
+            let rows=key ? (state.loans||[]).filter(x=>String(x.customerKey||'')===key) : [];
+            if(!rows.length && fallbackLoan){
+                const n=mfNormalizeCustomerKeyPart(fallbackLoan.name), p=String(fallbackLoan.phone||'').replace(/\D/g,'');
+                rows=(state.loans||[]).filter(x=>mfNormalizeCustomerKeyPart(x.name)===n && String(x.phone||'').replace(/\D/g,'')===p);
+            }
+            return rows.slice().sort((a,b)=>String(a.disbursalDate||'').localeCompare(String(b.disbursalDate||''))||String(a.id).localeCompare(String(b.id)));
+        }
+        function mfNextLoanId(){
+            let max=1000;
+            (state.loans||[]).forEach(l=>{const m=String(l?.id||'').match(/^L-(\d+)$/i);if(m)max=Math.max(max,Number(m[1])||0);});
+            return 'L-'+(max+1);
+        }
+        function mfFindCustomerKey(name,phone){
+            const direct=mfMakeCustomerKey(name,phone);
+            const hit=(state.loans||[]).find(l=>String(l.customerKey||'')===direct);
+            return hit?.customerKey||direct;
+        }
+        function mfLoanContextHtml(source,type){
+            if(!source) return '';
+            const label=type==='TOP_UP'?'Top-up Loan':'Renewal Loan';
+            return `<b style="color:#93c5fd;">${label}</b> · New independent Loan Account · Customer history remains linked to <b>${financeEsc(source.name||'-')}</b> · Source Loan <b>${financeEsc(source.id||'-')}</b>. Old loan data will not be changed.`;
+        }
+        function openRelatedLoanModal(type){
+            const id=document.getElementById('passbook-select')?.value;
+            const source=(state.loans||[]).find(l=>l.id===id);
+            if(!source){alert('Please select the source loan account first.');return;}
+            const t=String(type||'TOP_UP').toUpperCase();
+            if(t==='RENEWAL' && mfLoanStatusLabel(source)==='ACTIVE'){
+                alert('Renewal is available only after the existing loan account is completely closed, settled, or foreclosed.');
+                return;
+            }
+            populateProductSelect();
+            populateLoanCollectorSelect();
+            document.getElementById('fc-mode').value=t;
+            document.getElementById('fc-id').value='';
+            document.getElementById('fc-source-loan-id').value=source.id;
+            document.getElementById('fc-loan-type').value=t;
+            document.getElementById('modal-client-heading').innerText=t==='TOP_UP'?`Top-up Loan — ${source.name} (from ${source.id})`:`Renewal Loan — ${source.name} (from ${source.id})`;
+            document.getElementById('fc-loan-context').style.display='block';
+            document.getElementById('fc-loan-context').innerHTML=mfLoanContextHtml(source,t);
+            document.getElementById('fc-name').value=source.name||'';
+            document.getElementById('fc-phone').value=source.phone||'';
+            document.getElementById('fc-phone2').value=source.phone2||'';
+            document.getElementById('fc-guarantor-name').value=source.guarantorName||'';
+            document.getElementById('fc-guarantor-phone').value=source.guarantorPhone||'';
+            document.getElementById('fc-guarantor-phone2').value=source.guarantorPhone2||source.guarantorSecondaryPhone||'';
+            document.getElementById('fc-address').value=source.address||'';
+            document.getElementById('fc-product').value=source.product||'';
+            document.getElementById('fc-disbursal-mode').value=source.disbursalMode||'Cash';
+            document.getElementById('fc-collector').value=source.collectorId||'';
+            const today=new Date().toISOString().split('T')[0];
+            setDmyValues('fc',today);
+            syncClientFixedDateFromDisbursal();
+            document.getElementById('btn-delete-client').style.display='none';
+            const save=document.getElementById('btn-save-client'); if(save) save.textContent=t==='TOP_UP'?'Save & Activate Top-up Loan':'Save & Activate Renewal Loan';
+            previewProductSummary();
+            document.getElementById('modal-client').classList.add('active');
+        }
+        function openTopUpLoanModal(){openRelatedLoanModal('TOP_UP');}
+        function openRenewalLoanModal(){openRelatedLoanModal('RENEWAL');}
+        function openCustomerHistoryModal(){
+            const id=document.getElementById('passbook-select')?.value;
+            const loan=(state.loans||[]).find(l=>l.id===id);
+            if(!loan){alert('Please select a loan account first.');return;}
+            const rows=mfCustomerLoans(loan.customerKey,loan);
+            const summary=document.getElementById('customer-history-summary'), body=document.getElementById('customer-history-body');
+            if(!summary||!body)return;
+            const active=rows.filter(x=>mfLoanStatusLabel(x)==='ACTIVE').length;
+            const totalAmount=rows.reduce((sum,x)=>sum+Number(state.products?.[x.product]?.amount||0),0);
+            const totalOutstanding=rows.reduce((sum,x)=>sum+Math.max(0,Number(getLoanPending(x))||0),0);
+            const totalCollected=rows.reduce((sum,x)=>{const pm=x.postMaturitySettlement;const fc=x.foreclosed?x.foreclosureData:null;return sum+(x.payments||[]).reduce((a,p)=>a+(Number(p.amount)||0),0)+(fc?(Number(fc.settlementAmount)||0)+(Number(fc.partialAmountAlreadyCollected)||0):(pm?(Number(pm.actualReceived)||0)+(Number(pm.partialAmountAlreadyCollected)||0):0));},0);
+            summary.innerHTML=`<div class="statement-box" style="padding:12px;border-radius:12px;"><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-items:center;"><div><b style="font-size:.95rem;color:#fff;">${financeEsc(loan.name||'-')}</b><div style="font-size:.68rem;color:#94a3b8;">${rows.length} loan account(s) · ${active} active</div></div><div style="font-size:.76rem;color:#93c5fd;font-weight:800;">Sanctioned<br>₹${totalAmount.toLocaleString('en-IN')}</div><div style="font-size:.76rem;color:#34d399;font-weight:800;">Collected<br>₹${totalCollected.toLocaleString('en-IN')}</div><div style="font-size:.76rem;color:${totalOutstanding>0?'#fbbf24':'#34d399'};font-weight:800;">Outstanding<br>₹${totalOutstanding.toLocaleString('en-IN')}</div></div></div>`;
+            body.innerHTML=`<div class="mf-loan-history-grid">${rows.map((l,i)=>{const p=state.products?.[l.product]||{};return `<div class="mf-loan-history-card"><div style="display:flex;justify-content:space-between;gap:5px;align-items:center;"><span class="mf-loan-type-badge">${mfLoanTypeLabel(l)}</span><b style="font-size:.7rem;color:#93c5fd;">${financeEsc(l.id)}</b></div><div class="value" style="margin-top:7px;">${financeEsc(p.name||l.product||'-')}</div><div class="muted" style="margin-top:4px;">Disbursal</div><div class="value">${formatToIndianDate(l.disbursalDate)}</div><div class="muted" style="margin-top:4px;">Amount · Status</div><div class="value">₹${Number(p.amount||0).toLocaleString('en-IN')} · ${mfLoanStatusLabel(l)}</div><div class="muted" style="margin-top:4px;">Customer Mobile(s)</div><div class="value">${financeEsc(mfContactText(l.phone,l.phone2))}</div><div class="muted" style="margin-top:4px;">Guarantor</div><div class="value">${financeEsc(l.guarantorName||'-')}${mfGuarantorContactText(l)?` · ${financeEsc(mfGuarantorContactText(l))}`:''}</div><div style="margin-top:7px;display:flex;gap:5px;flex-wrap:wrap;"><button class="btn-edit-sm" onclick="selectPassbookLoan('${l.id}');closeModal('modal-customer-history');">Open Loan</button></div></div>`;}).join('')}</div>`;
+            document.getElementById('modal-customer-history').classList.add('active');
+        }
+        function printCustomerHistory(){
+            const id=document.getElementById('passbook-select')?.value; const loan=(state.loans||[]).find(l=>l.id===id); if(!loan)return;
+            const rows=mfCustomerLoans(loan.customerKey,loan);
+            const cards=rows.map(l=>{const p=state.products?.[l.product]||{};return `<div style="border:1px solid #000;padding:9px;margin-bottom:8px;border-radius:6px;"><b>${financeEsc(l.id)} · ${financeEsc(mfLoanTypeLabel(l))}</b><br>Customer: ${financeEsc(l.name)} · Product: ${financeEsc(p.name||l.product||'-')} · Amount: ₹${Number(p.amount||0).toLocaleString('en-IN')}<br>Disbursal: ${formatToIndianDate(l.disbursalDate)} · Status: ${financeEsc(mfLoanStatusLabel(l))}<br>Customer Mobile(s): ${financeEsc(mfContactText(l.phone,l.phone2))}<br>Guarantor: ${financeEsc(l.guarantorName||'-')}${mfGuarantorContactText(l)?' · '+financeEsc(mfGuarantorContactText(l)):''}</div>`}).join('');
+            const content=mfCompanyPrintHeader('Customer Consolidated Loan History')+`<div class="statement-box" style="padding:12px;"><h3 style="margin-top:0;">${financeEsc(loan.name||'-')}</h3>${cards}</div>`;
+            const w=mfPrintA4Shell(`${state.bizName} — Customer Consolidated Loan History`,content); if(!w)return; w.onload=()=>{w.focus();w.print();};
+        }
+
+    </script>
+
     <!-- MODAL 10: NOC GENERATION & LEGAL CERTIFICATE MODAL (NEW) -->
     <div class="modal-overlay" id="modal-noc">
         <div class="modal-card" style="max-width: 620px;">
@@ -2683,7 +2815,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         normalizeOperationalPeriods();
 
         // Preserve legacy customer records and add an optional second contact number.
-        (state.loans || []).forEach(l => { l.phone2 = String(l.phone2 || l.secondaryPhone || l.husbandPhone || "").trim(); });
+        function mfNormalizeCustomerKeyPart(v){ return String(v||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/[^a-z0-9@+ _.-]/g,''); }
+        function mfMakeCustomerKey(name,phone){ return (mfNormalizeCustomerKeyPart(name)+'|'+String(phone||'').replace(/\D/g,'')).replace(/\|$/,''); }
+        function mfEnsureLoanIdentity(l){
+            if(!l) return;
+            l.phone2=String(l.phone2||l.secondaryPhone||l.husbandPhone||'').trim();
+            l.guarantorPhone2=String(l.guarantorPhone2||l.guarantorSecondaryPhone||'').trim();
+            l.loanType=String(l.loanType||'NEW').toUpperCase();
+            if(!['NEW','TOP_UP','RENEWAL'].includes(l.loanType)) l.loanType='NEW';
+            l.sourceLoanId=String(l.sourceLoanId||l.originLoanId||'').trim();
+            l.customerKey=String(l.customerKey||mfMakeCustomerKey(l.name,l.phone));
+            l.customerSequence=Number(l.customerSequence)||0;
+        }
+        (state.loans || []).forEach(mfEnsureLoanIdentity);
 
         normalizeBorrowingCosts();
         normalizeOperationalPeriods();
@@ -3271,6 +3415,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }
 
                 normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
+                try{ (state.loans||[]).forEach(mfEnsureLoanIdentity); }catch(e){ console.warn('Loan identity normalization skipped:',e); }
                 mfDbReady=true;
                 mfV2LocalStateReady=true;
                 try{ mfScaleReinstallStateProxy(); }catch(e){}
@@ -5693,9 +5838,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const body=rows.map(x=>{const l=x,v=x._v; const st=l.foreclosed?'FORECLOSED':v.settled?'SETTLED':v.pending<=0?'CLOSED':v.overdueDays>0?(v.npaWatch?'90+ DPD':'OVERDUE'):'ACTIVE'; return `<div class="npa-row"><div><b>${financeEsc(l.name)}</b><div style="color:#64748b">${financeEsc(l.id)} · ${financeEsc(l.phone||'-')}</div></div><div class="npa-hide-mobile">${financeEsc(v.p.name||'-')}</div><div class="npa-hide-mobile">${v.overdueDays} DPD</div><div><b style="color:#f87171">₹${v.pending.toLocaleString('en-IN')}</b></div><div class="npa-hide-mobile">${st}</div><div class="npa-hide-mobile">${financeEsc(l.collectorName||'-')}</div><div><button class="btn-edit-sm" onclick="openLoanFromProduct('${l.id}')">Open</button>${v.maturity&&mfIsoToday()>String(v.maturity.toISOString().slice(0,10))&&v.pending>0&&!l.foreclosed&&!v.settled?` <button class="btn-edit-sm" style="background:#92400e;color:#fde68a" onclick="openPostMaturitySettlementModal('${l.id}')">Settle</button>`:''}</div></div>`;}).join('');
             box.innerHTML=summary+(body?`<div style="display:grid;gap:6px;max-height:55vh;overflow:auto;">${body}</div>`:'<div class="npa-empty">No customer matches these filters.</div>');
         }
-        function getNpaExportRows(){return getNpaRows().map(x=>{const v=x._v;return [x.id,x.name,x.phone||'',x.phone2||'',x.guarantorPhone||'',(x.guarantorPhone2||x.guarantorSecondaryPhone||''),v.p.name||'',formatToIndianDate(x.disbursalDate),v.maturity?formatToIndianDate(v.maturity.toISOString().split('T')[0]):'',v.overdueDays,v.recoveryMonths,v.pending,v.settled?'SETTLED':x.foreclosed?'FORECLOSED':v.pending<=0?'CLOSED':v.npaWatch?'90+ DPD':'OVERDUE',x.collectorName||'',formatToIndianDate(x.postMaturitySettlement?.settlementDate),x.postMaturitySettlement?.calculatedSettlement||0,x.postMaturitySettlement?.actualReceived||0,x.postMaturitySettlement?.waiverAmount||0,x.postMaturitySettlement?.partialAmountAlreadyCollected||0,x.postMaturitySettlement?.mode||''];});}
-        function exportNpaReportExcel(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}const wb=XLSX.utils.book_new();const headers=['Loan ID','Customer','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal Date','Maturity Date','DPD','Recovery Months','Contractual Pending','Status','Collector','Settlement Date','Calculated Settlement','Actual Received','Waiver','Partial Already Collected','Settlement Mode'];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['NPA & Recovery Report'],['Generated',new Date().toLocaleString('en-IN')],[],headers,...getNpaExportRows()]),'NPA_Recovery');XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_NPA_Recovery_Report.xlsx`);}
-        function printNpaReport(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}const rows=getNpaExportRows();const w=window.open('','_blank');if(!w){alert('Please allow pop-ups to print the report.');return;}w.document.write(`<html><head><title>NPA & Recovery Report - ${financeEsc(state.bizName)}</title><style>body{font-family:Arial,sans-serif;color:#111;padding:18px;font-size:10px}h1{font-size:18px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:5px;text-align:left}th{background:#eee}</style></head><body><h1>${financeEsc(state.bizName)} — NPA & Recovery Report</h1><div>Generated: ${new Date().toLocaleString('en-IN')}</div><table><thead><tr>${['Loan ID','Customer','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal','Maturity','DPD','Recovery Months','Pending','Status','Collector','Settlement Date','Calculated','Received','Waiver','Partial Collected','Mode'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${financeEsc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`);w.document.close();w.onload=()=>{w.focus();w.print();};}
+        function getNpaExportRows(){return getNpaRows().map(x=>{const v=x._v;return [x.id,x.name,mfLoanTypeLabel(x),x.phone||'',x.phone2||'',x.guarantorPhone||'',(x.guarantorPhone2||x.guarantorSecondaryPhone||''),v.p.name||'',formatToIndianDate(x.disbursalDate),v.maturity?formatToIndianDate(v.maturity.toISOString().split('T')[0]):'',v.overdueDays,v.recoveryMonths,v.pending,v.settled?'SETTLED':x.foreclosed?'FORECLOSED':v.pending<=0?'CLOSED':v.npaWatch?'90+ DPD':'OVERDUE',x.collectorName||'',formatToIndianDate(x.postMaturitySettlement?.settlementDate),x.postMaturitySettlement?.calculatedSettlement||0,x.postMaturitySettlement?.actualReceived||0,x.postMaturitySettlement?.waiverAmount||0,x.postMaturitySettlement?.partialAmountAlreadyCollected||0,x.postMaturitySettlement?.mode||''];});}
+        function exportNpaReportExcel(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}const wb=XLSX.utils.book_new();const headers=['Loan ID','Customer','Loan Type','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal Date','Maturity Date','DPD','Recovery Months','Contractual Pending','Status','Collector','Settlement Date','Calculated Settlement','Actual Received','Waiver','Partial Already Collected','Settlement Mode'];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['NPA & Recovery Report'],['Generated',new Date().toLocaleString('en-IN')],[],headers,...getNpaExportRows()]),'NPA_Recovery');XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_NPA_Recovery_Report.xlsx`);}
+        function printNpaReport(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}const rows=getNpaExportRows();const w=window.open('','_blank');if(!w){alert('Please allow pop-ups to print the report.');return;}w.document.write(`<html><head><title>NPA & Recovery Report - ${financeEsc(state.bizName)}</title><style>body{font-family:Arial,sans-serif;color:#111;padding:18px;font-size:10px}h1{font-size:18px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:5px;text-align:left}th{background:#eee}</style></head><body><h1>${financeEsc(state.bizName)} — NPA & Recovery Report</h1><div>Generated: ${new Date().toLocaleString('en-IN')}</div><table><thead><tr>${['Loan ID','Customer','Loan Type','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal','Maturity','DPD','Recovery Months','Pending','Status','Collector','Settlement Date','Calculated','Received','Waiver','Partial Collected','Mode'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${financeEsc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`);w.document.close();w.onload=()=>{w.focus();w.print();};}
 
         let recoveryStatusFilter='ALL';
         function setRecoveryStatusFilter(status){
@@ -6326,6 +6471,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             populateProductSelect();
             document.getElementById("fc-mode").value = "ADD";
             document.getElementById("fc-id").value = "";
+            document.getElementById("fc-source-loan-id").value = "";
+            document.getElementById("fc-loan-type").value = "NEW";
+            document.getElementById("fc-loan-context").style.display = "none";
+            document.getElementById("fc-loan-context").innerHTML = "";
             document.getElementById("modal-client-heading").innerText = "Create New Loan Account";
             document.getElementById("fc-name").value = "";
             document.getElementById("fc-phone").value = "";
@@ -6340,6 +6489,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             setDmyValues("fc", today);
             syncClientFixedDateFromDisbursal();
             document.getElementById("btn-delete-client").style.display = "none";
+            const save=document.getElementById("btn-save-client"); if(save) save.textContent="Save & Activate Loan";
             previewProductSummary();
             document.getElementById("modal-client").classList.add("active");
         }
@@ -6350,6 +6500,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(!loan)return;
             document.getElementById("fc-mode").value = "EDIT";
             document.getElementById("fc-id").value = loan.id;
+            document.getElementById("fc-source-loan-id").value = "";
+            document.getElementById("fc-loan-type").value = loan.loanType || "NEW";
+            document.getElementById("fc-loan-context").style.display = "none";
             document.getElementById("modal-client-heading").innerText = `Edit Account (${loan.id})`;
             document.getElementById("fc-name").value = loan.name;
             document.getElementById("fc-phone").value = loan.phone || "";
@@ -6493,9 +6646,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(!firstDueDate || firstDueDate < date){ alert("The first EMI date cannot be before the disbursal date."); return; }
             const details=mfPreEmiDetails({product:prod,disbursalDate:date,firstDueDate});
             preEmiInterest=details.interest; preEmiDays=details.days;
-            if (mode === "ADD") {
-                const newId = "L-" + (1000 + state.loans.length + 1);
-                state.loans.push({id:newId,name,phone,phone2,guarantorName,guarantorPhone,guarantorPhone2,collectorId,collectorName:collector?collector.name:"",address,product:prod,disbursalDate:date,disbursalMode,payments:[],foreclosed:false,foreclosureData:null,firstDueDate:firstDueDate||null,fixedDueDate:firstDueDate||null,preEmiDays,preEmiInterest,preEmiInterestReceived:0,preEmiDate:null});
+            if (mode === "ADD" || mode === "TOP_UP" || mode === "RENEWAL") {
+                const sourceId=String(document.getElementById("fc-source-loan-id")?.value||"").trim();
+                const sourceLoan=sourceId ? state.loans.find(x=>x.id===sourceId) : null;
+                const loanType=mode==='TOP_UP'?'TOP_UP':mode==='RENEWAL'?'RENEWAL':'NEW';
+                if(loanType==='RENEWAL' && sourceLoan && mfLoanStatusLabel(sourceLoan)==='ACTIVE'){ alert('Renewal requires the source loan to be completely closed, settled, or foreclosed.'); return; }
+                const newId = mfNextLoanId();
+                const customerKey=sourceLoan?.customerKey || mfFindCustomerKey(name,phone);
+                const historyCount=(state.loans||[]).filter(x=>String(x.customerKey||'')===String(customerKey)).length;
+                state.loans.push({id:newId,name,phone,phone2,guarantorName,guarantorPhone,guarantorPhone2,collectorId,collectorName:collector?collector.name:"",address,product:prod,disbursalDate:date,disbursalMode,payments:[],foreclosed:false,foreclosureData:null,firstDueDate:firstDueDate||null,fixedDueDate:firstDueDate||null,preEmiDays,preEmiInterest,preEmiInterestReceived:0,preEmiDate:null,loanType,sourceLoanId:sourceLoan?.id||'',customerKey,customerSequence:historyCount+1});
             } else {
                 const id = document.getElementById("fc-id").value;
                 const loan = state.loans.find(l => l.id === id); if(!loan)return;
@@ -7887,11 +8046,17 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const area = document.getElementById("passbook-content-area");
             const nocBtn = document.getElementById("btn-generate-noc");
             const editBtn = document.getElementById("btn-edit-passbook-loan");
+            const topupBtn = document.getElementById("btn-topup-passbook-loan");
+            const renewalBtn = document.getElementById("btn-renew-passbook-loan");
+            const historyBtn = document.getElementById("btn-customer-history");
 
             if (!id) {
                 area.innerHTML = `<div style="text-align:center; padding:30px; color:#64748b;"><p>Please select a customer above to view amortization schedule & statement.</p></div>`;
                 nocBtn.style.display = "none";
                 if(editBtn) editBtn.style.display = "none";
+                if(topupBtn) topupBtn.style.display = "none";
+                if(renewalBtn) renewalBtn.style.display = "none";
+                if(historyBtn) historyBtn.style.display = "none";
                 return;
             }
 
@@ -7904,6 +8069,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const l = state.loans.find(x => x.id === id);
             const p = state.products[l.product];
             if(editBtn) editBtn.style.display = "inline-flex";
+            if(topupBtn) topupBtn.style.display = "inline-flex";
+            if(renewalBtn) renewalBtn.style.display = mfLoanStatusLabel(l)==='ACTIVE' ? "none" : "inline-flex";
+            if(historyBtn) historyBtn.style.display = mfCustomerLoans(l.customerKey,l).length>1 ? "inline-flex" : "none";
             const postMaturity = l.postMaturitySettlement || null;
             const preEmiDue = mfLoanPreEmiDue(l);
             const preEmiInterest = mfLoanPreEmiCollected(l);
@@ -8068,6 +8236,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <div>
                             <h5 style="margin:0; font-weight:800; color:#fff;">${state.bizName}</h5>
                             <small style="color:#94a3b8;">Loan Statement & Amortization Schedule</small>
+                            <div style="margin-top:5px;"><span class="mf-loan-type-badge">${mfLoanTypeLabel(l)}</span>${l.sourceLoanId?` <span style="font-size:.64rem;color:#94a3b8;margin-left:4px;">Related to ${financeEsc(l.sourceLoanId)} · customer history linked</span>`:''}</div>
                         </div>
                         <div style="text-align:right;">
                             <span class="loan-badge" style="font-size:0.9rem; padding:3px 10px;">${l.id}</span>
@@ -8087,6 +8256,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     </div>
                     ${l.guarantorName ? `<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:0.8rem;"><span style="color:#94a3b8;">Guarantor:</span> <b style="color:#fff;">${l.guarantorName}</b>${mfGuarantorContactText(l) ? ` · <b style="color:#fff;">${financeEsc(mfGuarantorContactText(l))}</b>` : ""}</div>` : ""}
                 </div>
+                ${mfCustomerLoans(l.customerKey,l).length>1 ? `<div class="statement-box no-print" style="padding:12px;border-radius:12px;margin-bottom:12px;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;"><b style="color:#fff;font-size:.84rem;"><i class="fa-solid fa-clock-rotate-left" style="color:#60a5fa;"></i> Customer Loan History</b><button class="btn-edit-sm" onclick="openCustomerHistoryModal()">Open Consolidated History</button></div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${mfCustomerLoans(l.customerKey,l).map(x=>`<span class="mf-loan-type-badge">${financeEsc(x.id)} · ${mfLoanTypeLabel(x)} · ${mfLoanStatusLabel(x)}</span>`).join('')}</div></div>` : ''}
 
                 <!-- Total Collected From This Client — Segregation Box (like Lender Cost Breakdown) -->
                 <div class="statement-box" style="background:var(--bg-card); padding:14px; border-radius:14px; border:1px solid var(--border-subtle); margin-bottom:12px;">
@@ -8504,7 +8674,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const q=(document.getElementById('loan-master-search')?.value||'').trim();
             const product=document.getElementById('loan-master-product')?.value||'ALL';
             const status=document.getElementById('loan-master-status')?.value||'ALL';
-            tbody.innerHTML='<tr><td colspan="11" style="padding:20px;text-align:center;color:#94a3b8;">Loading scalable loan records…</td></tr>';
+            tbody.innerHTML='<tr><td colspan="12" style="padding:20px;text-align:center;color:#94a3b8;">Loading scalable loan records…</td></tr>';
             try{
                 const result=mfScaleReady?await mfScaleLoanMasterPageData({query:q,product,status,page:mfScaleLoanMasterPage,pageSize:MF_SCALE.pageSize}):null;
                 const filtered=result?result.rows:state.loans.filter(loan=>{const prod=state.products[loan.product]||{};const st=mfLoanOperationalStatus(loan);const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.address,loan.product,prod.name].filter(Boolean).join(' ').toLowerCase();return(!q||hay.includes(q.toLowerCase()))&&(product==='ALL'||loan.product===product)&&(status==='ALL'||st===status);}).slice(mfScaleLoanMasterPage*MF_SCALE.pageSize,(mfScaleLoanMasterPage+1)*MF_SCALE.pageSize);
@@ -8514,8 +8684,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(count) count.innerText=total!==null?`Showing ${total?mfScaleLoanMasterPage*MF_SCALE.pageSize+1:0}-${Math.min((mfScaleLoanMasterPage+1)*MF_SCALE.pageSize,total)} of ${total.toLocaleString('en-IN')} matching / ${state.loans.length.toLocaleString('en-IN')} total loan accounts`:`Showing page ${mfScaleLoanMasterPage+1} · ${result?.rows?.length||0} records loaded / ${state.loans.length.toLocaleString('en-IN')} total loan accounts`;
                 const nav=document.getElementById('loan-master-pagination');
                 if(nav) nav.innerHTML=(mfScaleLoanMasterPage>0||hasNext)?`<button type="button" class="btn-header btn-blue" ${mfScaleLoanMasterPage===0?'disabled':''} onclick="mfLoanMasterPageChange(-1)"><i class="fa-solid fa-chevron-left"></i> Previous</button><span style="font-size:.7rem;color:#94a3b8;font-weight:800;">Page ${mfScaleLoanMasterPage+1}${hasNext?' +':''}</span><button type="button" class="btn-header btn-blue" ${hasNext?'':'disabled'} onclick="mfLoanMasterPageChange(1)">Next <i class="fa-solid fa-chevron-right"></i></button>`:'';
-                if(!result && !filtered.length){tbody.innerHTML='<tr><td colspan="11" style="padding:25px;text-align:center;color:#64748b;">No loan accounts match the selected filters.</td></tr>';return;}
-                if(result && !result.rows.length){tbody.innerHTML='<tr><td colspan="11" style="padding:25px;text-align:center;color:#64748b;">No loan accounts match the selected filters.</td></tr>';return;}
+                if(!result && !filtered.length){tbody.innerHTML='<tr><td colspan="12" style="padding:25px;text-align:center;color:#64748b;">No loan accounts match the selected filters.</td></tr>';return;}
+                if(result && !result.rows.length){tbody.innerHTML='<tr><td colspan="12" style="padding:25px;text-align:center;color:#64748b;">No loan accounts match the selected filters.</td></tr>';return;}
                 tbody.innerHTML='';
                 (result?result.rows:filtered).forEach(loan=>{
                     const prod=state.products[loan.product]||{name:'Custom',amount:0,fileCharge:0,emi:0,tenure:0};
@@ -8523,9 +8693,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     const realizedProfit=Number(loan._scaleRealizedProfit)|| (Number(prod.fileCharge)||0+(loan.payments||[]).reduce((s,p)=>s+(Number(p.interest)||0)+(Number(p.penalty)||0),0)+(loan.foreclosed?(loan.foreclosureData?.feeAmount||0):0));
                     const pending=Number.isFinite(Number(loan._scalePending))?Number(loan._scalePending):getLoanPending(loan);
                     const st=mfLoanOperationalStatus(loan); const badge=st==='FORECLOSED'?'<span class="badge-foreclosed">FORECLOSED</span>':st==='SETTLED'?'<span class="badge-paid">SETTLED</span>':st==='CLOSED'?'<span class="badge-paid">CLOSED</span>':st==='OVERDUE'?'<span class="badge-overdue">OVERDUE</span>':st==='DUE'?'<span class="badge-pending">DUE TODAY</span>':'<span class="badge-pending">ACTIVE</span>';
-                    tbody.innerHTML+=`<tr onclick="openLoanMasterLoan('${recoverySafeId(loan.id)}')" style="cursor:pointer;" title="Open loan statement"><td><b style="color:#60a5fa;">${financeEsc(loan.id)}</b></td><td><b style="color:#fff;">${financeEsc(loan.name)}</b></td><td>${financeEsc(loan.phone||'-')}${loan.phone2?`<br><span style="font-size:.62rem;color:#60a5fa;">${financeEsc(loan.phone2)}</span>`:''}</td><td>${financeEsc(prod.name)}</td><td>${formatToIndianDate(loan.disbursalDate)}</td><td>₹${Number(prod.amount||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${Number(prod.emi||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${paidPrincipal.toLocaleString('en-IN')}</td><td style="color:#fbbf24;font-weight:700;">₹${realizedProfit.toLocaleString('en-IN')}</td><td style="color:${pending<=0?'#34d399':'#f87171'};font-weight:700;">₹${pending.toLocaleString('en-IN')}</td><td>${badge}</td></tr>`;
+                    tbody.innerHTML+=`<tr onclick="openLoanMasterLoan('${recoverySafeId(loan.id)}')" style="cursor:pointer;" title="Open loan statement"><td><b style="color:#60a5fa;">${financeEsc(loan.id)}</b></td><td><b style="color:#fff;">${financeEsc(loan.name)}</b></td><td>${financeEsc(loan.phone||'-')}${loan.phone2?`<br><span style="font-size:.62rem;color:#60a5fa;">${financeEsc(loan.phone2)}</span>`:''}</td><td><span class="mf-loan-type-badge">${mfLoanTypeLabel(loan)}</span></td><td>${financeEsc(prod.name)}</td><td>${formatToIndianDate(loan.disbursalDate)}</td><td>₹${Number(prod.amount||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${Number(prod.emi||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${paidPrincipal.toLocaleString('en-IN')}</td><td style="color:#fbbf24;font-weight:700;">₹${realizedProfit.toLocaleString('en-IN')}</td><td style="color:${pending<=0?'#34d399':'#f87171'};font-weight:700;">₹${pending.toLocaleString('en-IN')}</td><td>${badge}</td></tr>`;
                 });
-            }catch(e){tbody.innerHTML=`<tr><td colspan="11" style="padding:20px;text-align:center;color:#f87171;">Scalable loan index could not be loaded. Legacy view retained: ${financeEsc(e.message)}</td></tr>`;}
+            }catch(e){tbody.innerHTML=`<tr><td colspan="12" style="padding:20px;text-align:center;color:#f87171;">Scalable loan index could not be loaded. Legacy view retained: ${financeEsc(e.message)}</td></tr>`;}
         }
         function mfLoanMasterPageChange(delta){
             const next=Math.max(0,mfScaleLoanMasterPage+(Number(delta)||0));
@@ -9970,14 +10140,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function openFinanceDetail(type){ financeFilters={from:'',to:'',month:'',year:''}; financeDetailSearched=false; renderFinanceDetail(type); }
 
         function financeRowsForExport(type,d){
-            if(type==='gross') return d.disbursed.map(x=>[x.loan.id,x.loan.name,x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.includeDisb?x.p.fileCharge:0,x.interest,x.preEmiInterest,x.penalty,x.foreclosureFee,x.preClosureInterest,x.postMaturityInterest,x.settlementWaiver||0,x.totalProfit]);
+            if(type==='gross') return d.disbursed.map(x=>[x.loan.id,x.loan.name,mfLoanTypeLabel(x.loan),x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.includeDisb?x.p.fileCharge:0,x.interest,x.preEmiInterest,x.penalty,x.foreclosureFee,x.preClosureInterest,x.postMaturityInterest,x.settlementWaiver||0,x.totalProfit]);
             if(type==='lender') return d.lender.flatMap(x=>x.filteredRepayments.map(r=>[r.date,x.b.lenderName,r.principal,r.interest,r.gst||0,(Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0),r.mode||'']));
             if(type==='opex') return [...d.payroll.map(x=>[x.sp.date,x.st.name,'Payroll',x.sp.amount,x.sp.mode||'']),...d.expenses.map(x=>[x.date,x.category,x.desc,x.amount,x.mode||''])];
-            if(type==='disbursed') return d.disbursed.filter(x=>x.includeDisb).map(x=>[x.loan.id,x.loan.name,x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode),x.p.amount,(()=>{const fs=mfLoanOperationalStatus(x.loan);return (fs==='OVERDUE'||fs==='DUE')?'DUE':fs;})()]);
+            if(type==='disbursed') return d.disbursed.filter(x=>x.includeDisb).map(x=>[x.loan.id,x.loan.name,mfLoanTypeLabel(x.loan),x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode),x.p.amount,(()=>{const fs=mfLoanOperationalStatus(x.loan);return (fs==='OVERDUE'||fs==='DUE')?'DUE':fs;})()]);
             return [['Gross Revenue',d.gross],['Lender Cost',d.lenderCost],['Staff Salaries',d.salaries],['General Expenses',d.generalExp],['TRUE IN-HAND NET SURPLUS',d.net]];
         }
         function exportFinanceDetailReport(){
-            const d=getFinanceSnapshot(), wb=XLSX.utils.book_new(), type=financeCurrentType, rows=financeRowsForExport(type,d), headers=type==='gross'?['Loan ID','Customer','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','File Charge','Contractual Interest','Pre-EMI Interest','Penalty','Foreclosure Fee','Pre-Closure Interest','Post-Maturity Recovery Interest','Settlement Waiver (Not Revenue)','Revenue']:type==='lender'?['Date','Lender','Principal','Interest','GST','Total','Mode']:type==='opex'?['Date','Payee / Category','Type / Description','Amount','Mode']:type==='disbursed'?['Loan ID','Customer','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal Date','Disbursal Mode','Loan Amount','Status']:['Metric','Amount'];
+            const d=getFinanceSnapshot(), wb=XLSX.utils.book_new(), type=financeCurrentType, rows=financeRowsForExport(type,d), headers=type==='gross'?['Loan ID','Customer','Loan Type','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','File Charge','Contractual Interest','Pre-EMI Interest','Penalty','Foreclosure Fee','Pre-Closure Interest','Post-Maturity Recovery Interest','Settlement Waiver (Not Revenue)','Revenue']:type==='lender'?['Date','Lender','Principal','Interest','GST','Total','Mode']:type==='opex'?['Date','Payee / Category','Type / Description','Amount','Mode']:type==='disbursed'?['Loan ID','Customer','Loan Type','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal Date','Disbursal Mode','Loan Amount','Status']:['Metric','Amount'];
             XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['MicroFinance Financial Detail Report'],['Report Period',financePeriodLabel()],[],headers,...rows]),'Detail_Report');
             XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_${type}_Detail_Report.xlsx`);
         }
