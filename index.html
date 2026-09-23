@@ -5520,9 +5520,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const product=state.products[loan.product];
                 if(!product)return;
                 mfLoanScheduleRows(loan).forEach(r=>{
-                    if(r.dueDate<from||r.dueDate>to)return;
                     const rowStatus=mfUpcomingStatus(r,today);
-                    if(status!=='ALL'&&rowStatus!==status)return;
+                    // Due / Overdue is one operational collection filter: include both
+                    // today's dues and earlier unpaid overdue EMIs. This prevents a
+                    // long-pending Top-up/Renewal account from disappearing from recovery
+                    // merely because the quick-view range starts today.
+                    const isInRange=r.dueDate>=from&&r.dueDate<=to;
+                    if(status==='DUE'){
+                        if(rowStatus!=='DUE'&&rowStatus!=='OVERDUE')return;
+                    }else{
+                        if(!isInRange)return;
+                        if(status!=='ALL'&&rowStatus!==status)return;
+                    }
                     const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.guarantorPhone,loan.guarantorPhone2,loan.guarantorSecondaryPhone,loanCollectorName(loan),product.name].filter(Boolean).join(' ').toLowerCase();
                     if(q&&!hay.includes(q))return;
                     rows.push({...r,upcomingStatus:rowStatus,overdueDays:mfUpcomingOverdueDays(r.dueDate,today)});
@@ -6016,7 +6025,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             <div class="mf-passbook-loan-meta">${relation} · Disbursal ${formatToIndianDate(loan.disbursalDate)} · ₹${Number(prod.amount||0).toLocaleString('en-IN')} · Paid ${paidCount}/${prod.tenure} · ₹${paidAmt.toLocaleString('en-IN')} · Status ${financeEsc(status)}${view.overdueDays>0?` · ${view.overdueDays} days overdue`:''}${penaltyText}</div>
                             ${partialText}
                         </div>
-                        <div class="recovery-result-actions mf-recovery-group-actions">${recoveryActionButton(loan,view)}<button type="button" class="btn-edit-sm" onclick="openLoanFromProduct('${recoverySafeId(loan.id)}')"><i class="fa-solid fa-folder-open"></i> Open</button></div>
+                        <div class="recovery-result-actions mf-recovery-group-actions">${recoveryActionButton(loan,view)}<button type="button" class="btn-edit-sm" onclick="openLoanFromProduct('${recoverySafeId(loan.id)}')"><i class="fa-solid fa-file-invoice-dollar"></i> Statement</button></div>
                     </div>`;
                 }).join('');
                 wrap.innerHTML=`<button type="button" class="mf-passbook-customer-head" onclick="toggleRecoveryCustomerGroup('${recoverySafeId(bodyId)}','${recoverySafeId(arrowId)}')">
@@ -7623,9 +7632,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         function openLoanFromProduct(loanId) {
-            setTab('feed');
-            const search = document.getElementById('search-input');
-            if (search) { search.value = loanId; renderFeed(); }
+            // Open the exact loan directly in Statement & PDF.
+            if(typeof openLoanMasterLoan==='function'){ openLoanMasterLoan(loanId); return; }
+            const loan=state.loans.find(l=>String(l.id)===String(loanId)); if(!loan) return;
+            setTab('passbook');
+            const pb=document.getElementById('passbook-search');
+            if(pb) pb.value=loan.name||loan.id;
+            filterPassbookAccounts();
+            selectPassbookLoan(loan.id);
         }
 
         // ================= BULK EMI COLLECTION =================
@@ -9832,9 +9846,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const renewalCustomerCount=new Set(renewalLoans.map(customerKeyOf)).size;
             const advancementCustomerCount=new Set([...topUpLoans,...renewalLoans].map(customerKeyOf)).size;
             const loanTypeRows=[
-                ["NEW LOANS — New Loan Accounts",newLoans.length,newCustomerCount],
-                ["TOP-UP LOANS — Additional Accounts for Existing Customers",topUpLoans.length,topUpCustomerCount],
-                ["RENEWAL LOANS — New Accounts for Existing Customers",renewalLoans.length,renewalCustomerCount]
+                ["NEW LOANS — New Loan Accounts",newLoans.length],
+                ["TOP-UP LOANS — Additional Accounts for Existing Customers",topUpLoans.length],
+                ["RENEWAL LOANS — New Accounts for Existing Customers",renewalLoans.length]
             ];
 
             return {
@@ -9941,15 +9955,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
             const loanTypes=[
                 ["LOAN TYPE / CUSTOMER ADVANCEMENT — EXISTING CUSTOMER CONTINUITY"],
-                ["Loan Classification","Loan Accounts","Unique Customers in This Classification"],
+                ["Loan Classification","Loan Accounts"],
                 ...r.loanTypeRows,
-                ["ADDITIONAL ACCOUNTS FOR EXISTING CUSTOMERS — TOP-UP + RENEWAL",r.topUpLoanCount+r.renewalLoanCount,r.advancementCustomerCount],
+                ["ADDITIONAL ACCOUNTS FOR EXISTING CUSTOMERS — TOP-UP + RENEWAL",r.topUpLoanCount+r.renewalLoanCount],
                 [],
-                ["Note","Top-up and Renewal are additional independent loan accounts for customers who already exist in the system. The customer count is a unique-customer count, not an account count; the same customer may receive multiple Top-ups and/or Renewals."]
+                ["How to read this","New Loans = newly created loan accounts. Top-up / Renewal = additional independent loan accounts issued to customers who already have customer/loan history in the system. The same customer may hold multiple independent loan accounts."]
             ];
             const wsLoanTypes=XLSX.utils.aoa_to_sheet(loanTypes);
-            wsLoanTypes['!cols']=[{wch:38},{wch:18},{wch:22}];
-            wsLoanTypes['!autofilter']={ref:`A2:C${3+r.loanTypeRows.length}`};
+            wsLoanTypes['!cols']=[{wch:58},{wch:72}];
+            wsLoanTypes['!autofilter']={ref:`A2:B${3+r.loanTypeRows.length}`};
             wsLoanTypes['!freeze']={xSplit:0,ySplit:2};
             XLSX.utils.book_append_sheet(wb,wsLoanTypes,'Loan_Type_Overview');
 
@@ -10089,9 +10103,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     <h2>4. Portfolio Status</h2>
                     <table><tbody><tr><th>Status</th><th>Loan Accounts</th></tr>${statusRows}</tbody></table>
                     <h2>5. Loan Type / Customer Advancement</h2>
-                    <table><tbody><tr><th>Loan Classification</th><th>Loan Accounts</th><th>Unique Customers in Classification</th></tr>${r.loanTypeRows.map(x=>`<tr><td>${financeEsc(x[0])}</td><td style="text-align:right">${x[1]}</td><td style="text-align:right">${x[2]}</td></tr>`).join('')}
-                    <tr class="total"><td>Additional Accounts for Existing Customers — Top-up + Renewal</td><td style="text-align:right">${r.topUpLoanCount+r.renewalLoanCount}</td><td style="text-align:right">${r.advancementCustomerCount}</td></tr></tbody></table>
-                    <div style="margin-top:7px;font-size:9px;color:#475569;">Top-up / Renewal customer count represents unique customers who already had a customer/loan history in the system. One customer may hold multiple independent loan accounts.</div>
+                    <table><tbody><tr><th>Loan Classification</th><th>Loan Accounts</th></tr>${r.loanTypeRows.map(x=>`<tr><td>${financeEsc(x[0])}</td><td style="text-align:right">${x[1]}</td></tr>`).join('')}
+                    <tr class="total"><td>Additional Accounts for Existing Customers — Top-up + Renewal</td><td style="text-align:right">${r.topUpLoanCount+r.renewalLoanCount}</td></tr></tbody></table>
+                    <div style="margin-top:7px;font-size:9px;color:#475569;"><b>How to read:</b> New Loans are newly created loan accounts. Top-up and Renewal are additional independent loan accounts issued to customers who already have customer/loan history in the system. One customer may hold multiple independent loan accounts.</div>
                     <div class="mf-exec-note"><b>Customer relationship:</b> one customer can hold multiple independent loan accounts; Top-up and Renewal remain separate loan accounts while consolidated history stays customer-linked.</div>
                     <h2>6. Portfolio by Product</h2>
                     <table><tbody><tr><th>Product</th><th>Accounts</th><th>Disbursed</th><th>Scheduled Payable</th><th>Outstanding</th></tr>${productRows || '<tr><td colspan="5">No product data available.</td></tr>'}</tbody></table>
