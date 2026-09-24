@@ -1070,6 +1070,32 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 }
 </style>
 <!-- AMARA SYNC V2 — verified secure restore baseline -->
+
+<style id="mf-v11-loan-master-none-and-mobile-polish">
+.loan-master-filter-grid{grid-template-columns:minmax(250px,1.7fr) minmax(150px,1fr) minmax(145px,1fr) minmax(140px,1fr) minmax(155px,1fr) auto;}
+.loan-master-table-wrap{position:relative;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:thin;}
+.loan-master-table{min-width:1180px!important;width:1180px!important;table-layout:fixed!important;}
+.loan-master-table th,.loan-master-table td{overflow:hidden;text-overflow:ellipsis;}
+.loan-master-table th:nth-child(1),.loan-master-table td:nth-child(1){width:80px!important;}
+.loan-master-table th:nth-child(2),.loan-master-table td:nth-child(2){width:160px!important;white-space:normal!important;overflow-wrap:anywhere;}
+.loan-master-table th:nth-child(3),.loan-master-table td:nth-child(3){width:125px!important;}
+.loan-master-table th:nth-child(4),.loan-master-table td:nth-child(4){width:95px!important;text-align:center!important;}
+.loan-master-table th:nth-child(5),.loan-master-table td:nth-child(5){width:175px!important;white-space:normal!important;overflow-wrap:anywhere;}
+.loan-master-table th:nth-child(6),.loan-master-table td:nth-child(6){width:105px!important;}
+.loan-master-table th:nth-child(7),.loan-master-table td:nth-child(7){width:105px!important;text-align:right!important;}
+.loan-master-table th:nth-child(8),.loan-master-table td:nth-child(8){width:90px!important;text-align:right!important;}
+.loan-master-table th:nth-child(9),.loan-master-table td:nth-child(9){width:115px!important;text-align:right!important;}
+.loan-master-table th:nth-child(10),.loan-master-table td:nth-child(10){width:105px!important;text-align:right!important;}
+.loan-master-table th:nth-child(11),.loan-master-table td:nth-child(11){width:110px!important;text-align:right!important;}
+.loan-master-table th:nth-child(12),.loan-master-table td:nth-child(12){width:100px!important;text-align:center!important;}
+.loan-master-table td:nth-child(n+7):nth-child(-n+11){font-variant-numeric:tabular-nums;white-space:nowrap!important;}
+.loan-master-table .mf-loan-type-badge{max-width:100%;overflow:hidden;text-overflow:ellipsis;}
+.upcoming-emi-empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:22px 12px;color:#64748b;text-align:center;border:1px dashed rgba(96,165,250,.22);border-radius:10px;background:rgba(255,255,255,.018);}
+.upcoming-emi-empty-state i{color:#60a5fa;font-size:1rem;}.upcoming-emi-empty-state b{color:#cbd5e1;font-size:.75rem;}.upcoming-emi-empty-state span{font-size:.64rem;line-height:1.4;}
+@media(max-width:1050px){.loan-master-filter-grid{grid-template-columns:repeat(3,minmax(0,1fr));}.loan-master-search-wrap{grid-column:span 3;}}
+@media(max-width:700px){.loan-master-filter-grid{grid-template-columns:1fr 1fr;}.loan-master-search-wrap{grid-column:1/-1;}.loan-master-filter-grid select,.loan-master-reset{min-width:0;width:100%;}.loan-master-table-wrap{margin-left:0;margin-right:0;border-radius:9px;}.loan-master-table{min-width:1180px!important;width:1180px!important;}.loan-master-table th,.loan-master-table td{font-size:.66rem;padding:8px 9px;}.loan-master-filter-hint{font-size:.58rem;}.loan-master-table-wrap:after{content:'Swipe left / right to view financial columns';display:block;text-align:center;color:#64748b;font-size:.56rem;padding:5px 0 2px;}}
+@media(max-width:390px){.loan-master-filter-grid{grid-template-columns:1fr;}.loan-master-search-wrap{grid-column:1/-1;}}
+</style>
 </head>
 <body>
 
@@ -1203,10 +1229,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 </div>
                 <div class="npa-controls" style="margin-top:10px;">
                     <input id="npa-search" placeholder="Search name / Loan ID / phone" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;">
-                    <select id="npa-year-filter" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;"><option value="ALL">All Years</option></select>
+                    <select id="npa-year-filter" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;"><option value="NONE">Select Year</option><option value="ALL">All Years</option></select>
                     <select id="npa-product-filter" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;"><option value="ALL">All Products</option></select>
-                    <select id="npa-status-filter" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;"><option value="90PLUS">90+ DPD Recovery Watch</option><option value="POSTMATURITY">Post-Maturity Recovery</option><option value="90PLUS_OR_POSTMATURITY">90+ / Post-Maturity</option><option value="SETTLED">Settled / Closed</option></select>
-                    <select id="npa-agent-filter" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;"><option value="ALL">All Collection Agents</option></select>
+                    <select id="npa-status-filter" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;"><option value="NONE">Select Recovery View</option><option value="90PLUS">90+ DPD Recovery Watch</option><option value="POSTMATURITY">Post-Maturity Recovery</option><option value="90PLUS_OR_POSTMATURITY">90+ / Post-Maturity</option><option value="SETTLED">Settled / Closed</option></select>
+                    <select id="npa-agent-filter" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;"><option value="NONE">Select Collection Agent</option><option value="ALL">All Collection Agents</option></select>
                 </div>
                 <div class="npa-actions">
                     <button type="button" class="btn-header btn-green" onclick="applyNpaFilters()"><i class="fa-solid fa-filter"></i> Apply Filters</button>
@@ -1232,12 +1258,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             <div class="upcoming-emi-controls">
                 <div class="upcoming-emi-control date-control"><label>From Date</label><div class="upcoming-date-box"><input type="text" id="emi-schedule-from" placeholder="DD/MM/YYYY" inputmode="numeric" autocomplete="off" onblur="normalizeUpcomingDateInput('from')" onchange="renderUpcomingEmiSchedule()"><button type="button" class="upcoming-date-btn" onclick="pickUpcomingDate('from')" aria-label="Choose from date"><i class="fa-solid fa-calendar-days"></i></button><input type="date" id="emi-schedule-from-picker" class="upcoming-date-picker-hidden" tabindex="-1" aria-hidden="true" onchange="syncUpcomingPicker('from')"></div></div>
                 <div class="upcoming-emi-control date-control"><label>To Date</label><div class="upcoming-date-box"><input type="text" id="emi-schedule-to" placeholder="DD/MM/YYYY" inputmode="numeric" autocomplete="off" onblur="normalizeUpcomingDateInput('to')" onchange="renderUpcomingEmiSchedule()"><button type="button" class="upcoming-date-btn" onclick="pickUpcomingDate('to')" aria-label="Choose to date"><i class="fa-solid fa-calendar-days"></i></button><input type="date" id="emi-schedule-to-picker" class="upcoming-date-picker-hidden" tabindex="-1" aria-hidden="true" onchange="syncUpcomingPicker('to')"></div></div>
-                <div class="upcoming-emi-control"><label>Status</label><select id="emi-schedule-status" onchange="renderUpcomingEmiSchedule()"><option value="UPCOMING">Upcoming + Pending</option><option value="DUE">Due / Overdue</option><option value="PAID">Paid</option><option value="ALL">All in Range</option></select></div>
+                <div class="upcoming-emi-control"><label>Status</label><select id="emi-schedule-status" onchange="renderUpcomingEmiSchedule()"><option value="NONE">Select Status</option><option value="UPCOMING">Upcoming + Pending</option><option value="DUE">Due / Overdue</option><option value="PAID">Paid</option><option value="ALL">All in Range</option></select></div>
             </div>
             <div class="upcoming-emi-controls" style="margin-top:7px;grid-template-columns:1fr 1.6fr 1.2fr;">
-                <div class="upcoming-emi-control"><label>Quick View</label><select id="emi-schedule-quick" onchange="applyUpcomingQuickView()"><option value="7">Next 7 Days</option><option value="1">Today</option><option value="15">Next 15 Days</option><option value="30">Next 30 Days</option><option value="90">Next 90 Days</option><option value="MONTH">This Month</option><option value="YEAR">This Year</option></select></div>
+                <div class="upcoming-emi-control"><label>Quick View</label><select id="emi-schedule-quick" onchange="applyUpcomingQuickView()"><option value="NONE">Select Quick View</option><option value="7">Next 7 Days</option><option value="1">Today</option><option value="15">Next 15 Days</option><option value="30">Next 30 Days</option><option value="90">Next 90 Days</option><option value="MONTH">This Month</option><option value="YEAR">This Year</option></select></div>
                 <div class="upcoming-emi-control"><label>Customer Search</label><input type="text" id="emi-schedule-search" placeholder="Name / ID / phone" oninput="renderUpcomingEmiSchedule()"></div>
-                <div class="upcoming-emi-control"><label>Collection Agent</label><select id="emi-collector-filter" onchange="renderUpcomingEmiSchedule()"><option value="ALL">All Collectors</option></select></div>
+                <div class="upcoming-emi-control"><label>Collection Agent</label><select id="emi-collector-filter" onchange="renderUpcomingEmiSchedule()"><option value="NONE">Select Collector</option></select></div>
             </div>
             <div class="upcoming-emi-actions">
                 <button class="btn-header btn-blue" onclick="setUpcomingToday()"><i class="fa-solid fa-calendar-day"></i> Today</button>
@@ -1424,15 +1450,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <input id="loan-master-search" oninput="mfScaleLoanMasterPage=0;renderAllLoansTable()" placeholder="Search customer, mobile, Loan ID, guarantor or product..." autocomplete="off">
                     </div>
-                    <select id="loan-master-product" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()"><option value="ALL">All Products</option></select>
+                    <select id="loan-master-product" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()"><option value="NONE">Select Product</option><option value="ALL">All Products</option></select>
                     <select id="loan-master-type" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()">
-                        <option value="ALL">All Loan Types</option><option value="NEW">New Loan</option><option value="TOP_UP">Top-up</option><option value="RENEWAL">Renewal</option>
+                        <option value="NONE">Select Loan Type</option><option value="ALL">All Loan Types</option><option value="NEW">New Loan</option><option value="TOP_UP">Top-up</option><option value="RENEWAL">Renewal</option>
                     </select>
                     <select id="loan-master-status" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()">
-                        <option value="ALL">All Status</option><option value="ACTIVE">Active</option><option value="DUE">Due Today</option><option value="OVERDUE">Overdue</option><option value="CLOSED">Closed</option><option value="SETTLED">Settled</option><option value="FORECLOSED">Foreclosed</option>
+                        <option value="NONE">Select Status</option><option value="ALL">All Status</option><option value="ACTIVE">Active</option><option value="DUE">Due Today</option><option value="OVERDUE">Overdue</option><option value="CLOSED">Closed</option><option value="SETTLED">Settled</option><option value="FORECLOSED">Foreclosed</option>
                     </select>
                     <select id="loan-master-period" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()">
-                        <option value="ALL">All Disbursal Dates</option><option value="30D">Last 30 Days</option><option value="MONTH">This Month</option><option value="QUARTER">This Quarter</option><option value="YEAR">This Year</option>
+                        <option value="NONE">Select Disbursal Period</option><option value="ALL">All Disbursal Dates</option><option value="30D">Last 30 Days</option><option value="MONTH">This Month</option><option value="QUARTER">This Quarter</option><option value="YEAR">This Year</option>
                     </select>
                     <button type="button" class="btn-header btn-blue loan-master-reset" onclick="resetLoanMasterFilters()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
                 </div>
@@ -3507,10 +3533,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     r.onsuccess=()=>resolve(r.result||null); r.onerror=()=>resolve(null);
                 });
                 if(!loan) continue;
-                if(product!=='ALL' && String(loan.product)!==String(product)) continue;
+                if(product!=='ALL' && product!=='NONE' && String(loan.product)!==String(product)) continue;
                 const storedStatus=String(loan._scaleStatus||'ACTIVE');
                 const dynamicStatus=storedStatus;
-                if(status!=='ALL' && dynamicStatus!==String(status)) continue;
+                if(status!=='ALL' && status!=='NONE' && dynamicStatus!==String(status)) continue;
                 matched.push(String(loan.id));
             }
             const total=matched.length;
@@ -3524,7 +3550,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         function mfLoanMasterDateMatches(loan, period){
-            if(period==='ALL') return true;
+            if(period==='NONE' || period==='ALL') return true;
             const raw=String(loan?.disbursalDate||'');
             if(!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false;
             const d=new Date(raw+'T00:00:00'); if(Number.isNaN(d.getTime())) return false;
@@ -3536,7 +3562,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             return true;
         }
         function mfLoanMasterTypeMatches(loan, loanType){
-            return loanType==='ALL' || String(loan?.loanType||'NEW').toUpperCase()===String(loanType).toUpperCase();
+            return loanType==='NONE' || loanType==='ALL' || String(loan?.loanType||'NEW').toUpperCase()===String(loanType).toUpperCase();
         }
         async function mfScaleLoanMasterPageData({query='',product='ALL',loanType='ALL',status='ALL',period='ALL',page=0,pageSize=15}={}){
             const db=await openMfDb();
@@ -3550,9 +3576,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             });
             const matched=allRecords.filter(rec=>{
                 if(needle && !normalizeRecoverySearchText(mfScaleLoanSearchText(rec)).includes(needle)) return false;
-                if(product!=='ALL'&&String(rec.product)!==String(product)) return false;
+                if(product!=='ALL'&&product!=='NONE'&&String(rec.product)!==String(product)) return false;
                 if(!mfLoanMasterTypeMatches(rec,loanType)) return false;
-                const recStatus=String(rec._scaleStatus||'ACTIVE'); if(status!=='ALL'&&recStatus!==String(status)) return false;
+                const recStatus=String(rec._scaleStatus||'ACTIVE'); if(status!=='ALL'&&status!=='NONE'&&recStatus!==String(status)) return false;
                 return mfLoanMasterDateMatches(rec,period);
             });
             matched.sort((a,b)=>{
@@ -5054,7 +5080,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             state.expenses.forEach(e=>dataYears.push(getExpenseMonthYear(e).year));
             const years=[...new Set([...Array.from({length:101},(_,i)=>new Date().getFullYear()-50+i),...dataYears])].sort((a,b)=>b-a);
             m.innerHTML='<option value="ALL">All Months</option>'+months.map((x,i)=>`<option value="${i+1}">${x}</option>`).join('');
-            y.innerHTML='<option value="ALL">All Years</option>'+years.map(x=>`<option value="${x}">${x}</option>`).join('');
+            y.innerHTML='<option value="NONE">Select Year</option><option value="ALL">All Years</option>'+years.map(x=>`<option value="${x}">${x}</option>`).join('');
             if([...m.options].some(o=>o.value===oldM))m.value=oldM;
             if([...y.options].some(o=>o.value===oldY))y.value=oldY;
         }
@@ -5575,15 +5601,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         function populateUpcomingCollectorFilter(){
             const sel=document.getElementById('emi-collector-filter'); if(!sel) return;
-            const current=sel.value||'ALL', agents=getCollectionAgents();
-            sel.innerHTML='<option value="ALL">All Collectors</option><option value="UNASSIGNED">Unassigned</option>' + agents.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
-            if([...sel.options].some(o=>o.value===current)) sel.value=current; else sel.value='ALL';
+            const current=sel.value||'NONE', agents=getCollectionAgents();
+            sel.innerHTML='<option value="NONE">Select Collector</option><option value="ALL">All Collectors</option><option value="UNASSIGNED">Unassigned</option>' + agents.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+            if([...sel.options].some(o=>o.value===current)) sel.value=current; else sel.value='NONE';
         }
         function loanCollectorName(loan){
             if(loan.collectorId){ const s=(state.staff||[]).find(x=>x.id===loan.collectorId); if(s) return s.name; }
             return loan.collectorName||'Unassigned';
         }
-        function collectorMatches(loan, filter){ return filter==='ALL' || (filter==='UNASSIGNED' ? !loan.collectorId && !loan.collectorName : loan.collectorId===filter || loan.collectorName===filter); }
+        function collectorMatches(loan, filter){ return filter!=='NONE' && (filter==='ALL' || (filter==='UNASSIGNED' ? !loan.collectorId && !loan.collectorName : loan.collectorId===filter || loan.collectorName===filter)); }
         // Advanced collection accounting:
         // For every upcoming/current EMI, show ALL earlier unpaid contractual EMIs,
         // not just the first one. Partial money belongs to the next incomplete EMI
@@ -5870,9 +5896,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const from=getUpcomingDateIso('from')||mfIsoToday(), to=getUpcomingDateIso('to')||from;
             const status=document.getElementById('emi-schedule-status')?.value||'UPCOMING',
                   q=(document.getElementById('emi-schedule-search')?.value||'').trim().toLowerCase(),
-                  collector=document.getElementById('emi-collector-filter')?.value||'ALL',
+                  collector=document.getElementById('emi-collector-filter')?.value||'NONE',
                   today=mfIsoToday();
             populateUpcomingCollectorFilter();
+            if(status==='NONE' || collector==='NONE'){
+                const summary=document.getElementById('upcoming-emi-summary'), area=document.getElementById('upcoming-emi-results');
+                if(summary) summary.innerHTML='<div class="upcoming-emi-empty-state"><i class="fa-solid fa-filter"></i><b>Select Status and Collection Agent</b><span>Choose the required filters to load the collection book. No portfolio is loaded by default.</span></div>';
+                if(area) area.innerHTML='';
+                return;
+            }
 
             // Build a customer-wise collection book. Each loan remains an independent
             // accounting unit, while previous unpaid EMIs are retained even when the
@@ -6263,17 +6295,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         function initNpaFilters(){
             const y=document.getElementById('npa-year-filter'), pr=document.getElementById('npa-product-filter'), ag=document.getElementById('npa-agent-filter'); if(!y||!pr||!ag)return;
-            const cur=y.value||'ALL', years=[...new Set([...Array.from({length:21},(_,i)=>new Date().getFullYear()-10+i),...(state.loans||[]).map(l=>l.disbursalDate?new Date(l.disbursalDate).getFullYear():null).filter(Boolean)])].sort((a,b)=>b-a); y.innerHTML='<option value="ALL">All Years</option>'+years.map(v=>`<option value="${v}">${v}</option>`).join(''); if(years.includes(Number(cur)))y.value=cur;
-            const cp=pr.value||'ALL'; pr.innerHTML='<option value="ALL">All Products</option>'+Object.keys(state.products||{}).map(k=>`<option value="${k}">${state.products[k].name}</option>`).join(''); if(cp && (cp==='ALL'||state.products[cp]))pr.value=cp;
-            const ca=ag.value||'ALL'; const agents=[...new Set((state.loans||[]).map(l=>l.collectorName||'').filter(Boolean))].sort(); ag.innerHTML='<option value="ALL">All Collection Agents</option>'+agents.map(v=>`<option value="${financeEsc(v)}">${financeEsc(v)}</option>`).join(''); if(agents.includes(ca))ag.value=ca;
+            const cur=y.value||'ALL', years=[...new Set([...Array.from({length:21},(_,i)=>new Date().getFullYear()-10+i),...(state.loans||[]).map(l=>l.disbursalDate?new Date(l.disbursalDate).getFullYear():null).filter(Boolean)])].sort((a,b)=>b-a); y.innerHTML='<option value="ALL">All Years</option>'+years.map(v=>`<option value="${v}">${v}</option>`).join(''); if(cur==='NONE' || years.includes(Number(cur))) y.value=cur;
+            const cp=pr.value||'ALL'; pr.innerHTML='<option value="NONE">Select Product</option><option value="ALL">All Products</option>'+Object.keys(state.products||{}).map(k=>`<option value="${k}">${state.products[k].name}</option>`).join(''); if(cp && (cp==='NONE'||cp==='ALL'||state.products[cp]))pr.value=cp;
+            const ca=ag.value||'ALL'; const agents=[...new Set((state.loans||[]).map(l=>l.collectorName||'').filter(Boolean))].sort(); ag.innerHTML='<option value="NONE">Select Collection Agent</option><option value="ALL">All Collection Agents</option>'+agents.map(v=>`<option value="${financeEsc(v)}">${financeEsc(v)}</option>`).join(''); if(ca==='NONE' || agents.includes(ca))ag.value=ca;
         }
         let npaFiltersApplied=false;
         function getNpaRows(){
-            const q=(document.getElementById('npa-search')?.value||'').toLowerCase().trim(), y=document.getElementById('npa-year-filter')?.value||'ALL', pr=document.getElementById('npa-product-filter')?.value||'ALL', st=document.getElementById('npa-status-filter')?.value||'90PLUS', ag=document.getElementById('npa-agent-filter')?.value||'ALL';
-            return (state.loans||[]).map(l=>{const v=getLoanRecoveryView(l); return {...l,_v:v};}).filter(x=>{const l=x,v=x._v; const hay=[l.name,l.id,l.phone,l.phone2].filter(Boolean).join(' ').toLowerCase(); if(q&&!hay.includes(q))return false;if(y!=='ALL'&&String(new Date(l.disbursalDate).getFullYear())!==String(y))return false;if(pr!=='ALL'&&l.product!==pr)return false;if(ag!=='ALL'&&(l.collectorName||'')!==ag)return false; if(st==='90PLUS'&&!(v.npaWatch&&!v.settled&&!l.foreclosed&&v.pending>0))return false;if(st==='POSTMATURITY'&&!((v.maturity&&mfIsoToday()>String(v.maturity.toISOString().slice(0,10)))&&v.pending>0&&!v.settled&&!l.foreclosed))return false;if(st==='90PLUS_OR_POSTMATURITY'&&!((v.npaWatch||(v.maturity&&mfIsoToday()>String(v.maturity.toISOString().slice(0,10))))&&!v.settled&&!l.foreclosed&&v.pending>0))return false;if(st==='SETTLED'&&!v.settled&&!l.foreclosed&&v.pending>0)return false;return true;}).sort((a,b)=>b._v.overdueDays-a._v.overdueDays);
+            const q=(document.getElementById('npa-search')?.value||'').toLowerCase().trim(), y=document.getElementById('npa-year-filter')?.value||'NONE', pr=document.getElementById('npa-product-filter')?.value||'NONE', st=document.getElementById('npa-status-filter')?.value||'NONE', ag=document.getElementById('npa-agent-filter')?.value||'NONE';
+            if(!q && y==='NONE' && pr==='NONE' && st==='NONE' && ag==='NONE') return [];
+            return (state.loans||[]).map(l=>{const v=getLoanRecoveryView(l); return {...l,_v:v};}).filter(x=>{const l=x,v=x._v; const hay=[l.name,l.id,l.phone,l.phone2].filter(Boolean).join(' ').toLowerCase(); if(q&&!hay.includes(q))return false;if(y!=='NONE'&&y!=='ALL'&&String(new Date(l.disbursalDate).getFullYear())!==String(y))return false;if(pr!=='NONE'&&pr!=='ALL'&&l.product!==pr)return false;if(ag!=='NONE'&&ag!=='ALL'&&(l.collectorName||'')!==ag)return false; if(st==='NONE' && !q) return false; if(st==='90PLUS'&&!(v.npaWatch&&!v.settled&&!l.foreclosed&&v.pending>0))return false;if(st==='POSTMATURITY'&&!((v.maturity&&mfIsoToday()>String(v.maturity.toISOString().slice(0,10)))&&v.pending>0&&!v.settled&&!l.foreclosed))return false;if(st==='90PLUS_OR_POSTMATURITY'&&!((v.npaWatch||(v.maturity&&mfIsoToday()>String(v.maturity.toISOString().slice(0,10))))&&!v.settled&&!l.foreclosed&&v.pending>0))return false;if(st==='SETTLED'&&!v.settled&&!l.foreclosed&&v.pending>0)return false;return true;}).sort((a,b)=>b._v.overdueDays-a._v.overdueDays);
         }
         function applyNpaFilters(){npaFiltersApplied=true;renderNpaResults();}
-        function resetNpaFilters(){['npa-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['npa-year-filter','npa-product-filter','npa-agent-filter'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='ALL';});const ns=document.getElementById('npa-status-filter');if(ns)ns.value='90PLUS';npaFiltersApplied=false;document.getElementById('npa-results').innerHTML='<div class="npa-empty"><i class="fa-solid fa-magnifying-glass" style="font-size:1.4rem;display:block;margin-bottom:8px;"></i>Use Search / Filters and tap <b>Apply Filters</b> to load the recovery list.</div>';}
+        function resetNpaFilters(){['npa-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});['npa-year-filter','npa-product-filter','npa-agent-filter'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='NONE';});const ns=document.getElementById('npa-status-filter');if(ns)ns.value='NONE';npaFiltersApplied=false;document.getElementById('npa-results').innerHTML='<div class="npa-empty"><i class="fa-solid fa-magnifying-glass" style="font-size:1.4rem;display:block;margin-bottom:8px;"></i>Use Search / Filters and tap <b>Apply Filters</b> to load the recovery list.</div>';}
         function renderNpaResults(){
             const box=document.getElementById('npa-results'); if(!box)return; if(!npaFiltersApplied){resetNpaFilters();return;} const rows=getNpaRows(); const totalPending=rows.reduce((a,x)=>a+x._v.pending,0), watch=rows.filter(x=>x._v.npaWatch&&!x._v.settled).length, eligible=rows.filter(x=>x._v.maturity&&mfIsoToday()>String(x._v.maturity.toISOString().slice(0,10))&&x._v.pending>0&&!x._v.settled&&!x.foreclosed).length, settled=rows.filter(x=>x._v.settled||x.foreclosed||x._v.pending<=0).length;
             const summary=`<div class="npa-summary"><div class="kpi-card" style="padding:8px"><div class="kpi-label">Matched Accounts</div><div class="kpi-val" style="font-size:1rem">${rows.length}</div></div><div class="kpi-card" style="padding:8px"><div class="kpi-label">90+ DPD Watch</div><div class="kpi-val" style="font-size:1rem;color:#f87171">${watch}</div></div><div class="kpi-card" style="padding:8px"><div class="kpi-label">Post-Maturity Eligible</div><div class="kpi-val" style="font-size:1rem;color:#fbbf24">${eligible}</div></div><div class="kpi-card" style="padding:8px"><div class="kpi-label">Pending Amount</div><div class="kpi-val" style="font-size:1rem;color:#34d399">₹${totalPending.toLocaleString('en-IN')}</div></div></div>`;
@@ -9213,13 +9246,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         function refreshLoanMasterProductFilter() {
             const sel=document.getElementById('loan-master-product'); if(!sel) return;
-            const cur=sel.value; sel.innerHTML='<option value="ALL">All Products</option>' + Object.keys(state.products).map(code=>`<option value="${code}">${state.products[code].name}</option>`).join('');
+            const cur=sel.value; sel.innerHTML='<option value="NONE">Select Product</option><option value="ALL">All Products</option>' + Object.keys(state.products).map(code=>`<option value="${code}">${state.products[code].name}</option>`).join('');
             if (Object.keys(state.products).includes(cur)) sel.value=cur;
         }
 
         function resetLoanMasterFilters() {
             const q=document.getElementById('loan-master-search'), p=document.getElementById('loan-master-product'), ty=document.getElementById('loan-master-type'), st=document.getElementById('loan-master-status'), per=document.getElementById('loan-master-period');
-            if(q) q.value=''; if(p) p.value='ALL'; if(ty) ty.value='ALL'; if(st) st.value='ALL'; if(per) per.value='ALL'; mfScaleLoanMasterPage=0; renderAllLoansTable();
+            if(q) q.value=''; if(p) p.value='NONE'; if(ty) ty.value='NONE'; if(st) st.value='NONE'; if(per) per.value='NONE'; mfScaleLoanMasterPage=0; renderAllLoansTable();
         }
 
         function openLoanMasterLoan(id) {
@@ -9238,11 +9271,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const product=document.getElementById('loan-master-product')?.value||'ALL';
             const loanType=document.getElementById('loan-master-type')?.value||'ALL';
             const status=document.getElementById('loan-master-status')?.value||'ALL';
-            const period=document.getElementById('loan-master-period')?.value||'ALL';
+            const period=document.getElementById('loan-master-period')?.value||'NONE';
+            const noCriteria=!q && product==='NONE' && loanType==='NONE' && status==='NONE' && period==='NONE';
+            if(noCriteria){
+                const count=document.getElementById('loan-master-result-count'); if(count) count.innerText=`${state.loans.length.toLocaleString('en-IN')} total loan accounts · Select Search or any filter to load accounts`;
+                const nav=document.getElementById('loan-master-pagination'); if(nav) nav.innerHTML='';
+                tbody.innerHTML='<tr><td colspan="12" style="padding:28px;text-align:center;color:#64748b;"><i class="fa-solid fa-filter" style="color:#60a5fa;margin-right:5px;"></i>Select a filter or enter a search term to load Loan Master records.</td></tr>';
+                return;
+            }
             tbody.innerHTML='<tr><td colspan="12" style="padding:20px;text-align:center;color:#94a3b8;">Loading scalable loan records…</td></tr>';
             try{
                 const result=mfScaleReady?await mfScaleLoanMasterPageData({query:q,product,loanType,status,period,page:mfScaleLoanMasterPage,pageSize:MF_SCALE.pageSize}):null;
-                const filtered=result?result.rows:state.loans.filter(loan=>{const prod=state.products[loan.product]||{};const st=mfLoanOperationalStatus(loan);const hay=mfScaleLoanSearchText(loan).toLowerCase();return(!q||hay.includes(q.toLowerCase()))&&(product==='ALL'||loan.product===product)&&mfLoanMasterTypeMatches(loan,loanType)&&(status==='ALL'||st===status)&&mfLoanMasterDateMatches(loan,period);}).slice(mfScaleLoanMasterPage*MF_SCALE.pageSize,(mfScaleLoanMasterPage+1)*MF_SCALE.pageSize);
+                const filtered=result?result.rows:state.loans.filter(loan=>{const prod=state.products[loan.product]||{};const st=mfLoanOperationalStatus(loan);const hay=mfScaleLoanSearchText(loan).toLowerCase();return(!q||hay.includes(q.toLowerCase()))&&(product==='ALL'||product==='NONE'||loan.product===product)&&mfLoanMasterTypeMatches(loan,loanType)&&(status==='NONE'||status==='ALL'||st===status)&&mfLoanMasterDateMatches(loan,period);}).slice(mfScaleLoanMasterPage*MF_SCALE.pageSize,(mfScaleLoanMasterPage+1)*MF_SCALE.pageSize);
                 // Normalize the scalable result boundary. Filtered pages intentionally return
                 // total=null, while older mirrors can briefly return an undefined total during
                 // bootstrap. Never let a presentation counter throw a TypeError.
@@ -9275,7 +9315,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     const legacy=state.loans.filter(loan=>{
                         const prod=state.products[loan.product]||{}; const st=mfLoanOperationalStatus(loan);
                         const hay=mfScaleLoanSearchText(loan).toLowerCase();
-                        return(!q||hay.includes(q.toLowerCase()))&&(product==='ALL'||loan.product===product)&&mfLoanMasterTypeMatches(loan,loanType)&&(status==='ALL'||st===status)&&mfLoanMasterDateMatches(loan,period);
+                        return(!q||hay.includes(q.toLowerCase()))&&(product==='ALL'||product==='NONE'||loan.product===product)&&mfLoanMasterTypeMatches(loan,loanType)&&(status==='NONE'||status==='ALL'||st===status)&&mfLoanMasterDateMatches(loan,period);
                     });
                     const start=mfScaleLoanMasterPage*MF_SCALE.pageSize, pageRows=legacy.slice(start,start+MF_SCALE.pageSize);
                     const count=document.getElementById('loan-master-result-count');
