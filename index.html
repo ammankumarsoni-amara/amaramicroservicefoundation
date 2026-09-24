@@ -4482,20 +4482,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if (np !== cp) { alert('PIN and Confirm PIN do not match.'); return; }
             const cur = localStorage.getItem('MF_APP_PIN_HASH');
             const doSet = async () => {
-                try{
-                    const h=await mfHashPin(np);
+                mfHashPin(np).then(async h => {
                     localStorage.setItem('MF_APP_PIN_HASH', h);
                     mfAppUnlockedThisSession = true;
                     const currentCloudPin = getCloudPin();
-                    if(currentCloudPin){
-                        try{ await persistCloudPinWrapped(currentCloudPin); }
-                        catch(e){ console.warn('Cloud PIN persistence during App Lock save skipped:',e); }
-                    }
+                    if(currentCloudPin) await persistCloudPinWrapped(currentCloudPin);
                     renderAppLockSection();
-                }catch(e){
-                    console.error('App Lock PIN save failed:',e);
-                    alert('App Lock PIN could not be saved. No security setting was changed. Please try again.');
-                }
+                });
             };
             if (cur) {
                 const oldPin = prompt('Enter your CURRENT PIN to confirm this change:');
@@ -9855,10 +9848,20 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const pin=getCloudPin();
                 const visiblePin=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
                 if(!pin || !visiblePin || visiblePin!==pin) return alert('Activate the Cloud Encryption PIN first. Google Drive connection is locked until the active PIN is verified.');
-                const clientId=(document.getElementById('google-client-id').value||localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'').trim();
-                if(!clientId) return alert('Please enter your Google OAuth Web Client ID.');
+                // Explicit security gate: a Drive connection may only be established after
+                // the operator has entered the OAuth Web Client ID in this form. Do not fall back
+                // to the remembered client ID here; that fallback previously allowed Connect to
+                // proceed even when the field was blank.
+                const clientId=(document.getElementById('google-client-id')?.value||'').trim();
+                if(!clientId) return alert('Please enter your Google OAuth Web Client ID before connecting Google Drive.');
                 // CONNECT ONLY: establish/validate Drive authorization. Never create, replace,
                 // read, decrypt, reconcile, restore, or upload a business backup here.
+                const previousClientId=(localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'').trim();
+                if(previousClientId && previousClientId!==clientId){
+                    clearPersistedGoogleAccessToken();
+                    googleTokenClient=null; googleTokenClientId='';
+                    googleDriveFolderId=null; googleDriveFileId=null;
+                }
                 localStorage.setItem('MF_GOOGLE_CLIENT_ID',clientId);
                 await getGoogleToken(true);
                 googleDriveFolderId=null; googleDriveFileId=null;
@@ -10073,8 +10076,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             // mobile Chrome while WebCrypto is deriving/unwrapping the device key.
             const modal=document.getElementById('modal-cloud');
             if(modal) modal.classList.add('active');
-            const savedId=localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'';
-            const input=document.getElementById('google-client-id'); if(input) input.value=savedId;
+            // Keep the OAuth Web Client ID as protected configuration for token
+            // restoration, but do not silently populate the connection field. A new or
+            // reconnected Drive session must explicitly supply the Web Client ID here.
+            const input=document.getElementById('google-client-id'); if(input) input.value='';
             mfRefreshDriveBackupUi();
             const fbCfg=document.getElementById('firebase-config-input'); if(fbCfg) fbCfg.value=localStorage.getItem('MF_FIREBASE_CONFIG')||'';
             const fbCode=document.getElementById('firebase-sync-code'); if(fbCode) fbCode.value=localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'';
