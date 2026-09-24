@@ -783,6 +783,11 @@
 .mf-qa-result .ok{color:#34d399;font-weight:800;}.mf-qa-result .bad{color:#f87171;font-weight:800;}.mf-qa-result .warn{color:#fbbf24;font-weight:800;}
 html.mf-qa-preview .top-header,html.mf-qa-preview .main-wrap{pointer-events:none;}
 html.mf-qa-preview #app-lock-overlay{display:none!important;}
+#app-lock-overlay{position:fixed;inset:0;z-index:2147483000;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(2,8,18,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+#app-lock-overlay .app-lock-card{width:min(420px,94vw);padding:22px;border:1px solid rgba(96,165,250,.28);border-radius:18px;background:linear-gradient(180deg,#101d2f,#091525);box-shadow:0 24px 70px rgba(0,0,0,.45);color:#f4f7fb;text-align:center;}
+#app-lock-overlay .app-lock-input{width:100%;box-sizing:border-box;padding:12px 13px;border-radius:10px;background:rgba(8,20,34,.9);border:1px solid rgba(148,163,184,.22);color:#fff;font-size:1rem;letter-spacing:.18em;text-align:center;-webkit-text-security:disc;text-security:disc;}
+#app-lock-overlay .app-lock-input:focus{outline:none;border-color:rgba(47,124,246,.8);box-shadow:0 0 0 3px rgba(47,124,246,.12);}
+@media(max-width:560px){#app-lock-overlay{padding:14px;}#app-lock-overlay .app-lock-card{padding:18px;border-radius:15px;}#app-lock-overlay .app-lock-input{font-size:.95rem;}}
 @media(max-width:760px){.mf-advanced-tool-grid{grid-template-columns:1fr;}.mf-audit-summary{grid-template-columns:1fr 1fr;}.mf-audit-row{grid-template-columns:68px 76px 1fr;}.mf-audit-row>div:last-child{grid-column:1/-1;text-align:right;}.mf-version-row{grid-template-columns:1fr;}.mf-version-actions{justify-content:flex-start;}.mf-qa-preview-wrap{padding:5px;}}
 </style>
 
@@ -1098,6 +1103,17 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 </style>
 </head>
 <body>
+<div id="app-lock-overlay" aria-modal="true" role="dialog" aria-label="App Lock">
+  <div class="app-lock-card">
+    <div style="font-size:2rem;color:#60a5fa;margin-bottom:7px;"><i class="fa-solid fa-shield-halved"></i></div>
+    <div style="font-size:1.05rem;font-weight:800;margin-bottom:5px;">Amara Micro Service Foundation</div>
+    <div style="font-size:.76rem;color:#94a3b8;line-height:1.45;margin-bottom:15px;">App Lock is active on this device. Enter your 4–8 digit PIN to continue.</div>
+    <input id="app-lock-input" class="app-lock-input" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" aria-label="App Lock PIN" placeholder="Enter PIN">
+    <div id="app-lock-error" style="min-height:18px;margin-top:8px;color:#f87171;font-size:.72rem;font-weight:700;"></div>
+    <button type="button" class="btn-header btn-blue" style="width:100%;justify-content:center;margin-top:4px;" onclick="attemptAppUnlock()"><i class="fa-solid fa-unlock-keyhole"></i> Unlock App</button>
+    <button type="button" class="btn-header" style="width:100%;justify-content:center;margin-top:7px;background:#172235;color:#cbd5e1;border:1px solid rgba(148,163,184,.16);" onclick="startForgotPinFlow()"><i class="fa-solid fa-key"></i> Forgot PIN</button>
+  </div>
+</div>
 
     <!-- Header -->
     <div class="top-header">
@@ -2657,14 +2673,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, host this app on your HTTPS domain.</div>
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required to connect, backup/restore)</label>
                 <input type="text" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for encrypted backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;-webkit-text-security:disc;text-security:disc;" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-dashlane-ignore="true" data-form-type="other" oninput="onCloudPinInputChange()">
-                <label style="display:flex;align-items:center;gap:6px;font-size:.66rem;color:#94a3b8;margin-top:7px;cursor:pointer;">
-                    <input type="checkbox" id="cloud-pin-remember" onchange="onCloudPinRememberChange()" style="accent-color:#22c55e;"> Keep PIN active on this device (encrypted storage; raw PIN is never stored)
+                <label style="display:flex;align-items:center;gap:6px;font-size:.66rem;color:#94a3b8;margin-top:7px;cursor:default;">
+                    <input type="checkbox" id="cloud-pin-remember" checked disabled style="accent-color:#22c55e;"> Keep PIN active on this device (encrypted storage; raw PIN is never stored)
                 </label>
                 <div style="display:flex;gap:7px;margin-top:7px;">
                     <button type="button" class="btn-header btn-blue" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;" onclick="saveCloudPinNow()"><i class="fa-solid fa-floppy-disk"></i> Activate PIN</button>
                     <button type="button" class="btn-header" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;background:#3f1d2e;color:#fb7185;border:1px solid rgba(251,113,133,.25);" onclick="resetCloudPin()"><i class="fa-solid fa-rotate-left"></i> Reset PIN</button>
                 </div>
-                <div style="font-size:.64rem;color:#94a3b8;margin-top:5px;line-height:1.35;">When set, the database sent to Google Drive is AES-GCM encrypted in the browser. Google Drive connection is allowed only after Firebase sign-in and an active Cloud Encryption PIN are verified. Keep this PIN safe; without it, an encrypted cloud backup cannot be restored. <b>The PIN is kept active on this device using encrypted device storage; the raw PIN is never saved to browser storage.</b> <b>Reset PIN</b> clears it from the current session — do this if you're changing the PIN or using a shared device. If the box is ever empty during a sync, this app will now warn you instead of silently uploading an unencrypted backup.</div>
+                <div style="font-size:.64rem;color:#94a3b8;margin-top:5px;line-height:1.35;">When set, the database sent to Google Drive is AES-GCM encrypted in the browser. Google Drive connection is allowed only after Firebase sign-in and an active Cloud Encryption PIN are verified. Keep this PIN safe; without it, an encrypted cloud backup cannot be restored. <b>The PIN is kept active on this device using encrypted device storage; the raw PIN is never saved to browser storage.</b> <b>Reset PIN</b> is the explicit removal action — use it only if you're changing the PIN or using a shared device. If the box is ever empty during a sync, this app will now warn you instead of silently uploading an unencrypted backup.</div>
             </div>
 
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
@@ -4466,14 +4482,20 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if (np !== cp) { alert('PIN and Confirm PIN do not match.'); return; }
             const cur = localStorage.getItem('MF_APP_PIN_HASH');
             const doSet = async () => {
-                mfHashPin(np).then(async h => {
+                try{
+                    const h=await mfHashPin(np);
                     localStorage.setItem('MF_APP_PIN_HASH', h);
                     mfAppUnlockedThisSession = true;
                     const currentCloudPin = getCloudPin();
-                    if(currentCloudPin) await persistCloudPinWrapped(currentCloudPin);
-                    alert('App Lock PIN saved. The Cloud Encryption PIN will also be restored automatically on this device without storing it in plain text.');
+                    if(currentCloudPin){
+                        try{ await persistCloudPinWrapped(currentCloudPin); }
+                        catch(e){ console.warn('Cloud PIN persistence during App Lock save skipped:',e); }
+                    }
                     renderAppLockSection();
-                });
+                }catch(e){
+                    console.error('App Lock PIN save failed:',e);
+                    alert('App Lock PIN could not be saved. No security setting was changed. Please try again.');
+                }
             };
             if (cur) {
                 const oldPin = prompt('Enter your CURRENT PIN to confirm this change:');
@@ -4507,8 +4529,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 wrap.innerHTML = `
                     <div style="font-size:.74rem;color:#34d399;font-weight:700;margin-bottom:8px;"><i class="fa-solid fa-lock"></i> App Lock is ON — a PIN is required to open this app.</div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-                        <input type="text" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
-                        <input type="text" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                        <input type="password" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                        <input type="password" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px;">
                         <button class="btn-header btn-blue" style="justify-content:center;" onclick="setAppLockPin()"><i class="fa-solid fa-rotate"></i> Change PIN</button>
@@ -4518,8 +4540,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 wrap.innerHTML = `
                     <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;">No lock is set — anyone with this link can currently open the app. Set a PIN so it's required every time the app is opened.</div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-                        <input type="text" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
-                        <input type="text" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                        <input type="password" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                        <input type="password" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
                     </div>
                     <button class="btn-header btn-green" style="width:100%;justify-content:center;margin-top:7px;" onclick="setAppLockPin()"><i class="fa-solid fa-lock"></i> Set PIN</button>`;
             }
@@ -9601,7 +9623,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         async function onCloudPinRememberChange(){
             const cb=document.getElementById('cloud-pin-remember');
-            if(cb?.checked) saveCloudPinNow(); else resetCloudPin();
+            if(cb) cb.checked=true;
+            // Persistence is controlled by Activate PIN / Reset PIN, never by an accidental checkbox click.
         }
         // SECURITY RULE: merely typing text into the PIN field NEVER activates the
         // Cloud Encryption PIN. Only the explicit "Activate PIN" action may do that.
@@ -9613,31 +9636,22 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function onCloudPinInputChange(){
             const input=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
             const active=String(mfCloudPinMemory||'').trim();
-            if(!input){
-                if(active || mfGoogleDriveIsConfigured() || googleAccessToken){
-                    resetCloudPin();
-                }else{
-                    updateSecureCloudStatus();
+            const cb=document.getElementById('cloud-pin-remember');
+            // An already-activated Cloud Encryption PIN is persistent device security state.
+            // Typing into or clearing the visible field must NOT silently delete that state.
+            // Use the explicit Reset PIN action when the operator intentionally wants to remove it.
+            if(active){
+                if(cb) cb.checked=true;
+                if(!input || input!==active){
+                    updateSecureCloudStatus('🟢 Cloud Encryption PIN remains securely active on this device. Press Reset PIN only if you intentionally want to remove it.',false);
                 }
                 return;
             }
-            // A different value means the previously active PIN is no longer the PIN
-            // shown to the user. Invalidate the old activation immediately; the new PIN
-            // becomes active only after the user presses "Activate PIN".
-            if(active && input!==active){
-                mfCloudPinMemory='';
-                googleAccessToken=null; googleTokenExpiresAt=0; googleDriveFileId=null; googleDriveFolderId=null;
-                try{
-                    localStorage.removeItem('MF_CLOUD_PIN_WRAPPED');
-                    localStorage.removeItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY);
-                }catch(e){}
-                const cb=document.getElementById('cloud-pin-remember'); if(cb) cb.checked=false;
-                updateSecureCloudStatus('🟡 New Cloud Encryption PIN entered but not activated. Click "Activate PIN" before connecting Google Drive.',true);
+            if(!input){
+                updateSecureCloudStatus();
                 return;
             }
-            if(!active){
-                updateSecureCloudStatus('🟡 Cloud Encryption PIN entered but not active. Click "Activate PIN" before connecting Google Drive.',true);
-            }
+            updateSecureCloudStatus('🟡 Cloud Encryption PIN entered but not active. Click "Activate PIN" to save it securely on this device.',true);
         }
         async function sha256Hex(text){
             const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
