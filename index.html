@@ -2997,7 +2997,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         // ================= SECURE STORAGE FOUNDATION =================
         const MF_IDB_NAME = "AMARA_WORKFLOW_CLEAN_DB_V2_FINAL_CLEAN";
-        const MF_IDB_VERSION = 1;
+        const MF_IDB_VERSION = 2;
         const MF_IDB_STORE = "snapshots";
         const MF_IDB_HISTORY_STORE = "history";
         let mfDb = null;
@@ -3026,13 +3026,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     if(!db.objectStoreNames.contains(MF_IDB_STORE)) db.createObjectStore(MF_IDB_STORE,{keyPath:"id"});
                     if(!db.objectStoreNames.contains(MF_IDB_HISTORY_STORE)){ const hs=db.createObjectStore(MF_IDB_HISTORY_STORE,{keyPath:"id"}); hs.createIndex("createdAt","createdAt",{unique:false}); }
                     // Scalable entity stores: the legacy snapshot/history stores remain untouched.
-                    const mk=(name,opts)=>{ if(!db.objectStoreNames.contains(name)) return db.createObjectStore(name,opts||{keyPath:"id"}); return null; };
+                    const mk=(name,opts)=>{ if(!db.objectStoreNames.contains(name)) return db.createObjectStore(name,opts||{keyPath:"id"}); return req.transaction.objectStore(name); };
+                    // Schema v2 is an additive repair for installations that already had the
+                    // scalable stores at v1 but missed one or more indexes. Existing records are
+                    // preserved; only the IndexedDB schema is completed.
                     const loans=mk('scalable_loans',{keyPath:'id'}); if(loans && !loans.indexNames.contains('product')) loans.createIndex('product','product',{unique:false}); if(loans && !loans.indexNames.contains('scaleStatus')) loans.createIndex('scaleStatus','_scaleStatus',{unique:false});
                     const payments=mk('scalable_payments',{keyPath:'id'}); if(payments && !payments.indexNames.contains('loanId')) payments.createIndex('loanId','loanId',{unique:false}); if(payments && !payments.indexNames.contains('date')) payments.createIndex('date','date',{unique:false});
-                    const products=mk('scalable_products',{keyPath:'id'});
-                    const staff=mk('scalable_staff',{keyPath:'id'});
-                    const expenses=mk('scalable_expenses',{keyPath:'id'});
-                    const borrowings=mk('scalable_borrowings',{keyPath:'id'});
+                    mk('scalable_products',{keyPath:'id'});
+                    mk('scalable_staff',{keyPath:'id'});
+                    mk('scalable_expenses',{keyPath:'id'});
+                    mk('scalable_borrowings',{keyPath:'id'});
                     const search=mk('scalable_search',{keyPath:'id'}); if(search && !search.indexNames.contains('token')) search.createIndex('token','token',{unique:false}); if(search && !search.indexNames.contains('loanId')) search.createIndex('loanId','loanId',{unique:false});
                     const queue=mk('scalable_sync_queue',{keyPath:'id'}); if(queue && !queue.indexNames.contains('status')) queue.createIndex('status','status',{unique:false});
                     const due=mk('scalable_due_index',{keyPath:'id'});
@@ -3040,7 +3043,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     if(due && !due.indexNames.contains('status')) due.createIndex('status','status',{unique:false});
                     if(due && !due.indexNames.contains('product')) due.createIndex('product','product',{unique:false});
                     if(due && !due.indexNames.contains('collectorId')) due.createIndex('collectorId','collectorId',{unique:false});
-                    const aggregates=mk('scalable_aggregates',{keyPath:'id'});
+                    mk('scalable_aggregates',{keyPath:'id'});
                     mk('scalable_meta',{keyPath:'id'});
                 };
                 req.onsuccess=()=>{ mfDb=req.result; resolve(mfDb); };
@@ -9216,10 +9219,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             try{
                 const result=mfScaleReady?await mfScaleLoanMasterPageData({query:q,product,status,page:mfScaleLoanMasterPage,pageSize:MF_SCALE.pageSize}):null;
                 const filtered=result?result.rows:state.loans.filter(loan=>{const prod=state.products[loan.product]||{};const st=mfLoanOperationalStatus(loan);const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.address,loan.product,prod.name].filter(Boolean).join(' ').toLowerCase();return(!q||hay.includes(q.toLowerCase()))&&(product==='ALL'||loan.product===product)&&(status==='ALL'||st===status);}).slice(mfScaleLoanMasterPage*MF_SCALE.pageSize,(mfScaleLoanMasterPage+1)*MF_SCALE.pageSize);
-                const total=result?.total;
-                const hasNext=result?result.hasNext:(mfScaleLoanMasterPage+1)*MF_SCALE.pageSize<state.loans.length;
+                // Normalize the scalable result boundary. Filtered pages intentionally return
+                // total=null, while older mirrors can briefly return an undefined total during
+                // bootstrap. Never let a presentation counter throw a TypeError.
+                const total=(result && Number.isFinite(Number(result.total)))?Number(result.total):null;
+                const hasNext=result?!!result.hasNext:(mfScaleLoanMasterPage+1)*MF_SCALE.pageSize<state.loans.length;
                 const count=document.getElementById('loan-master-result-count');
-                if(count) count.innerText=total!==null?`Showing ${total?mfScaleLoanMasterPage*MF_SCALE.pageSize+1:0}-${Math.min((mfScaleLoanMasterPage+1)*MF_SCALE.pageSize,total)} of ${total.toLocaleString('en-IN')} matching / ${state.loans.length.toLocaleString('en-IN')} total loan accounts`:`Showing page ${mfScaleLoanMasterPage+1} · ${result?.rows?.length||0} records loaded / ${state.loans.length.toLocaleString('en-IN')} total loan accounts`;
+                if(count){
+                    if(total!==null) count.innerText=`Showing ${total?mfScaleLoanMasterPage*MF_SCALE.pageSize+1:0}-${Math.min((mfScaleLoanMasterPage+1)*MF_SCALE.pageSize,total)} of ${total.toLocaleString('en-IN')} matching / ${state.loans.length.toLocaleString('en-IN')} total loan accounts`;
+                    else count.innerText=`Showing page ${mfScaleLoanMasterPage+1} · ${result?.rows?.length||0} records loaded / ${state.loans.length.toLocaleString('en-IN')} total loan accounts`;
+                }
                 const nav=document.getElementById('loan-master-pagination');
                 if(nav) nav.innerHTML=(mfScaleLoanMasterPage>0||hasNext)?`<button type="button" class="btn-header btn-blue" ${mfScaleLoanMasterPage===0?'disabled':''} onclick="mfLoanMasterPageChange(-1)"><i class="fa-solid fa-chevron-left"></i> Previous</button><span style="font-size:.7rem;color:#94a3b8;font-weight:800;">Page ${mfScaleLoanMasterPage+1}${hasNext?' +':''}</span><button type="button" class="btn-header btn-blue" ${hasNext?'':'disabled'} onclick="mfLoanMasterPageChange(1)">Next <i class="fa-solid fa-chevron-right"></i></button>`:'';
                 if(!result && !filtered.length){tbody.innerHTML='<tr><td colspan="12" style="padding:25px;text-align:center;color:#64748b;">No loan accounts match the selected filters.</td></tr>';return;}
@@ -9233,7 +9242,37 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     const st=mfLoanOperationalStatus(loan); const badge=st==='FORECLOSED'?'<span class="badge-foreclosed">FORECLOSED</span>':st==='SETTLED'?'<span class="badge-paid">SETTLED</span>':st==='CLOSED'?'<span class="badge-paid">CLOSED</span>':st==='OVERDUE'?'<span class="badge-overdue">OVERDUE</span>':st==='DUE'?'<span class="badge-pending">DUE TODAY</span>':'<span class="badge-pending">ACTIVE</span>';
                     tbody.innerHTML+=`<tr onclick="openLoanMasterLoan('${recoverySafeId(loan.id)}')" style="cursor:pointer;" title="Open loan statement"><td><b style="color:#60a5fa;">${financeEsc(loan.id)}</b></td><td><b style="color:#fff;">${financeEsc(loan.name)}</b></td><td>${financeEsc(loan.phone||'-')}${loan.phone2?`<br><span style="font-size:.62rem;color:#60a5fa;">${financeEsc(loan.phone2)}</span>`:''}</td><td><span class="mf-loan-type-badge">${mfLoanTypeLabel(loan)}</span></td><td>${financeEsc(prod.name)}</td><td>${formatToIndianDate(loan.disbursalDate)}</td><td>₹${Number(prod.amount||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${Number(prod.emi||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${paidPrincipal.toLocaleString('en-IN')}</td><td style="color:#fbbf24;font-weight:700;">₹${realizedProfit.toLocaleString('en-IN')}</td><td style="color:${pending<=0?'#34d399':'#f87171'};font-weight:700;">₹${pending.toLocaleString('en-IN')}</td><td>${badge}</td></tr>`;
                 });
-            }catch(e){tbody.innerHTML=`<tr><td colspan="12" style="padding:20px;text-align:center;color:#f87171;">Scalable loan index could not be loaded. Legacy view retained: ${financeEsc(e.message)}</td></tr>`;}
+            }catch(e){
+                // The scalable index is an optimization, never the source of truth. If an
+                // IndexedDB/index migration is interrupted, immediately render the authoritative
+                // state.loans collection instead of exposing technical errors to the operator.
+                console.warn('Loan Master scalable index unavailable; using authoritative legacy collection:',e);
+                try{
+                    const legacy=state.loans.filter(loan=>{
+                        const prod=state.products[loan.product]||{}; const st=mfLoanOperationalStatus(loan);
+                        const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.address,loan.product,prod.name].filter(Boolean).join(' ').toLowerCase();
+                        return(!q||hay.includes(q.toLowerCase()))&&(product==='ALL'||loan.product===product)&&(status==='ALL'||st===status);
+                    });
+                    const start=mfScaleLoanMasterPage*MF_SCALE.pageSize, pageRows=legacy.slice(start,start+MF_SCALE.pageSize);
+                    const count=document.getElementById('loan-master-result-count');
+                    if(count) count.innerText=`Showing ${legacy.length?start+1:0}-${Math.min(start+pageRows.length,legacy.length)} of ${legacy.length.toLocaleString('en-IN')} matching / ${state.loans.length.toLocaleString('en-IN')} total loan accounts`;
+                    const nav=document.getElementById('loan-master-pagination');
+                    const hasNext=start+MF_SCALE.pageSize<legacy.length;
+                    if(nav) nav.innerHTML=(mfScaleLoanMasterPage>0||hasNext)?`<button type="button" class="btn-header btn-blue" ${mfScaleLoanMasterPage===0?'disabled':''} onclick="mfLoanMasterPageChange(-1)"><i class="fa-solid fa-chevron-left"></i> Previous</button><span style="font-size:.7rem;color:#94a3b8;font-weight:800;">Page ${mfScaleLoanMasterPage+1}${hasNext?' +':''}</span><button type="button" class="btn-header btn-blue" ${hasNext?'':'disabled'} onclick="mfLoanMasterPageChange(1)">Next <i class="fa-solid fa-chevron-right"></i></button>`:'';
+                    if(!pageRows.length){tbody.innerHTML='<tr><td colspan="12" style="padding:25px;text-align:center;color:#64748b;">No loan accounts match the selected filters.</td></tr>';return;}
+                    tbody.innerHTML=pageRows.map(loan=>{
+                        const prod=state.products[loan.product]||{name:'Custom',amount:0,fileCharge:0,emi:0,tenure:0};
+                        const paidPrincipal=(loan.payments||[]).reduce((s,p)=>s+(Number(p.principal)||0),0)+(loan.foreclosed?(loan.foreclosureData?.principalPaid||0)+Number(loan.foreclosureData?.partialAmountAlreadyCollected||0):0);
+                        const realizedProfit=Number(prod.fileCharge)||0+(loan.payments||[]).reduce((s,p)=>s+(Number(p.interest)||0)+(Number(p.penalty)||0),0)+(loan.foreclosed?(loan.foreclosureData?.feeAmount||0):0);
+                        const pending=Math.max(0,Number(getLoanPending(loan))||0); const st=mfLoanOperationalStatus(loan);
+                        const badge=st==='FORECLOSED'?'<span class="badge-foreclosed">FORECLOSED</span>':st==='SETTLED'?'<span class="badge-paid">SETTLED</span>':st==='CLOSED'?'<span class="badge-paid">CLOSED</span>':st==='OVERDUE'?'<span class="badge-overdue">OVERDUE</span>':st==='DUE'?'<span class="badge-pending">DUE TODAY</span>':'<span class="badge-pending">ACTIVE</span>';
+                        return `<tr onclick="openLoanMasterLoan('${recoverySafeId(loan.id)}')" style="cursor:pointer;" title="Open loan statement"><td><b style="color:#60a5fa;">${financeEsc(loan.id)}</b></td><td><b style="color:#fff;">${financeEsc(loan.name)}</b></td><td>${financeEsc(loan.phone||'-')}${loan.phone2?`<br><span style="font-size:.62rem;color:#60a5fa;">${financeEsc(loan.phone2)}</span>`:''}</td><td><span class="mf-loan-type-badge">${mfLoanTypeLabel(loan)}</span></td><td>${financeEsc(prod.name)}</td><td>${formatToIndianDate(loan.disbursalDate)}</td><td>₹${Number(prod.amount||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${Number(prod.emi||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${paidPrincipal.toLocaleString('en-IN')}</td><td style="color:#fbbf24;font-weight:700;">₹${realizedProfit.toLocaleString('en-IN')}</td><td style="color:${pending<=0?'#34d399':'#f87171'};font-weight:700;">₹${pending.toLocaleString('en-IN')}</td><td>${badge}</td></tr>`;
+                    }).join('');
+                }catch(fallbackError){
+                    console.error('Loan Master fallback failed:',fallbackError);
+                    tbody.innerHTML='<tr><td colspan="12" style="padding:25px;text-align:center;color:#f87171;">Loan Master is temporarily unavailable. Your loan data is preserved. Please refresh once.</td></tr>';
+                }
+            }
         }
         function mfLoanMasterPageChange(delta){
             const next=Math.max(0,mfScaleLoanMasterPage+(Number(delta)||0));
