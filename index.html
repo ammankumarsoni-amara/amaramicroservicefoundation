@@ -971,6 +971,40 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 </style>
 
 
+<style id="mf-loan-master-advanced-responsive-v2">
+.loan-master-filter-grid{display:grid;grid-template-columns:minmax(280px,1.7fr) minmax(150px,1fr) minmax(135px,.9fr) minmax(130px,.85fr) minmax(145px,.95fr) auto;gap:7px;align-items:center;}
+.loan-master-search-wrap{position:relative;min-width:0;}
+.loan-master-search-wrap>i{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#7dd3fc;font-size:.78rem;pointer-events:none;}
+.loan-master-search-wrap input,.loan-master-filter-grid select{box-sizing:border-box;width:100%;height:40px;padding:0 10px;border-radius:9px;background:rgba(255,255,255,.055);border:1px solid var(--border-subtle);color:#fff;font-weight:700;outline:none;}
+.loan-master-search-wrap input{padding-left:30px;}
+.loan-master-filter-grid select{cursor:pointer;}
+.loan-master-filter-grid select option{background:#0b1730;color:#fff;}
+.loan-master-reset{height:40px;white-space:nowrap;}
+.loan-master-filter-hint{display:flex;align-items:center;gap:7px;margin-top:7px;color:#64748b;font-size:.62rem;font-weight:700;line-height:1.35;}
+.loan-master-filter-hint i{color:#60a5fa;flex:0 0 auto;}
+.loan-master-table-wrap{width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;border-radius:10px;}
+.loan-master-table{width:100%;min-width:1180px;table-layout:fixed;border-collapse:separate;border-spacing:0;}
+.loan-master-table th,.loan-master-table td{box-sizing:border-box;vertical-align:middle;text-align:left;white-space:nowrap;word-break:normal;overflow-wrap:normal;}
+.loan-master-table th{height:46px;padding:8px 9px;font-size:.64rem;line-height:1.15;white-space:normal;}
+.loan-master-table td{padding:9px;font-size:.68rem;line-height:1.25;}
+.loan-master-table th:nth-child(1),.loan-master-table td:nth-child(1){width:7%;}
+.loan-master-table th:nth-child(2),.loan-master-table td:nth-child(2){width:13%;white-space:normal;}
+.loan-master-table th:nth-child(3),.loan-master-table td:nth-child(3){width:9%;}
+.loan-master-table th:nth-child(4),.loan-master-table td:nth-child(4){width:8%;text-align:center;}
+.loan-master-table th:nth-child(5),.loan-master-table td:nth-child(5){width:12%;white-space:normal;}
+.loan-master-table th:nth-child(6),.loan-master-table td:nth-child(6){width:9%;}
+.loan-master-table th:nth-child(7),.loan-master-table td:nth-child(7){width:8%;text-align:right;}
+.loan-master-table th:nth-child(8),.loan-master-table td:nth-child(8){width:7%;text-align:right;}
+.loan-master-table th:nth-child(9),.loan-master-table td:nth-child(9){width:9%;text-align:right;}
+.loan-master-table th:nth-child(10),.loan-master-table td:nth-child(10){width:8%;text-align:right;}
+.loan-master-table th:nth-child(11),.loan-master-table td:nth-child(11){width:9%;text-align:right;}
+.loan-master-table th:nth-child(12),.loan-master-table td:nth-child(12){width:8%;text-align:center;}
+.loan-master-table td:nth-child(7),.loan-master-table td:nth-child(8),.loan-master-table td:nth-child(9),.loan-master-table td:nth-child(10),.loan-master-table td:nth-child(11){font-variant-numeric:tabular-nums;}
+.loan-master-table .mf-loan-type-badge{display:inline-flex;align-items:center;justify-content:center;max-width:100%;white-space:nowrap;}
+@media(max-width:1050px){.loan-master-filter-grid{grid-template-columns:repeat(3,minmax(0,1fr));}.loan-master-search-wrap{grid-column:span 3;}}
+@media(max-width:700px){.loan-master-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}.loan-master-search-wrap{grid-column:span 2;}.loan-master-filter-grid select,.loan-master-reset{height:42px;font-size:.68rem;min-width:0;}.loan-master-search-wrap input{height:42px;font-size:.72rem;}.loan-master-filter-hint{font-size:.58rem;}.loan-master-table{min-width:1180px;}.loan-master-table th{font-size:.61rem;padding:8px;}.loan-master-table td{font-size:.65rem;padding:8px;}}
+@media(max-width:390px){.loan-master-filter-grid{grid-template-columns:1fr;}.loan-master-search-wrap{grid-column:span 1;}}
+</style>
 <style id="mf-v4-final-contact-wrap">
 .finance-section td{overflow-wrap:anywhere;word-break:normal;}
 .finance-pill{white-space:normal;overflow-wrap:anywhere;word-break:normal;}
@@ -1384,37 +1418,33 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         <!-- 6. ALL LOANS MASTER TAB -->
         <div id="tab-all" style="display: none;">
             <div id="loan-master-summary" style="margin-bottom:12px;"></div>
-            <div class="client-card" style="margin-bottom:12px;">
-                <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
-                    <div style="position:relative;flex:1;min-width:220px;">
-                        <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:10px;top:11px;color:#64748b;font-size:.78rem;"></i>
-                        <input id="loan-master-search" oninput="mfScaleLoanMasterPage=0;renderAllLoansTable()" placeholder="Search customer, phone, Loan ID or product..." style="width:100%;padding:9px 10px 9px 30px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;font-weight:600;">
+            <div class="client-card loan-master-controls" style="margin-bottom:12px;">
+                <div class="loan-master-filter-grid">
+                    <div class="loan-master-search-wrap">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input id="loan-master-search" oninput="mfScaleLoanMasterPage=0;renderAllLoansTable()" placeholder="Search customer, mobile, Loan ID, guarantor or product..." autocomplete="off">
                     </div>
-                    <select id="loan-master-product" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;font-weight:700;min-width:150px;"><option value="ALL">All Products</option></select>
-                    <select id="loan-master-status" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()" style="padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;font-weight:700;min-width:125px;"><option value="ALL">All Status</option><option value="ACTIVE">Active</option><option value="DUE">Due Today</option><option value="OVERDUE">Overdue</option><option value="CLOSED">Closed</option><option value="SETTLED">Settled</option><option value="FORECLOSED">Foreclosed</option></select>
-                    <button class="btn-header btn-blue" onclick="resetLoanMasterFilters()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+                    <select id="loan-master-product" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()"><option value="ALL">All Products</option></select>
+                    <select id="loan-master-type" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()">
+                        <option value="ALL">All Loan Types</option><option value="NEW">New Loan</option><option value="TOP_UP">Top-up</option><option value="RENEWAL">Renewal</option>
+                    </select>
+                    <select id="loan-master-status" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()">
+                        <option value="ALL">All Status</option><option value="ACTIVE">Active</option><option value="DUE">Due Today</option><option value="OVERDUE">Overdue</option><option value="CLOSED">Closed</option><option value="SETTLED">Settled</option><option value="FORECLOSED">Foreclosed</option>
+                    </select>
+                    <select id="loan-master-period" onchange="mfScaleLoanMasterPage=0;renderAllLoansTable()">
+                        <option value="ALL">All Disbursal Dates</option><option value="30D">Last 30 Days</option><option value="MONTH">This Month</option><option value="QUARTER">This Quarter</option><option value="YEAR">This Year</option>
+                    </select>
+                    <button type="button" class="btn-header btn-blue loan-master-reset" onclick="resetLoanMasterFilters()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
                 </div>
-                <div id="loan-master-result-count" style="font-size:.7rem;color:#64748b;margin-top:7px;"></div>
+                <div class="loan-master-filter-hint"><i class="fa-solid fa-circle-info"></i><span>Search and filters work together. Results are paginated so a large portfolio never becomes one long sheet.</span></div>
+                <div id="loan-master-result-count" style="font-size:.7rem;color:#94a3b8;margin-top:7px;"></div>
                 <div id="loan-master-pagination" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;"></div>
             </div>
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Loan ID</th>
-                            <th>Customer Name</th>
-                            <th>Phone</th>
-                            <th>Loan Type</th>
-                            <th>Plan</th>
-                            <th>Disbursal Date</th>
-                            <th>Loan Amount</th>
-                            <th>EMI (₹)</th>
-                            <th>Principal Paid</th>
-                            <th>Net Profit</th>
-                            <th>Outstanding</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
+            <div class="table-wrap loan-master-table-wrap">
+                <table class="loan-master-table">
+                    <thead><tr>
+                        <th>Loan ID</th><th>Customer</th><th>Phone</th><th>Type</th><th>Plan</th><th>Disbursed</th><th>Loan Amount</th><th>EMI</th><th>Principal Paid</th><th>Net Profit</th><th>Outstanding</th><th>Status</th>
+                    </tr></thead>
                     <tbody id="all-loans-tbody"></tbody>
                 </table>
             </div>
@@ -3135,7 +3165,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         // logic and legacy snapshot remain authoritative during the compatibility phase.
         // Entity-level IndexedDB stores and bounded structured Firebase mirrors are maintained
         // without replacing the proven V15 business engine until a verified migration is ready.
-        const MF_SCALE = Object.freeze({schema:'AMARA-SCALABLE-1',pageSize:50,recoveryPageSize:50,maxRecoveryRender:100});
+        const MF_SCALE = Object.freeze({schema:'AMARA-SCALABLE-1',pageSize:15,recoveryPageSize:50,maxRecoveryRender:100});
         let mfScaleReady=false, mfScaleSearchReady=false, mfScaleBuildBusy=false;
         let mfScaleRecoveryPage=0, mfScaleLoanMasterPage=0;
         let mfScaleRecoveryTimer=0, mfScaleMirrorTimer=0, mfScaleLastMirrorAt=0;
@@ -3242,7 +3272,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         function mfScaleLoanSearchText(loan){
             const p=state.products?.[loan?.product]||{};
-            return [loan?.id,loan?.name,loan?.phone,loan?.phone2,loan?.guarantorName,loan?.guarantorPhone,loan?.guarantorPhone2,loan?.guarantorSecondaryPhone,loan?.husbandName,loan?.husbandPhone,loan?.secondaryName,loan?.address,loan?.collectorName,loan?.product,p?.name].filter(v=>v!==undefined&&v!==null).join(' ');
+            return [loan?.id,loan?.name,loan?.phone,loan?.phone2,loan?.guarantorName,loan?.guarantorPhone,loan?.guarantorPhone2,loan?.guarantorSecondaryPhone,loan?.husbandName,loan?.husbandPhone,loan?.secondaryName,loan?.address,loan?.collectorName,loan?.product,p?.name,loan?.loanType,mfLoanTypeLabel(loan)].filter(v=>v!==undefined&&v!==null).join(' ');
         }
         function mfScaleTx(storeNames,mode,fn){
             return openMfDb().then(db=>new Promise((resolve,reject)=>{
@@ -3493,57 +3523,49 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             return {rows,total,hasNext};
         }
 
-        async function mfScaleLoanMasterPageData({query='',product='ALL',status='ALL',page=0,pageSize=50}={}){
+        function mfLoanMasterDateMatches(loan, period){
+            if(period==='ALL') return true;
+            const raw=String(loan?.disbursalDate||'');
+            if(!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false;
+            const d=new Date(raw+'T00:00:00'); if(Number.isNaN(d.getTime())) return false;
+            const now=new Date(); now.setHours(0,0,0,0);
+            if(period==='30D'){ const from=new Date(now); from.setDate(from.getDate()-29); return d>=from&&d<=now; }
+            if(period==='MONTH') return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();
+            if(period==='QUARTER'){ const q=Math.floor(now.getMonth()/3); return d.getFullYear()===now.getFullYear()&&Math.floor(d.getMonth()/3)===q; }
+            if(period==='YEAR') return d.getFullYear()===now.getFullYear();
+            return true;
+        }
+        function mfLoanMasterTypeMatches(loan, loanType){
+            return loanType==='ALL' || String(loan?.loanType||'NEW').toUpperCase()===String(loanType).toUpperCase();
+        }
+        async function mfScaleLoanMasterPageData({query='',product='ALL',loanType='ALL',status='ALL',period='ALL',page=0,pageSize=15}={}){
             const db=await openMfDb();
             const skip=Math.max(0,Number(page)||0)*pageSize;
-            const tokens=mfScaleTokens(query);
-            const rows=[]; let matched=0; let hasNext=false; let total=null;
-            const loanMatches=async id=>{
-                const rec=await new Promise(resolve=>{const tx=db.transaction('scalable_loans','readonly');const r=tx.objectStore('scalable_loans').get(String(id));r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>resolve(null);});
-                if(!rec) return null;
-                if(product!=='ALL'&&String(rec.product)!==String(product)) return null;
-                const recStatus=String(rec._scaleStatus||'ACTIVE'); if(status!=='ALL'&&recStatus!==String(status)) return null;
-                if(tokens.length>1){
-                    for(const token of tokens.slice(1)){
-                        const exists=await new Promise(resolve=>{const tx=db.transaction('scalable_search','readonly');const r=tx.objectStore('scalable_search').get(token+'|'+String(id));r.onsuccess=()=>resolve(!!r.result);r.onerror=()=>resolve(false);});
-                        if(!exists) return null;
-                    }
-                }
-                return rec;
-            };
-            await new Promise(resolve=>{
-                const tx=db.transaction(tokens.length?'scalable_search':'scalable_loans','readonly');
-                const st=tx.objectStore(tokens.length?'scalable_search':'scalable_loans');
-                let req;
-                if(tokens.length){
-                    const idx=st.index('token'); req=idx.openCursor(IDBKeyRange.only(tokens[0]));
-                }else if(product!=='ALL'){
-                    req=st.index('product').openCursor(IDBKeyRange.only(product));
-                }else if(status!=='ALL'){
-                    req=st.index('scaleStatus').openCursor(IDBKeyRange.only(status));
-                }else{
-                    req=st.openCursor();
-                }
-                let seen=0;
-                req.onsuccess=async e=>{
-                    const c=e.target.result;
-                    if(!c){resolve();return;}
-                    const id=tokens.length?String(c.value.loanId):String(c.value.id);
-                    const rec=await loanMatches(id);
-                    if(rec){
-                        if(seen<skip) seen++;
-                        else if(rows.length<pageSize+1) rows.push(rec);
-                        else {hasNext=true;resolve();return;}
-                    }
-                    c.continue();
-                };
-                req.onerror=()=>resolve();
+            const needle=normalizeRecoverySearchText(query||'');
+            const allRecords=await new Promise((resolve,reject)=>{
+                const tx=db.transaction('scalable_loans','readonly');
+                const req=tx.objectStore('scalable_loans').getAll();
+                req.onsuccess=()=>resolve(req.result||[]);
+                req.onerror=()=>reject(req.error||new Error('Loan Master index read failed'));
             });
-            if(rows.length>pageSize){hasNext=true;rows.length=pageSize;}
-            if(!query&&product==='ALL'&&status==='ALL') total=await new Promise(resolve=>{const tx=db.transaction('scalable_loans','readonly');const r=tx.objectStore('scalable_loans').count();r.onsuccess=()=>resolve(Number(r.result)||0);r.onerror=()=>resolve(null);});
-            const pageIds=rows.map(r=>String(r.id));
+            const matched=allRecords.filter(rec=>{
+                if(needle && !normalizeRecoverySearchText(mfScaleLoanSearchText(rec)).includes(needle)) return false;
+                if(product!=='ALL'&&String(rec.product)!==String(product)) return false;
+                if(!mfLoanMasterTypeMatches(rec,loanType)) return false;
+                const recStatus=String(rec._scaleStatus||'ACTIVE'); if(status!=='ALL'&&recStatus!==String(status)) return false;
+                return mfLoanMasterDateMatches(rec,period);
+            });
+            matched.sort((a,b)=>{
+                const da=String(a.disbursalDate||''), dbd=String(b.disbursalDate||'');
+                return dbd.localeCompare(da)||String(b.id||'').localeCompare(String(a.id||''));
+            });
+            const total=matched.length;
+            const pageRows=matched.slice(skip,skip+pageSize);
+            const hasNext=skip+pageSize<total;
+            const pageIds=pageRows.map(r=>String(r.id));
             const hydrated=await mfScaleGetLoansByIds(pageIds,{hydratePayments:true});
-            const order=new Map(pageIds.map((id,i)=>[id,i])); hydrated.sort((a,b)=>(order.get(String(a.id))??0)-(order.get(String(b.id))??0));
+            const order=new Map(pageIds.map((id,i)=>[id,i]));
+            hydrated.sort((a,b)=>(order.get(String(a.id))??0)-(order.get(String(b.id))??0));
             return {rows:hydrated,total,hasNext};
         }
 
@@ -9196,8 +9218,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         function resetLoanMasterFilters() {
-            const q=document.getElementById('loan-master-search'), p=document.getElementById('loan-master-product'), st=document.getElementById('loan-master-status');
-            if(q) q.value=''; if(p) p.value='ALL'; if(st) st.value='ALL'; mfScaleLoanMasterPage=0; renderAllLoansTable();
+            const q=document.getElementById('loan-master-search'), p=document.getElementById('loan-master-product'), ty=document.getElementById('loan-master-type'), st=document.getElementById('loan-master-status'), per=document.getElementById('loan-master-period');
+            if(q) q.value=''; if(p) p.value='ALL'; if(ty) ty.value='ALL'; if(st) st.value='ALL'; if(per) per.value='ALL'; mfScaleLoanMasterPage=0; renderAllLoansTable();
         }
 
         function openLoanMasterLoan(id) {
@@ -9214,11 +9236,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const tbody=document.getElementById('all-loans-tbody'); if(!tbody) return;
             const q=(document.getElementById('loan-master-search')?.value||'').trim();
             const product=document.getElementById('loan-master-product')?.value||'ALL';
+            const loanType=document.getElementById('loan-master-type')?.value||'ALL';
             const status=document.getElementById('loan-master-status')?.value||'ALL';
+            const period=document.getElementById('loan-master-period')?.value||'ALL';
             tbody.innerHTML='<tr><td colspan="12" style="padding:20px;text-align:center;color:#94a3b8;">Loading scalable loan records…</td></tr>';
             try{
-                const result=mfScaleReady?await mfScaleLoanMasterPageData({query:q,product,status,page:mfScaleLoanMasterPage,pageSize:MF_SCALE.pageSize}):null;
-                const filtered=result?result.rows:state.loans.filter(loan=>{const prod=state.products[loan.product]||{};const st=mfLoanOperationalStatus(loan);const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.address,loan.product,prod.name].filter(Boolean).join(' ').toLowerCase();return(!q||hay.includes(q.toLowerCase()))&&(product==='ALL'||loan.product===product)&&(status==='ALL'||st===status);}).slice(mfScaleLoanMasterPage*MF_SCALE.pageSize,(mfScaleLoanMasterPage+1)*MF_SCALE.pageSize);
+                const result=mfScaleReady?await mfScaleLoanMasterPageData({query:q,product,loanType,status,period,page:mfScaleLoanMasterPage,pageSize:MF_SCALE.pageSize}):null;
+                const filtered=result?result.rows:state.loans.filter(loan=>{const prod=state.products[loan.product]||{};const st=mfLoanOperationalStatus(loan);const hay=mfScaleLoanSearchText(loan).toLowerCase();return(!q||hay.includes(q.toLowerCase()))&&(product==='ALL'||loan.product===product)&&mfLoanMasterTypeMatches(loan,loanType)&&(status==='ALL'||st===status)&&mfLoanMasterDateMatches(loan,period);}).slice(mfScaleLoanMasterPage*MF_SCALE.pageSize,(mfScaleLoanMasterPage+1)*MF_SCALE.pageSize);
                 // Normalize the scalable result boundary. Filtered pages intentionally return
                 // total=null, while older mirrors can briefly return an undefined total during
                 // bootstrap. Never let a presentation counter throw a TypeError.
@@ -9250,8 +9274,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 try{
                     const legacy=state.loans.filter(loan=>{
                         const prod=state.products[loan.product]||{}; const st=mfLoanOperationalStatus(loan);
-                        const hay=[loan.id,loan.name,loan.phone,loan.phone2,loan.address,loan.product,prod.name].filter(Boolean).join(' ').toLowerCase();
-                        return(!q||hay.includes(q.toLowerCase()))&&(product==='ALL'||loan.product===product)&&(status==='ALL'||st===status);
+                        const hay=mfScaleLoanSearchText(loan).toLowerCase();
+                        return(!q||hay.includes(q.toLowerCase()))&&(product==='ALL'||loan.product===product)&&mfLoanMasterTypeMatches(loan,loanType)&&(status==='ALL'||st===status)&&mfLoanMasterDateMatches(loan,period);
                     });
                     const start=mfScaleLoanMasterPage*MF_SCALE.pageSize, pageRows=legacy.slice(start,start+MF_SCALE.pageSize);
                     const count=document.getElementById('loan-master-result-count');
