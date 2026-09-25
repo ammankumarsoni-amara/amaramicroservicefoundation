@@ -1108,7 +1108,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
     <div style="font-size:2rem;color:#60a5fa;margin-bottom:7px;"><i class="fa-solid fa-shield-halved"></i></div>
     <div style="font-size:1.05rem;font-weight:800;margin-bottom:5px;">Amara Micro Service Foundation</div>
     <div style="font-size:.76rem;color:#94a3b8;line-height:1.45;margin-bottom:15px;">App Lock is active on this device. Enter your 4–8 digit PIN to continue.</div>
-    <input id="app-lock-input" class="app-lock-input" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" aria-label="App Lock PIN" placeholder="Enter PIN">
+    <input id="app-lock-input" class="app-lock-input" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="App Lock PIN" placeholder="Enter PIN">
     <div id="app-lock-error" style="min-height:18px;margin-top:8px;color:#f87171;font-size:.72rem;font-weight:700;"></div>
     <button type="button" class="btn-header btn-blue" style="width:100%;justify-content:center;margin-top:4px;" onclick="attemptAppUnlock()"><i class="fa-solid fa-unlock-keyhole"></i> Unlock App</button>
     <button type="button" class="btn-header" style="width:100%;justify-content:center;margin-top:7px;background:#172235;color:#cbd5e1;border:1px solid rgba(148,163,184,.16);" onclick="startForgotPinFlow()"><i class="fa-solid fa-key"></i> Forgot PIN</button>
@@ -2669,7 +2669,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <input type="text" id="google-client-id" placeholder="xxxx.apps.googleusercontent.com" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;margin-bottom:7px;">
                     </div>
                 </details>
-                <div style="font-size:.66rem;color:#94a3b8;margin-top:6px;line-height:1.4;">The app never asks for or stores your Gmail password. Google OAuth grants the app the limited <b>drive.file</b> Drive scope needed for its own backup files.</div>
+                <div style="font-size:.66rem;color:#94a3b8;margin-top:6px;line-height:1.4;">The app never asks for or stores your Gmail password. Google OAuth grants the app the limited <b>drive.file</b> Drive scope needed for its own backup files. The OAuth Web Client ID is required for the first setup and is securely reused from this device for later reconnects; it is never generated or bypassed by the app.</div>
                 <div class="secure-cloud-warning"><b>Important:</b> direct Google OAuth requires the HTML app to run from a secure HTTPS web origin. If you open the file directly as <b>file://</b>, host this app on your HTTPS domain.</div>
                 <label style="font-size:.72rem;color:var(--text-muted);font-weight:700;display:block;margin-top:9px;margin-bottom:4px;">Cloud Encryption PIN (required to connect, backup/restore)</label>
                 <input type="text" id="cloud-encryption-pin" inputmode="numeric" placeholder="Create a private PIN for encrypted backup" style="width:100%;padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;-webkit-text-security:disc;text-security:disc;" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-dashlane-ignore="true" data-form-type="other" oninput="onCloudPinInputChange()">
@@ -2680,7 +2680,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     <button type="button" class="btn-header btn-blue" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;" onclick="saveCloudPinNow()"><i class="fa-solid fa-floppy-disk"></i> Activate PIN</button>
                     <button type="button" class="btn-header" style="flex:1;justify-content:center;padding:7px;font-size:.7rem;background:#3f1d2e;color:#fb7185;border:1px solid rgba(251,113,133,.25);" onclick="resetCloudPin()"><i class="fa-solid fa-rotate-left"></i> Reset PIN</button>
                 </div>
-                <div style="font-size:.64rem;color:#94a3b8;margin-top:5px;line-height:1.35;">When set, the database sent to Google Drive is AES-GCM encrypted in the browser. Google Drive connection is allowed only after Firebase sign-in and an active Cloud Encryption PIN are verified. Keep this PIN safe; without it, an encrypted cloud backup cannot be restored. <b>The PIN is kept active on this device using encrypted device storage; the raw PIN is never saved to browser storage.</b> <b>Reset PIN</b> is the explicit removal action — use it only if you're changing the PIN or using a shared device. If the box is ever empty during a sync, this app will now warn you instead of silently uploading an unencrypted backup.</div>
+                <div style="font-size:.64rem;color:#94a3b8;margin-top:5px;line-height:1.35;">When set, the database sent to Google Drive is AES-GCM encrypted in the browser. Google Drive connection is allowed only after Firebase sign-in and an active Cloud Encryption PIN are verified. Keep this PIN safe; without it, an encrypted cloud backup cannot be restored. <b>The PIN is kept active on this device using encrypted device storage; the raw PIN is never saved to browser storage. Re-entering the same PIN preserves access to existing encrypted backups; changing to a different PIN creates a new encryption key for future backups, so keep the old PIN if you may need to restore older Drive backups encrypted with it.</b> <b>Reset PIN</b> is the explicit removal action — use it only if you're changing the PIN or using a shared device. If the box is ever empty during a sync, this app will now warn you instead of silently uploading an unencrypted backup.</div>
             </div>
 
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
@@ -4522,8 +4522,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 wrap.innerHTML = `
                     <div style="font-size:.74rem;color:#34d399;font-weight:700;margin-bottom:8px;"><i class="fa-solid fa-lock"></i> App Lock is ON — a PIN is required to open this app.</div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-                        <input type="password" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
-                        <input type="password" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                        <input type="password" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
+                        <input type="password" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px;">
                         <button class="btn-header btn-blue" style="justify-content:center;" onclick="setAppLockPin()"><i class="fa-solid fa-rotate"></i> Change PIN</button>
@@ -4533,8 +4533,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 wrap.innerHTML = `
                     <div style="font-size:.68rem;color:#94a3b8;margin-bottom:8px;">No lock is set — anyone with this link can currently open the app. Set a PIN so it's required every time the app is opened.</div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
-                        <input type="password" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
-                        <input type="password" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;" autocomplete="new-password">
+                        <input type="password" id="applock-new-pin" inputmode="numeric" placeholder="New PIN (4-8 digits)" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
+                        <input type="password" id="applock-confirm-pin" inputmode="numeric" placeholder="Confirm New PIN" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" style="padding:9px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:.8rem;">
                     </div>
                     <button class="btn-header btn-green" style="width:100%;justify-content:center;margin-top:7px;" onclick="setAppLockPin()"><i class="fa-solid fa-lock"></i> Set PIN</button>`;
             }
@@ -9514,6 +9514,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         // already-live token only for explicit internal calls, but the scheduler never invokes
         // Drive OAuth, reconciliation, or uploads. Local IndexedDB + Firebase remain authoritative.
         async function driveApi(path,options={},interactive=true){
+            // Security invariant: every Google Drive API operation requires all three
+            // application-side gates. OAuth alone is never sufficient.
+            if(!mfFirebaseUser) throw new Error('Firebase sign-in is required before Google Drive can be used.');
+            if(!getCloudPin()) throw new Error('Cloud Encryption PIN must be active before Google Drive can be used.');
+            const configuredClientId=(document.getElementById('google-client-id')?.value||localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'').trim();
+            if(!configuredClientId) throw new Error('Google OAuth Web Client ID is required before Google Drive can be used.');
             if(!googleAccessToken){
                 if(interactive) await getGoogleToken(true);
                 else throw new Error('Google Drive authorization needs a one-time manual reconnect.');
@@ -9848,20 +9854,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const pin=getCloudPin();
                 const visiblePin=(document.getElementById('cloud-encryption-pin')?.value||'').trim();
                 if(!pin || !visiblePin || visiblePin!==pin) return alert('Activate the Cloud Encryption PIN first. Google Drive connection is locked until the active PIN is verified.');
-                // Explicit security gate: a Drive connection may only be established after
-                // the operator has entered the OAuth Web Client ID in this form. Do not fall back
-                // to the remembered client ID here; that fallback previously allowed Connect to
-                // proceed even when the field was blank.
-                const clientId=(document.getElementById('google-client-id')?.value||'').trim();
-                if(!clientId) return alert('Please enter your Google OAuth Web Client ID before connecting Google Drive.');
+                const clientId=(document.getElementById('google-client-id').value||localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'').trim();
+                if(!clientId) return alert('Please enter your Google OAuth Web Client ID.');
                 // CONNECT ONLY: establish/validate Drive authorization. Never create, replace,
                 // read, decrypt, reconcile, restore, or upload a business backup here.
-                const previousClientId=(localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'').trim();
-                if(previousClientId && previousClientId!==clientId){
-                    clearPersistedGoogleAccessToken();
-                    googleTokenClient=null; googleTokenClientId='';
-                    googleDriveFolderId=null; googleDriveFileId=null;
-                }
                 localStorage.setItem('MF_GOOGLE_CLIENT_ID',clientId);
                 await getGoogleToken(true);
                 googleDriveFolderId=null; googleDriveFileId=null;
@@ -10076,10 +10072,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             // mobile Chrome while WebCrypto is deriving/unwrapping the device key.
             const modal=document.getElementById('modal-cloud');
             if(modal) modal.classList.add('active');
-            // Keep the OAuth Web Client ID as protected configuration for token
-            // restoration, but do not silently populate the connection field. A new or
-            // reconnected Drive session must explicitly supply the Web Client ID here.
-            const input=document.getElementById('google-client-id'); if(input) input.value='';
+            const savedId=localStorage.getItem('MF_GOOGLE_CLIENT_ID')||'';
+            const input=document.getElementById('google-client-id'); if(input) input.value=savedId;
             mfRefreshDriveBackupUi();
             const fbCfg=document.getElementById('firebase-config-input'); if(fbCfg) fbCfg.value=localStorage.getItem('MF_FIREBASE_CONFIG')||'';
             const fbCode=document.getElementById('firebase-sync-code'); if(fbCode) fbCode.value=localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'';
