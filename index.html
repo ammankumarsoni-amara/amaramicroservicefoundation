@@ -2696,6 +2696,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="font-size:.64rem;color:#94a3b8;line-height:1.4;">Read-only integrity checks, automatic local version history, and a real responsive preview. These tools do not change loan math or existing records unless you explicitly restore a backup.</div>
                 <div class="mf-advanced-tool-grid">
                     <div class="mf-advanced-tool"><b><i class="fa-solid fa-shield-check" style="color:#34d399;"></i> Loan Audit</b><span>Check schedules, payments, partials, penalties and settlement/foreclosure totals for internal inconsistencies.</span><button class="btn-header btn-blue" type="button" onclick="openLoanAuditModal()">Run Integrity Check</button></div>
+                    <div class="mf-advanced-tool"><b><i class="fa-solid fa-chart-column" style="color:#60a5fa;"></i> Reporting Audit</b><span>Read-only check of year/month reporting, actual collections, revenue reconciliation and export totals.</span><button class="btn-header btn-blue" type="button" onclick="openReportingAuditModal()">Audit Reports</button></div>
                     <div class="mf-advanced-tool"><b><i class="fa-solid fa-clock-rotate-left" style="color:#fbbf24;"></i> Backup Versions</b><span>Automatic local snapshots are kept in IndexedDB so you can safely review or restore an earlier version.</span><button class="btn-header btn-blue" type="button" onclick="openBackupVersionsModal()">Version History</button></div>
                     <div class="mf-advanced-tool"><b><i class="fa-solid fa-mobile-screen-button" style="color:#93c5fd;"></i> Responsive QA</b><span>Preview this exact app at mobile, tablet and laptop widths and run overflow/clipping diagnostics.</span><button class="btn-header btn-blue" type="button" onclick="openResponsiveQAModal()">Open QA Mode</button></div>
                 </div>
@@ -2720,6 +2721,17 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             <div id="mf-loan-audit-summary"></div>
             <div id="mf-loan-audit-results" style="max-height:54vh;overflow:auto;"></div>
             <div style="display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px;"><button class="btn-header btn-blue" onclick="runLoanIntegrityAudit(true)"><i class="fa-solid fa-rotate"></i> Re-run Audit</button><button class="btn-header btn-purple" onclick="exportLoanAuditReport()"><i class="fa-solid fa-download"></i> Export Audit</button></div>
+        </div>
+    </div>
+
+    <!-- ADVANCED MAINTENANCE: REPORTING AUDIT -->
+    <div class="modal-overlay" id="modal-reporting-audit">
+        <div class="modal-card" style="max-width:980px;width:96%;">
+            <div class="modal-title"><span><i class="fa-solid fa-chart-column" style="color:#60a5fa;"></i> Reporting & Reconciliation Audit</span><i class="fa-solid fa-xmark" onclick="closeModal('modal-reporting-audit')" style="cursor:pointer;color:#94a3b8;"></i></div>
+            <div style="padding:9px 10px;border-radius:9px;background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.16);font-size:.66rem;color:#cbd5e1;line-height:1.45;margin-bottom:10px;">Read-only diagnostic. It checks the reporting engine without changing loans, payments, EMI schedules, settlement, foreclosure, security or cloud data. Period reporting uses actual transaction dates; future unpaid EMIs are not counted as collections.</div>
+            <div id="mf-reporting-audit-summary"></div>
+            <div id="mf-reporting-audit-results" style="max-height:54vh;overflow:auto;"></div>
+            <div style="display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px;"><button class="btn-header btn-blue" onclick="runReportingAudit(true)"><i class="fa-solid fa-rotate"></i> Re-run Audit</button><button class="btn-header btn-purple" onclick="exportReportingAudit()"><i class="fa-solid fa-download"></i> Export Audit</button></div>
         </div>
     </div>
 
@@ -10214,6 +10226,64 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(showAlert) alert(critical||warning?`Audit complete: ${critical} critical issue(s), ${warning} warning(s).`:`Audit complete: no integrity issues detected.`);
             return window.__mfLastAudit;
         }
+        function runReportingAudit(showAlert=false){
+            const issues=[];
+            const loans=Array.isArray(state.loans)?state.loans:[];
+            const years=new Set();
+            loans.forEach(l=>{
+                if(l.disbursalDate) years.add(String(l.disbursalDate).slice(0,4));
+                (l.payments||[]).forEach(p=>{if(p.date) years.add(String(p.date).slice(0,4));});
+                if(l.foreclosureData?.settlementDate) years.add(String(l.foreclosureData.settlementDate).slice(0,4));
+                if(l.postMaturitySettlement?.settlementDate) years.add(String(l.postMaturitySettlement.settlementDate).slice(0,4));
+            });
+            const sortedYears=[...years].filter(Boolean).sort();
+            let checkedPeriods=0, checkedLoans=0, critical=0, warning=0, info=0;
+            const add=(severity,message,detail='')=>{issues.push({severity,message,detail});};
+            const gross=getFinanceSnapshot();
+            const componentGross=(Number(gross.file)||0)+(Number(gross.interest)||0)+(Number(gross.penalty)||0)+(Number(gross.foreclosureFee)||0)+(Number(gross.preClosureInterest)||0)+(Number(gross.postMaturityInterest)||0)+(Number(gross.preEmiInterest)||0);
+            if(Math.abs(componentGross-Number(gross.gross||0))>0.01) add('critical','Gross Revenue does not reconcile to its component totals.',`Components ₹${componentGross.toFixed(2)} · Reported ₹${Number(gross.gross||0).toFixed(2)}`);
+            loans.forEach(l=>{
+                checkedLoans++;
+                const payments=Array.isArray(l.payments)?l.payments:[];
+                payments.forEach((p,i)=>{
+                    const amt=Number(p.amount)||0, split=(Number(p.principal)||0)+(Number(p.interest)||0)+(Number(p.preEmiInterest)||0);
+                    if(Math.abs(amt-split)>0.01) add('critical',`Loan ${l.id||'-'} payment #${i+1} does not reconcile.`,`Actual ₹${amt.toFixed(2)} · Principal + Interest + Pre-EMI ₹${split.toFixed(2)}`);
+                });
+            });
+            sortedYears.forEach(year=>{
+                checkedPeriods++;
+                const f={from:'',to:'',month:'',year};
+                const d=getFinanceSnapshot(f);
+                const activityRows=d.disbursed.filter(x=>x.includeDisb||x.activityInPeriod);
+                const activityLoanIds=new Set();
+                loans.forEach(l=>{const has=(l.payments||[]).some(p=>String(p.date||'').slice(0,4)===year)||String(l.foreclosureData?.settlementDate||'').slice(0,4)===year||String(l.postMaturitySettlement?.settlementDate||'').slice(0,4)===year;if(has)activityLoanIds.add(l.id);});
+                activityRows.forEach(x=>{if(!x.includeDisb&&!x.activityInPeriod)add('critical',`Year ${year}: a report row has neither disbursal nor actual activity basis.`,x.loan?.id||'-');});
+                const missing=[...activityLoanIds].filter(id=>!activityRows.some(x=>x.loan?.id===id));
+                if(missing.length)add('critical',`Year ${year}: actual-activity loan(s) are missing from Market Disbursement reporting.`,missing.slice(0,10).join(', '));
+                const principal=d.disbursed.reduce((sum,x)=>sum+(Number(x.paymentPrincipal)||0),0);
+                const direct=loans.reduce((sum,l)=>sum+(l.payments||[]).filter(p=>String(p.date||'').slice(0,4)===year).reduce((a,p)=>a+(Number(p.principal)||0),0),0);
+                if(Math.abs(principal-direct)>0.01)add('critical',`Year ${year}: actual principal collection total does not reconcile.`,`Report ₹${principal.toFixed(2)} · Transactions ₹${direct.toFixed(2)}`);
+            });
+            if(!sortedYears.length) add('info','No dated loan activity is available yet for period-by-period audit.','The report engine remains ready; add dated loan/payment records to exercise period checks.');
+            critical=issues.filter(x=>x.severity==='critical').length; warning=issues.filter(x=>x.severity==='warning').length; info=issues.filter(x=>x.severity==='info').length;
+            const summary=document.getElementById('mf-reporting-audit-summary');
+            if(summary) summary.innerHTML=`<div class="mf-audit-summary"><div class="mf-audit-stat"><small>Loan Accounts</small><b>${checkedLoans}</b></div><div class="mf-audit-stat"><small>Periods</small><b>${checkedPeriods}</b></div><div class="mf-audit-stat"><small>Critical</small><b style="color:#f87171;">${critical}</b></div><div class="mf-audit-stat"><small>Warnings / Info</small><b style="color:#fbbf24;">${warning+info}</b></div></div>`;
+            const box=document.getElementById('mf-reporting-audit-results');
+            if(box){
+                if(!issues.length) box.innerHTML=`<div style="padding:22px;text-align:center;border:1px solid rgba(52,211,153,.2);background:rgba(52,211,153,.05);border-radius:10px;color:#34d399;font-weight:800;"><i class="fa-solid fa-circle-check" style="font-size:1.4rem;display:block;margin-bottom:6px;"></i>Reporting audit passed. Revenue, actual-collection period visibility and reconciliation checks found no inconsistencies.</div>`;
+                else box.innerHTML=issues.map(x=>`<div class="mf-audit-row ${x.severity}"><span class="mf-audit-pill ${x.severity}">${x.severity.toUpperCase()}</span><div><div style="color:#fff;font-weight:750;">${financeEsc(x.message)}</div>${x.detail?`<div style="color:#94a3b8;margin-top:2px;">${financeEsc(x.detail)}</div>`:''}</div></div>`).join('');
+            }
+            window.__mfLastReportingAudit={at:new Date().toISOString(),issues,counts:{loans:checkedLoans,periods:checkedPeriods,critical,warning,info}};
+            if(showAlert) alert(critical||warning?`Reporting audit complete: ${critical} critical issue(s), ${warning} warning(s).`:`Reporting audit passed with no inconsistencies detected.`);
+            return window.__mfLastReportingAudit;
+        }
+        function openReportingAuditModal(){closeModal('modal-cloud');document.getElementById('modal-reporting-audit')?.classList.add('active');runReportingAudit(false);}
+        function exportReportingAudit(){
+            const report=window.__mfLastReportingAudit||runReportingAudit(false), rows=report.issues||[];
+            const data=[['Reporting & Reconciliation Audit'],['Generated',new Date().toLocaleString('en-IN')],['Loan Accounts',report.counts.loans],['Periods Checked',report.counts.periods],['Critical',report.counts.critical],['Warnings',report.counts.warning],['Info',report.counts.info],[],['Severity','Issue','Detail'],...rows.map(x=>[x.severity,x.message,x.detail])];
+            if(typeof XLSX!=='undefined'){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(data),'Reporting_Audit');XLSX.writeFile(wb,`${(state.bizName||'MicroFinance').replace(/\s+/g,'_')}_Reporting_Audit.xlsx`);}
+        }
+
         function openLoanAuditModal(){closeModal('modal-cloud');document.getElementById('modal-loan-audit')?.classList.add('active');runLoanIntegrityAudit(false);}
         function exportLoanAuditReport(){
             const report=window.__mfLastAudit||runLoanIntegrityAudit(false), rows=report.issues||[];
@@ -10359,6 +10429,36 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const topUpCustomerCount=new Set(topUpLoans.map(customerKeyOf)).size;
             const renewalCustomerCount=new Set(renewalLoans.map(customerKeyOf)).size;
             const advancementCustomerCount=new Set([...topUpLoans,...renewalLoans].map(customerKeyOf)).size;
+            // Cash-collection view is intentionally separate from revenue. Principal received
+            // is cash recovery, not business revenue; the figures below are derived from actual
+            // recorded transactions only.
+            let actualCollections=0, actualPrincipalCollected=0, actualInterestCollected=0, actualPreEmiCollected=0, actualPenaltyCollected=0;
+            loans.forEach(l=>{
+                (l.payments||[]).forEach(pay=>{
+                    actualCollections += Number(pay.amount)||0;
+                    actualPrincipalCollected += Number(pay.principal)||0;
+                    actualInterestCollected += Number(pay.interest)||0;
+                    actualPreEmiCollected += Number(pay.preEmiInterest)||0;
+                    actualPenaltyCollected += Number(pay.penalty)||0;
+                });
+                if(l.foreclosed){
+                    const fd=l.foreclosureData||{};
+                    actualCollections += Number(fd.settlementAmount)||0;
+                    actualPrincipalCollected += Number(fd.principalPaid)||0;
+                    actualInterestCollected += Number(fd.preClosureInterest)||0;
+                }
+                if(l.postMaturitySettlement){
+                    const pm=l.postMaturitySettlement;
+                    const calc=typeof mfSettlementAllocation==='function' ? mfSettlementAllocation(l,Number(pm.actualReceived)||0,getPostMaturitySettlementCalc(l,pm.settlementDate)) : null;
+                    actualCollections += Number(pm.actualReceived)||0;
+                    actualPrincipalCollected += Number(calc?.principalReceived)||0;
+                    actualInterestCollected += Number(calc?.contractualInterestReceived)||0;
+                    actualPreEmiCollected += Number(calc?.preEmiReceived)||0;
+                }
+            });
+            const overdueOutstanding=loans.filter(l=>mfLoanOperationalStatus(l)==='OVERDUE'&&!l.foreclosed).reduce((sum,l)=>sum+Math.max(0,Number(getLoanPending(l))||0),0);
+            const activeOutstanding=loans.filter(l=>!l.foreclosed).reduce((sum,l)=>sum+Math.max(0,Number(getLoanPending(l))||0),0);
+            const loanCountWithActivity=loans.filter(l=>(l.payments||[]).length||l.foreclosed||l.postMaturitySettlement).length;
             const loanTypeRows=[
                 ["NEW LOANS — New Loan Accounts",newLoans.length],
                 ["TOP-UP LOANS — Additional Accounts for Existing Customers",topUpLoans.length],
@@ -10374,6 +10474,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 productRows,statusRows,loanTypeRows,
                 newLoanCount:newLoans.length,topUpLoanCount:topUpLoans.length,renewalLoanCount:renewalLoans.length,
                 newCustomerCount,topUpCustomerCount,renewalCustomerCount,advancementCustomerCount,
+                actualCollections,actualPrincipalCollected,actualInterestCollected,actualPreEmiCollected,actualPenaltyCollected,
+                overdueOutstanding,activeOutstanding,loanCountWithActivity,
                 reportDate:formatToIndianDate(new Date().toISOString().split('T')[0])
             };
         }
@@ -10404,6 +10506,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 ["Capital Borrowed",r.capitalBorrowed],
                 ["Remaining Lender Principal",r.remainingDebt],
                 ["Gross Business Earnings",d.gross],
+                ["Actual Customer Collections (Cash Received)",r.actualCollections],
+                ["Actual Principal Recovered",r.actualPrincipalCollected],
+                ["Overdue Portfolio Outstanding",r.overdueOutstanding],
                 ["Lender Financing Cost",d.lenderCost],
                 ["Operating Expenses & Payroll",d.opex],
                 ["TRUE IN-HAND NET SURPLUS / PROFIT",d.net],
@@ -10506,6 +10611,23 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             wsCollections['!cols']=[{wch:38},{wch:22}];
             XLSX.utils.book_append_sheet(wb,wsCollections,'Recovery_Summary');
 
+            const collectionOverview=[
+                ["ACTUAL CUSTOMER COLLECTIONS — CASH BASIS"],
+                ["Metric","Amount (₹)"],
+                ["Actual Customer Collections",r.actualCollections],
+                ["Principal Recovered",r.actualPrincipalCollected],
+                ["Contractual Interest Collected",r.actualInterestCollected],
+                ["Pre-EMI Interest Collected",r.actualPreEmiCollected],
+                ["Penalty Collected",r.actualPenaltyCollected],
+                ["Loan Accounts with Recorded Activity",r.loanCountWithActivity],
+                ["Overdue Portfolio Outstanding",r.overdueOutstanding],
+                [],
+                ["Important","Cash received is not the same as revenue. Principal recovery is excluded from Gross Business Earnings."]
+            ];
+            const wsCollectionOverview=XLSX.utils.aoa_to_sheet(collectionOverview);
+            wsCollectionOverview['!cols']=[{wch:46},{wch:78}];
+            XLSX.utils.book_append_sheet(wb,wsCollectionOverview,'Actual_Collections');
+
             const capital=[
                 ["CAPITAL & LENDER LIABILITY SUMMARY"],
                 ["Metric","Amount (₹)"],
@@ -10581,6 +10703,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <div><small>Market Disbursed</small><b>${money(r.totalDisbursed)}</b></div>
                         <div><small>Customer Outstanding</small><b>${money(r.outstanding)}</b></div>
                         <div><small>Gross Earnings</small><b>${money(d.gross)}</b></div>
+                        <div><small>Actual Cash Collected</small><b>${money(r.actualCollections)}</b></div>
+                        <div><small>Principal Recovered</small><b>${money(r.actualPrincipalCollected)}</b></div>
                         <div><small>Lender Cost</small><b>${money(d.lenderCost)}</b></div>
                         <div><small>OPEX</small><b>${money(d.opex)}</b></div>
                         <div><small>True Net Surplus</small><b>${money(d.net)}</b></div>
@@ -10597,7 +10721,17 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <tr><td>Pre-EMI Interest</td><td>${money(d.preEmiInterest)}</td></tr>
                         <tr class="total"><td>GROSS BUSINESS EARNINGS</td><td>${money(d.gross)}</td></tr>
                     </tbody></table>
-                    <h2>2. Capital & Lender Liability</h2>
+                    <h2>2. Actual Customer Collections — Cash Basis</h2>
+                    <table><tbody>
+                        <tr><th>Metric</th><th>Amount</th></tr>
+                        <tr><td>Actual Customer Collections</td><td>${money(r.actualCollections)}</td></tr>
+                        <tr><td>Principal Recovered</td><td>${money(r.actualPrincipalCollected)}</td></tr>
+                        <tr><td>Contractual Interest Collected</td><td>${money(r.actualInterestCollected)}</td></tr>
+                        <tr><td>Pre-EMI Interest Collected</td><td>${money(r.actualPreEmiCollected)}</td></tr>
+                        <tr><td>Penalty Collected</td><td>${money(r.actualPenaltyCollected)}</td></tr>
+                    </tbody></table>
+                    <div class="mf-exec-note"><b>Cash vs revenue:</b> actual customer collections include principal recovery, while principal is not revenue. Future unpaid EMIs are never treated as collected cash.</div>
+                    <h2>3. Capital & Lender Liability</h2>
                     <table><tbody>
                         <tr><th>Metric</th><th>Amount</th></tr>
                         <tr><td>Capital Borrowed</td><td>${money(r.capitalBorrowed)}</td></tr>
@@ -10606,7 +10740,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <tr><td>Lender Interest + GST + Upfront Charges</td><td>${money(r.financingCost)}</td></tr>
                         <tr class="total"><td>TOTAL LENDER FINANCING COST</td><td>${money(d.lenderCost)}</td></tr>
                     </tbody></table>
-                    <h2>3. Operating Costs & Net Position</h2>
+                    <h2>4. Operating Costs & Net Position</h2>
                     <table><tbody>
                         <tr><th>Metric</th><th>Amount</th></tr>
                         <tr><td>Staff Salaries</td><td>${money(d.salaries)}</td></tr>
@@ -10614,14 +10748,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <tr class="total"><td>TOTAL OPEX</td><td>${money(d.opex)}</td></tr>
                         <tr class="grand"><td>TRUE IN-HAND NET SURPLUS / PROFIT</td><td>${money(d.net)}</td></tr>
                     </tbody></table>
-                    <h2>4. Portfolio Status</h2>
+                    <h2>5. Portfolio Status</h2>
                     <table><tbody><tr><th>Status</th><th>Loan Accounts</th></tr>${statusRows}</tbody></table>
-                    <h2>5. Loan Type / Customer Advancement</h2>
+                    <h2>6. Loan Type / Customer Advancement</h2>
                     <table><tbody><tr><th>Loan Classification</th><th>Loan Accounts</th></tr>${r.loanTypeRows.map(x=>`<tr><td>${financeEsc(x[0])}</td><td style="text-align:right">${x[1]}</td></tr>`).join('')}
                     <tr class="total"><td>Additional Accounts for Existing Customers — Top-up + Renewal</td><td style="text-align:right">${r.topUpLoanCount+r.renewalLoanCount}</td></tr></tbody></table>
                     <div style="margin-top:7px;font-size:9px;color:#475569;"><b>How to read:</b> New Loans are newly created loan accounts. Top-up and Renewal are additional independent loan accounts issued to customers who already have customer/loan history in the system. One customer may hold multiple independent loan accounts.</div>
                     <div class="mf-exec-note"><b>Customer relationship:</b> one customer can hold multiple independent loan accounts; Top-up and Renewal remain separate loan accounts while consolidated history stays customer-linked.</div>
-                    <h2>6. Portfolio by Product</h2>
+                    <h2>7. Portfolio by Product</h2>
                     <table><tbody><tr><th>Product</th><th>Accounts</th><th>Disbursed</th><th>Scheduled Payable</th><th>Outstanding</th></tr>${productRows || '<tr><td colspan="5">No product data available.</td></tr>'}</tbody></table>
                     <div class="mf-exec-note"><b>Plain-English interpretation:</b> True In-Hand Net Surplus = Gross Business Earnings − Lender Financing Cost − Operating Expenses.</div>
                     <div class="mf-exec-note"><b>Privacy:</b> This executive report deliberately excludes customer names, loan IDs, customer/guarantor phone numbers and customer-level transaction rows.</div>
@@ -10669,19 +10803,27 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function financeHasFilters(){ return !!(financeFilters.from||financeFilters.to||financeFilters.month||financeFilters.year); }
 
         function getFinanceSnapshot(filters=financeFilters){
+            const hasFilters=!!(filters.from||filters.to||filters.month||filters.year);
             let disbursed=[], file=0, interest=0, penalty=0, foreclosureFee=0, preClosureInterest=0, postMaturityInterest=0, preEmiInterest=0, settlementAmount=0, settlementWaiver=0;
             state.loans.forEach(l=>{
                 const p=state.products[l.product]; if(!p) return;
                 const disbDate=String(l.disbursalDate||'').slice(0,10);
-                const includeDisb=!financeHasFilters() || financeDateInRange(disbDate,filters);
-                const payments=(l.payments||[]).filter(x=>!financeHasFilters()||financeDateInRange(x.date,filters));
+                // REPORTING RULE: a period filter separates the original disbursal event
+                // from activity that actually happened inside the selected period. A loan
+                // disbursed in 2025 can therefore remain visible in the 2026 report when a
+                // real customer payment/settlement happened in 2026. The original capital
+                // and file charge are counted only in the disbursal period.
+                const includeDisb=!hasFilters || financeDateInRange(disbDate,filters);
+                const payments=(l.payments||[]).filter(x=>!hasFilters||financeDateInRange(x.date,filters));
                 const li=payments.reduce((a,x)=>a+(Number(x.interest)||0),0);
                 const lp=payments.reduce((a,x)=>a+(Number(x.penalty)||0),0);
-                const ff=l.foreclosed && (!financeHasFilters() || financeDateInRange(l.foreclosureData?.settlementDate,filters)) ? (Number(l.foreclosureData?.feeAmount)||0) : 0;
-                const fci=l.foreclosed && (!financeHasFilters() || financeDateInRange(l.foreclosureData?.settlementDate,filters)) ? (Number(l.foreclosureData?.preClosureInterest)||0) : 0;
-                const sa=l.foreclosed && (!financeHasFilters() || financeDateInRange(l.foreclosureData?.settlementDate,filters)) ? (Number(l.foreclosureData?.settlementAmount)||0) : 0;
+                const paymentAmount=payments.reduce((a,x)=>a+(Number(x.amount)||0),0);
+                const paymentPrincipal=payments.reduce((a,x)=>a+(Number(x.principal)||0),0);
+                const ff=l.foreclosed && (!hasFilters || financeDateInRange(l.foreclosureData?.settlementDate,filters)) ? (Number(l.foreclosureData?.feeAmount)||0) : 0;
+                const fci=l.foreclosed && (!hasFilters || financeDateInRange(l.foreclosureData?.settlementDate,filters)) ? (Number(l.foreclosureData?.preClosureInterest)||0) : 0;
+                const sa=l.foreclosed && (!hasFilters || financeDateInRange(l.foreclosureData?.settlementDate,filters)) ? (Number(l.foreclosureData?.settlementAmount)||0) : 0;
                 let pm=0, waiver=0, settlementContractualInterest=0, settlementPreEmiInterest=0, settlementPrincipal=0;
-                if(l.postMaturitySettlement && (!financeHasFilters() || financeDateInRange(l.postMaturitySettlement.settlementDate,filters))){
+                if(l.postMaturitySettlement && (!hasFilters || financeDateInRange(l.postMaturitySettlement.settlementDate,filters))){
                     const c=getPostMaturitySettlementCalc(l,l.postMaturitySettlement.settlementDate);
                     const alloc=mfSettlementAllocation(l,Number(l.postMaturitySettlement.actualReceived)||0,c);
                     pm=Number(alloc.recoveryInterestReceived)||0;
@@ -10691,18 +10833,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     waiver=Math.max(0,c.calculatedSettlement-(Number(l.postMaturitySettlement.actualReceived)||0));
                 }
                 const pe=payments.reduce((sum,pay)=>sum+(Number(pay.preEmiInterest)||0),0);
+                const activityInPeriod=payments.length>0 || ff>0 || fci>0 || pm>0 || settlementContractualInterest>0 || settlementPreEmiInterest>0 || sa>0 || waiver>0;
                 const fc=includeDisb?(Number(p.fileCharge)||0):0;
                 file+=fc; interest+=li+settlementContractualInterest; penalty+=lp; foreclosureFee+=ff; preClosureInterest+=fci; postMaturityInterest+=pm; preEmiInterest+=pe+settlementPreEmiInterest; settlementAmount+=sa; settlementWaiver+=waiver;
-                if(includeDisb || li || lp || ff || fci || pm || pe || settlementContractualInterest || settlementPreEmiInterest || sa || waiver) disbursed.push({loan:l,p,interest:li+settlementContractualInterest,penalty:lp,foreclosureFee:ff,preClosureInterest:fci,postMaturityInterest:pm,preEmiInterest:pe+settlementPreEmiInterest,settlementContractualInterest,settlementPreEmiInterest,settlementPrincipal,settlementAmount:sa,settlementWaiver:waiver,totalProfit:fc+li+settlementContractualInterest+lp+ff+fci+pm+pe+settlementPreEmiInterest,filteredPayments:payments,includeDisb});
+                if(includeDisb || activityInPeriod) disbursed.push({loan:l,p,interest:li+settlementContractualInterest,penalty:lp,foreclosureFee:ff,preClosureInterest:fci,postMaturityInterest:pm,preEmiInterest:pe+settlementPreEmiInterest,settlementContractualInterest,settlementPreEmiInterest,settlementPrincipal,settlementAmount:sa,settlementWaiver:waiver,totalProfit:fc+li+settlementContractualInterest+lp+ff+fci+pm+pe+settlementPreEmiInterest,filteredPayments:payments,paymentAmount,paymentPrincipal,includeDisb,activityInPeriod,reportBasis:includeDisb?'Disbursal + period activity': 'Period activity only'});
             });
             let lender=[]; let lenderInterest=0,lenderGst=0,lenderPrincipal=0,lenderUpfront=0;
             state.borrowings.forEach(b=>{
-                const reps=(b.repayments||[]).filter(r=>!financeHasFilters()||financeDateInRange(r.date,filters));
+                const reps=(b.repayments||[]).filter(r=>!hasFilters||financeDateInRange(r.date,filters));
                 const prin=reps.reduce((a,x)=>a+(Number(x.principal)||0),0);
                 const int=reps.reduce((a,x)=>a+(Number(x.interest)||0),0);
                 const gst=reps.reduce((a,x)=>a+(Number(x.gst)||0),0);
                 const borrowingDate=String(b.date||'').slice(0,10);
-                const includeUpfront=!financeHasFilters() || financeDateInRange(borrowingDate,filters);
+                const includeUpfront=!hasFilters || financeDateInRange(borrowingDate,filters);
                 const processingFee=includeUpfront?(Number(b.processingFee)||0):0;
                 const processingGst=includeUpfront?(Number(b.processingGst)||0):0;
                 const otherCharges=includeUpfront?(Number(b.otherCharges)||0):0;
@@ -10712,8 +10855,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(reps.length || upfront) lender.push({b,prin,int,gst,processingFee,processingGst,otherCharges,otherGst,upfront,total:int+gst+upfront,filteredRepayments:reps,includeUpfront});
             });
             let payroll=[], salaries=0;
-            state.staff.forEach(st=>(st.salaryPayments||[]).forEach(sp=>{if(!financeHasFilters()||financeDateInRange(sp.date,filters)){ salaries+=Number(sp.amount)||0; payroll.push({st,sp}); }}));
-            let expenses=state.expenses.filter(x=>!financeHasFilters()||financeDateInRange(x.date,filters));
+            state.staff.forEach(st=>(st.salaryPayments||[]).forEach(sp=>{if(!hasFilters||financeDateInRange(sp.date,filters)){ salaries+=Number(sp.amount)||0; payroll.push({st,sp}); }}));
+            let expenses=state.expenses.filter(x=>!hasFilters||financeDateInRange(x.date,filters));
             let generalExp=expenses.reduce((a,x)=>a+(Number(x.amount)||0),0);
             const gross=file+interest+penalty+foreclosureFee+preClosureInterest+postMaturityInterest+preEmiInterest, lenderCost=lenderInterest+lenderGst+lenderUpfront, opex=salaries+generalExp, net=gross-lenderCost-opex;
             return {disbursed,file,interest,penalty,foreclosureFee,preClosureInterest,postMaturityInterest,preEmiInterest,settlementAmount,settlementWaiver,gross,lender,lenderInterest,lenderGst,lenderPrincipal,lenderUpfront,payroll,salaries,expenses,generalExp,lenderCost,opex,net};
@@ -10752,10 +10895,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // This report is about capital disbursements. A year/month/date filter must
                 // filter on the loan's disbursal date; loans with only a payment in the period
                 // must not appear as phantom disbursal rows with a blank date/mode.
-                const marketDisbursed=d.disbursed.filter(x=>x.includeDisb);
+                const marketDisbursed=d.disbursed.filter(x=>x.includeDisb||x.activityInPeriod);
                 const rows=marketDisbursed.map(x=>{
                     const l=x.loan,p=x.p;
-                    const paid=l.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((a,z)=>a+(Number(z.principal)||0),0)+(l.foreclosed?(Number(l.foreclosureData?.principalPaid)||0):0);
+                    const foreclosurePrincipalInPeriod=l.foreclosed && (!financeHasFilters() || financeDateInRange(l.foreclosureData?.settlementDate)) ? (Number(l.foreclosureData?.principalPaid)||0) : 0;
+                    const paid=(Number(x.paymentPrincipal)||0)+foreclosurePrincipalInPeriod;
                     const out=l.foreclosed?0:getLoanPending(l);
                     const rawStatus=mfLoanOperationalStatus(l); const status=(rawStatus==='OVERDUE'||rawStatus==='DUE')?'DUE':rawStatus;
                     const customerName=financeEsc(l.name||'-');
@@ -10766,14 +10910,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     const contacts=`<div class="finance-contact-cell"><span><b>Customer:</b> ${customerPhones}</span>${guarantorName?`<span><b>Guarantor:</b> ${guarantorPhones}</span>`:''}</div>`;
                     const productCell=`<div class="finance-profile-cell"><b>${financeEsc(p.name||'Custom')}</b><small>Loan Amount: ${money(p.amount)}</small></div>`;
                     const disbCell=x.includeDisb?`<div class="finance-profile-cell"><b>${formatToIndianDate(l.disbursalDate)}</b><small>${financeEsc(mfDisbursalModeLabel(l.disbursalMode))}</small></div>`:`-`;
-                    return [profile,contacts,productCell,disbCell,x.includeDisb?money(p.amount):'-',money(paid),money(out),`<span class="finance-status-pill ${status.toLowerCase()}">${status}</span>`];
+                    return [profile,contacts,productCell,disbCell,x.includeDisb?money(p.amount):'₹0',money(paid),money(out),`<span class="finance-status-pill ${status.toLowerCase()}">${status}</span>`];
                 });
-                headerHtml=financeHeader([['Accounts',marketDisbursed.length],['Capital Given',money(marketDisbursed.reduce((a,x)=>a+(Number(x.p.amount)||0),0))],['Principal Recovered',money(marketDisbursed.reduce((a,x)=>a+x.loan.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((q,z)=>q+(Number(z.principal)||0),0),0))],['Current Outstanding',money(marketDisbursed.reduce((a,x)=>a+(x.loan.foreclosed?0:getLoanPending(x.loan)),0))]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())} · Market Disbursed includes loans whose disbursal date falls inside the selected period.</div>`;
-                detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Loan-wise Capital Disbursement</b><span class="finance-pill">Complete customer profile · all stored contact numbers</span></div>${financeTable(['Customer Profile','All Contact Numbers','Product','Disbursal','Capital Given','Principal Recovered','Outstanding','Status'],rows.map(r=>`<tr>${r.map((cell,i)=>`<td class="${i>=4&&i<=6?'finance-money-cell':''}">${cell}</td>`).join('')}</tr>`))}</div>`;
+                headerHtml=financeHeader([['Accounts',marketDisbursed.length],['Capital Given',money(marketDisbursed.reduce((a,x)=>a+(Number(x.p.amount)||0),0))],['Principal Recovered',money(marketDisbursed.reduce((a,x)=>a+x.loan.payments.filter(z=>!financeHasFilters()||financeDateInRange(z.date)).reduce((q,z)=>q+(Number(z.principal)||0),0),0))],['Current Outstanding',money(marketDisbursed.reduce((a,x)=>a+(x.loan.foreclosed?0:getLoanPending(x.loan)),0))]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())} · Actual-collection reporting: loans are shown when a real payment/settlement occurred in the period; original capital and file charge are counted only in the original disbursal period.</div>`;
+                detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Loan-wise Capital Disbursement</b><span class="finance-pill">Complete customer profile · all stored contact numbers</span></div>${financeTable(['Customer Profile','All Contact Numbers','Product','Original Disbursal','Capital Given in Period','Actual Principal Recovered','Current Outstanding','Status'],rows.map(r=>`<tr>${r.map((cell,i)=>`<td class="${i>=4&&i<=6?'finance-money-cell':''}">${cell}</td>`).join('')}</tr>`))}</div>`;
             } else if(type==='gross'){
                 title='Gross Revenue — Client-wise Revenue Detail';
                 const rows=d.disbursed.map(x=>`<tr><td><b>${financeEsc(x.loan.name)}</b><br><span class="finance-pill">${financeEsc(x.loan.id)}</span></td><td>${financeEsc(x.p.name)}</td><td>${money(x.includeDisb?x.p.fileCharge:0)}</td><td>${money(x.interest)}</td><td>${money(x.preEmiInterest)}</td><td>${money(x.penalty)}</td><td>${money(x.foreclosureFee)}</td><td>${money(x.preClosureInterest)}</td><td>${money(x.postMaturityInterest)}</td><td>${money(x.settlementWaiver||0)}</td><td><b>${money(x.totalProfit)}</b></td></tr>`);
-                headerHtml=financeHeader([['File Charges',money(d.file)],['Contractual Interest',money(d.interest)],['Pre-EMI Interest',money(d.preEmiInterest)],['Pre-Closure Interest',money(d.preClosureInterest)],['Late Penalties',money(d.penalty)],['Foreclosure Fees',money(d.foreclosureFee)],['Post-Maturity Recovery Interest',money(d.postMaturityInterest)],['Settlement Waiver (Not Revenue)',money(d.settlementWaiver)]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())} · Settlement waiver is disclosed separately and is excluded from Gross Revenue.</div>`;
+                headerHtml=financeHeader([['File Charges',money(d.file)],['Contractual Interest',money(d.interest)],['Pre-EMI Interest',money(d.preEmiInterest)],['Pre-Closure Interest',money(d.preClosureInterest)],['Late Penalties',money(d.penalty)],['Foreclosure Fees',money(d.foreclosureFee)],['Post-Maturity Recovery Interest',money(d.postMaturityInterest)],['Settlement Waiver (Not Revenue)',money(d.settlementWaiver)]])+`<div class="finance-report-note">Period: ${financeEsc(financePeriodLabel())} · Settlement waiver is disclosed separately and is excluded from Gross Revenue. Period filters use actual transaction/settlement dates; future unpaid EMIs are not treated as collected revenue.</div>`;
                 detailHtml=`<div class="finance-section"><div class="finance-section-head"><b>Client-wise Gross Revenue</b><span class="finance-pill">Principal is excluded from revenue · Waiver is not revenue</span></div>${financeTable(['Customer / Loan','Product','File Charge','Contractual Interest','Pre-EMI Interest','Pre-Closure Interest','Penalty','Foreclosure Fee','Post-Maturity Recovery','Settlement Waiver','Revenue'],rows)}</div>`;
                 detailHtml+=`<div class="finance-section"><div class="finance-section-head"><b>Collection Transaction Detail</b></div>${financeTable(['Date','Customer','Loan','Amount','Interest','Penalty','Mode','Type'],d.disbursed.flatMap(x=>{let r=x.filteredPayments.map(p=>`<tr><td>${formatToIndianDate(p.date)}</td><td>${financeEsc(x.loan.name)}</td><td>${financeEsc(x.loan.id)}</td><td>${money(p.amount)}</td><td>${money((Number(p.interest)||0)+(Number(p.preEmiInterest)||0))}</td><td>${money(p.penalty||0)}</td><td>${financeEsc(p.mode)}</td><td>${Number(p.preEmiInterest||0)>0?`Regular EMI + Pre-EMI Interest (EMI #1) · Pre-EMI ${money(p.preEmiInterest)}`:'Regular EMI'}</td></tr>`); if(x.loan.foreclosed && x.foreclosureFee) r.push(`<tr class="detail-row"><td>${formatToIndianDate(x.loan.foreclosureData.settlementDate)}</td><td>${financeEsc(x.loan.name)}</td><td>${financeEsc(x.loan.id)}</td><td>${money(x.loan.foreclosureData.settlementAmount)}</td><td>${money(Number(x.loan.foreclosureData?.preClosureInterest)||0)}</td><td>₹0</td><td>${financeEsc(x.loan.foreclosureData.mode)}</td><td>Foreclosure Settlement · Pre-Closure Interest ${money(x.loan.foreclosureData?.preClosureInterest||0)} · Fee ${money(x.foreclosureFee)}</td></tr>`); if(x.loan.postMaturitySettlement) { const pm=x.loan.postMaturitySettlement; const pc=getPostMaturitySettlementCalc(x.loan,pm.settlementDate); const pa=mfSettlementAllocation(x.loan,Number(pm.actualReceived)||0,pc); r.push(`<tr class="detail-row"><td>${formatToIndianDate(pm.settlementDate)}</td><td>${financeEsc(x.loan.name)}</td><td>${financeEsc(x.loan.id)}</td><td>${money(pm.actualReceived)}</td><td>${money(pa.contractualInterestReceived+pa.recoveryInterestReceived)}</td><td>₹0</td><td>${financeEsc(pm.mode)}</td><td>Post-Maturity Settlement · Contractual Interest ${money(pa.contractualInterestReceived)} · Principal ${money(pa.principalReceived)} · Recovery Calculated ${money(pm.recoveryInterest||0)} · Recovery Received ${money(pa.recoveryInterestReceived)} · Waiver ${money(pm.waiverAmount||0)}</td></tr>`); } return r;}))}</div>`;
             } else if(type==='lender'){
@@ -10874,15 +11018,21 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function openFinanceDetail(type){ financeFilters={from:'',to:'',month:'',year:''}; financeDetailSearched=false; renderFinanceDetail(type); }
 
         function financeRowsForExport(type,d){
-            if(type==='gross') return d.disbursed.map(x=>[x.loan.id,x.loan.name,mfLoanTypeLabel(x.loan),x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.includeDisb?x.p.fileCharge:0,x.interest,x.preEmiInterest,x.penalty,x.foreclosureFee,x.preClosureInterest,x.postMaturityInterest,x.settlementWaiver||0,x.totalProfit]);
+            if(type==='gross') return d.disbursed.map(x=>[x.loan.id,x.loan.name,mfLoanTypeLabel(x.loan),x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.includeDisb?x.p.fileCharge:0,x.interest,x.preEmiInterest,x.penalty,x.foreclosureFee,x.preClosureInterest,x.postMaturityInterest,x.settlementWaiver||0,x.totalProfit,x.reportBasis]);
             if(type==='lender') return d.lender.flatMap(x=>x.filteredRepayments.map(r=>[r.date,x.b.lenderName,r.principal,r.interest,r.gst||0,(Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0),r.mode||'']));
             if(type==='opex') return [...d.payroll.map(x=>[x.sp.date,x.st.name,'Payroll',x.sp.amount,x.sp.mode||'']),...d.expenses.map(x=>[x.date,x.category,x.desc,x.amount,x.mode||''])];
-            if(type==='disbursed') return d.disbursed.filter(x=>x.includeDisb).map(x=>[x.loan.id,x.loan.name,mfLoanTypeLabel(x.loan),x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode),x.p.amount,(()=>{const fs=mfLoanOperationalStatus(x.loan);return (fs==='OVERDUE'||fs==='DUE')?'DUE':fs;})()]);
+            if(type==='disbursed') return d.disbursed.filter(x=>x.includeDisb||x.activityInPeriod).map(x=>[x.loan.id,x.loan.name,mfLoanTypeLabel(x.loan),x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode),x.includeDisb?x.p.amount:0,x.paymentPrincipal||0,x.activityInPeriod?'Actual period activity':'Disbursed in period',(()=>{const fs=mfLoanOperationalStatus(x.loan);return (fs==='OVERDUE'||fs==='DUE')?'DUE':fs;})()]);
             return [['Gross Revenue',d.gross],['Lender Cost',d.lenderCost],['Staff Salaries',d.salaries],['General Expenses',d.generalExp],['TRUE IN-HAND NET SURPLUS',d.net]];
         }
         function exportFinanceDetailReport(){
-            const d=getFinanceSnapshot(), wb=XLSX.utils.book_new(), type=financeCurrentType, rows=financeRowsForExport(type,d), headers=type==='gross'?['Loan ID','Customer','Loan Type','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','File Charge','Contractual Interest','Pre-EMI Interest','Penalty','Foreclosure Fee','Pre-Closure Interest','Post-Maturity Recovery Interest','Settlement Waiver (Not Revenue)','Revenue']:type==='lender'?['Date','Lender','Principal','Interest','GST','Total','Mode']:type==='opex'?['Date','Payee / Category','Type / Description','Amount','Mode']:type==='disbursed'?['Loan ID','Customer','Loan Type','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal Date','Disbursal Mode','Loan Amount','Status']:['Metric','Amount'];
-            XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['MicroFinance Financial Detail Report'],['Report Period',financePeriodLabel()],[],headers,...rows]),'Detail_Report');
+            const d=getFinanceSnapshot(), wb=XLSX.utils.book_new(), type=financeCurrentType, rows=financeRowsForExport(type,d), headers=type==='gross'?['Loan ID','Customer','Loan Type','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','File Charge','Contractual Interest','Pre-EMI Interest','Penalty','Foreclosure Fee','Pre-Closure Interest','Post-Maturity Recovery Interest','Settlement Waiver (Not Revenue)','Revenue','Reporting Basis']:type==='lender'?['Date','Lender','Principal','Interest','GST','Total','Mode']:type==='opex'?['Date','Payee / Category','Type / Description','Amount','Mode']:type==='disbursed'?['Loan ID','Customer','Loan Type','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Original Disbursal Date','Disbursal Mode','Capital Disbursed in Period','Actual Principal Recovered in Period','Reporting Basis','Status']:['Metric','Amount'];
+            XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['MicroFinance Financial Detail Report'],['Report Period',financePeriodLabel()],['Reporting Basis','Actual transaction/collection basis. Future unpaid EMIs are not counted as collected. Original disbursal capital and file charge belong only to the disbursal period.'],[],headers,...rows]),'Detail_Report');
+            const definitions=[['REPORTING DEFINITIONS'],['Term','Meaning'],['Actual Collection','Money recorded as actually received in a customer payment/settlement transaction during the selected period.'],['Market Disbursed','Original loan capital disbursed during the selected period. A prior-year loan can still appear when it has actual activity in the selected period.'],['Gross Revenue','Revenue components actually recognized by this software from recorded transactions; principal is not revenue.'],['Current Outstanding','Current contractual pending amount for the loan; it is not a period collection figure.'],['Reporting Basis','Period filters use event dates. No future unpaid EMI is treated as received revenue.']];
+            XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(definitions),'Definitions');
+            if(type==='gross'){
+                const tx=[['ACTUAL CUSTOMER COLLECTIONS IN SELECTED PERIOD'],['Date','Customer','Loan ID','Actual Received','Principal','Interest','Pre-EMI','Penalty','Mode','Type'],...d.disbursed.flatMap(x=>x.filteredPayments.map(p=>[p.date,x.loan.name,x.loan.id,p.amount,p.principal||0,p.interest||0,p.preEmiInterest||0,p.penalty||0,p.mode||'',Number(p.preEmiInterest||0)>0?'Regular EMI + Pre-EMI':'Regular EMI']))];
+                XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(tx),'Collection_Transactions');
+            }
             XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_${type}_Detail_Report.xlsx`);
         }
         function printFinanceDetailReport(){
