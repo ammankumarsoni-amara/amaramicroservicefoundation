@@ -1612,7 +1612,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     </div>
                     <div class="form-group">
                         <label>Monthly Salary (₹) *</label>
-                        <input type="number" id="st-salary" placeholder="15000" required>
+                        <input type="number" id="st-salary" placeholder="15000" step="any" required>
                     </div>
                 </div>
 
@@ -1665,7 +1665,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
                 <div class="form-group">
                     <label>Salary Paid (₹) *</label>
-                    <input type="number" id="ps-amount" required style="color:#34d399; font-weight:800; font-size:1.1rem;">
+                    <input type="number" id="ps-amount" step="any" required style="color:#34d399; font-weight:800; font-size:1.1rem;">
                 </div>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -1741,7 +1741,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                     <div class="form-group">
                         <label>Amount (₹) *</label>
-                        <input type="number" id="ex-amount" placeholder="250" required style="color:#f472b6; font-weight:800; font-size:1.05rem;">
+                        <input type="number" id="ex-amount" placeholder="250" step="any" required style="color:#f472b6; font-weight:800; font-size:1.05rem;">
                     </div>
                     <div class="form-group">
                         <label>Paid By Mode</label>
@@ -1811,7 +1811,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     </div>
                     <div class="form-group">
                         <label>Loan Amount (₹) *</label>
-                        <input type="number" id="b-amount" placeholder="200000" required>
+                        <input type="number" id="b-amount" placeholder="200000" step="any" required>
                     </div>
                 </div>
 
@@ -2128,7 +2128,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
                 <div class="form-group">
                     <label id="pay-amount-label">Collected EMI Amount (₹) *</label>
-                    <input type="number" id="pay-amount" required style="color: #34d399; font-weight: 800; font-size: 1.15rem;">
+                    <input type="number" id="pay-amount" step="any" required style="color: #34d399; font-weight: 800; font-size: 1.15rem;">
                 </div>
 
                 <!-- Late Penalty Field: BLANK (0) BY DEFAULT — shared by Full EMI and Partial/Advance modes -->
@@ -2138,7 +2138,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <span style="font-size:0.65rem; color:#cbd5e1;">(Hidden from client PDF)</span>
                     </div>
                     <div style="display:flex; gap:6px; margin-bottom:7px;">
-                        <input type="number" id="pay-penalty" value="0" style="color:#fbbf24; font-weight:800; font-size:1rem; flex:1;" placeholder="0" oninput="updatePenaltyModeVisibility()">
+                        <input type="number" id="pay-penalty" value="0" step="any" style="color:#fbbf24; font-weight:800; font-size:1rem; flex:1;" placeholder="0" oninput="updatePenaltyModeVisibility()">
                         <button type="button" class="btn-edit-sm" style="background:#f59e0b; color:#0f172a; font-weight:800; border:none;" onclick="applySuggestedPenalty()" id="btn-suggest-pen">Apply ₹0</button>
                     </div>
                     <div id="pay-penalty-mode-toggle" style="display:none; gap:6px;">
@@ -2287,7 +2287,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="background: rgba(255,255,255,0.04); padding: 9px 11px; border-radius: 9px; margin-bottom: 14px; font-size: 0.82rem; color:#94a3b8;" id="ep-info"></div>
                 <div class="form-group">
                     <label>Penalty Amount for this EMI (₹)</label>
-                    <input type="number" id="ep-amount" style="color:#fbbf24; font-weight:800; font-size:1.05rem;" placeholder="0">
+                    <input type="number" id="ep-amount" step="any" style="color:#fbbf24; font-weight:800; font-size:1.05rem;" placeholder="0">
                 </div>
                 <div style="font-size:0.66rem; color:#64748b; margin-bottom:12px;">Set to 0 to remove a penalty entered by mistake. This only changes the penalty on this already-collected EMI — never shown on the client-facing PDF.</div>
                 <button type="submit" class="btn-submit" style="background: linear-gradient(135deg, #f59e0b, #d97706);">✓ Save Penalty</button>
@@ -2362,11 +2362,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
                     <div class="form-group">
                         <label>Fee % (On Full Loan)</label>
-                        <input type="number" id="fc-fee-percent" value="5" step="0.5" oninput="calcForeclosureTotals()">
+                        <input type="number" id="fc-fee-percent" value="5" min="0" max="100" step="any" oninput="calcForeclosureTotals()">
                     </div>
                     <div class="form-group">
                         <label>Fee Amount (₹) [Editable]</label>
-                        <input type="number" id="fc-fee-amount" oninput="calcForeclosureFromFee()">
+                        <input type="number" id="fc-fee-amount" min="0" step="any" oninput="calcForeclosureFromFee()">
                     </div>
                 </div>
 
@@ -6639,13 +6639,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("b-interest-basis").value = b.interestBasis || "Reducing Balance";
             document.getElementById("b-type").value = b.type;
             const legacyProcessingPct = Number(b.processingFeePct || 0) || ((Number(b.amount)||0) > 0 ? ((Number(b.processingFee)||0) / (Number(b.amount)||0) * 100) : 0);
-            document.getElementById("b-processing-fee-pct").value = legacyProcessingPct ? Number(legacyProcessingPct.toFixed(4)) : 0;
+            document.getElementById("b-processing-fee-pct").value = legacyProcessingPct ? Number(legacyProcessingPct) : 0;
             const legacyProcessingGstPct = Number(b.processingGstPct || 0) || ((Number(b.processingFee)||0) > 0 ? ((Number(b.processingGst)||0) / (Number(b.processingFee)||0) * 100) : 0);
-            document.getElementById("b-processing-gst-pct").value = legacyProcessingGstPct ? Number(legacyProcessingGstPct.toFixed(4)) : 0;
+            document.getElementById("b-processing-gst-pct").value = legacyProcessingGstPct ? Number(legacyProcessingGstPct) : 0;
             document.getElementById("b-processing-gst-amount").value = Number(b.processingGst || 0);
             document.getElementById("b-other-charges").value = Number(b.otherCharges || 0);
             const legacyOtherGstPct = Number(b.otherGstPct || 0) || ((Number(b.otherCharges)||0) > 0 ? ((Number(b.otherGst)||0) / (Number(b.otherCharges)||0) * 100) : 0);
-            document.getElementById("b-other-gst-pct").value = legacyOtherGstPct ? Number(legacyOtherGstPct.toFixed(4)) : 0;
+            document.getElementById("b-other-gst-pct").value = legacyOtherGstPct ? Number(legacyOtherGstPct) : 0;
             document.getElementById("b-other-gst").value = Number(b.otherGst || 0);
             document.getElementById("b-apply-gst").checked = b.applyGst || false;
             document.getElementById("b-interest-gst-pct").value = Number(b.interestGstPct || 18);
@@ -6678,14 +6678,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const fee = Math.max(0, amount * pct / 100);
             const gstPctEl = document.getElementById("b-processing-gst-pct");
             const gstAmtEl = document.getElementById("b-processing-gst-amount");
-            const gstPct = parseFloat(gstPctEl?.value) || 0;
-            const calculatedGst = Math.max(0, fee * gstPct / 100);
+            let gstPct = parseFloat(gstPctEl?.value) || 0;
+            let gst = Math.max(0, parseFloat(gstAmtEl?.value) || 0);
             if (source === 'pct' || source === 'reset') {
-                if (gstAmtEl) { gstAmtEl.value = calculatedGst; gstAmtEl.dataset.userEdited = ''; }
+                gst = Math.max(0, fee * gstPct / 100);
+                if (gstAmtEl) { gstAmtEl.value = gst; gstAmtEl.dataset.userEdited = ''; }
+            } else if (source === 'amount') {
+                if (gstPctEl) gstPctEl.value = fee>0 ? (gst/fee*100) : 0;
+                gstPct = fee>0 ? (gst/fee*100) : 0;
             } else if (gstAmtEl && !gstAmtEl.value) {
-                gstAmtEl.value = calculatedGst;
+                gst = Math.max(0, fee * gstPct / 100);
+                gstAmtEl.value = gst;
             }
-            const gst = Math.max(0, parseFloat(gstAmtEl?.value) || 0);
             const out = document.getElementById("b-processing-fee-calc");
             const gstOut = document.getElementById("b-processing-gst-calc");
             if (out) out.innerText = "Calculated: ₹" + fee.toLocaleString("en-IN", {maximumFractionDigits:2});
@@ -6697,14 +6701,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const base = Math.max(0, parseFloat(document.getElementById("b-other-charges")?.value) || 0);
             const pctEl = document.getElementById("b-other-gst-pct");
             const amtEl = document.getElementById("b-other-gst");
-            const pct = parseFloat(pctEl?.value) || 0;
-            const calculated = Math.max(0, base * pct / 100);
+            let pct = parseFloat(pctEl?.value) || 0;
+            let amount = Math.max(0, parseFloat(amtEl?.value) || 0);
             if (source === 'pct' || source === 'reset') {
-                if (amtEl) { amtEl.value = calculated; amtEl.dataset.userEdited = ''; }
+                amount = Math.max(0, base * pct / 100);
+                if (amtEl) { amtEl.value = amount; amtEl.dataset.userEdited = ''; }
+            } else if (source === 'amount') {
+                pct = base>0 ? (amount/base*100) : 0;
+                if (pctEl) pctEl.value = pct;
             } else if (amtEl && !amtEl.value) {
-                amtEl.value = calculated;
+                amount = Math.max(0, base * pct / 100);
+                amtEl.value = amount;
             }
-            const amount = Math.max(0, parseFloat(amtEl?.value) || 0);
             const out = document.getElementById("b-other-gst-calc");
             if (out) out.innerText = "GST Amount: ₹" + amount.toLocaleString('en-IN',{maximumFractionDigits:2});
             return { pct, amount };
@@ -7116,13 +7124,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function calcLenderPaymentTotals(source='') {
             const p = Number(document.getElementById("lp-principal")?.value) || 0;
             const i = Number(document.getElementById("lp-interest")?.value) || 0;
-            const gstPct = Number(document.getElementById("lp-gst-pct")?.value) || 0;
+            const pctEl = document.getElementById("lp-gst-pct");
             const gstEl = document.getElementById("lp-gst");
-            const calculatedGst = Math.round(i * gstPct / 100 * 100) / 100;
-            if (gstEl && (source === 'pct' || source === 'reset' || !gstEl.value)) gstEl.value = calculatedGst;
-            const gst = Math.max(0, Number(gstEl?.value) || 0);
+            let gstPct = Number(pctEl?.value) || 0;
+            let gst = Math.max(0, Number(gstEl?.value) || 0);
+            if (source === 'pct' || source === 'reset' || !gstEl?.value) {
+                gst = Math.max(0, i * gstPct / 100);
+                if (gstEl) gstEl.value = gst;
+            } else if (source === 'amount') {
+                gstPct = i>0 ? (gst/i*100) : 0;
+                if (pctEl) pctEl.value = gstPct;
+            }
             const gstDisp = document.getElementById("lp-gst-amount-disp");
-            if (gstDisp) gstDisp.innerText = gst.toLocaleString('en-IN');
+            if (gstDisp) gstDisp.innerText = gst.toLocaleString('en-IN',{maximumFractionDigits:2});
             const total = p + i + gst;
             const totalPaid = document.getElementById("lp-total-paid");
             if (totalPaid && totalPaid.dataset.userEdited !== '1') totalPaid.value = total;
@@ -7416,11 +7430,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("fc-orig-loan").innerText="₹"+Number(prod.amount||0).toLocaleString('en-IN');
             document.getElementById("fc-emis-paid").innerText=loan.payments.length+" EMIs";
             document.getElementById("fc-rem-principal").value=editMode?Number(fd.principalPaid??remPrincipal):remPrincipal;
-            document.getElementById("fc-fee-amount").value=editMode?Number(fd.feeAmount||0):Math.round(currentForeclosureOrigLoan*5/100);
-            document.getElementById("fc-fee-percent").value=editMode && currentForeclosureOrigLoan>0 ? ((Number(fd.feeAmount||0)/currentForeclosureOrigLoan)*100).toFixed(1) : 5;
+            document.getElementById("fc-fee-amount").value=editMode?Number(fd.feeAmount||0):(currentForeclosureOrigLoan*5/100);
+            document.getElementById("fc-fee-percent").value=editMode && currentForeclosureOrigLoan>0 ? ((Number(fd.feeAmount||0)/currentForeclosureOrigLoan)*100) : 5;
             const legacyGstPct = Number(fd.gstPct||0) || ((Number(fd.feeAmount)||0)>0 && Number(fd.gstAmount)>0 ? (Number(fd.gstAmount)/Number(fd.feeAmount)*100) : 18);
-            document.getElementById("fc-gst-pct").value=editMode?Number(legacyGstPct.toFixed(4)):18;
-            document.getElementById("fc-gst-amount").value=editMode?Number(fd.gstAmount||0):Math.round((Number(currentForeclosureOrigLoan*5/100)*18)/100);
+            document.getElementById("fc-gst-pct").value=editMode?Number(legacyGstPct):18;
+            document.getElementById("fc-gst-amount").value=editMode?Number(fd.gstAmount||0):((Number(currentForeclosureOrigLoan*5/100)*18)/100);
             document.getElementById("fc-gst-amount").dataset.userEdited=editMode?'1':'';
             document.getElementById("fc-s-mode").value=editMode?(fd.mode||'Cash'):'Cash';
             setDmyValues("fc-s",editMode&&fd.settlementDate?fd.settlementDate:mfIsoToday());
@@ -7447,10 +7461,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const loan=state.loans.find(l=>l.id===loanId);
             const settleDate=getForeclosureSettlementDate();
             const pc=loan?mfPreClosureDetails(loan,settleDate):{days:0,interest:0,monthlyInterest:0,fromDate:'',toDate:settleDate};
-            const feeAmt = Math.round((currentForeclosureOrigLoan * feePercent) / 100);
+            const feeAmt = Math.max(0, (currentForeclosureOrigLoan * feePercent) / 100);
             const gstPct=getForeclosureGstPct();
             const gstEl=document.getElementById('fc-gst-amount');
-            const calculatedGst=Math.round((feeAmt*gstPct)/100);
+            const calculatedGst=Math.max(0, (feeAmt*gstPct)/100);
             if(gstEl && gstEl.dataset.userEdited!=='1') gstEl.value=calculatedGst;
             const gstAmt=Math.max(0,Number(gstEl?.value)||0);
             const netTotal = remPrin + pc.interest + feeAmt + gstAmt;
@@ -7474,10 +7488,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const pc=loan?mfPreClosureDetails(loan,settleDate):{days:0,interest:0,monthlyInterest:0,fromDate:'',toDate:settleDate};
             const gstPct=getForeclosureGstPct();
             const gstEl=document.getElementById('fc-gst-amount');
-            if(gstEl && gstEl.dataset.userEdited!=='1') gstEl.value=Math.round((feeAmt*gstPct)/100);
+            if(gstEl && gstEl.dataset.userEdited!=='1') gstEl.value=Math.max(0, (feeAmt*gstPct)/100);
             const gstAmt=Math.max(0,Number(gstEl?.value)||0);
             const netTotal = remPrin + pc.interest + feeAmt + gstAmt;
-            const feePercent = currentForeclosureOrigLoan > 0 ? ((feeAmt / currentForeclosureOrigLoan) * 100).toFixed(4) : 0;
+            const feePercent = currentForeclosureOrigLoan > 0 ? ((feeAmt / currentForeclosureOrigLoan) * 100) : 0;
             document.getElementById("fc-fee-percent").value = feePercent;
             document.getElementById("fc-preclosure-interest").value = pc.interest.toFixed(2);
             document.getElementById("fc-preclosure-interest-note").innerText = pc.days>0
@@ -7497,7 +7511,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         function calcForeclosureFromGstAmount(){
             const el=document.getElementById('fc-gst-amount');
+            const pctEl=document.getElementById('fc-gst-pct');
+            const feeEl=document.getElementById('fc-fee-amount');
             if(el)el.dataset.userEdited='1';
+            const fee=Number(feeEl?.value)||0;
+            const gst=Number(el?.value)||0;
+            if(pctEl) pctEl.value = fee>0 ? (gst/fee*100) : 0;
             calcForeclosureTotals();
         }
 
