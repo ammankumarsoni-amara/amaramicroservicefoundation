@@ -1855,16 +1855,22 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
                             <label>Processing Fee GST (%)</label>
-                            <input type="number" id="b-processing-gst-pct" value="0" min="0" max="100" step="any" placeholder="e.g. 18" oninput="calcBorrowingUpfrontFields()">
-                            <div id="b-processing-gst-calc" style="font-size:.68rem;color:#94a3b8;margin-top:3px;">Calculated: ₹0</div>
+                            <input type="number" id="b-processing-gst-pct" value="18" min="0" max="100" step="any" placeholder="e.g. 18" oninput="calcBorrowingUpfrontFields('pct')">
+                            <div id="b-processing-gst-calc" style="font-size:.68rem;color:#94a3b8;margin-top:3px;">GST Amount: ₹0</div>
+                            <input type="number" id="b-processing-gst-amount" value="0" min="0" step="0.01" placeholder="GST amount" oninput="document.getElementById('b-processing-gst-amount').dataset.userEdited='1';calcBorrowingUpfrontFields('amount')" style="margin-top:5px;">
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
                             <label>Other Charges (₹)</label>
                             <input type="number" id="b-other-charges" value="0" min="0" step="any" placeholder="0">
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
-                            <label>Other Charges GST (₹)</label>
-                            <input type="number" id="b-other-gst" value="0" min="0" step="any" placeholder="0">
+                            <label>Other Charges GST (%)</label>
+                            <input type="number" id="b-other-gst-pct" value="18" min="0" max="100" step="any" placeholder="e.g. 18" oninput="calcBorrowingOtherGst('pct')">
+                            <div id="b-other-gst-calc" style="font-size:.68rem;color:#94a3b8;margin-top:3px;">Calculated: ₹0</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Other Charges GST Amount (₹) [Editable]</label>
+                            <input type="number" id="b-other-gst" value="0" min="0" step="0.01" placeholder="0" oninput="calcBorrowingOtherGst('amount')">
                         </div>
                     </div>
                     <div style="margin-top:8px; font-size:.72rem; color:#94a3b8;">
@@ -1874,9 +1880,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
                 <div class="form-group" style="background: rgba(255,255,255,0.04); padding: 10px; border-radius: 9px; border: 1px solid var(--border-subtle);">
                     <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0; color:#fff; font-size:0.8rem;">
-                        <input type="checkbox" id="b-apply-gst" style="width:16px; height:16px;">
-                        <span>Apply 18% GST on Interest Payments</span>
+                        <input type="checkbox" id="b-apply-gst" style="width:16px; height:16px;" onchange="toggleGstCheckbox()">
+                        <span>Apply GST on Interest Payments</span>
                     </label>
+                </div>
+
+                <div class="form-group" id="b-interest-gst-settings" style="display:none;background:rgba(56,189,248,.07);padding:10px;border-radius:9px;border:1px solid rgba(56,189,248,.18);">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Interest GST (%)</label>
+                            <input type="number" id="b-interest-gst-pct" value="18" min="0" max="100" step="any" placeholder="18">
+                        </div>
+                        <div style="font-size:.68rem;color:#94a3b8;align-self:end;padding-bottom:5px;">Default: 18%. Change the rate when required. Actual GST amount is entered on each lender payment and remains editable.</div>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -1954,9 +1970,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     </div>
                     <div class="form-group" id="lp-gst-field-wrap">
                         <label>GST on Interest (%)</label>
-                        <input type="number" id="lp-gst-pct" value="18" min="0" max="100" step="any" oninput="calcLenderPaymentTotals()" style="background:rgba(255,255,255,0.08);color:#38bdf8;">
-                        <input type="hidden" id="lp-gst" value="0">
-                        <div style="font-size:.72rem;color:#38bdf8;margin-top:5px;font-weight:700;">GST Amount: ₹<span id="lp-gst-amount-disp">0</span></div>
+                        <input type="number" id="lp-gst-pct" value="18" min="0" max="100" step="any" oninput="calcLenderPaymentTotals('pct')" style="background:rgba(255,255,255,0.08);color:#38bdf8;">
+                        <input type="number" id="lp-gst" value="0" min="0" step="0.01" oninput="calcLenderPaymentTotals('amount')" style="margin-top:5px;background:rgba(255,255,255,0.08);color:#38bdf8;">
+                        <div style="font-size:.72rem;color:#38bdf8;margin-top:5px;font-weight:700;">GST Amount (Editable)</div>
                     </div>
                 </div>
 
@@ -2354,9 +2370,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>GST on Foreclosure Fee (18%) (₹)</label>
-                    <input type="number" id="fc-gst-amount" readonly style="background:rgba(255,255,255,0.08); color:#fbbf24;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div class="form-group">
+                        <label>GST on Foreclosure Fee (%)</label>
+                        <input type="number" id="fc-gst-pct" value="18" min="0" max="100" step="any" oninput="calcForeclosureFromGstRate()">
+                    </div>
+                    <div class="form-group">
+                        <label>GST Amount (₹) [Editable]</label>
+                        <input type="number" id="fc-gst-amount" value="0" min="0" step="0.01" oninput="calcForeclosureFromGstAmount()">
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -2389,7 +2411,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <b style="font-size:1.25rem; color:#c084fc;" id="fc-net-total-display">₹0</b>
                     </div>
                     <div style="font-size:0.7rem; color:#cbd5e1; margin-top:3px;">
-                        Principal: <span id="fc-sub-p">₹0</span> + Pre-Closure Interest: <span id="fc-sub-i">₹0</span> + Foreclosure Charges (5%+GST): <span id="fc-sub-f">₹0</span>
+                        Principal: <span id="fc-sub-p">₹0</span> + Pre-Closure Interest: <span id="fc-sub-i">₹0</span> + Foreclosure Charges (Fee + GST): <span id="fc-sub-f">₹0</span>
                     </div>
                 </div>
 
@@ -3018,6 +3040,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 }
                 b.otherCharges = Number(b.otherCharges || 0);
                 b.otherGst = Number(b.otherGst || 0);
+                b.otherGstPct = Number(b.otherGstPct || 0);
+                if (!b.otherGstPct && b.otherCharges > 0 && b.otherGst) b.otherGstPct = (b.otherGst / b.otherCharges) * 100;
+                b.interestGstPct = Number(b.interestGstPct || 0);
+                if (b.applyGst && !b.interestGstPct) b.interestGstPct = 18;
                 b.tenure = Number(b.tenure || 0);
                 if (!Array.isArray(b.repayments)) b.repayments = [];
                 // Preserve existing repayment data, but attach schedule metadata when tenure is available.
@@ -6582,11 +6608,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("b-tenure").value = "12";
             document.getElementById("b-interest-basis").value = "Reducing Balance";
             document.getElementById("b-processing-fee-pct").value = 0;
-            document.getElementById("b-processing-gst-pct").value = 0;
-            calcBorrowingUpfrontFields();
+            document.getElementById("b-processing-gst-pct").value = 18;
+            document.getElementById("b-processing-gst-amount").value = 0;
             document.getElementById("b-other-charges").value = 0;
+            document.getElementById("b-other-gst-pct").value = 18;
             document.getElementById("b-other-gst").value = 0;
             document.getElementById("b-apply-gst").checked = false;
+            document.getElementById("b-interest-gst-pct").value = 18;
+            document.getElementById("b-processing-gst-pct").dataset.userEdited = '';
+            document.getElementById("b-other-gst-pct").dataset.userEdited = '';
+            document.getElementById("b-other-gst").dataset.userEdited = '';
+            calcBorrowingUpfrontFields('reset');
+            calcBorrowingOtherGst('reset');
+            toggleGstCheckbox();
             setDmyValues("b", new Date().toISOString().split('T')[0]);
             document.getElementById("btn-delete-borrowing").style.display = "none";
             document.getElementById("modal-borrowing").classList.add("active");
@@ -6608,33 +6642,72 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("b-processing-fee-pct").value = legacyProcessingPct ? Number(legacyProcessingPct.toFixed(4)) : 0;
             const legacyProcessingGstPct = Number(b.processingGstPct || 0) || ((Number(b.processingFee)||0) > 0 ? ((Number(b.processingGst)||0) / (Number(b.processingFee)||0) * 100) : 0);
             document.getElementById("b-processing-gst-pct").value = legacyProcessingGstPct ? Number(legacyProcessingGstPct.toFixed(4)) : 0;
+            document.getElementById("b-processing-gst-amount").value = Number(b.processingGst || 0);
             document.getElementById("b-other-charges").value = Number(b.otherCharges || 0);
+            const legacyOtherGstPct = Number(b.otherGstPct || 0) || ((Number(b.otherCharges)||0) > 0 ? ((Number(b.otherGst)||0) / (Number(b.otherCharges)||0) * 100) : 0);
+            document.getElementById("b-other-gst-pct").value = legacyOtherGstPct ? Number(legacyOtherGstPct.toFixed(4)) : 0;
             document.getElementById("b-other-gst").value = Number(b.otherGst || 0);
             document.getElementById("b-apply-gst").checked = b.applyGst || false;
-            calcBorrowingUpfrontFields();
+            document.getElementById("b-interest-gst-pct").value = Number(b.interestGstPct || 18);
+            document.getElementById("b-processing-gst-pct").dataset.userEdited = '1';
+            document.getElementById("b-other-gst-pct").dataset.userEdited = '1';
+            document.getElementById("b-other-gst").dataset.userEdited = '1';
+            calcBorrowingUpfrontFields('load');
+            calcBorrowingOtherGst('load');
+            toggleGstCheckbox();
             setDmyValues("b", b.date);
             document.getElementById("btn-delete-borrowing").style.display = "block";
             document.getElementById("modal-borrowing").classList.add("active");
         }
 
         function toggleGstCheckbox() {
-            const cat = document.getElementById("b-category").value;
+            const cat = document.getElementById("b-category")?.value;
+            const checkbox = document.getElementById("b-apply-gst");
+            const wrap = document.getElementById("b-interest-gst-settings");
             if (cat === "Credit Card Loan" || cat === "Bank Personal Loan") {
-                document.getElementById("b-apply-gst").checked = true;
+                if (checkbox) checkbox.checked = true;
             }
+            if (wrap) wrap.style.display = checkbox?.checked ? '' : 'none';
+            const pct = document.getElementById("b-interest-gst-pct");
+            if (pct && (!pct.value || Number(pct.value) < 0)) pct.value = 18;
         }
 
-        function calcBorrowingUpfrontFields() {
+        function calcBorrowingUpfrontFields(source='') {
             const amount = parseFloat(document.getElementById("b-amount")?.value) || 0;
             const pct = parseFloat(document.getElementById("b-processing-fee-pct")?.value) || 0;
             const fee = Math.max(0, amount * pct / 100);
-            const gstPct = parseFloat(document.getElementById("b-processing-gst-pct")?.value) || 0;
-            const gst = Math.max(0, fee * gstPct / 100);
+            const gstPctEl = document.getElementById("b-processing-gst-pct");
+            const gstAmtEl = document.getElementById("b-processing-gst-amount");
+            const gstPct = parseFloat(gstPctEl?.value) || 0;
+            const calculatedGst = Math.max(0, fee * gstPct / 100);
+            if (source === 'pct' || source === 'reset') {
+                if (gstAmtEl) { gstAmtEl.value = calculatedGst; gstAmtEl.dataset.userEdited = ''; }
+            } else if (gstAmtEl && !gstAmtEl.value) {
+                gstAmtEl.value = calculatedGst;
+            }
+            const gst = Math.max(0, parseFloat(gstAmtEl?.value) || 0);
             const out = document.getElementById("b-processing-fee-calc");
             const gstOut = document.getElementById("b-processing-gst-calc");
             if (out) out.innerText = "Calculated: ₹" + fee.toLocaleString("en-IN", {maximumFractionDigits:2});
-            if (gstOut) gstOut.innerText = "Calculated: ₹" + gst.toLocaleString("en-IN", {maximumFractionDigits:2});
-            return { fee, gst };
+            if (gstOut) gstOut.innerText = "GST Amount: ₹" + gst.toLocaleString("en-IN", {maximumFractionDigits:2});
+            return { fee, gst, gstPct };
+        }
+
+        function calcBorrowingOtherGst(source='') {
+            const base = Math.max(0, parseFloat(document.getElementById("b-other-charges")?.value) || 0);
+            const pctEl = document.getElementById("b-other-gst-pct");
+            const amtEl = document.getElementById("b-other-gst");
+            const pct = parseFloat(pctEl?.value) || 0;
+            const calculated = Math.max(0, base * pct / 100);
+            if (source === 'pct' || source === 'reset') {
+                if (amtEl) { amtEl.value = calculated; amtEl.dataset.userEdited = ''; }
+            } else if (amtEl && !amtEl.value) {
+                amtEl.value = calculated;
+            }
+            const amount = Math.max(0, parseFloat(amtEl?.value) || 0);
+            const out = document.getElementById("b-other-gst-calc");
+            if (out) out.innerText = "GST Amount: ₹" + amount.toLocaleString('en-IN',{maximumFractionDigits:2});
+            return { pct, amount };
         }
 
         function handleBorrowingSubmit(e) {
@@ -6650,10 +6723,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const processingFeePct = parseFloat(document.getElementById("b-processing-fee-pct").value) || 0;
             const processingFee = Math.max(0, amount * processingFeePct / 100);
             const processingGstPct = parseFloat(document.getElementById("b-processing-gst-pct").value) || 0;
-            const processingGst = Math.max(0, processingFee * processingGstPct / 100);
+            const processingGst = Math.max(0, parseFloat(document.getElementById("b-processing-gst-amount")?.value) || 0);
             const otherCharges = parseFloat(document.getElementById("b-other-charges").value) || 0;
-            const otherGst = parseFloat(document.getElementById("b-other-gst").value) || 0;
+            const otherGstPct = parseFloat(document.getElementById("b-other-gst-pct")?.value) || 0;
+            const otherGst = Math.max(0, parseFloat(document.getElementById("b-other-gst").value) || 0);
             const applyGst = document.getElementById("b-apply-gst").checked;
+            const interestGstPct = Math.max(0, parseFloat(document.getElementById("b-interest-gst-pct")?.value) || 18);
             const date = getDmyIsoString("b");
 
             if (!Number.isFinite(tenure) || tenure < 1) {
@@ -6677,7 +6752,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     processingGstPct: processingGstPct,
                     processingGst: processingGst,
                     otherCharges: otherCharges,
+                    otherGstPct: otherGstPct,
                     otherGst: otherGst,
+                    interestGstPct: interestGstPct,
                     applyGst: applyGst,
                     date: date,
                     repayments: []
@@ -6697,7 +6774,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 b.processingGstPct = processingGstPct;
                 b.processingGst = processingGst;
                 b.otherCharges = otherCharges;
+                b.otherGstPct = otherGstPct;
                 b.otherGst = otherGst;
+                b.interestGstPct = interestGstPct;
                 b.applyGst = applyGst;
                 b.date = date;
             }
@@ -6771,7 +6850,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             <span class="borrow-badge">${financeEsc(b.id)}</span>
                             <b style="font-size: 0.95rem; margin-left: 5px; color:#fff;">${financeEsc(b.lenderName)}</b>
                             <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">
-                                ${financeEsc(b.category)} · <span style="color:#fbbf24; font-weight:700;">${Number(b.rate||0)}% p.a.</span> · ${financeEsc(b.type)} · ${b.tenure ? Number(b.tenure)+' months' : 'Tenure not set'} ${b.applyGst ? '<span style="color:#38bdf8; font-weight:700;">(+18% GST on Interest)</span>':''}
+                                ${financeEsc(b.category)} · <span style="color:#fbbf24; font-weight:700;">${Number(b.rate||0)}% p.a.</span> · ${financeEsc(b.type)} · ${b.tenure ? Number(b.tenure)+' months' : 'Tenure not set'} ${b.applyGst ? `<span style="color:#38bdf8; font-weight:700;">(+${Number(b.interestGstPct||18).toLocaleString('en-IN',{maximumFractionDigits:4})}% GST on Interest)</span>`:''}
                             </div>
                         </div>
                         <div style="text-align:right;">
@@ -6795,7 +6874,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     </div>
                     <div style="font-size:.68rem; color:#94a3b8; line-height:1.55; margin-bottom:8px;">
                         Processing: ${Number(b.processingFeePct||0).toLocaleString('en-IN',{maximumFractionDigits:2})}% = ₹${Number(b.processingFee||0).toLocaleString('en-IN')} + GST ${Number(b.processingGstPct||0).toLocaleString('en-IN',{maximumFractionDigits:2})}% = ₹${Number(b.processingGst||0).toLocaleString('en-IN')}
-                        &nbsp;·&nbsp; Other: ₹${Number(b.otherCharges||0).toLocaleString('en-IN')} + GST ₹${Number(b.otherGst||0).toLocaleString('en-IN')}
+                        &nbsp;·&nbsp; Other: ₹${Number(b.otherCharges||0).toLocaleString('en-IN')} + GST ${Number(b.otherGstPct||0).toLocaleString('en-IN',{maximumFractionDigits:2})}% = ₹${Number(b.otherGst||0).toLocaleString('en-IN')}
                     </div>
                     ${(() => { const paidCount=(b.repayments||[]).length; return paidCount>0 ? `<div style="font-size:.68rem;color:#34d399;line-height:1.5;margin-bottom:8px;">Paid till now: <b>${paidCount} installment${paidCount>1?'s':''}</b> · Principal Paid: <b>${mfMoney(paidP)}</b> · File Charge + Interest + GST Paid: <b>${mfMoney(paidFileIntGst)}</b></div>` : `<div style="font-size:.68rem;color:#94a3b8;line-height:1.5;margin-bottom:8px;">No payment recorded yet for this borrowing.</div>`; })()}
                     <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); font-size:0.76rem;">
@@ -6984,11 +7063,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 set('lp-edit-index',-1); set('lp-borrow-id',b.id);
                 set('lp-name-disp',b.lenderName,'innerText'); set('lp-id-disp',b.id,'innerText'); set('lp-orig-disp',mfMoney(b.amount),'innerText');
                 set('lp-rate-disp',(b.rate||0)+'% p.a. · '+(b.interestBasis||'Reducing Balance'),'innerText'); set('lp-rem-disp',mfMoney(remP),'innerText');
-                set('lp-gst-disp',b.applyGst?'Yes (18% on Int)':'No','innerText'); set('lp-emi-no',next.no,'innerText'); set('lp-due-date',formatToIndianDate(next.dueDate),'innerText');
+                set('lp-gst-disp',b.applyGst?`Yes (${Number(b.interestGstPct||18).toLocaleString('en-IN',{maximumFractionDigits:4})}% on Int)`:'No','innerText'); set('lp-emi-no',next.no,'innerText'); set('lp-due-date',formatToIndianDate(next.dueDate),'innerText');
                 // Leave Principal/Interest blank — this business enters the exact amount from the lender's
                 // own statement for each installment (banks often front-load interest in the first EMI, so
                 // no auto-calculated suggestion is shown here).
                 set('lp-principal',''); set('lp-interest',''); set('lp-gst',0);
+                const gstPctNew=document.getElementById('lp-gst-pct'); if(gstPctNew)gstPctNew.value=b.applyGst?Number(b.interestGstPct||18):0;
                 const gstWrap=document.getElementById('lp-gst-field-wrap'); if(gstWrap) gstWrap.style.display=b.applyGst?'':'none';
                 const pct=document.getElementById('lp-gst-pct'); if(pct)pct.value=b.applyGst?18:0;
                 const total=document.getElementById('lp-total-paid'); if(total){total.dataset.userEdited='';total.value='';}
@@ -7012,8 +7092,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             set('lp-edit-index',Number(index));set('lp-borrow-id',b.id);set('lp-name-disp',b.lenderName,'innerText');set('lp-id-disp',b.id,'innerText');set('lp-orig-disp',mfMoney(b.amount),'innerText');
             set('lp-rate-disp',(b.rate||0)+'% p.a. · '+(b.interestBasis||'Reducing Balance'),'innerText');
             const paidP=(b.repayments||[]).reduce((sum,x,i)=>i===Number(index)?sum:sum+(Number(x.principal)||0),0);set('lp-rem-disp',mfMoney(Math.max(0,Number(b.amount||0)-paidP)),'innerText');
-            set('lp-gst-disp',b.applyGst?'Yes (18% on Int)':'No','innerText');set('lp-emi-no',scheduled.no,'innerText');set('lp-due-date',formatToIndianDate(scheduled.dueDate),'innerText');
-            set('lp-gst',Number(r.gst)||0);set('lp-gst-pct',b.applyGst?18:0);set('lp-total-paid',Number(r.totalPaid)||'');set('lp-mode',r.mode||'Bank Transfer');
+            set('lp-gst-disp',b.applyGst?`Yes (${Number(b.interestGstPct||18).toLocaleString('en-IN',{maximumFractionDigits:4})}% on Int)`:'No','innerText');set('lp-emi-no',scheduled.no,'innerText');set('lp-due-date',formatToIndianDate(scheduled.dueDate),'innerText');
+            set('lp-gst',Number(r.gst)||0);set('lp-gst-pct',b.applyGst?Number(b.interestGstPct||18):0);set('lp-total-paid',Number(r.totalPaid)||'');set('lp-mode',r.mode||'Bank Transfer');
             const gstWrap=document.getElementById('lp-gst-field-wrap'); if(gstWrap) gstWrap.style.display=b.applyGst?'':'none';
             // Show the ACTUAL amounts that were recorded for this installment (this is real entered data, not any suggestion).
             set('lp-principal',Number(r.principal)||'');set('lp-interest',Number(r.interest)||'');
@@ -7033,13 +7113,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const schedule=document.getElementById('modal-borrowing-schedule');if(schedule&&schedule.classList.contains('active'))openBorrowingSchedule(b.id);
         }
 
-        function calcLenderPaymentTotals() {
+        function calcLenderPaymentTotals(source='') {
             const p = Number(document.getElementById("lp-principal")?.value) || 0;
             const i = Number(document.getElementById("lp-interest")?.value) || 0;
             const gstPct = Number(document.getElementById("lp-gst-pct")?.value) || 0;
-            const gst = Math.round(i * gstPct / 100 * 100) / 100;
-            const gstHidden = document.getElementById("lp-gst");
-            if (gstHidden) gstHidden.value = gst;
+            const gstEl = document.getElementById("lp-gst");
+            const calculatedGst = Math.round(i * gstPct / 100 * 100) / 100;
+            if (gstEl && (source === 'pct' || source === 'reset' || !gstEl.value)) gstEl.value = calculatedGst;
+            const gst = Math.max(0, Number(gstEl?.value) || 0);
             const gstDisp = document.getElementById("lp-gst-amount-disp");
             if (gstDisp) gstDisp.innerText = gst.toLocaleString('en-IN');
             const total = p + i + gst;
@@ -7337,12 +7418,26 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("fc-rem-principal").value=editMode?Number(fd.principalPaid??remPrincipal):remPrincipal;
             document.getElementById("fc-fee-amount").value=editMode?Number(fd.feeAmount||0):Math.round(currentForeclosureOrigLoan*5/100);
             document.getElementById("fc-fee-percent").value=editMode && currentForeclosureOrigLoan>0 ? ((Number(fd.feeAmount||0)/currentForeclosureOrigLoan)*100).toFixed(1) : 5;
+            const legacyGstPct = Number(fd.gstPct||0) || ((Number(fd.feeAmount)||0)>0 && Number(fd.gstAmount)>0 ? (Number(fd.gstAmount)/Number(fd.feeAmount)*100) : 18);
+            document.getElementById("fc-gst-pct").value=editMode?Number(legacyGstPct.toFixed(4)):18;
+            document.getElementById("fc-gst-amount").value=editMode?Number(fd.gstAmount||0):Math.round((Number(currentForeclosureOrigLoan*5/100)*18)/100);
+            document.getElementById("fc-gst-amount").dataset.userEdited=editMode?'1':'';
             document.getElementById("fc-s-mode").value=editMode?(fd.mode||'Cash'):'Cash';
             setDmyValues("fc-s",editMode&&fd.settlementDate?fd.settlementDate:mfIsoToday());
             if(editMode)calcForeclosureFromFee(); else calcForeclosureTotals();
+            if(editMode){
+                document.getElementById("fc-gst-amount").value=Number(fd.gstAmount||0);
+                document.getElementById("fc-gst-amount").dataset.userEdited='1';
+                calcForeclosureTotals();
+            }
             const submit=document.querySelector('#form-foreclose .btn-submit');
             if(submit)submit.innerHTML=editMode?'✓ Update Foreclosure':'✓ Execute Foreclosure';
             document.getElementById("modal-foreclose").classList.add("active");
+        }
+
+        function getForeclosureGstPct(){
+            const v=Number(document.getElementById('fc-gst-pct')?.value);
+            return Number.isFinite(v)&&v>=0?v:0;
         }
 
         function calcForeclosureTotals() {
@@ -7353,19 +7448,21 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const settleDate=getForeclosureSettlementDate();
             const pc=loan?mfPreClosureDetails(loan,settleDate):{days:0,interest:0,monthlyInterest:0,fromDate:'',toDate:settleDate};
             const feeAmt = Math.round((currentForeclosureOrigLoan * feePercent) / 100);
-            const gstAmt = Math.round((feeAmt * 18) / 100);
+            const gstPct=getForeclosureGstPct();
+            const gstEl=document.getElementById('fc-gst-amount');
+            const calculatedGst=Math.round((feeAmt*gstPct)/100);
+            if(gstEl && gstEl.dataset.userEdited!=='1') gstEl.value=calculatedGst;
+            const gstAmt=Math.max(0,Number(gstEl?.value)||0);
             const netTotal = remPrin + pc.interest + feeAmt + gstAmt;
             document.getElementById("fc-fee-amount").value = feeAmt;
-            document.getElementById("fc-gst-amount").value = gstAmt;
             document.getElementById("fc-preclosure-interest").value = pc.interest.toFixed(2);
             document.getElementById("fc-preclosure-interest-note").innerText = pc.days>0
                 ? `${pc.days} day(s) × ₹${pc.monthlyInterest.toLocaleString('en-IN',{maximumFractionDigits:2})} ÷ 30, from ${formatToIndianDate(pc.fromDate)} to ${formatToIndianDate(settleDate)}. Actual-use interest only; any prepayment/foreclosure charge must be permitted and disclosed under the applicable loan terms/KFS and law.`
                 : "No additional pre-closure interest: foreclosure date is on/before the last completed EMI's contractual due date.";
-            const combinedCharges = feeAmt + gstAmt;
             document.getElementById("fc-net-total-display").innerText = "₹" + netTotal.toLocaleString('en-IN');
             document.getElementById("fc-sub-p").innerText = "₹" + remPrin.toLocaleString('en-IN');
             document.getElementById("fc-sub-i").innerText = "₹" + pc.interest.toLocaleString('en-IN',{maximumFractionDigits:2});
-            document.getElementById("fc-sub-f").innerText = "₹" + combinedCharges.toLocaleString('en-IN');
+            document.getElementById("fc-sub-f").innerText = "₹" + (feeAmt + gstAmt).toLocaleString('en-IN');
         }
 
         function calcForeclosureFromFee() {
@@ -7375,11 +7472,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const loan=state.loans.find(l=>l.id===loanId);
             const settleDate=getForeclosureSettlementDate();
             const pc=loan?mfPreClosureDetails(loan,settleDate):{days:0,interest:0,monthlyInterest:0,fromDate:'',toDate:settleDate};
-            const gstAmt = Math.round((feeAmt * 18) / 100);
+            const gstPct=getForeclosureGstPct();
+            const gstEl=document.getElementById('fc-gst-amount');
+            if(gstEl && gstEl.dataset.userEdited!=='1') gstEl.value=Math.round((feeAmt*gstPct)/100);
+            const gstAmt=Math.max(0,Number(gstEl?.value)||0);
             const netTotal = remPrin + pc.interest + feeAmt + gstAmt;
-            const feePercent = currentForeclosureOrigLoan > 0 ? ((feeAmt / currentForeclosureOrigLoan) * 100).toFixed(1) : 0;
+            const feePercent = currentForeclosureOrigLoan > 0 ? ((feeAmt / currentForeclosureOrigLoan) * 100).toFixed(4) : 0;
             document.getElementById("fc-fee-percent").value = feePercent;
-            document.getElementById("fc-gst-amount").value = gstAmt;
             document.getElementById("fc-preclosure-interest").value = pc.interest.toFixed(2);
             document.getElementById("fc-preclosure-interest-note").innerText = pc.days>0
                 ? `${pc.days} day(s) × ₹${pc.monthlyInterest.toLocaleString('en-IN',{maximumFractionDigits:2})} ÷ 30, from ${formatToIndianDate(pc.fromDate)} to ${formatToIndianDate(settleDate)}. Actual-use interest only; any prepayment/foreclosure charge must be permitted and disclosed under the applicable loan terms/KFS and law.`
@@ -7388,6 +7487,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("fc-sub-p").innerText = "₹" + remPrin.toLocaleString('en-IN');
             document.getElementById("fc-sub-i").innerText = "₹" + pc.interest.toLocaleString('en-IN',{maximumFractionDigits:2});
             document.getElementById("fc-sub-f").innerText = "₹" + (feeAmt + gstAmt).toLocaleString('en-IN');
+        }
+
+        function calcForeclosureFromGstRate(){
+            const el=document.getElementById('fc-gst-amount');
+            if(el)el.dataset.userEdited='';
+            calcForeclosureTotals();
+        }
+
+        function calcForeclosureFromGstAmount(){
+            const el=document.getElementById('fc-gst-amount');
+            if(el)el.dataset.userEdited='1';
+            calcForeclosureTotals();
         }
 
         function handleForecloseSubmit(e) {
@@ -7414,6 +7525,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 preClosureMonthlyInterest: pc.monthlyInterest,
                 preClosureInterest: pc.interest,
                 feeAmount: feeAmt,
+                gstPct: getForeclosureGstPct(),
                 gstAmount: gstAmt,
                 settlementAmount: netSettleAmt,
                 mode: mode
@@ -8883,7 +8995,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             <div>Remaining Principal Paid: <b style="color:#fff;">₹${Number(l.foreclosureData.principalPaid||0).toLocaleString('en-IN')}</b></div>
                             ${Number(l.foreclosureData.partialAmountAlreadyCollected||0)>0 ? `<div>Partial Amount Already Collected: <b style="color:#60a5fa;">₹${Number(l.foreclosureData.partialAmountAlreadyCollected).toLocaleString('en-IN')}</b></div>` : ''}
                             <div>Pre-Closure Interest: <b style="color:#34d399;">₹${preClosureInterest.toLocaleString('en-IN',{maximumFractionDigits:2})}</b>${Number(l.foreclosureData.preClosureDays||0)>0?` <span style="font-size:.68rem;color:#94a3b8;">(${Number(l.foreclosureData.preClosureDays)} day(s) × ₹${Number(l.foreclosureData.preClosureMonthlyInterest||0).toLocaleString('en-IN',{maximumFractionDigits:2})} ÷ 30)</span>`:''}</div>
-                            <div>Foreclosure Charges: <b style="color:#fbbf24;">₹${totalCombinedForecloseCharges.toLocaleString('en-IN')}</b></div>
+                            <div>Foreclosure Fee: <b style="color:#fbbf24;">₹${Number(l.foreclosureData.feeAmount||0).toLocaleString('en-IN')}</b></div>
+                            ${Number(l.foreclosureData.gstAmount||0)>0 ? `<div>Foreclosure GST${Number(l.foreclosureData.gstPct||0)>0 ? ` (${Number(l.foreclosureData.gstPct).toLocaleString('en-IN',{maximumFractionDigits:4})}%)` : ''}: <b style="color:#38bdf8;">₹${Number(l.foreclosureData.gstAmount||0).toLocaleString('en-IN')}</b></div>` : ''}
                             <div style="text-align:right;">Total Settlement Paid: <b style="color:#34d399; font-size:0.95rem;">₹${Number(l.foreclosureData.settlementAmount||0).toLocaleString('en-IN')}</b></div>
                         </div>
                         <div style="margin-top:6px; font-size:0.75rem; color:#cbd5e1;">
@@ -9176,7 +9289,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             ${Number(l.foreclosureData.partialAmountAlreadyCollected||0)>0 ? `<tr><td style="border:none; padding:4px 0;"><b>Partial Amount Already Collected:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.partialAmountAlreadyCollected).toLocaleString('en-IN')}</td></tr>` : ''}
                             <tr><td style="border:none; padding:4px 0;"><b>Pre-Closure Interest:</b></td><td style="border:none; padding:4px 0;">${Number(l.foreclosureData.preClosureDays||0)} day(s) × ₹${Number(l.foreclosureData.preClosureMonthlyInterest||0).toLocaleString('en-IN',{maximumFractionDigits:2})} ÷ 30 = ₹${Number(l.foreclosureData.preClosureInterest||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Foreclosure Fee:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.feeAmount||0).toLocaleString('en-IN')}</td></tr>
-                            <tr><td style="border:none; padding:4px 0;"><b>GST on Foreclosure Fee:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.gstAmount||0).toLocaleString('en-IN')}</td></tr>
+                            ${Number(l.foreclosureData.gstAmount||0)>0 ? `<tr><td style="border:none; padding:4px 0;"><b>GST on Foreclosure Fee${Number(l.foreclosureData.gstPct||0)>0 ? ` (${Number(l.foreclosureData.gstPct).toLocaleString('en-IN',{maximumFractionDigits:4})}%)` : ''}:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.gstAmount||0).toLocaleString('en-IN')}</td></tr>` : ''}
                             <tr><td style="border:none; padding:4px 0;"><b>Final Settlement Amount:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.settlementAmount||0).toLocaleString('en-IN')} (${l.foreclosureData.mode})</td></tr>
                             ${l.guarantorName ? `<tr><td style="border:none; padding:4px 0;"><b>Guarantor:</b></td><td style="border:none; padding:4px 0;">${l.guarantorName}${mfGuarantorContactText(l) ? ' (' + financeEsc(mfGuarantorContactText(l)) + ')' : ''}</td></tr>` : ''}
                         </table>
