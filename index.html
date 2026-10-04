@@ -3277,7 +3277,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         let mfScaleProxySuspend=false;
         let mfScaleStateProxyInstalled=false;
         function mfScaleMarkDirty(kind,id){
-            try{ mfFinancialReconciliationCache=null; mfGrowthCache=null; }catch(e){}
+            try{ mfFinancialReconciliationCache=null; mfGrowthCache=null; mfResetBorrowingAggregateCache(); }catch(e){}
             if(mfScaleProxySuspend) return;
             if(kind==='root'){ mfScaleDirty.full=true; return; }
             if(mfScaleDirty[kind]) { mfScaleDirty[kind].add(String(id)); if(kind==='loans' && id) { try { const ref=Array.isArray(state?.loans)?state.loans.find(x=>String(x?.id)===String(id)):null; if(ref) mfScaleDirtyLoanRefs.set(String(id),ref); } catch(e) {} } }
@@ -3456,15 +3456,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // V15 loan collection (including payments) before allowing the mirror to be
                 // treated as current. This is what prevents Statement/PDF and Recovery from
                 // silently reading two different versions of the same loan.
-                const sourceLoanFingerprint=mfScaleHash(loans);
-                const mirrorSourceMatches=String(meta?.sourceLoanFingerprint||'')===String(sourceLoanFingerprint);
-                if(!fullRebuild && mirrorSourceMatches && meta?.localDirtyAt===dirtyAt && Number(meta.loanCount||0)===loans.length && meta.searchReady){
+                const hasPendingDirty = mfScaleDirty.loans.size || mfScaleDirty.products.size || mfScaleDirty.staff.size || mfScaleDirty.expenses.size || mfScaleDirty.borrowings.size;
+                if(!fullRebuild && !hasPendingDirty && !mfScaleDirty.full && meta?.localDirtyAt===dirtyAt && Number(meta.loanCount||0)===loans.length && meta.searchReady){
                     mfScaleReady=true; mfScaleSearchReady=true; return;
                 }
                 // Any mismatch between the authoritative loan collection and its scalable
                 // projection is a rebuild condition, even when the proxy dirty flags are clear.
-                const needsConsistencyRebuild=!mirrorSourceMatches;
-                const rebuildRequested=fullRebuild || !meta?.searchReady || needsConsistencyRebuild;
+                const sourceLoanFingerprint = fullRebuild || !meta?.searchReady ? mfScaleHash(loans) : String(meta?.sourceLoanFingerprint||'INCREMENTAL');
+                const rebuildRequested=fullRebuild || !meta?.searchReady;
                 if(rebuildRequested){
                     // Full rebuilds (first install / restore) must remove stale scalable records
                     // before rebuilding. Otherwise a deleted old loan could remain searchable.
@@ -4628,13 +4627,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             idbPutSnapshot().then(()=>{
                 const el=document.getElementById("last-sync-time");
                 if(el) el.innerHTML=`<i class="fa-solid fa-check text-success me-1"></i> Saved: ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
-                renderAll();
+                mfSchedulePersistRender();
                 queueAutomaticVersionedBackup();
             }).catch(err=>{
                 console.error("IndexedDB save failed",err);
                 const el=document.getElementById("last-sync-time");
                 if(el) el.innerHTML=`<i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> Local save warning`;
-                renderAll();
+                mfSchedulePersistRender();
             }).finally(()=>{
                 // PRIMARY OPERATIONAL CLOUD COPY: Firebase Secure Sync must not depend on
                 // IndexedDB success. A transient IndexedDB failure must never block the
@@ -4919,6 +4918,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         // earnings are included in Gross Revenue; settlement principal and waivers are excluded.
         let mfFinancialReconciliationCache=null;
         let mfGrowthCache=null;
+        // Performance cache: reuse existing repayment arithmetic across borrowing KPI/list/reconciliation renders.
+        let mfBorrowingAggregateCache=new WeakMap();
+        function mfResetBorrowingAggregateCache(){ mfBorrowingAggregateCache=new WeakMap(); }
+        function mfBorrowingAggregates(b){
+            if(!b || typeof b!=='object') return {paidP:0,paidI:0,paidG:0,paidCount:0,repayments:null,length:0};
+            const reps=Array.isArray(b.repayments)?b.repayments:[];
+            const cached=mfBorrowingAggregateCache.get(b);
+            if(cached && cached.repayments===reps && cached.length===reps.length) return cached;
+            let paidP=0,paidI=0,paidG=0;
+            for(const r of reps){ paidP+=Number(r?.principal)||0; paidI+=Number(r?.interest)||0; paidG+=Number(r?.gst)||0; }
+            const out={paidP,paidI,paidG,paidCount:reps.length,repayments:reps,length:reps.length};
+            mfBorrowingAggregateCache.set(b,out); return out;
+        }
         function mfFinancialReconciliation(){
             if(mfFinancialReconciliationCache) return mfFinancialReconciliationCache;
             const loans=Array.isArray(state.loans)?state.loans:[], products=state.products||{};
@@ -4954,7 +4966,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             let lenderInterest=0,lenderGst=0,lenderUpfront=0,principalRepaid=0,capitalBorrowed=0;
             (state.borrowings||[]).forEach(b=>{
                 capitalBorrowed+=Math.max(0,Number(b.amount)||0); lenderUpfront+=Math.max(0,Number(borrowingUpfrontCharges(b))||0);
-                (b.repayments||[]).forEach(r=>{principalRepaid+=Math.max(0,Number(r.principal)||0);lenderInterest+=Math.max(0,Number(r.interest)||0);lenderGst+=Math.max(0,Number(r.gst)||0);});
+                const agg=mfBorrowingAggregates(b); principalRepaid+=Math.max(0,agg.paidP); lenderInterest+=Math.max(0,agg.paidI); lenderGst+=Math.max(0,agg.paidG);
             });
             const salaries=(state.staff||[]).reduce((a,st)=>a+(st.salaryPayments||[]).reduce((s,x)=>s+Math.max(0,Number(x.amount)||0),0),0);
             const generalExp=(state.expenses||[]).reduce((a,e)=>a+Math.max(0,Number(e.amount)||0),0);
@@ -4989,6 +5001,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         // Calculations/state/security are untouched; only the DOM render scope is reduced.
         let mfActiveTab = 'feed';
         let mfRenderRaf = 0;
+        let mfPersistRenderRaf = 0;
+        function mfSchedulePersistRender(){
+            if(mfPersistRenderRaf) return;
+            const cb=()=>{ mfPersistRenderRaf=0; try{ renderAll(); }catch(e){ console.error('Deferred render failed',e); } };
+            if(typeof requestAnimationFrame==='function') mfPersistRenderRaf=requestAnimationFrame(cb); else mfPersistRenderRaf=setTimeout(cb,0);
+        }
         function syncCompanyNameField(){
             const input=document.getElementById('biz-name');
             if(!input) return;
@@ -6812,8 +6830,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const rows = state.borrowings.map(b=>{
                 const upfrontBase=(Number(b.processingFee)||0)+(Number(b.otherCharges)||0);
                 const upfrontGst=(Number(b.processingGst)||0)+(Number(b.otherGst)||0);
-                const paidI = (b.repayments||[]).reduce((s,r)=>s+(Number(r.interest)||0),0);
-                const paidG = (b.repayments||[]).reduce((s,r)=>s+(Number(r.gst)||0),0)+upfrontGst;
+                const agg=mfBorrowingAggregates(b);
+                const paidI = agg.paidI;
+                const paidG = agg.paidG+upfrontGst;
                 totalUpfrontBase+=upfrontBase; totalInterest+=paidI; totalGst+=paidG;
                 return `<tr><td style="padding:7px;">${financeEsc(b.lenderName)}</td><td style="padding:7px;">${mfMoney(upfrontBase)}</td><td style="padding:7px;">${mfMoney(paidI)}</td><td style="padding:7px;">${mfMoney(paidG)}</td><td style="padding:7px;"><b>${mfMoney(upfrontBase+paidI+paidG)}</b></td></tr>`;
             }).join('');
@@ -6839,10 +6858,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 totBorrow += Number(b.amount)||0;
                 totUpfront += upfront;
 
-                const paidP = (b.repayments||[]).reduce((s, r) => s + (Number(r.principal)||0), 0);
-                const paidI = (b.repayments||[]).reduce((s, r) => s + (Number(r.interest)||0), 0);
+                const agg=mfBorrowingAggregates(b);
+                const paidP = agg.paidP;
+                const paidI = agg.paidI;
                 const upfrontGst = (Number(b.processingGst)||0)+(Number(b.otherGst)||0);
-                const paidG = (b.repayments||[]).reduce((s, r) => s + (Number(r.gst)||0), 0) + upfrontGst;
+                const paidG = agg.paidG + upfrontGst;
                 totPaidPrin += paidP;
                 totPaidIntGst += paidI + paidG + (upfront - upfrontGst); // upfront's own GST is already inside paidG, so subtract it here to avoid double-counting
 
@@ -6930,12 +6950,17 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
         }
 
+        const mfAmortisationCache=new WeakMap();
         function mfBuildAmortisation(b) {
             const principal = Math.max(0, Number(b.amount) || 0);
             const annualRate = Math.max(0, Number(b.rate) || 0);
             const tenure = Math.max(1, parseInt(b.tenure, 10) || 0);
             const start = String(b.date || "").slice(0,10);
             if (!principal || !tenure || !start) return [];
+            const cacheKey=[principal,annualRate,tenure,start,String(b.interestBasis||"Reducing Balance"),String(b.type||"")].join('|');
+            const cached=mfAmortisationCache.get(b);
+            if(cached && cached.key===cacheKey) return cached.rows;
+            const store=(rows)=>{ mfAmortisationCache.set(b,{key:cacheKey,rows}); return rows; };
 
             const basis = b.interestBasis || "Reducing Balance";
             const mr = annualRate / 100 / 12;
@@ -6949,7 +6974,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const i = Math.round(interest);
                 const gst = 0; // GST is recorded separately at payment time; never part of amortisation.
                 rows.push({no:1,dueDate:mfAddMonths(start,tenure),emi:Math.round(principal+i),principal:Math.round(principal),interest:i,gst,closing:0});
-                return rows;
+                return store(rows);
             }
 
             if (b.type === "Interest Only") {
@@ -6961,7 +6986,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     balance = Math.max(0,balance-p);
                     rows.push({no:n,dueDate:mfAddMonths(start,n),emi:Math.round(p+i),principal:Math.round(p),interest:i,gst,closing:Math.round(balance)});
                 }
-                return rows;
+                return store(rows);
             }
 
             if (basis === "Flat Rate") {
@@ -6983,7 +7008,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     balance = Math.max(0, balance-p);
                     rows.push({no:n,dueDate:mfAddMonths(start,n),emi:pr+ir,principal:pr,interest:ir,gst,closing:Math.round(balance)});
                 }
-                return rows;
+                return store(rows);
             }
 
             // Reducing-balance / standard bank EMI.
@@ -7000,7 +7025,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 balance = Math.max(0,balance-p);
                 rows.push({no:n,dueDate:mfAddMonths(start,n),emi:pr+i,principal:pr,interest:i,gst,closing:Math.round(balance)});
             }
-            return rows;
+            return store(rows);
         }
 
         function mfUpfrontCost(b) {
