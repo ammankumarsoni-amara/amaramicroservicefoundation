@@ -3123,9 +3123,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         // ================= SECURE STORAGE FOUNDATION =================
         const MF_IDB_NAME = "AMARA_WORKFLOW_CLEAN_DB_V2_FINAL_CLEAN";
-        const MF_IDB_VERSION = 2;
+        const MF_IDB_VERSION = 3;
         const MF_IDB_STORE = "snapshots";
         const MF_IDB_HISTORY_STORE = "history";
+        const MF_IDB_JOURNAL_STORE = "perf_v2_journal";
         let mfDb = null;
         let mfDbReady = false;
         let cloudSyncTimer = null;
@@ -3151,6 +3152,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     const db=req.result;
                     if(!db.objectStoreNames.contains(MF_IDB_STORE)) db.createObjectStore(MF_IDB_STORE,{keyPath:"id"});
                     if(!db.objectStoreNames.contains(MF_IDB_HISTORY_STORE)){ const hs=db.createObjectStore(MF_IDB_HISTORY_STORE,{keyPath:"id"}); hs.createIndex("createdAt","createdAt",{unique:false}); }
+                    if(!db.objectStoreNames.contains(MF_IDB_JOURNAL_STORE)){ const js=db.createObjectStore(MF_IDB_JOURNAL_STORE,{keyPath:"id"}); js.createIndex("seq","seq",{unique:true}); js.createIndex("createdAt","createdAt",{unique:false}); }
                     // Scalable entity stores: the legacy snapshot/history stores remain untouched.
                     const mk=(name,opts)=>{ if(!db.objectStoreNames.contains(name)) return db.createObjectStore(name,opts||{keyPath:"id"}); return req.transaction.objectStore(name); };
                     // Schema v2 is an additive repair for installations that already had the
@@ -3193,7 +3195,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             }
         }
 
-        async function idbPutSnapshot(){
+        async function idbPutSnapshot(options={}){
             const db=await openMfDb();
             const savedState=mfCloneStateForPersistence();
             const hasBusinessData=!!(savedState && savedState.products && (
@@ -3202,9 +3204,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 (Array.isArray(savedState.staff)?savedState.staff.length:0)+
                 (Array.isArray(savedState.expenses)?savedState.expenses.length:0)
             ));
-            const payload={id:"current",version:1,updatedAt:new Date().toISOString(),state:savedState};
+            const previous=await new Promise((resolve,reject)=>{
+                const tx=db.transaction(MF_IDB_STORE,'readonly');
+                const r=tx.objectStore(MF_IDB_STORE).get('current');
+                r.onsuccess=()=>resolve(r.result||null); r.onerror=()=>reject(r.error||new Error('Snapshot metadata read failed'));
+            });
+            const journalSeq=Number(options.journalSeq!==undefined?options.journalSeq:(mfPerfV2Seq||previous?.journalSeq||0))||0;
+            const payload={id:"current",version:1,updatedAt:new Date().toISOString(),state:savedState,journalSeq};
             payload.stateFingerprint=mfStateFingerprintObject(payload.state);
             await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,"readwrite");tx.objectStore(MF_IDB_STORE).put(payload);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
+            if(options.clearJournal!==false){
+                try{ await mfPerfV2DeleteJournalThrough(journalSeq); }catch(e){ console.warn('Performance journal cleanup deferred:',e); }
+            }
             if(hasBusinessData){
                 try{ localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_READY','1'); localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_HASH',String(payload.stateFingerprint||'')); }catch(e){}
             }
@@ -3215,6 +3226,140 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const db=await openMfDb();
             return await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,"readonly");const r=tx.objectStore(MF_IDB_STORE).get("current");r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);});
         }
+
+        // ================= PERFORMANCE ARCHITECTURE V2 =================
+        // Golden rule: zero business-data migration, zero manual re-entry, zero change to
+        // existing financial calculations. V15 state remains the business authority.
+        // Normal saves write only changed entities to a durable local journal. A complete
+        // snapshot is compacted periodically, so page reload/recovery still has one canonical
+        // snapshot while routine collections/edits do not serialize the entire database.
+        const MF_PERF_V2={schema:'AMARA-PERFORMANCE-ARCH-V2',compactEvery:25,compactAfterMs:120000,maxJournal:80};
+        let mfPerfV2WriteChain=Promise.resolve();
+        let mfPerfV2Seq=0;
+        let mfPerfV2JournalCount=0;
+        let mfPerfV2LastCompactAt=0;
+        let mfPerfV2Compacting=false;
+
+        function mfPerfV2Clone(v){
+            try{return mfScaleClone(v);}catch(e){return JSON.parse(JSON.stringify(v??null));}
+        }
+        function mfPerfV2EntityCurrent(kind,id){
+            const key=String(id);
+            if(kind==='products') return state.products&&Object.prototype.hasOwnProperty.call(state.products,key)?state.products[key]:null;
+            const arr=Array.isArray(state[kind])?state[kind]:[];
+            return arr.find(x=>String(x?.id)===key)||null;
+        }
+        function mfPerfV2BuildPatch(){
+            const patch={schema:MF_PERF_V2.schema,createdAt:new Date().toISOString(),full:false,shell:null,changes:{loans:[],products:[],staff:[],expenses:[],borrowings:[]}};
+            if(mfV2PendingDirty.full){ patch.full=true; return patch; }
+            if(mfV2PendingDirty.shell) patch.shell=mfPerfV2Clone(mfV2Shell());
+            for(const kind of Object.keys(patch.changes)){
+                for(const id of mfV2PendingDirty[kind]){
+                    const row=mfPerfV2EntityCurrent(kind,id);
+                    patch.changes[kind].push({id:String(id),row:row?mfPerfV2Clone(row):null});
+                }
+            }
+            const meaningful=patch.full||patch.shell!==null||Object.values(patch.changes).some(a=>a.length);
+            return meaningful?patch:null;
+        }
+        function mfPerfV2ApplyPatch(target,patch){
+            if(!patch||patch.full) return target;
+            if(patch.shell&&typeof patch.shell==='object') target={...target,...patch.shell};
+            for(const kind of Object.keys(patch.changes||{})){
+                const changes=patch.changes[kind]||[];
+                if(kind==='products'){
+                    target.products=target.products&&typeof target.products==='object'?target.products:{};
+                    for(const c of changes){ if(c.row===null) delete target.products[String(c.id)]; else target.products[String(c.id)]=c.row; }
+                }else{
+                    const arr=Array.isArray(target[kind])?target[kind]:[];
+                    for(const c of changes){
+                        const idx=arr.findIndex(x=>String(x?.id)===String(c.id));
+                        if(c.row===null){if(idx>=0)arr.splice(idx,1);}
+                        else if(idx>=0)arr[idx]=c.row;
+                        else arr.push(c.row);
+                    }
+                    target[kind]=arr;
+                }
+            }
+            return target;
+        }
+        async function mfPerfV2ReadJournalAfter(seq){
+            const db=await openMfDb();
+            return await new Promise((resolve,reject)=>{
+                const tx=db.transaction(MF_IDB_JOURNAL_STORE,'readonly');
+                const idx=tx.objectStore(MF_IDB_JOURNAL_STORE).index('seq');
+                const req=idx.getAll();
+                req.onsuccess=()=>resolve((req.result||[]).filter(x=>Number(x.seq||0)>Number(seq||0)).sort((a,b)=>Number(a.seq||0)-Number(b.seq||0)));
+                req.onerror=()=>reject(req.error||new Error('Performance journal read failed'));
+            });
+        }
+        async function mfPerfV2ReplayJournal(snapshot){
+            if(!snapshot?.state) return {state:null,seq:Number(snapshot?.journalSeq||0)};
+            const baseSeq=Number(snapshot.journalSeq||0);
+            const rows=await mfPerfV2ReadJournalAfter(baseSeq);
+            let next=baseSeq, working=snapshot.state;
+            for(const rec of rows){
+                if(rec.patch?.full) continue; // a full patch is compacted as a snapshot, never replayed here
+                working=mfPerfV2ApplyPatch(working,rec.patch); next=Math.max(next,Number(rec.seq||0));
+            }
+            mfPerfV2Seq=next; mfPerfV2JournalCount=rows.length;
+            return {state:working,seq:next,replayed:rows.length};
+        }
+        async function mfPerfV2AppendJournal(){
+            const patch=mfPerfV2BuildPatch();
+            if(!patch) return {seq:mfPerfV2Seq,changed:false};
+            if(patch.full){
+                // Full imports/restores are already explicitly persisted by their existing paths.
+                mfPerfV2Seq=Number(mfPerfV2Seq||0); return {seq:mfPerfV2Seq,changed:false,full:true};
+            }
+            const db=await openMfDb();
+            const seq=Number(mfPerfV2Seq||0)+1;
+            const rec={id:'j-'+seq,seq,version:1,createdAt:new Date().toISOString(),patch};
+            await new Promise((resolve,reject)=>{
+                const tx=db.transaction(MF_IDB_JOURNAL_STORE,'readwrite');
+                tx.objectStore(MF_IDB_JOURNAL_STORE).put(rec);
+                tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error||new Error('Performance journal save failed')); tx.onabort=()=>reject(tx.error||new Error('Performance journal save aborted'));
+            });
+            mfPerfV2Seq=seq; mfPerfV2JournalCount+=1;
+            return {seq,changed:true};
+        }
+        async function mfPerfV2DeleteJournalThrough(seq){
+            const db=await openMfDb();
+            await new Promise((resolve,reject)=>{
+                const tx=db.transaction(MF_IDB_JOURNAL_STORE,'readwrite');
+                const st=tx.objectStore(MF_IDB_JOURNAL_STORE), idx=st.index('seq'), req=idx.openCursor();
+                req.onsuccess=e=>{const c=e.target.result;if(!c)return resolve();if(Number(c.value?.seq||0)<=Number(seq||0)){c.delete();c.continue();}else resolve();};
+                req.onerror=()=>reject(req.error||new Error('Performance journal cleanup failed'));
+                tx.onerror=()=>reject(tx.error||new Error('Performance journal cleanup failed'));
+            });
+        }
+        async function mfPerfV2Compact(reason='threshold'){
+            if(mfPerfV2Compacting||!mfPerfV2JournalCount)return;
+            mfPerfV2Compacting=true;
+            const targetSeq=mfPerfV2Seq;
+            try{
+                await idbPutSnapshot({journalSeq:targetSeq});
+                await mfPerfV2DeleteJournalThrough(targetSeq);
+                mfPerfV2JournalCount=0; mfPerfV2LastCompactAt=Date.now();
+                console.debug('Performance Architecture V2 compacted local journal:',reason,targetSeq);
+            }catch(e){console.warn('Performance Architecture V2 compaction deferred:',e);}
+            finally{mfPerfV2Compacting=false;}
+        }
+        function mfPerfV2ScheduleCompact(seq){
+            const dueCount=mfPerfV2JournalCount>=MF_PERF_V2.compactEvery;
+            const dueTime=(Date.now()-Number(mfPerfV2LastCompactAt||0))>=MF_PERF_V2.compactAfterMs;
+            if(dueCount||dueTime) setTimeout(()=>mfPerfV2Compact(dueCount?'count':'time').catch(()=>{}),0);
+            if(mfPerfV2JournalCount>MF_PERF_V2.maxJournal) setTimeout(()=>mfPerfV2Compact('safety-limit').catch(()=>{}),0);
+        }
+        function mfPerfV2QueuePersist(){
+            mfPerfV2WriteChain=mfPerfV2WriteChain.then(async()=>{
+                const result=await mfPerfV2AppendJournal();
+                mfPerfV2ScheduleCompact(result.seq);
+                return result;
+            }).catch(e=>{console.warn('Performance Architecture V2 local journal skipped; legacy snapshot path will protect data:',e);return null;});
+            return mfPerfV2WriteChain;
+        }
+        // ================= END PERFORMANCE ARCHITECTURE V2 =================
 
         function mfCloneStateForBackup(){
             // Versioned backups must use the same Proxy-safe persistence clone as the
@@ -3227,10 +3372,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         async function idbPutVersionedBackup(reason='AUTO',force=false){
             const db=await openMfDb();
-            const fingerprint=mfStateFingerprint(state);
+            // Performance V2: when the incremental journal is compacted, the current
+            // snapshot already contains the exact authoritative state. Reuse that snapshot
+            // instead of cloning/stringifying the whole live state again.
+            const snap=await idbGetSnapshot();
+            if(!force && mfPerfV2JournalCount>0) return null;
+            let fingerprint=String(snap?.stateFingerprint||'');
+            let sourceState=snap?.state||null;
+            if(force && mfPerfV2JournalCount>0){ fingerprint=mfStateFingerprint(state); sourceState=mfCloneStateForBackup(); }
+            else if(!fingerprint){ fingerprint=mfStateFingerprint(state); sourceState=null; }
             if(!force && fingerprint===mfLastVersionFingerprint) return null;
             const now=new Date();
-            const rec={id:'v-'+now.getTime()+'-'+Math.random().toString(36).slice(2,8),version:1,createdAt:now.toISOString(),reason:String(reason||'AUTO'),state:mfCloneStateForBackup()};
+            const rec={id:'v-'+now.getTime()+'-'+Math.random().toString(36).slice(2,8),version:1,createdAt:now.toISOString(),reason:String(reason||'AUTO'),state:sourceState||mfCloneStateForBackup()};
             await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_HISTORY_STORE,'readwrite');tx.objectStore(MF_IDB_HISTORY_STORE).put(rec);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Backup version save failed'));});
             mfLastVersionFingerprint=fingerprint;
             const all=await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_HISTORY_STORE,'readonly');const r=tx.objectStore(MF_IDB_HISTORY_STORE).getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error||new Error('Backup history read failed'));});
@@ -3253,7 +3406,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         function queueAutomaticVersionedBackup(){
             clearTimeout(mfVersionBackupTimer);
-            mfVersionBackupTimer=setTimeout(()=>{ idbPutVersionedBackup('AUTO').then(()=>{ if(document.getElementById('modal-backup-versions')?.classList.contains('active')) renderBackupVersionList(); }).catch(e=>console.warn('Automatic backup version failed',e)); },900);
+            mfVersionBackupTimer=setTimeout(()=>{ idbPutVersionedBackup('AUTO').then(()=>{ if(document.getElementById('modal-backup-versions')?.classList.contains('active')) renderBackupVersionList(); }).catch(e=>console.warn('Automatic backup version failed',e)); },30000);
         }
 
         // ================= SCALABLE DATA ENGINE =================
@@ -3269,17 +3422,33 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         const mfScalePaymentCounts=new Map();
         // Incremental mutation tracking: the compatibility V15 state remains authoritative,
         // but normal saves no longer require a full state scan to refresh the scalable mirrors.
-        const mfScaleDirty={loans:new Set(),products:new Set(),staff:new Set(),expenses:new Set(),borrowings:new Set(),full:false};
+        const mfScaleDirty={loans:new Set(),products:new Set(),staff:new Set(),expenses:new Set(),borrowings:new Set(),shell:false,full:false};
         const mfScaleDirtyLoanRefs=new Map();
+        const mfV2PendingDirty={loans:new Set(),products:new Set(),staff:new Set(),expenses:new Set(),borrowings:new Set(),shell:false,full:false};
+        const mfV2DirtyGeneration={loans:new Map(),products:new Map(),staff:new Map(),expenses:new Map(),borrowings:new Map(),shell:0,full:0};
         let mfScaleProxySuspend=false;
         let mfScaleStateProxyInstalled=false;
+        function mfScaleSetFullDirty(){
+            mfScaleDirty.full=true; mfV2PendingDirty.full=true; mfV2DirtyGeneration.full++;
+            try{ mfScalePaymentCounts.clear(); (state.loans||[]).forEach(l=>mfScalePaymentCounts.set(String(l?.id),Array.isArray(l?.payments)?l.payments.length:0)); }catch(e){}
+        }
         function mfScaleMarkDirty(kind,id){
             try{ mfFinancialReconciliationCache=null; mfGrowthCache=null; mfResetBorrowingAggregateCache(); }catch(e){}
             if(mfScaleProxySuspend) return;
-            if(kind==='root'){ mfScaleDirty.full=true; return; }
-            if(mfScaleDirty[kind]) { mfScaleDirty[kind].add(String(id)); if(kind==='loans' && id) { try { const ref=Array.isArray(state?.loans)?state.loans.find(x=>String(x?.id)===String(id)):null; if(ref) mfScaleDirtyLoanRefs.set(String(id),ref); } catch(e) {} } }
+            if(kind==='root'){
+                mfScaleDirty.shell=true; mfV2PendingDirty.shell=true; mfV2DirtyGeneration.shell++;
+                return;
+            }
+            if(mfScaleDirty[kind]) {
+                const key=String(id);
+                mfScaleDirty[kind].add(key);
+                if(mfV2PendingDirty[kind]) { mfV2PendingDirty[kind].add(key); mfV2DirtyGeneration[kind].set(key,(mfV2DirtyGeneration[kind].get(key)||0)+1); }
+                if(kind==='loans' && id) {
+                    try { const ref=Array.isArray(state?.loans)?state.loans.find(x=>String(x?.id)===String(id)):null; if(ref) mfScaleDirtyLoanRefs.set(key,ref); } catch(e) {}
+                }
+            }
         }
-        function mfScaleResetDirty(){ mfScaleDirty.loans.clear(); mfScaleDirtyLoanRefs.clear(); mfScaleDirty.products.clear(); mfScaleDirty.staff.clear(); mfScaleDirty.expenses.clear(); mfScaleDirty.borrowings.clear(); mfScaleDirty.full=false; }
+        function mfScaleResetDirty(){ mfScaleDirty.loans.clear(); mfScaleDirtyLoanRefs.clear(); mfScaleDirty.products.clear(); mfScaleDirty.staff.clear(); mfScaleDirty.expenses.clear(); mfScaleDirty.borrowings.clear(); mfScaleDirty.shell=false; mfScaleDirty.full=false; }
         function mfScaleWrapObject(value,kind='',id='',seen=new WeakMap()){
             if(!value || typeof value!=='object' || seen.has(value)) return value;
             const cached=seen.get(value); if(cached) return cached;
@@ -3441,7 +3610,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             });
         }
         async function mfScaleBuildLocalEntities(force=false){
-            if(mfScaleBuildBusy) return; mfScaleBuildBusy=true;
+            if(mfScaleBuildBusy) return false; mfScaleBuildBusy=true;
             const fullRebuild=!!force || mfScaleDirty.full;
             try{
                 const meta=await mfScaleGetMeta('entity_mirror');
@@ -3453,9 +3622,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // V15 loan collection (including payments) before allowing the mirror to be
                 // treated as current. This is what prevents Statement/PDF and Recovery from
                 // silently reading two different versions of the same loan.
-                const hasPendingDirty = mfScaleDirty.loans.size || mfScaleDirty.products.size || mfScaleDirty.staff.size || mfScaleDirty.expenses.size || mfScaleDirty.borrowings.size;
+                const hasPendingDirty = mfScaleDirty.loans.size || mfScaleDirty.products.size || mfScaleDirty.staff.size || mfScaleDirty.expenses.size || mfScaleDirty.borrowings.size || mfScaleDirty.shell;
                 if(!fullRebuild && !hasPendingDirty && !mfScaleDirty.full && meta?.localDirtyAt===dirtyAt && Number(meta.loanCount||0)===loans.length && meta.searchReady){
-                    mfScaleReady=true; mfScaleSearchReady=true; return;
+                    mfScaleReady=true; mfScaleSearchReady=true; return true;
                 }
                 // Any mismatch between the authoritative loan collection and its scalable
                 // projection is a rebuild condition, even when the proxy dirty flags are clear.
@@ -3538,8 +3707,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 mfScaleReady=true; mfScaleSearchReady=true;
                 const scaleEl=document.getElementById('mf-scalable-status'); if(scaleEl) scaleEl.textContent='🟢 Local data setup is ready.';
                 await mfScalePutMeta({id:'entity_mirror',schema:MF_SCALE.schema,localDirtyAt:dirtyAt,loanCount:loans.length,searchReady:true,sourceLoanFingerprint:sourceLoanFingerprint,updatedAt:new Date().toISOString()});
-            }catch(e){console.warn('Scalable local entity update skipped:',e);}
+            }catch(e){console.warn('Scalable local entity update skipped:',e); return false;}
             finally{mfScaleBuildBusy=false;}
+            return true;
         }
         async function mfScaleFindLoanIds(rawQuery){
             if(!mfScaleSearchReady) return null;
@@ -3685,8 +3855,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(validLocalSnapshot){
                     state=snap.state;
                     try{
+                        const replay=await mfPerfV2ReplayJournal(snap);
+                        if(replay?.state) state=replay.state;
+                    }catch(e){ console.warn('Performance Architecture V2 journal replay skipped; canonical snapshot remains authoritative:',e); }
+                    try{
                         localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_READY','1');
-                        localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_HASH',String(snap.stateFingerprint||mfStateFingerprintObject(snap.state)||''));
+                        localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_HASH',String(mfStateFingerprintObject(state)||snap.stateFingerprint||''));
                     }catch(e){}
                 }else{
                     // A missing local snapshot is never permission to push the startup/default
@@ -3702,6 +3876,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 mfDbReady=true;
                 mfV2LocalStateReady=true;
                 try{ mfScaleReinstallStateProxy(); }catch(e){}
+                try{ mfScalePaymentCounts.clear(); (state.loans||[]).forEach(l=>mfScalePaymentCounts.set(String(l?.id),Array.isArray(l?.payments)?l.payments.length:0)); }catch(e){}
 
                 // Do not present a false zero dashboard while authoritative startup data is
                 // still being recovered. The existing loading CSS keeps the KPI values hidden.
@@ -3839,19 +4014,90 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           }
         }
 
-        async function mfV2WriteEntities(ownerUid,version){
-          const kinds={loans:mfV2EntityRows('loans'),products:mfV2EntityRows('products'),staff:mfV2EntityRows('staff'),expenses:mfV2EntityRows('expenses'),borrowings:mfV2EntityRows('borrowings'),payments:mfV2PaymentRows()};
-          // Keep Firestore's 400-document batch safety limit, but write independent
-          // collections concurrently to remove serial network waits.
-          await Promise.all(MF_SYNC_V2_KINDS.map(async kind=>{
-            const col=mfV2Col(kind); const rows=kinds[kind];
-            for(let i=0;i<rows.length;i+=400){
+        function mfV2PendingDirtySnapshot(){
+          const out={full:!!mfV2PendingDirty.full,shell:!!mfV2PendingDirty.shell,fullGeneration:mfV2DirtyGeneration.full,shellGeneration:mfV2DirtyGeneration.shell};
+          for(const kind of ['loans','products','staff','expenses','borrowings']){ out[kind]=new Set(mfV2PendingDirty[kind]); out[kind+'Generation']=new Map([...out[kind]].map(id=>[id,mfV2DirtyGeneration[kind].get(id)||0])); }
+          return out;
+        }
+        function mfV2ClearPendingDirty(dirty){
+          if(!dirty) return;
+          for(const kind of ['loans','products','staff','expenses','borrowings']){
+            for(const id of dirty[kind]||[]){
+              if((mfV2DirtyGeneration[kind].get(id)||0)===(dirty[kind+'Generation']?.get(id)||0)) mfV2PendingDirty[kind].delete(id);
+            }
+          }
+          if(dirty.shell && mfV2DirtyGeneration.shell===dirty.shellGeneration) mfV2PendingDirty.shell=false;
+          // Full-sync state is cleared only if no new mutation arrived while the network
+          // write was in flight. Entity-level generations protect same-loan rapid edits.
+          if(dirty.full && mfV2DirtyGeneration.full===dirty.fullGeneration && !mfV2PendingDirty.loans.size && !mfV2PendingDirty.products.size && !mfV2PendingDirty.staff.size && !mfV2PendingDirty.expenses.size && !mfV2PendingDirty.borrowings.size && !mfV2PendingDirty.shell) mfV2PendingDirty.full=false;
+        }
+        async function mfV2WriteEntities(ownerUid,version,dirty){
+          if(dirty.full){
+            const kinds={loans:mfV2EntityRows('loans'),products:mfV2EntityRows('products'),staff:mfV2EntityRows('staff'),expenses:mfV2EntityRows('expenses'),borrowings:mfV2EntityRows('borrowings'),payments:mfV2PaymentRows()};
+            await Promise.all(MF_SYNC_V2_KINDS.map(async kind=>{
+              const col=mfV2Col(kind), rows=kinds[kind];
+              for(let i=0;i<rows.length;i+=400){
+                const batch=mfFirestoreDb.batch();
+                rows.slice(i,i+400).forEach(e=>{const ref=col.doc(e.id);batch.set(ref,{...e.row,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp(),...(kind==='payments'?{loanId:e.loanId,paymentIndex:e.paymentIndex}:{})},{merge:true});});
+                await batch.commit();
+              }
+            }));
+            return;
+          }
+          if(dirty.shell){
+            await mfV2Root().set({shell:mfV2Shell()}, {merge:true});
+          }
+          const writeKind=async(kind,ids)=>{
+            if(!ids.size)return;
+            const col=mfV2Col(kind), list=[...ids];
+            for(let start=0;start<list.length;start+=400){
               const batch=mfFirestoreDb.batch();
-              rows.slice(i,i+400).forEach(e=>{const ref=col.doc(e.id);batch.set(ref,{...e.row,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp(),...(kind==='payments'?{loanId:e.loanId,paymentIndex:e.paymentIndex}:{})},{merge:true});});
+              for(const id of list.slice(start,start+400)){
+                const row=kind==='products'?(state.products?.[id]||null):((state[kind]||[]).find(x=>String(x?.id)===String(id))||null);
+                const ref=col.doc(String(id));
+                if(row){const y=mfV2SafeClone(row);delete y.id;delete y._ownerUid;delete y._syncMeta;batch.set(ref,{...y,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});}
+                else batch.delete(ref);
+              }
               await batch.commit();
             }
-          }));
+          };
+          await Promise.all([
+            writeKind('products',dirty.products),writeKind('staff',dirty.staff),writeKind('expenses',dirty.expenses),writeKind('borrowings',dirty.borrowings)
+          ]);
+          // A changed loan is the natural unit for payments. Write only that loan and its
+          // payment rows; reconcile stale payment rows for that loan instead of scanning every
+          // payment in the business.
+          for(const loanId of dirty.loans){
+            const loan=(state.loans||[]).find(x=>String(x?.id)===String(loanId));
+            const loanCol=mfV2Col('loans'), loanRef=loanCol.doc(String(loanId));
+            if(loan){const y=mfV2SafeClone(loan);delete y.id;delete y._ownerUid;delete y._syncMeta;await loanRef.set({...y,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});}
+            else await loanRef.delete();
+            const pcol=mfV2Col('payments');
+            const previousCount=Number(mfScalePaymentCounts.get(String(loanId))||0);
+            const nextCount=loan&&Array.isArray(loan.payments)?loan.payments.length:0;
+            if(loan && Array.isArray(loan.payments)){
+              for(let i=0;i<loan.payments.length;i+=400){
+                const batch=mfFirestoreDb.batch();
+                for(let j=i;j<Math.min(i+400,loan.payments.length);j++){
+                  const p=loan.payments[j], id=String(loanId)+'-'+j; const y=mfV2SafeClone(p);delete y.id;delete y._ownerUid;delete y._syncMeta;
+                  batch.set(pcol.doc(id),{...y,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp(),loanId:String(loanId),paymentIndex:j},{merge:true});
+                }
+                await batch.commit();
+              }
+            }
+            // Payment document IDs are loanId-index. If a payment was removed, only the
+            // trailing index range can be stale; every remaining index is overwritten above.
+            if(previousCount>nextCount){
+              for(let start=nextCount;start<previousCount;start+=400){
+                const batch=mfFirestoreDb.batch();
+                for(let j=start;j<Math.min(start+400,previousCount);j++) batch.delete(pcol.doc(String(loanId)+'-'+j));
+                await batch.commit();
+              }
+            }
+            mfScalePaymentCounts.set(String(loanId),nextCount);
+          }
         }
+
         async function mfV2ReadEntities(ownerUid){
           const out={loans:[],products:{},staff:[],expenses:[],borrowings:[],payments:[]};
           // Child collections remain authoritative server reads. They are independent,
@@ -3898,26 +4144,33 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           // must not turn a legitimate local edit into an accidental pull of older cloud metadata.
           if(root.exists && cloud.stateFingerprint && cloud.stateFingerprint!==localHash && !force && (!knownCloudHash || cloud.stateFingerprint!==knownCloudHash)) throw new Error('SYNC_CONFLICT: secure cloud changed on another device. Local changes were not overwritten.');
           const version=mfV2NextVersion(Number(cloud.version||0));
+          const dirty=mfV2PendingDirtySnapshot();
+          const syntheticFull=!dirty.full && !dirty.shell && !dirty.loans.size && !dirty.products.size && !dirty.staff.size && !dirty.expenses.size && !dirty.borrowings.size;
+          if(syntheticFull){
+            // A manual Sync Now after a restored/legacy state still gets a safe full write.
+            dirty.full=true;
+          }
           // Firestore Rules require the parent business document to exist before any
           // structured_v1_* child collection can be written. Create/refresh the owner
           // envelope first, then write children, then publish the final fingerprint.
           const rootRef=mfV2Root();
           await rootRef.set({ownerUid:mfFirebaseUser.uid,schemaVersion:'AMARA-SYNC-V2',version,updatedByDevice:mfFirebaseDeviceId,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAtLabel:new Date().toLocaleString('en-IN')},{merge:true});
-          await mfV2WriteEntities(mfFirebaseUser.uid,version);
-          // Remove owner-scoped records that no longer exist locally. This prevents a
-          // deleted loan/payment from reappearing on another device during a later pull.
-          const currentIds={};
-          for(const kind of MF_SYNC_V2_KINDS){currentIds[kind]=new Set((kind==='payments'?mfV2PaymentRows():mfV2EntityRows(kind)).map(x=>String(x.id)));}
-          // Cleanup reads are independent; run them concurrently while keeping the
-          // same owner-scoped delete rules and 400-document batch limit.
-          await Promise.all(MF_SYNC_V2_KINDS.map(async kind=>{
-            const snap=await mfV2Col(kind).where('_ownerUid','==',mfFirebaseUser.uid).get({source:'server'});
-            const stale=snap.docs.filter(d=>!currentIds[kind].has(String(d.id)));
-            for(let i=0;i<stale.length;i+=400){const b=mfFirestoreDb.batch();stale.slice(i,i+400).forEach(d=>b.delete(d.ref));await b.commit();}
-          }));
+          // Targeted cloud persistence: normal saves touch only changed entities. A full
+          // owner-scoped cleanup remains available for imports/restores, where deletions may
+          // span the entire database.
+          await mfV2WriteEntities(mfFirebaseUser.uid,version,dirty);
+          if(dirty.full){
+            const currentIds={};
+            for(const kind of MF_SYNC_V2_KINDS){currentIds[kind]=new Set((kind==='payments'?mfV2PaymentRows():mfV2EntityRows(kind)).map(x=>String(x.id)));}
+            await Promise.all(MF_SYNC_V2_KINDS.map(async kind=>{
+              const snap=await mfV2Col(kind).where('_ownerUid','==',mfFirebaseUser.uid).get({source:'server'});
+              const stale=snap.docs.filter(d=>!currentIds[kind].has(String(d.id)));
+              for(let i=0;i<stale.length;i+=400){const b=mfFirestoreDb.batch();stale.slice(i,i+400).forEach(d=>b.delete(d.ref));await b.commit();}
+            }));
+          }
           const meta={ownerUid:mfFirebaseUser.uid,version,schemaVersion:'AMARA-SYNC-V2',updatedByDevice:mfFirebaseDeviceId,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAtLabel:new Date().toLocaleString('en-IN'),stateFingerprint:localHash,counts:{loans:(state.loans||[]).length,products:Object.keys(state.products||{}).length,staff:(state.staff||[]).length,expenses:(state.expenses||[]).length,borrowings:(state.borrowings||[]).length,payments:(state.loans||[]).reduce((n,l)=>n+(Array.isArray(l.payments)?l.payments.length:0),0)},shell:mfV2Shell()};
           await rootRef.set(meta,{merge:true});
-          mfV2SetHash(localHash);mfSetKnownCloudVersion(version);mfV2ClearDirty();
+          mfV2SetHash(localHash);mfSetKnownCloudVersion(version);mfV2ClearDirty();if(!syntheticFull)mfV2ClearPendingDirty(dirty);
           mfV2SetStatus('🟢 Secure cloud updated from this device — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
           return true;
         }
@@ -4621,13 +4874,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // distinguish a newer local compatibility copy from an older IndexedDB copy.
                 localStorage.setItem("MF_LOCAL_SAVED_AT", now.toISOString());
             }catch(e){}
-            idbPutSnapshot().then(()=>{
+            mfPerfV2QueuePersist().then(async result=>{
                 const el=document.getElementById("last-sync-time");
                 if(el) el.innerHTML=`<i class="fa-solid fa-check text-success me-1"></i> Saved: ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
                 mfSchedulePersistRender();
+                // Version history remains a full-state audit snapshot, but it is now queued
+                // behind the incremental journal instead of being part of every save burst.
                 queueAutomaticVersionedBackup();
+                try{ const mirrored=await mfScaleBuildLocalEntities(false); if(mirrored) mfScaleResetDirty(); }catch(e){ console.warn('Scalable entity refresh skipped:',e); }
             }).catch(err=>{
-                console.error("IndexedDB save failed",err);
+                console.error("Incremental local save failed",err);
                 const el=document.getElementById("last-sync-time");
                 if(el) el.innerHTML=`<i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> Local save warning`;
                 mfSchedulePersistRender();
@@ -4638,14 +4894,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // Google Drive remains the encrypted secondary backup/recovery layer.
                 try{ mfV2MarkDirty(); scheduleFirebasePush(); }catch(e){ console.warn('Automatic Secure Firebase sync scheduling skipped:',e); }
                 try{
-                    mfScaleBuildLocalEntities(false).then(()=>{
-                        mfScaleScheduleMirror();
-                        // renderAll() runs before the scalable mirror refresh. Once the
-                        // mirror is current, refresh Customer Recovery so it cannot keep
-                        // displaying an older payment/foreclosure projection than the
-                        // authoritative state used by Statement/PDF.
-                        try{ if(typeof renderFeed==='function') renderFeed(); }catch(e){}
-                    }).catch(e=>console.warn('Scalable entity refresh skipped:',e));
+                    mfScaleScheduleMirror();
+                    // Once the targeted mirror refresh is complete, Customer Recovery can
+                    // repaint from the same authoritative state without rebuilding hidden tabs.
+                    try{ if(typeof renderFeed==='function') renderFeed(); }catch(e){}
                 }catch(e){}
                 /* Drive auto-sync disabled by production policy. */
             });
@@ -10052,7 +10304,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(remoteUpdated > localUpdated + 2000){
                 try{ const conflict={id:'conflict-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(conflict);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); localStorage.setItem('MF_LAST_LOCAL_CONFLICT_AT',conflict.updatedAt); }catch(e){}
                 const r=await driveApi('files/'+remote.id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); try{mfRefreshFirebaseSyncControls();}catch(e){} scheduleFirebasePush();
+                state=parsed; mfScaleReinstallStateProxy(); mfScaleSetFullDirty(); normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile(); await idbPutSnapshot(); try{mfRefreshFirebaseSyncControls();}catch(e){} scheduleFirebasePush();
                 markCloudSynced(); renderAll(); updateSecureCloudStatus('🟢 Latest encrypted Google Drive data loaded on this device. New secure cloud baseline will be published automatically.'); return;
             }
             if(localUpdated > remoteUpdated + 2000 || dirty){ await syncNowToGoogleDrive(background); return; }
@@ -10103,7 +10355,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(!confirm('Restore the latest encrypted Google Drive database? Your current device data will first be preserved in local version history.')) return;
                 try{ const safety={id:'pre-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
                 const r=await driveApi('files/'+files[0].id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
+                state=parsed; mfScaleReinstallStateProxy(); mfScaleSetFullDirty(); normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
                 const persisted=await idbPutSnapshot();
                 if(!persisted?.state || !localStorage.getItem('MF_V2_LOCAL_SNAPSHOT_READY')) throw new Error('Restored data could not be committed to the protected local database. Cloud baseline was not changed.');
                 renderAll(); await mfV2PublishVerifiedDriveBaseline('latest-drive-restore'); updateSecureCloudStatus('🟢 Latest encrypted Google Drive backup restored, validated, and published as the new secure baseline.'); const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Restored latest backup: '+new Date().toLocaleString('en-IN'); alert('Latest encrypted Google Drive backup restored successfully and established as the new secure cloud baseline.'); closeModal('modal-cloud'); setTab('feed');
@@ -10209,7 +10461,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     const db=await openMfDb();
                     await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
                 }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true;
+                state=parsed; mfScaleReinstallStateProxy(); mfScaleSetFullDirty();
                 normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
                 const persisted=await idbPutSnapshot();
                 if(!persisted?.state || !localStorage.getItem('MF_V2_LOCAL_SNAPSHOT_READY')) throw new Error('Restored data could not be committed to the protected local database. Cloud baseline was not changed.');
@@ -10273,7 +10525,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
                 }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
 
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true;
+                state=parsed; mfScaleReinstallStateProxy(); mfScaleSetFullDirty();
                 normalizeOperationalPeriods();
                 normalizeBorrowingCosts();
                 normalizeCompanyProfile();
@@ -10499,7 +10751,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 if(!rec||!rec.state)throw new Error('Backup version not found or invalid.');
                 if(!confirm(`Restore the backup from ${new Date(rec.createdAt).toLocaleString('en-IN')} (${rec.reason||'AUTO'})? The current data will first be saved as a safety snapshot.`))return;
                 await idbPutVersionedBackup('BEFORE RESTORE',true);
-                state=(typeof structuredClone==='function')?structuredClone(rec.state):JSON.parse(JSON.stringify(rec.state)); mfScaleReinstallStateProxy(); mfScaleDirty.full=true;
+                state=(typeof structuredClone==='function')?structuredClone(rec.state):JSON.parse(JSON.stringify(rec.state)); mfScaleReinstallStateProxy(); mfScaleSetFullDirty();
                 normalizeOperationalPeriods();normalizeBorrowingCosts();normalizeCompanyProfile();
                 await idbPutSnapshot();
                 mfV2ArmBaseline(); mfV2MarkDirty(); scheduleFirebasePush();
@@ -10554,7 +10806,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     const raw=JSON.parse(e.target.result); const parsed=raw.state||raw;
                     if(parsed.loans&&parsed.products){
                         if(confirm('Restore this backup?')){
-                            state=parsed; mfScaleReinstallStateProxy(); mfScaleDirty.full=true; normalizeOperationalPeriods(); normalizeBorrowingCosts();
+                            state=parsed; mfScaleReinstallStateProxy(); mfScaleSetFullDirty(); normalizeOperationalPeriods(); normalizeBorrowingCosts();
                             await idbPutSnapshot();
                             mfV2ArmBaseline(); mfV2MarkDirty(); scheduleFirebasePush();
                             renderAll(); alert('Database restored successfully into IndexedDB.'); closeModal('modal-cloud'); setTab('feed');
