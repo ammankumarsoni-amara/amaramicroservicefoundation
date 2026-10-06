@@ -1857,7 +1857,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             <label>Processing Fee GST (%)</label>
                             <input type="number" id="b-processing-gst-pct" value="18" min="0" max="100" step="any" placeholder="e.g. 18" oninput="calcBorrowingUpfrontFields('pct')">
                             <div id="b-processing-gst-calc" style="font-size:.68rem;color:#94a3b8;margin-top:3px;">GST Amount: ₹0</div>
-                            <input type="number" id="b-processing-gst-amount" value="0" min="0" step="0.01" placeholder="GST amount" oninput="document.getElementById('b-processing-gst-amount').dataset.userEdited='1';calcBorrowingUpfrontFields('amount')" style="margin-top:5px;">
+                            <input type="number" id="b-processing-gst-amount" value="0" min="0" step="any" placeholder="GST amount" oninput="document.getElementById('b-processing-gst-amount').dataset.userEdited='1';calcBorrowingUpfrontFields('amount')" style="margin-top:5px;">
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
                             <label>Other Charges (₹)</label>
@@ -1870,7 +1870,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
                             <label>Other Charges GST Amount (₹) [Editable]</label>
-                            <input type="number" id="b-other-gst" value="0" min="0" step="0.01" placeholder="0" oninput="calcBorrowingOtherGst('amount')">
+                            <input type="number" id="b-other-gst" value="0" min="0" step="any" placeholder="0" oninput="calcBorrowingOtherGst('amount')">
                         </div>
                     </div>
                     <div style="margin-top:8px; font-size:.72rem; color:#94a3b8;">
@@ -1971,7 +1971,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     <div class="form-group" id="lp-gst-field-wrap">
                         <label>GST on Interest (%)</label>
                         <input type="number" id="lp-gst-pct" value="18" min="0" max="100" step="any" oninput="calcLenderPaymentTotals('pct')" style="background:rgba(255,255,255,0.08);color:#38bdf8;">
-                        <input type="number" id="lp-gst" value="0" min="0" step="0.01" oninput="calcLenderPaymentTotals('amount')" style="margin-top:5px;background:rgba(255,255,255,0.08);color:#38bdf8;">
+                        <input type="number" id="lp-gst" value="0" min="0" step="any" oninput="calcLenderPaymentTotals('amount')" style="margin-top:5px;background:rgba(255,255,255,0.08);color:#38bdf8;">
                         <div style="font-size:.72rem;color:#38bdf8;margin-top:5px;font-weight:700;">GST Amount (Editable)</div>
                     </div>
                 </div>
@@ -2025,11 +2025,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                     <div class="form-group">
                         <label>Loan Amount (₹) *</label>
-                        <input type="number" id="fp-amount" placeholder="50000" step="0.01" oninput="productRateChanged()" required>
+                        <input type="number" id="fp-amount" placeholder="50000" step="any" oninput="productRateChanged()" required>
                     </div>
                     <div class="form-group">
                         <label>File Charge (₹) *</label>
-                        <input type="number" id="fp-filecharge" placeholder="2500" step="0.01" oninput="productFileChargeChanged()" required>
+                        <input type="number" id="fp-filecharge" placeholder="2500" step="any" oninput="productFileChargeChanged()" required>
                     </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -2076,13 +2076,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                     <div class="form-group">
                         <label>EMI Amount (₹) — Auto Calculated / Manual Target *</label>
-                        <input type="number" id="fp-emi" placeholder="2500" step="0.01" min="0" oninput="productEmiChanged()" required>
+                        <input type="number" id="fp-emi" placeholder="2500" step="any" min="0" oninput="productEmiChanged()" required>
                     </div>
                     <div class="form-group">
                         <label>Default Late Penalty (₹) *</label>
-                        <input type="number" id="fp-penalty" placeholder="170" step="0.01" required>
+                        <input type="number" id="fp-penalty" placeholder="170" step="any" required>
                     </div>
-                    <div class="form-group"><label>Post-Maturity Recovery / Month (₹)</label><input type="number" id="fp-post-maturity-interest" placeholder="e.g. 900" min="0" step="0.01"><small style="font-size:.64rem;color:#64748b;">Applied only after contractual maturity, using the overdue-month rule. Keep this aligned with the customer's agreed terms/KFS.</small></div>
+                    <div class="form-group"><label>Post-Maturity Recovery / Month (₹)</label><input type="number" id="fp-post-maturity-interest" placeholder="e.g. 900" min="0" step="any"><small style="font-size:.64rem;color:#64748b;">Applied only after contractual maturity, using the overdue-month rule. Keep this aligned with the customer's agreed terms/KFS.</small></div>
                 </div>
                 <div id="fp-calc-note" style="font-size:.66rem;color:#94a3b8;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.14);padding:8px;border-radius:9px;margin-bottom:10px;line-height:1.55;">Interest is calculated on the full Loan Amount. File Charge is a separate income/charge and is never deducted from the interest principal.</div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(255,255,255,0.04); padding: 8px; border-radius: 9px; margin-bottom: 12px;">
@@ -2267,7 +2267,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             </div>
             <form id="form-edit-due-penalty" onsubmit="handleEditDuePenaltySubmit(event)">
                 <input type="hidden" id="edp-loan-id"><input type="hidden" id="edp-idx">
-                <div class="form-group"><label>Penalty Amount (₹)</label><input type="number" id="edp-amount" min="0.01" step="0.01" required></div>
+                <div class="form-group"><label>Penalty Amount (₹)</label><input type="number" id="edp-amount" min="0.01" step="any" required></div>
                 <div class="form-group"><label>Penalty Applied Date</label><div id="edp-applied-date" style="background:rgba(255,255,255,.04);border:1px solid var(--border-subtle);border-radius:10px;padding:11px 12px;color:#fbbf24;font-weight:800;">-</div><small style="display:block;color:#64748b;font-size:.64rem;line-height:1.45;margin-top:5px;">Applied Date is fixed to this EMI's original contractual Due Date. Edit the penalty amount here; the applied date cannot be changed.</small></div>
                 <button type="submit" class="btn-submit" style="background:linear-gradient(135deg,#f59e0b,#d97706);">✓ Save Penalty Due</button>
             </form>
@@ -2377,7 +2377,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     </div>
                     <div class="form-group">
                         <label>GST Amount (₹) [Editable]</label>
-                        <input type="number" id="fc-gst-amount" value="0" min="0" step="0.01" oninput="calcForeclosureFromGstAmount()">
+                        <input type="number" id="fc-gst-amount" value="0" min="0" step="any" oninput="calcForeclosureFromGstAmount()">
                     </div>
                 </div>
 
@@ -2439,7 +2439,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
                 <div class="mf-settlement-grid" style="margin-top:10px;">
                     <div class="form-group"><label>Actual Settlement Date <span style="color:#f87171">*</span></label><div class="dmy-grid pm-dmy-grid"><select id="pm-s-day" required onchange="updatePostMaturitySettlementPreview()"></select><select id="pm-s-month" required onchange="updatePostMaturitySettlementPreview()"></select><select id="pm-s-year" required onchange="updatePostMaturitySettlementPreview()"></select></div><small style="color:#64748b;font-size:.65rem;">Date / Month / Year — e.g. 03 / 09 / 2026</small></div>
-                    <div class="form-group"><label>Actual Amount Received (₹) <span style="color:#f87171">*</span></label><input type="number" id="pm-actual-amount" min="0" step="0.01" required oninput="updatePostMaturitySettlementPreview()" placeholder="e.g. 7000"></div>
+                    <div class="form-group"><label>Actual Amount Received (₹) <span style="color:#f87171">*</span></label><input type="number" id="pm-actual-amount" min="0" step="any" required oninput="updatePostMaturitySettlementPreview()" placeholder="e.g. 7000"></div>
                 </div>
 
                 <div class="mf-settlement-grid">
@@ -6630,7 +6630,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById('pm-loan-id').value=loanId;
             document.getElementById('pm-customer-summary').innerHTML=`<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;"><div><b style="color:#fff;font-size:1rem;">${financeEsc(loan.name)}</b><div style="font-size:.7rem;color:#94a3b8;margin-top:2px;">${financeEsc(loan.id)} · ${financeEsc(loan.phone||'-')} · ${financeEsc(p.name||'-')}</div></div><div style="text-align:right;"><span style="font-size:.68rem;color:#94a3b8;">Contractual Pending</span><br><b style="color:#f87171;font-size:1.05rem;">₹${getLoanPending(loan).toLocaleString('en-IN')}</b></div></div>`;
             setDmyValues('pm-s',loan.postMaturitySettlement?.settlementDate||today);
-            document.getElementById('pm-actual-amount').value=loan.postMaturitySettlement?.actualReceived??'';
+            document.getElementById('pm-actual-amount').value=loan.postMaturitySettlement?._rawActualReceived ?? (loan.postMaturitySettlement?.actualReceived??'');
             document.getElementById('pm-mode').value=loan.postMaturitySettlement?.mode||'Cash';
             updatePostMaturitySettlementPreview();
             document.getElementById('modal-post-maturity-settlement').classList.add('active');
@@ -6662,7 +6662,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 : getLoanPartialSum(loan);
             const totalContractualInterest=Math.max(0,(Number(state.products[loan.product]?.interest)||0)*(Number(state.products[loan.product]?.tenure)||0))+mfLoanPreEmiDue(loan);
             const alloc=mfSettlementAllocation(loan,actual,c);
-            loan.postMaturitySettlement={settlementDate:settleDate,maturityDate:c.maturityIso,overdueDays:c.overdueDays,recoveryMonths:c.recoveryMonths,recoveryRate:c.rate,contractualPending:c.contractualPending,recoveryInterest:c.recoveryInterest,recoveryInterestReceived:alloc.recoveryInterestReceived,contractualInterestReceived:alloc.contractualInterestReceived,principalReceived:alloc.principalReceived,preEmiInterestReceived:alloc.preEmiReceived,calculatedSettlement:c.calculatedSettlement,actualReceived:actual,waiverAmount:waiver,mode,partialAmountAlreadyCollected,recordedAt:new Date().toISOString(),workingNote:{pendingEmis:c.pendingEmis,emi:c.emi,pendingPrincipal:c.pendingPrincipal,pendingInterest:c.pendingInterest,totalContractualInterest,totalScheduledPending:c.scheduledPending}};
+            loan.postMaturitySettlement={settlementDate:settleDate,maturityDate:c.maturityIso,_rawActualReceived:String(document.getElementById('pm-actual-amount').value||actual),overdueDays:c.overdueDays,recoveryMonths:c.recoveryMonths,recoveryRate:c.rate,contractualPending:c.contractualPending,recoveryInterest:c.recoveryInterest,recoveryInterestReceived:alloc.recoveryInterestReceived,contractualInterestReceived:alloc.contractualInterestReceived,principalReceived:alloc.principalReceived,preEmiInterestReceived:alloc.preEmiReceived,calculatedSettlement:c.calculatedSettlement,actualReceived:actual,waiverAmount:waiver,mode,partialAmountAlreadyCollected,recordedAt:new Date().toISOString(),workingNote:{pendingEmis:c.pendingEmis,emi:c.emi,pendingPrincipal:c.pendingPrincipal,pendingInterest:c.pendingInterest,totalContractualInterest,totalScheduledPending:c.scheduledPending}};
             loan.pendingParts=[]; loan.status='SETTLED'; loan.closedBy='POST_MATURITY_SETTLEMENT';
             closeModal('modal-post-maturity-settlement'); persist(); alert(`Loan ${loan.id} (${loan.name}) settled after maturity. Received ₹${actual.toLocaleString('en-IN')}; waiver ₹${waiver.toLocaleString('en-IN')}.`);
         }
@@ -6912,8 +6912,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("b-processing-gst-amount").value = Number(b.processingGst || 0);
             document.getElementById("b-other-charges").value = Number(b.otherCharges || 0);
             const legacyOtherGstPct = Number(b.otherGstPct || 0) || ((Number(b.otherCharges)||0) > 0 ? ((Number(b.otherGst)||0) / (Number(b.otherCharges)||0) * 100) : 0);
-            document.getElementById("b-other-gst-pct").value = legacyOtherGstPct ? Number(legacyOtherGstPct) : 0;
-            document.getElementById("b-other-gst").value = Number(b.otherGst || 0);
+            document.getElementById("b-other-gst-pct").value = String(b._rawOtherGstPct ?? (legacyOtherGstPct ? Number(legacyOtherGstPct) : 0));
+            document.getElementById("b-other-gst").value = String(b._rawOtherGst ?? Number(b.otherGst || 0));
             document.getElementById("b-apply-gst").checked = b.applyGst || false;
             document.getElementById("b-interest-gst-pct").value = Number(b.interestGstPct || 18);
             document.getElementById("b-processing-gst-pct").dataset.userEdited = '1';
@@ -6939,23 +6939,79 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if (pct && (!pct.value || Number(pct.value) < 0)) pct.value = 18;
         }
 
+        // ================== EXACT DECIMAL INPUT / CONVERSION CORE ==================
+        // Financial input rule: user-entered decimal text is never intentionally rounded.
+        // Paired percentage <-> rupee conversions use integer decimal arithmetic (BigInt)
+        // instead of binary floating-point multiplication/division. Existing stored numeric
+        // fields remain compatible; _raw* fields preserve the user's exact entered text where
+        // available so reopening Edit never silently changes 1770 into 1769.999999...
+        function mfExactText(id, fallback='0'){
+            const el=document.getElementById(id); if(!el) return String(fallback);
+            const v=String(el.value ?? '').trim();
+            return v!=='' ? v : String(fallback);
+        }
+        function mfSetExactText(id, value){
+            const el=document.getElementById(id); if(!el) return;
+            const v=String(value ?? ''); el.value=v; el.dataset.exactValue=v;
+        }
+        function mfDecNormalize(v){
+            let s=String(v??'').trim();
+            if(!s) return '0';
+            if(/^[-+]?\.\d+$/.test(s)) s=s.replace(/^([+-]?)\./,'$1'+'0.');
+            if(!/^[+-]?\d+(?:\.\d+)?$/.test(s)) return '0';
+            let sign=''; if(s[0]=='-'||s[0]=='+'){sign=s[0]=='-'?'-':'';s=s.slice(1);}
+            let [a,b='']=s.split('.'); a=a.replace(/^0+(?=\d)/,'')||'0'; b=b.replace(/0+$/,'');
+            return sign+(b?a+'.'+b:a);
+        }
+        function mfDecToParts(v){
+            const s=mfDecNormalize(v), neg=s[0]=='-'; const t=neg?s.slice(1):s; const [a,b='']=t.split('.');
+            return {neg, digits:(a+b)||'0', scale:b.length};
+        }
+        function mfDecMul(a,b){
+            const A=mfDecToParts(a),B=mfDecToParts(b); let n=BigInt(A.digits)*BigInt(B.digits); const neg=A.neg!==B.neg;
+            const scale=A.scale+B.scale; let out=n.toString();
+            if(scale){out=out.padStart(scale+1,'0');out=out.slice(0,-scale)+'.'+out.slice(-scale);}
+            out=mfDecNormalize((neg?'-':'')+out); return out;
+        }
+        function mfDecDiv(a,b,maxDigits=60){
+            const A=mfDecToParts(a),B=mfDecToParts(b); if(BigInt(B.digits)===0n) return '0';
+            let num=BigInt(A.digits), den=BigInt(B.digits);
+            if(A.scale>B.scale) den*=10n**BigInt(A.scale-B.scale); else if(B.scale>A.scale) num*=10n**BigInt(B.scale-A.scale);
+            const neg=A.neg!==B.neg; const integer=num/den; let rem=num%den; let out=integer.toString();
+            if(rem!==0n){ out+='.'; let i=0; while(rem!==0n && i<maxDigits){rem*=10n;out+=(rem/den).toString();rem%=den;i++;} }
+            return mfDecNormalize((neg?'-':'')+out);
+        }
+        function mfDecAdd(a,b){ const A=mfDecToParts(a),B=mfDecToParts(b); const scale=Math.max(A.scale,B.scale); const an=BigInt(A.digits)*(10n**BigInt(scale-A.scale))*(A.neg?-1n:1n); const bn=BigInt(B.digits)*(10n**BigInt(scale-B.scale))*(B.neg?-1n:1n); let n=an+bn; const neg=n<0n; if(neg)n=-n; let out=n.toString(); if(scale){out=out.padStart(scale+1,'0');out=out.slice(0,-scale)+'.'+out.slice(-scale);} return mfDecNormalize((neg?'-':'')+out); }
+        function mfDecSub(a,b){ return mfDecAdd(a, (String(b).trim().startsWith('-')?String(b).trim().slice(1):'-'+String(b).trim())); }
+        function mfDecPercentOf(base, pct){ return mfDecDiv(mfDecMul(base,pct),'100'); }
+        function mfDecPercentFromAmount(base, amount){ return mfDecMul(mfDecDiv(amount,base),'100'); }
+        function mfSafeNumber(v){ const n=Number(v); return Number.isFinite(n)?n:0; }
+        function mfRememberExactField(id){ const el=document.getElementById(id); if(el) el.dataset.exactValue=String(el.value??''); }
+        // ================== END EXACT DECIMAL INPUT / CONVERSION CORE ==================
+
         function calcBorrowingUpfrontFields(source='') {
-            const amount = parseFloat(document.getElementById("b-amount")?.value) || 0;
-            const pct = parseFloat(document.getElementById("b-processing-fee-pct")?.value) || 0;
-            const fee = Math.max(0, amount * pct / 100);
+            const amountText = mfExactText('b-amount','0');
+            const amount = mfSafeNumber(amountText);
+            const pctText = mfExactText('b-processing-fee-pct','0');
+            const pct = mfSafeNumber(pctText);
+            const feeText = mfDecPercentOf(amountText,pctText);
+            const fee = Math.max(0, mfSafeNumber(feeText));
             const gstPctEl = document.getElementById("b-processing-gst-pct");
             const gstAmtEl = document.getElementById("b-processing-gst-amount");
-            let gstPct = parseFloat(gstPctEl?.value) || 0;
-            let gst = Math.max(0, parseFloat(gstAmtEl?.value) || 0);
+            let gstPctText = mfExactText('b-processing-gst-pct','0');
+            let gstPct = mfSafeNumber(gstPctText);
+            let gstText = mfExactText('b-processing-gst-amount','0');
+            let gst = Math.max(0, mfSafeNumber(gstText));
             if (source === 'pct' || source === 'reset') {
-                gst = Math.max(0, fee * gstPct / 100);
-                if (gstAmtEl) { gstAmtEl.value = gst; gstAmtEl.dataset.userEdited = ''; }
+                gstText = mfDecPercentOf(feeText,gstPctText);
+                gst = mfSafeNumber(gstText);
+                if (gstAmtEl) { gstAmtEl.value = gstText; gstAmtEl.dataset.userEdited = ''; }
             } else if (source === 'amount') {
-                if (gstPctEl) gstPctEl.value = fee>0 ? (gst/fee*100) : 0;
-                gstPct = fee>0 ? (gst/fee*100) : 0;
+                gstPctText = fee>0 ? mfDecPercentFromAmount(feeText,gstText) : '0';
+                gstPct = mfSafeNumber(gstPctText);
+                if (gstPctEl) gstPctEl.value = gstPctText;
             } else if (gstAmtEl && !gstAmtEl.value) {
-                gst = Math.max(0, fee * gstPct / 100);
-                gstAmtEl.value = gst;
+                gstText = mfDecPercentOf(feeText,gstPctText); gst=mfSafeNumber(gstText); gstAmtEl.value=gstText;
             }
             const out = document.getElementById("b-processing-fee-calc");
             const gstOut = document.getElementById("b-processing-gst-calc");
@@ -6965,20 +7021,22 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         function calcBorrowingOtherGst(source='') {
-            const base = Math.max(0, parseFloat(document.getElementById("b-other-charges")?.value) || 0);
+            const baseText = mfExactText('b-other-charges','0');
+            const base = Math.max(0,mfSafeNumber(baseText));
             const pctEl = document.getElementById("b-other-gst-pct");
             const amtEl = document.getElementById("b-other-gst");
-            let pct = parseFloat(pctEl?.value) || 0;
-            let amount = Math.max(0, parseFloat(amtEl?.value) || 0);
+            let pctText = mfExactText('b-other-gst-pct','0');
+            let pct = mfSafeNumber(pctText);
+            let amountText = mfExactText('b-other-gst','0');
+            let amount = Math.max(0,mfSafeNumber(amountText));
             if (source === 'pct' || source === 'reset') {
-                amount = Math.max(0, base * pct / 100);
-                if (amtEl) { amtEl.value = amount; amtEl.dataset.userEdited = ''; }
+                amountText = mfDecPercentOf(baseText,pctText); amount=mfSafeNumber(amountText);
+                if (amtEl) { amtEl.value = amountText; amtEl.dataset.userEdited = ''; }
             } else if (source === 'amount') {
-                pct = base>0 ? (amount/base*100) : 0;
-                if (pctEl) pctEl.value = pct;
+                pctText = base>0 ? mfDecPercentFromAmount(baseText,amountText) : '0'; pct=mfSafeNumber(pctText);
+                if (pctEl) pctEl.value = pctText;
             } else if (amtEl && !amtEl.value) {
-                amount = Math.max(0, base * pct / 100);
-                amtEl.value = amount;
+                amountText = mfDecPercentOf(baseText,pctText); amount=mfSafeNumber(amountText); amtEl.value=amountText;
             }
             const out = document.getElementById("b-other-gst-calc");
             if (out) out.innerText = "GST Amount: ₹" + amount.toLocaleString('en-IN',{maximumFractionDigits:2});
@@ -6995,13 +7053,20 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const tenure = parseInt(document.getElementById("b-tenure").value, 10);
             const interestBasis = document.getElementById("b-interest-basis").value;
             const type = document.getElementById("b-type").value;
-            const processingFeePct = parseFloat(document.getElementById("b-processing-fee-pct").value) || 0;
-            const processingFee = Math.max(0, amount * processingFeePct / 100);
-            const processingGstPct = parseFloat(document.getElementById("b-processing-gst-pct").value) || 0;
-            const processingGst = Math.max(0, parseFloat(document.getElementById("b-processing-gst-amount")?.value) || 0);
-            const otherCharges = parseFloat(document.getElementById("b-other-charges").value) || 0;
-            const otherGstPct = parseFloat(document.getElementById("b-other-gst-pct")?.value) || 0;
-            const otherGst = Math.max(0, parseFloat(document.getElementById("b-other-gst").value) || 0);
+            const processingFeePctText = mfExactText('b-processing-fee-pct','0');
+            const processingFeePct = mfSafeNumber(processingFeePctText);
+            const processingFeeText = mfDecPercentOf(mfExactText('b-amount',String(amount)),processingFeePctText);
+            const processingFee = Math.max(0,mfSafeNumber(processingFeeText));
+            const processingGstPctText = mfExactText('b-processing-gst-pct','0');
+            const processingGstPct = mfSafeNumber(processingGstPctText);
+            const processingGstText = mfExactText('b-processing-gst-amount','0');
+            const processingGst = Math.max(0,mfSafeNumber(processingGstText));
+            const otherChargesText = mfExactText('b-other-charges','0');
+            const otherCharges = Math.max(0,mfSafeNumber(otherChargesText));
+            const otherGstPctText = mfExactText('b-other-gst-pct','0');
+            const otherGstPct = mfSafeNumber(otherGstPctText);
+            const otherGstText = mfExactText('b-other-gst','0');
+            const otherGst = Math.max(0,mfSafeNumber(otherGstText));
             const applyGst = document.getElementById("b-apply-gst").checked;
             const interestGstPct = Math.max(0, parseFloat(document.getElementById("b-interest-gst-pct")?.value) || 18);
             const date = getDmyIsoString("b");
@@ -7029,6 +7094,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     otherCharges: otherCharges,
                     otherGstPct: otherGstPct,
                     otherGst: otherGst,
+                    _rawProcessingFeePct: mfExactText('b-processing-fee-pct',String(processingFeePct)),
+                    _rawProcessingFee: processingFeeText,
+                    _rawProcessingGstPct: mfExactText('b-processing-gst-pct',String(processingGstPct)),
+                    _rawProcessingGst: processingGstText,
+                    _rawOtherGstPct: mfExactText('b-other-gst-pct',String(otherGstPct)),
+                    _rawOtherGst: otherGstText,
                     interestGstPct: interestGstPct,
                     applyGst: applyGst,
                     date: date,
@@ -7375,10 +7446,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             set('lp-rate-disp',(b.rate||0)+'% p.a. · '+(b.interestBasis||'Reducing Balance'),'innerText');
             const paidP=(b.repayments||[]).reduce((sum,x,i)=>i===Number(index)?sum:sum+(Number(x.principal)||0),0);set('lp-rem-disp',mfMoney(Math.max(0,Number(b.amount||0)-paidP)),'innerText');
             set('lp-gst-disp',b.applyGst?`Yes (${Number(b.interestGstPct||18).toLocaleString('en-IN',{maximumFractionDigits:4})}% on Int)`:'No','innerText');set('lp-emi-no',scheduled.no,'innerText');set('lp-due-date',formatToIndianDate(scheduled.dueDate),'innerText');
-            set('lp-gst',Number(r.gst)||0);set('lp-gst-pct',b.applyGst?Number(b.interestGstPct||18):0);set('lp-total-paid',Number(r.totalPaid)||'');set('lp-mode',r.mode||'Bank Transfer');
+            set('lp-gst',String(r._rawGst ?? (Number(r.gst)||0)));set('lp-gst-pct',String(r._rawGstPct ?? (b.applyGst?Number(b.interestGstPct||18):0)));set('lp-total-paid',String(r._rawTotalPaid ?? (Number(r.totalPaid)||'')));set('lp-mode',r.mode||'Bank Transfer');
             const gstWrap=document.getElementById('lp-gst-field-wrap'); if(gstWrap) gstWrap.style.display=b.applyGst?'':'none';
             // Show the ACTUAL amounts that were recorded for this installment (this is real entered data, not any suggestion).
-            set('lp-principal',Number(r.principal)||'');set('lp-interest',Number(r.interest)||'');
+            set('lp-principal',String(r._rawPrincipal ?? (Number(r.principal)||'')));set('lp-interest',String(r._rawInterest ?? (Number(r.interest)||'')));
             if(typeof initDmySelectors==='function')initDmySelectors('lp');if(typeof setDmyValues==='function')setDmyValues('lp',r.date||scheduled.dueDate);
             set('lp-emi-month',String(scheduled.dueDate).slice(5,7));set('lp-emi-year',String(scheduled.dueDate).slice(0,4));
             const title=document.querySelector('#modal-pay-lender .modal-title span');if(title)title.innerText=`Edit Lender EMI Payment — EMI #${scheduled.no}`;
@@ -7396,18 +7467,21 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         function calcLenderPaymentTotals(source='') {
-            const p = Number(document.getElementById("lp-principal")?.value) || 0;
-            const i = Number(document.getElementById("lp-interest")?.value) || 0;
+            const p = mfSafeNumber(mfExactText('lp-principal','0'));
+            const iText = mfExactText('lp-interest','0');
+            const i = mfSafeNumber(iText);
             const pctEl = document.getElementById("lp-gst-pct");
             const gstEl = document.getElementById("lp-gst");
-            let gstPct = Number(pctEl?.value) || 0;
-            let gst = Math.max(0, Number(gstEl?.value) || 0);
+            let gstPctText = mfExactText('lp-gst-pct','0');
+            let gstPct = mfSafeNumber(gstPctText);
+            let gstText = mfExactText('lp-gst','0');
+            let gst = Math.max(0,mfSafeNumber(gstText));
             if (source === 'pct' || source === 'reset' || !gstEl?.value) {
-                gst = Math.max(0, i * gstPct / 100);
-                if (gstEl) gstEl.value = gst;
+                gstText = mfDecPercentOf(iText,gstPctText); gst=mfSafeNumber(gstText);
+                if (gstEl) gstEl.value = gstText;
             } else if (source === 'amount') {
-                gstPct = i>0 ? (gst/i*100) : 0;
-                if (pctEl) pctEl.value = gstPct;
+                gstPctText = i>0 ? mfDecPercentFromAmount(iText,gstText) : '0'; gstPct=mfSafeNumber(gstPctText);
+                if (pctEl) pctEl.value = gstPctText;
             }
             const gstDisp = document.getElementById("lp-gst-amount-disp");
             if (gstDisp) gstDisp.innerText = gst.toLocaleString('en-IN',{maximumFractionDigits:2});
@@ -7431,7 +7505,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const i=Number(document.getElementById('lp-interest')?.value)||0;
             const g=Number(document.getElementById('lp-gst')?.value)||0;
             if(p<=0 && i<=0){ alert('Please enter the Principal and/or Interest amount actually paid for this installment.'); return; }
-            const record={date:actualPaidDate,dueDate:scheduled.dueDate,emiNo:emiNo,emiMonth:String(scheduled.dueDate).slice(5,7),emiYear:Number(String(scheduled.dueDate).slice(0,4)),principal:p,interest:i,gst:g,totalPaid:Number(document.getElementById('lp-total-paid')?.value)||(p+i+g),mode:mode};
+            const record={date:actualPaidDate,dueDate:scheduled.dueDate,emiNo:emiNo,emiMonth:String(scheduled.dueDate).slice(5,7),emiYear:Number(String(scheduled.dueDate).slice(0,4)),principal:p,interest:i,gst:g,totalPaid:Number(document.getElementById('lp-total-paid')?.value)||mfSafeNumber(mfDecAdd(mfDecAdd(String(p),String(i)),String(g))),mode:mode,
+                _rawPrincipal:mfExactText('lp-principal',String(p)),_rawInterest:mfExactText('lp-interest',String(i)),_rawGst:mfExactText('lp-gst',String(g)),_rawGstPct:mfExactText('lp-gst-pct',String(b.applyGst?b.interestGstPct||18:0)),_rawTotalPaid:mfExactText('lp-total-paid',mfDecAdd(mfDecAdd(String(p),String(i)),String(g)))};
             if(editIndex>=0){
                 if(!b.repayments[editIndex])return;
                 b.repayments[editIndex]=record;
@@ -7704,17 +7779,22 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("fc-orig-loan").innerText="₹"+Number(prod.amount||0).toLocaleString('en-IN');
             document.getElementById("fc-emis-paid").innerText=loan.payments.length+" EMIs";
             document.getElementById("fc-rem-principal").value=editMode?Number(fd.principalPaid??remPrincipal):remPrincipal;
-            document.getElementById("fc-fee-amount").value=editMode?Number(fd.feeAmount||0):(currentForeclosureOrigLoan*5/100);
-            document.getElementById("fc-fee-percent").value=editMode && currentForeclosureOrigLoan>0 ? ((Number(fd.feeAmount||0)/currentForeclosureOrigLoan)*100) : 5;
+            document.getElementById("fc-fee-amount").value=editMode ? String(fd._rawFeeAmount ?? fd.feeAmount ?? 0) : mfDecPercentOf(String(currentForeclosureOrigLoan), '5');
+            document.getElementById("fc-fee-percent").value=editMode && currentForeclosureOrigLoan>0 ? String(fd._rawFeePercent ?? mfDecPercentFromAmount(String(currentForeclosureOrigLoan), String(fd.feeAmount ?? 0))) : '5';
+            document.getElementById("fc-fee-amount").dataset.userEdited=editMode?'1':'';
+            document.getElementById("fc-fee-percent").dataset.exactValue=String(document.getElementById("fc-fee-percent").value);
             const legacyGstPct = Number(fd.gstPct||0) || ((Number(fd.feeAmount)||0)>0 && Number(fd.gstAmount)>0 ? (Number(fd.gstAmount)/Number(fd.feeAmount)*100) : 18);
-            document.getElementById("fc-gst-pct").value=editMode?Number(legacyGstPct):18;
-            document.getElementById("fc-gst-amount").value=editMode?Number(fd.gstAmount||0):((Number(currentForeclosureOrigLoan*5/100)*18)/100);
+            document.getElementById("fc-gst-pct").value=editMode?String(fd._rawGstPercent ?? legacyGstPct):18;
+            document.getElementById("fc-gst-amount").value=editMode?String(fd._rawGstAmount ?? (fd.gstAmount||0)):((Number(currentForeclosureOrigLoan*5/100)*18)/100);
             document.getElementById("fc-gst-amount").dataset.userEdited=editMode?'1':'';
             document.getElementById("fc-s-mode").value=editMode?(fd.mode||'Cash'):'Cash';
             setDmyValues("fc-s",editMode&&fd.settlementDate?fd.settlementDate:mfIsoToday());
-            if(editMode)calcForeclosureFromFee(); else calcForeclosureTotals();
             if(editMode){
-                document.getElementById("fc-gst-amount").value=Number(fd.gstAmount||0);
+                // Reopen exactly what was saved. Do not recalculate the stored fee from a derived percentage.
+                calcForeclosureTotals(true);
+            } else calcForeclosureTotals();
+            if(editMode){
+                document.getElementById("fc-gst-amount").value=String(fd._rawGstAmount ?? (fd.gstAmount||0));
                 document.getElementById("fc-gst-amount").dataset.userEdited='1';
                 calcForeclosureTotals();
             }
@@ -7728,21 +7808,26 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             return Number.isFinite(v)&&v>=0?v:0;
         }
 
-        function calcForeclosureTotals() {
+        function calcForeclosureTotals(preserveEnteredFee=false) {
             const remPrin = parseFloat(document.getElementById("fc-rem-principal").value) || 0;
-            const feePercent = parseFloat(document.getElementById("fc-fee-percent").value) || 0;
+            const feePercentText = mfExactText('fc-fee-percent','0');
+            const feePercent = mfSafeNumber(feePercentText);
             const loanId=document.getElementById("fc-settle-loan-id")?.value;
             const loan=state.loans.find(l=>l.id===loanId);
             const settleDate=getForeclosureSettlementDate();
             const pc=loan?mfPreClosureDetails(loan,settleDate):{days:0,interest:0,monthlyInterest:0,fromDate:'',toDate:settleDate};
-            const feeAmt = Math.max(0, (currentForeclosureOrigLoan * feePercent) / 100);
-            const gstPct=getForeclosureGstPct();
+            const feeEl=document.getElementById("fc-fee-amount");
+            let feeText=preserveEnteredFee ? mfExactText('fc-fee-amount','0') : mfDecPercentOf(String(currentForeclosureOrigLoan),feePercentText);
+            let feeAmt=mfSafeNumber(feeText);
+            if(!preserveEnteredFee && feeEl){ feeEl.value=feeText; feeEl.dataset.userEdited=''; }
+            const gstPctText=mfExactText('fc-gst-pct','0');
+            const gstPct=mfSafeNumber(gstPctText);
             const gstEl=document.getElementById('fc-gst-amount');
-            const calculatedGst=Math.max(0, (feeAmt*gstPct)/100);
-            if(gstEl && gstEl.dataset.userEdited!=='1') gstEl.value=calculatedGst;
-            const gstAmt=Math.max(0,Number(gstEl?.value)||0);
+            const calculatedGstText=mfDecPercentOf(feeText,gstPctText);
+            if(gstEl && gstEl.dataset.userEdited!=='1') gstEl.value=calculatedGstText;
+            const gstAmt=mfSafeNumber(gstEl?.value);
             const netTotal = remPrin + pc.interest + feeAmt + gstAmt;
-            document.getElementById("fc-fee-amount").value = feeAmt;
+            if(document.getElementById("fc-fee-percent")) document.getElementById("fc-fee-percent").dataset.exactValue=feePercentText;
             document.getElementById("fc-preclosure-interest").value = pc.interest.toFixed(2);
             document.getElementById("fc-preclosure-interest-note").innerText = pc.days>0
                 ? `${pc.days} day(s) × ₹${pc.monthlyInterest.toLocaleString('en-IN',{maximumFractionDigits:2})} ÷ 30, from ${formatToIndianDate(pc.fromDate)} to ${formatToIndianDate(settleDate)}. Actual-use interest only; any prepayment/foreclosure charge must be permitted and disclosed under the applicable loan terms/KFS and law.`
@@ -7755,18 +7840,21 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         function calcForeclosureFromFee() {
             const remPrin = parseFloat(document.getElementById("fc-rem-principal").value) || 0;
-            const feeAmt = parseFloat(document.getElementById("fc-fee-amount").value) || 0;
+            const feeText = mfExactText('fc-fee-amount','0');
+            const feeAmt = mfSafeNumber(feeText);
             const loanId=document.getElementById("fc-settle-loan-id")?.value;
             const loan=state.loans.find(l=>l.id===loanId);
             const settleDate=getForeclosureSettlementDate();
             const pc=loan?mfPreClosureDetails(loan,settleDate):{days:0,interest:0,monthlyInterest:0,fromDate:'',toDate:settleDate};
-            const gstPct=getForeclosureGstPct();
+            const gstPctText=mfExactText('fc-gst-pct','0');
             const gstEl=document.getElementById('fc-gst-amount');
-            if(gstEl && gstEl.dataset.userEdited!=='1') gstEl.value=Math.max(0, (feeAmt*gstPct)/100);
-            const gstAmt=Math.max(0,Number(gstEl?.value)||0);
+            if(gstEl && gstEl.dataset.userEdited!=='1') gstEl.value=mfDecPercentOf(feeText,gstPctText);
+            const gstAmt=mfSafeNumber(gstEl?.value);
             const netTotal = remPrin + pc.interest + feeAmt + gstAmt;
-            const feePercent = currentForeclosureOrigLoan > 0 ? ((feeAmt / currentForeclosureOrigLoan) * 100) : 0;
-            document.getElementById("fc-fee-percent").value = feePercent;
+            const feePercentText = currentForeclosureOrigLoan > 0 ? mfDecPercentFromAmount(String(currentForeclosureOrigLoan),feeText) : '0';
+            document.getElementById("fc-fee-percent").value = feePercentText;
+            document.getElementById("fc-fee-percent").dataset.exactValue=feePercentText;
+            document.getElementById("fc-fee-amount").dataset.userEdited='1';
             document.getElementById("fc-preclosure-interest").value = pc.interest.toFixed(2);
             document.getElementById("fc-preclosure-interest-note").innerText = pc.days>0
                 ? `${pc.days} day(s) × ₹${pc.monthlyInterest.toLocaleString('en-IN',{maximumFractionDigits:2})} ÷ 30, from ${formatToIndianDate(pc.fromDate)} to ${formatToIndianDate(settleDate)}. Actual-use interest only; any prepayment/foreclosure charge must be permitted and disclosed under the applicable loan terms/KFS and law.`
@@ -7790,8 +7878,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(el)el.dataset.userEdited='1';
             const fee=Number(feeEl?.value)||0;
             const gst=Number(el?.value)||0;
-            if(pctEl) pctEl.value = fee>0 ? (gst/fee*100) : 0;
-            calcForeclosureTotals();
+            if(pctEl) pctEl.value = fee>0 ? mfDecPercentFromAmount(String(fee), String(el?.value||0)) : '0';
+            calcForeclosureTotals(true);
         }
 
         function handleForecloseSubmit(e) {
@@ -7806,7 +7894,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const loan = state.loans.find(l => l.id === loanId);
             const partialAmountAlreadyCollected = Math.max(0, getLoanPartialSum(loan));
             const pc = mfPreClosureDetails(loan, settleDate);
-            const netSettleAmt = remPrin + pc.interest + feeAmt + gstAmt;
+            const netSettleAmt = mfSafeNumber(mfDecAdd(mfDecAdd(mfDecAdd(String(remPrin),String(pc.interest)),String(feeAmt)),String(gstAmt)));
 
             loan.foreclosed = true;
             loan.foreclosureData = {
@@ -7820,6 +7908,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 feeAmount: feeAmt,
                 gstPct: getForeclosureGstPct(),
                 gstAmount: gstAmt,
+                _rawFeeAmount: mfExactText('fc-fee-amount',String(feeAmt)),
+                _rawFeePercent: mfExactText('fc-fee-percent','0'),
+                _rawGstAmount: mfExactText('fc-gst-amount',String(gstAmt)),
+                _rawGstPercent: mfExactText('fc-gst-pct',String(getForeclosureGstPct())),
                 settlementAmount: netSettleAmt,
                 mode: mode
             };
@@ -8070,18 +8162,18 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("fp-code").value = code;
             document.getElementById("modal-prod-heading").innerText = `Edit Loan Product — ${p.name}`;
             document.getElementById("fp-name").value = p.name || "";
-            document.getElementById("fp-amount").value = p.amount ?? "";
-            document.getElementById("fp-filecharge").value = p.fileCharge ?? "";
+            document.getElementById("fp-amount").value = p._rawAmount ?? (p.amount ?? "");
+            document.getElementById("fp-filecharge").value = p._rawFileCharge ?? (p.fileCharge ?? "");
             document.getElementById("fp-tenure").value = p.tenure ?? "";
-            document.getElementById("fp-rate").value = p.rate ?? "";
+            document.getElementById("fp-rate").value = p._rawRate ?? (p.rate ?? "");
             document.getElementById("fp-interest-basis").value = p.interestBasis || "Reducing Basis";
             const editFreq=(p.frequencyMode==='M15FIXED')?'M15FIXED':(p.frequencyMode==='MONTHLY_CALENDAR'?'MONTHLY_CALENDAR':(['7','15','30'].includes(String(p.days||''))?String(p.days):'CUSTOM'));
             document.getElementById("fp-frequency").value = editFreq;
             document.getElementById("fp-custom-days").value = editFreq==='CUSTOM' ? (p.days||'') : '';
             updateProductFrequencyUi();
-            document.getElementById("fp-emi").value = p.emi ?? "";
-            document.getElementById("fp-penalty").value = p.penalty ?? "";
-            document.getElementById("fp-post-maturity-interest").value = p.postMaturityInterest ?? 0;
+            document.getElementById("fp-emi").value = p._rawEmi ?? (p.emi ?? "");
+            document.getElementById("fp-penalty").value = p._rawPenalty ?? (p.penalty ?? "");
+            document.getElementById("fp-post-maturity-interest").value = p._rawPostMaturityInterest ?? (p.postMaturityInterest ?? 0);
             document.getElementById("fp-principal").value = p.principal ?? "";
             document.getElementById("fp-interest").value = p.interest ?? "";
             setProductCalcMode((Number.isFinite(Number(p.rate)) && Number(p.rate) > 0) ? "rate" : "emi", false);
@@ -8125,16 +8217,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 principal = Number(calc.firstPrincipal.toFixed(2));
                 interest = Number(calc.firstInterest.toFixed(2));
             } else {
-                // Preserve the user's target EMI exactly to the stored precision while
-                // deriving the rate from that target. The schedule still uses the
-                // calculated annual rate as the source of truth.
-                emi = Number(emi.toFixed(2));
+                // The target EMI is a user-entered financial input: never round it before saving.
+                emi = mfSafeNumber(mfExactText('fp-emi',String(emi)));
                 principal = Number(calc.firstPrincipal.toFixed(2));
                 interest = Number(calc.firstInterest.toFixed(2));
             }
 
             const storedFrequencyMode = frequencyMode === "M15FIXED" ? "M15FIXED" : (frequencyMode === "MONTHLY_CALENDAR" ? "MONTHLY_CALENDAR" : (days===7 ? "WEEKLY" : (days===15 ? "FORTNIGHTLY" : (days===30 ? "MONTHLY_30" : "CUSTOM"))));
-            const productData = { name, amount, fileCharge, tenure, emi, days, penalty, postMaturityInterest, principal, interest, rate, interestBasis: basis, frequencyMode: storedFrequencyMode, _legacyEmiLocked: false };
+            const productData = { name, amount, fileCharge, tenure, emi, days, penalty, postMaturityInterest, principal, interest, rate, interestBasis: basis, frequencyMode: storedFrequencyMode, _legacyEmiLocked: false,
+                _rawAmount:mfExactText('fp-amount',String(amount)),_rawFileCharge:mfExactText('fp-filecharge',String(fileCharge)),_rawRate:mfExactText('fp-rate',String(rate)),_rawEmi:mfExactText('fp-emi',String(emi)),_rawPenalty:mfExactText('fp-penalty',String(penalty)),_rawPostMaturityInterest:mfExactText('fp-post-maturity-interest',String(postMaturityInterest)) };
             const targetCode = code || ("P-" + Math.round(amount/1000) + "K_" + Date.now().toString().slice(-4));
             state.products[targetCode] = { ...(existing || {}), ...productData };
 
@@ -8460,7 +8551,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const prod = state.products[loan.product];
             if (!loan || !prod || !(amount > 0)) return;
             if (!loan.pendingParts) loan.pendingParts = [];
-            loan.pendingParts.push({ date: date, amount: Number(amount), mode: mode });
+            loan.pendingParts.push({ date: date, amount: Number(amount), mode: mode, _rawAmount: String(amount) });
             if (penaltyTiming === 'DUE') {
                 loan.pendingDuePenalty = (loan.pendingDuePenalty || 0) + (Number(penalty) || 0);
                 loan.pendingDuePenaltyAppliedDate = mfPenaltyAppliedDueDate(loan, loan.payments.length + 1, date);
@@ -8826,12 +8917,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("collect-mode-toggle-row").style.display = "none";
             document.getElementById("pay-name-display").innerText = loan.name;
             document.getElementById("pay-id-display").innerText = loan.id;
-            document.getElementById("pay-amount").value = pay.amount;
+            document.getElementById("pay-amount").value = String(pay._rawAmount ?? pay.amount);
             document.getElementById("split-p").innerText = "₹" + (pay.principal ?? prod.principal);
             document.getElementById("split-i").innerText = "₹" + (pay.interest ?? prod.interest);
             const splitPre=document.getElementById("split-preemi"); if(splitPre) splitPre.innerText = "₹" + (Number(pay.preEmiInterest)||0).toLocaleString("en-IN");
 
-            document.getElementById("pay-penalty").value = pay.penalty || 0;
+            document.getElementById("pay-penalty").value = String(pay._rawPenalty ?? (pay.penalty || 0));
             currentCollectSuggestedPenalty = prod.penalty || 0;
             document.getElementById("btn-suggest-pen").innerText = `Apply ₹${currentCollectSuggestedPenalty}`;
             setPenaltyTiming('NOW');
@@ -8945,6 +9036,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const pay = loan.payments[idx];
                 if (!pay) { closeModal("modal-collect"); return; }
                 pay.amount = amt;
+                pay._rawAmount = mfExactText('pay-amount',String(amt));
+                pay._rawPenalty = mfExactText('pay-penalty',String(penaltyVal));
                 pay.dueDate = mfLoanScheduleDueIso(loan, idx + 1);
                 pay.date = recDate;
                 pay.mode = mode;
@@ -8979,7 +9072,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 date: recDate,
                 dueDate: dueDate,
                 amount: amt,
+                _rawAmount: mfExactText('pay-amount',String(amt)),
                 penalty: collectNow ? penaltyVal : 0,
+                _rawPenalty: mfExactText('pay-penalty',String(penaltyVal)),
                 mode: mode,
                 principal: prod.principal,
                 interest: prod.interest,
@@ -9400,7 +9495,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         function openPostMaturitySettlementEdit(loanId){
             const loan=state.loans.find(l=>l.id===loanId); const pm=loan?.postMaturitySettlement; if(!loan||!pm)return;
-            document.getElementById('pm-loan-id').value=loanId; setDmyValues('pm-s',pm.settlementDate||mfIsoToday()); document.getElementById('pm-actual-amount').value=pm.actualReceived||0; document.getElementById('pm-mode').value=pm.mode||'Cash';
+            document.getElementById('pm-loan-id').value=loanId; setDmyValues('pm-s',pm.settlementDate||mfIsoToday()); document.getElementById('pm-actual-amount').value=String(pm._rawActualReceived ?? (pm.actualReceived||0)); document.getElementById('pm-mode').value=pm.mode||'Cash';
             updatePostMaturitySettlementPreview(); document.getElementById('modal-post-maturity-settlement').classList.add('active');
         }
 
@@ -9493,7 +9588,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById('ep-loan-id').value = loanId;
             document.getElementById('ep-idx').value = idx;
             document.getElementById('ep-info').innerHTML = `EMI <b style="color:#fff;">#${idx + 1}</b> for <b style="color:#fff;">${loan.name}</b>, paid on ${formatToIndianDate(pay.date)}`;
-            document.getElementById('ep-amount').value = pay.penalty || 0;
+            document.getElementById('ep-amount').value = String(pay._rawPenalty ?? (pay.penalty || 0));
             document.getElementById('modal-edit-penalty').classList.add('active');
         }
 
@@ -9506,7 +9601,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if (!pay) return;
             const newAmt=parseFloat(document.getElementById('ep-amount').value) || 0;
             const oldAmt=Number(pay.penalty)||0;
-            pay.penalty=newAmt;
+            pay.penalty=newAmt; pay._rawPenalty=String(document.getElementById('ep-amount').value||newAmt);
             if(Array.isArray(loan.penaltyReceipts)){
                 const matches=loan.penaltyReceipts.filter(r=>Number(r.installmentNum)===idx+1);
                 if(matches.length){
@@ -10651,6 +10746,46 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(showAlert) alert(critical||warning?`Audit complete: ${critical} critical issue(s), ${warning} warning(s).`:`Audit complete: no integrity issues detected.`);
             return window.__mfLastAudit;
         }
+        function runMathematicalImpactAudit(showAlert=false){
+            const issues=[]; const add=(severity,message,detail='')=>issues.push({severity,message,detail});
+            const loans=Array.isArray(state.loans)?state.loans:[];
+            let checkedPayments=0,checkedBorrowings=0,checkedForeclosures=0,checkedSettlements=0,checkedReports=0;
+            // 1) Recorded customer payments: amount must reconcile with its accounting split.
+            loans.forEach(l=>{
+                (l.payments||[]).forEach((p,i)=>{
+                    checkedPayments++;
+                    const amt=Number(p.amount)||0, split=(Number(p.principal)||0)+(Number(p.interest)||0)+(Number(p.preEmiInterest)||0);
+                    if(Math.abs(amt-split)>0.005) add('critical',`Loan ${l.id||'-'} payment #${i+1} does not reconcile.`,`Amount ₹${amt} vs Principal + Interest + Pre-EMI ₹${split}`);
+                });
+                if(l.foreclosed && l.foreclosureData){
+                    checkedForeclosures++;
+                    const f=l.foreclosureData, calc=(Number(f.principalPaid)||0)+(Number(f.preClosureInterest)||0)+(Number(f.feeAmount)||0)+(Number(f.gstAmount)||0), actual=Number(f.settlementAmount)||0;
+                    if(Math.abs(calc-actual)>0.005) add('critical',`Loan ${l.id||'-'} foreclosure does not reconcile.`,`Components ₹${calc} vs settlement ₹${actual}`);
+                }
+                if(l.postMaturitySettlement){
+                    checkedSettlements++;
+                    const pm=l.postMaturitySettlement, received=Number(pm.actualReceived)||0, split=(Number(pm.principalReceived)||0)+(Number(pm.contractualInterestReceived)||0)+(Number(pm.recoveryInterestReceived)||0);
+                    if(Math.abs(received-split)>0.005) add('critical',`Loan ${l.id||'-'} post-maturity settlement does not reconcile.`,`Received ₹${received} vs allocated components ₹${split}`);
+                }
+            });
+            (state.borrowings||[]).forEach(b=>(b.repayments||[]).forEach((r,i)=>{
+                checkedBorrowings++;
+                const total=Number(r.totalPaid)||0, split=(Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0);
+                if(Math.abs(total-split)>0.005) add('critical',`Borrowing ${b.id||'-'} repayment #${i+1} does not reconcile.`,`Total paid ₹${total} vs Principal + Interest + GST ₹${split}`);
+            }));
+            // 2) Calendar + Financial Year reports: canonical annual numbers must match their
+            // monthly roll-up, mode breakdown and reconciliation checks. This verifies impact
+            // propagation after add/edit/delete/payment-mode changes without mutating anything.
+            const years=new Set();
+            loans.forEach(l=>{if(l.disbursalDate)years.add(String(l.disbursalDate).slice(0,4));(l.payments||[]).forEach(p=>{if(p.date)years.add(String(p.date).slice(0,4));});if(l.foreclosureData?.settlementDate)years.add(String(l.foreclosureData.settlementDate).slice(0,4));if(l.postMaturitySettlement?.settlementDate)years.add(String(l.postMaturitySettlement.settlementDate).slice(0,4));});
+            const periods=[...years].filter(Boolean).flatMap(y=>[{year:y,basis:'calendar'},{year:y,basis:'financial'}]);
+            periods.forEach(f=>{try{checkedReports++;const r=mfExecutiveReportData(f);r.reconciliation.forEach(x=>{if(x[3]!=='PASS')add('critical',`${r.periodLabel}: ${x[0]} failed.`,`Calculated ₹${Number(x[1]||0)} · Reported ₹${Number(x[2]||0)}`);});r.monthlyReconciliation.forEach(x=>{if(x[3]!=='PASS')add('critical',`${r.periodLabel}: monthly trend ${x[0]} does not roll up.`,`Monthly ₹${Number(x[1]||0)} · Annual ₹${Number(x[2]||0)}`);});}catch(e){add('critical',`Reporting audit failed for ${f.basis} ${f.year}.`,e?.message||String(e));}});
+            const critical=issues.filter(x=>x.severity==='critical').length,warning=issues.filter(x=>x.severity==='warning').length;
+            window.__mfLastMathematicalImpactAudit={at:new Date().toISOString(),issues,counts:{payments:checkedPayments,borrowings:checkedBorrowings,foreclosures:checkedForeclosures,settlements:checkedSettlements,reports:checkedReports,critical,warning}};
+            if(showAlert)alert(critical?`Mathematical impact audit: ${critical} critical issue(s) found.`:'Mathematical impact audit passed. Cross-module reporting reconciles for all available periods.');
+            return window.__mfLastMathematicalImpactAudit;
+        }
+
         function runReportingAudit(showAlert=false){
             const issues=[];
             const loans=Array.isArray(state.loans)?state.loans:[];
@@ -10998,6 +11133,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             ];
             const modeDataQuality=[]; const pb=mfAnnualBounds(year,basis); (state.loans||[]).forEach(l=>{const dd=String(l.disbursalDate||'').slice(0,10);if(dd>=pb.start&&dd<=pb.end){const raw=String(l.disbursalMode??l.disbursementMode??l.loanDisbursalMode??'').trim();if(!raw)modeDataQuality.push({id:l.id,name:l.name,disbursalDate:dd,storedMode:'',effectiveMode:'Cash',issue:'Legacy record has no explicit stored disbursalMode. Reporting uses the application legacy Cash fallback only; the record is not rewritten and no mode is inferred from any customer collection or other transaction.'});}});
             const monthly=mfAnnualMonthlyTrend(year,basis), loanTypeRows=mfAnnualLoanTypeSummary(d), productRows=mfAnnualProductRows(year,d,portfolio);
+            // Annual-vs-monthly integrity gate: every monthly report line must roll up to the
+            // same canonical annual snapshot. This is a read-only audit; it never rewrites data.
+            const monthlyRollup={disbursed:0,collections:0,principal:0,revenue:0,lenderCost:0,opex:0,net:0};
+            monthly.forEach(m=>{for(const k of Object.keys(monthlyRollup)) monthlyRollup[k]+=Number(m[k]||0);});
+            const annualTargets={disbursed:capitalDisbursed,collections:c.total,principal:c.principal,revenue:d.gross,lenderCost:d.lenderCost,opex:d.opex,net:d.net};
+            const monthlyReconciliation=Object.keys(annualTargets).map(k=>[k,monthlyRollup[k],annualTargets[k],Math.abs(monthlyRollup[k]-annualTargets[k])<=0.005?'PASS':'CHECK']);
+            reconciliation.push(['Monthly Trend Roll-up — Disbursement',monthlyRollup.disbursed,annualTargets.disbursed,Math.abs(monthlyRollup.disbursed-annualTargets.disbursed)<=0.005?'PASS':'CHECK']);
+            reconciliation.push(['Monthly Trend Roll-up — Collections',monthlyRollup.collections,annualTargets.collections,Math.abs(monthlyRollup.collections-annualTargets.collections)<=0.005?'PASS':'CHECK']);
+            reconciliation.push(['Monthly Trend Roll-up — Principal',monthlyRollup.principal,annualTargets.principal,Math.abs(monthlyRollup.principal-annualTargets.principal)<=0.005?'PASS':'CHECK']);
+            reconciliation.push(['Monthly Trend Roll-up — Revenue',monthlyRollup.revenue,annualTargets.revenue,Math.abs(monthlyRollup.revenue-annualTargets.revenue)<=0.005?'PASS':'CHECK']);
+            reconciliation.push(['Monthly Trend Roll-up — Lender Cost',monthlyRollup.lenderCost,annualTargets.lenderCost,Math.abs(monthlyRollup.lenderCost-annualTargets.lenderCost)<=0.005?'PASS':'CHECK']);
+            reconciliation.push(['Monthly Trend Roll-up — Opex',monthlyRollup.opex,annualTargets.opex,Math.abs(monthlyRollup.opex-annualTargets.opex)<=0.005?'PASS':'CHECK']);
+            reconciliation.push(['Monthly Trend Roll-up — Net',monthlyRollup.net,annualTargets.net,Math.abs(monthlyRollup.net-annualTargets.net)<=0.005?'PASS':'CHECK']);
             const compareMetrics=[
                 ['Loan Accounts Disbursed',disbLoans.length,pd.disbursed.filter(x=>x.includeDisb).length],
                 ['Capital Disbursed',capitalDisbursed,pd.disbursed.filter(x=>x.includeDisb).reduce((s,x)=>s+(Number(x.p.amount)||0),0)],
@@ -11009,7 +11157,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 ['Net Operating Surplus',d.net,pd.net],
                 ['Closing Principal Portfolio',portfolio.closing,pp.closing]
             ].map(x=>{const delta=Number(x[1]||0)-Number(x[2]||0),pct=Math.abs(Number(x[2]||0))>0.005?(delta/Number(x[2]))*100:null;return [...x,delta,pct];});
-            return {year,basis,filters:f,period,periodLabel:mfReportPeriodLabel(f),d,previous:{year:prevYear,basis,d:pd,collections:pc,portfolio:pp},collections:c,portfolio,modeRows,modeDataQuality,disbLoans,viewLoans,totalLoans:viewLoans.length,loanTypeRows,statusRows,foreclosureRows,settlementRows,capitalBorrowed,lenderPayments,capitalDisbursed,netCashMovement,revenueComponents,reconciliation,monthly,productRows,compareMetrics,reportDate:formatToIndianDate(new Date().toISOString().slice(0,10))};
+            return {year,basis,filters:f,period,periodLabel:mfReportPeriodLabel(f),d,previous:{year:prevYear,basis,d:pd,collections:pc,portfolio:pp},collections:c,portfolio,modeRows,modeDataQuality,disbLoans,viewLoans,totalLoans:viewLoans.length,loanTypeRows,statusRows,foreclosureRows,settlementRows,capitalBorrowed,lenderPayments,capitalDisbursed,netCashMovement,revenueComponents,reconciliation,monthly,monthlyRollup,monthlyReconciliation,productRows,compareMetrics,reportDate:formatToIndianDate(new Date().toISOString().slice(0,10))};
         }
         function mfStyleExecutiveSheet(ws,titleRows=1,headerRow=null){ if(!ws)return; ws['!cols']=ws['!cols']||[]; if(headerRow!==null)ws['!autofilter']={ref:`A${headerRow}:Z${headerRow}`}; ws['!freeze']={xSplit:0,ySplit:headerRow||0}; }
         function mfExecutiveReportTableRows(rows){ return rows.map(r=>r.map(v=>v===undefined||v===null?'':v)); }
@@ -11159,7 +11307,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     waiver=Math.max(0,c.calculatedSettlement-(Number(l.postMaturitySettlement.actualReceived)||0));
                 }
                 const pe=payments.reduce((sum,pay)=>sum+(Number(pay.preEmiInterest)||0),0);
-                const activityInPeriod=payments.length>0 || ff>0 || fci>0 || pm>0 || settlementContractualInterest>0 || settlementPreEmiInterest>0 || sa>0 || waiver>0;
+                const activityInPeriod=payments.length>0 || ff>0 || fci>0 || pm>0 || settlementContractualInterest>0 || settlementPreEmiInterest>0 || settlementPrincipal>0 || sa>0 || waiver>0;
                 const fc=includeDisb?(Number(p.fileCharge)||0):0;
                 file+=fc; interest+=li+settlementContractualInterest; penalty+=lp; foreclosureFee+=ff; preClosureInterest+=fci; postMaturityInterest+=pm; preEmiInterest+=pe+settlementPreEmiInterest; settlementAmount+=sa; settlementWaiver+=waiver;
                 if(includeDisb || activityInPeriod) disbursed.push({loan:l,p,interest:li+settlementContractualInterest,penalty:lp,foreclosureFee:ff,preClosureInterest:fci,postMaturityInterest:pm,preEmiInterest:pe+settlementPreEmiInterest,settlementContractualInterest,settlementPreEmiInterest,settlementPrincipal,settlementAmount:sa,settlementWaiver:waiver,totalProfit:fc+li+settlementContractualInterest+lp+ff+fci+pm+pe+settlementPreEmiInterest,filteredPayments:payments,paymentAmount,paymentPrincipal,includeDisb,activityInPeriod,reportBasis:includeDisb?'Disbursal + period activity': 'Period activity only'});
