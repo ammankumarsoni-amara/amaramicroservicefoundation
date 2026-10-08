@@ -12888,5 +12888,85 @@ try{renderPhaseB();}catch(e){console.warn('Phase B linked workflow initial rende
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(bootV9,0));else setTimeout(bootV9,0);
 })();
 </script>
+<script id="mf-phaseb-v10-ptp-cleanup-fix">
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const esc=v=>typeof financeEsc==='function'?financeEsc(v):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const norm=v=>String(v??'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+  const localToday=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+
+  // Phase-B dates are operational UI dates. Use the browser's local calendar date,
+  // not UTC, so India users do not see yesterday after local midnight.
+  window.mfPhaseBToday=localToday;
+
+  // A fresh Record PTP form must be completely blank of customer/amount/follow-up
+  // data. The only automatic value is Promised Date = today's local date.
+  window.openPhaseBAddPtp=function(){
+    if(typeof mfPhaseBEnsureState==='function')mfPhaseBEnsureState();
+    const title=$('mf-phaseb-ptp-title');if(title)title.textContent='Record Promise to Pay';
+    const save=document.querySelector('#modal-phaseb-ptp .btn-green');
+    if(save){delete save.dataset.editId;save.innerHTML='<i class="fa-solid fa-floppy-disk"></i> Save PTP';}
+    try{if(typeof mfPhaseBPopulateLoanSelect==='function')mfPhaseBPopulateLoanSelect('mf-phaseb-ptp-loan');}catch(e){}
+    const sel=$('mf-phaseb-ptp-loan');if(sel)sel.value='';
+    const search=$('mf-phaseb-ptp-loan-search');if(search)search.value='';
+    const results=$('mf-phaseb-ptp-loan-results');if(results)results.innerHTML='<div class="mf-phaseb-search-note">Type to search. No customer list is loaded until you search.</div>';
+    const selected=$('mf-phaseb-ptp-selected-loan');if(selected)selected.textContent='No customer / loan selected. Search and select the customer/loan above.';
+    const date=$('mf-phaseb-ptp-date');if(date)date.value=localToday();
+    const follow=$('mf-phaseb-ptp-follow-date');if(follow)follow.value='';
+    const amount=$('mf-phaseb-ptp-amount');if(amount)amount.value='';
+    const channel=$('mf-phaseb-ptp-channel');if(channel)channel.value='Phone';
+    const notes=$('mf-phaseb-ptp-notes');if(notes)notes.value='';
+    const modal=$('modal-phaseb-ptp');if(modal)modal.classList.add('active');
+  };
+
+  // Exact/unique search is safe to auto-select; ambiguous matches still require
+  // an explicit click. This prevents the save error when the user typed one exact
+  // customer name but did not click the single result.
+  const originalSearch=window.renderPhaseBPTPLoanSearch;
+  window.renderPhaseBPTPLoanSearch=function(){
+    if(typeof originalSearch==='function')originalSearch();
+    const q=String($('mf-phaseb-ptp-loan-search')?.value||'').trim();
+    if(!q)return;
+    const selected=String($('mf-phaseb-ptp-loan')?.value||'').trim();
+    if(selected)return;
+    const loans=(state.loans||[]).filter(l=>!l.foreclosed&&!l.postMaturitySettlement&&Number(typeof getLoanPending==='function'?getLoanPending(l):0)>0);
+    const nq=norm(q);
+    const exact=loans.filter(l=>[l.name,l.id,l.phone,l.phone2,l.guarantorName,l.guarantorPhone,l.guarantorPhone2].some(v=>norm(v)===nq));
+    if(exact.length===1 && typeof window.mfPhaseBSelectPTPLoan==='function')window.mfPhaseBSelectPTPLoan(exact[0].id);
+  };
+
+  // The approved workflow has no separate PTP-history window. An older layered
+  // patch was still re-inserting the button after V9 cleanup, leaving a dead button.
+  // Remove the obsolete control and any legacy history modal/UI; do not touch live PTP data.
+  function removeLegacyHistoryUI(){
+    document.querySelectorAll('#mf-phaseb-ptp-history-btn,#mf-phaseb-ptp-history-modal,.mf-phaseb-history-only').forEach(el=>el.remove());
+    document.querySelectorAll('button').forEach(b=>{
+      const t=String(b.textContent||'').replace(/\s+/g,' ').trim();
+      if(/^(PTP History|View Full PTP History|View Customer PTP History)$/i.test(t))b.remove();
+    });
+  }
+
+  // Re-run cleanup after the older delayed Phase-B control builder has had its turn.
+  [0,100,250,600,1200].forEach(ms=>setTimeout(removeLegacyHistoryUI,ms));
+
+  // Keep the live PTP register free of historical sections if an older render path
+  // recreates them later. This is DOM-only cleanup; it does not delete current PTP data.
+  const observer=new MutationObserver(()=>removeLegacyHistoryUI());
+  if(document.body)observer.observe(document.body,{childList:true,subtree:true});
+  setTimeout(()=>{try{observer.disconnect();}catch(e){}},2500);
+
+  // Ensure a fresh modal cannot inherit a stale edit target from another path.
+  document.addEventListener('click',e=>{
+    const b=e.target?.closest?.('button');
+    if(!b)return;
+    if(b.matches('.btn-green') && b.closest('#modal-phaseb-ptp') && /Save PTP/i.test(b.textContent||'') && !b.dataset.editId){
+      // No action needed; marker intentionally confirms create-mode. Validation remains strict.
+    }
+  },true);
+
+  try{removeLegacyHistoryUI();}catch(e){}
+})();
+</script>
 </body>
 </html>
