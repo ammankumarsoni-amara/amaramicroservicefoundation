@@ -12864,18 +12864,52 @@ try{renderPhaseB();}catch(e){console.warn('Phase B linked workflow initial rende
     return {issues:allIssues,counts:{critical:allIssues.filter(x=>x.severity==='critical').length,warning:allIssues.filter(x=>x.severity==='warning').length,info:allIssues.filter(x=>x.severity==='info').length}};
   };
 
+  // STARTUP SAFETY: Phase-B operational enhancements must never run against the
+  // startup/default state. They are activated only after the canonical local/cloud
+  // storage layer has finished restoring the verified business state.
+  let mfV4Ready=false;
+  let mfV4RetryTimer=0;
+  let mfV4RetryCount=0;
+  const mfV4StorageReady=()=>{
+    try{
+      return typeof mfDbReady!=='undefined' && !!mfDbReady &&
+             typeof mfV2LocalStateReady!=='undefined' && !!mfV2LocalStateReady;
+    }catch(e){return false;}
+  };
   function bootV4(){
+    // Never normalize, persist, or replace renderPhaseB while storage is still loading.
+    if(!mfV4StorageReady()){
+      if(mfV4RetryCount<240){
+        mfV4RetryCount++;
+        clearTimeout(mfV4RetryTimer);
+        mfV4RetryTimer=setTimeout(bootV4,250);
+      }
+      return false;
+    }
     try{if(typeof mfPhaseBEnsureState==='function')mfPhaseBEnsureState();}catch(e){}
-    let changed=false;try{changed=normalizeLegacyPartialChains()||changed;changed=repairActiveFollowups()||changed;}catch(e){console.warn('Phase B V4 normalization skipped',e);}
+    let changed=false;
+    try{changed=normalizeLegacyPartialChains()||changed;changed=repairActiveFollowups()||changed;}
+    catch(e){console.warn('Phase B V4 normalization skipped',e);}
     if(changed)persistSafe();
     try{ensureOutcomePartialFields();}catch(e){}
     window.renderPhaseBPTPList=renderActivePtpRegisterV4;
     window.renderPhaseBFollowUps=renderFollowupsV4;
-    try{renderKPIsV4();renderActivePtpRegisterV4();renderFollowupsV4();}catch(e){console.warn('Phase B V4 render skipped',e);}
+    window.renderPhaseB=function(){
+      try{
+        if(typeof mfPhaseBEnsureState==='function')mfPhaseBEnsureState();
+        renderKPIsV4();renderActivePtpRegisterV4();renderFollowupsV4();
+        if(typeof renderPhaseBCustomerDirectory==='function')renderPhaseBCustomerDirectory();
+      }catch(e){console.warn('Phase B V4 render failed',e);}
+    };
+    window.mfPhaseBRefreshPTP=bootV4;
+    mfV4Ready=true;
+    try{renderKPIsV4();renderActivePtpRegisterV4();renderFollowupsV4();}
+    catch(e){console.warn('Phase B V4 render skipped',e);}
+    return true;
   }
-  window.renderPhaseB=function(){try{if(typeof mfPhaseBEnsureState==='function')mfPhaseBEnsureState();renderKPIsV4();renderActivePtpRegisterV4();renderFollowupsV4();if(typeof renderPhaseBCustomerDirectory==='function')renderPhaseBCustomerDirectory();}catch(e){console.warn('Phase B V4 render failed',e);}};
-  window.mfPhaseBRefreshPTP=bootV4;
-  setTimeout(bootV4,0);setTimeout(bootV4,180);
+  // Poll only until the verified storage layer is ready; no financial/state write occurs
+  // during this waiting period. This preserves the existing startup/sync architecture.
+  setTimeout(bootV4,250);
 })();
 </script>
 </body>
