@@ -12968,5 +12968,143 @@ try{renderPhaseB();}catch(e){console.warn('Phase B linked workflow initial rende
   try{removeLegacyHistoryUI();}catch(e){}
 })();
 </script>
+<script id="mf-phaseb-v11-customer360-live-advanced">
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const E=v=>typeof financeEsc==='function'?financeEsc(v):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const money=v=>typeof mfMoney==='function'?mfMoney(Number(v)||0):`₹${(Number(v)||0).toLocaleString('en-IN',{maximumFractionDigits:2})}`;
+  const dateLabel=v=>typeof mfPhaseBDateLabel==='function'?mfPhaseBDateLabel(v):(v?String(v).split('-').reverse().join('/'): '-');
+  const loan=id=>(state.loans||[]).find(l=>String(l.id)===String(id));
+  const amount=p=>typeof mfPhaseBAmount==='function'?Number(mfPhaseBAmount(p))||0:Number(p?._rawAmount??p?.amount??0)||0;
+  const receipts=p=>Array.isArray(p?.ptpReceipts)?p.ptpReceipts:[];
+  const received=p=>receipts(p).reduce((s,r)=>s+(Number(r?.amount)||0),0);
+  const balance=p=>Math.max(0,amount(p)-Math.min(amount(p),received(p)));
+  const followSnapshots=p=>Array.isArray(p?.ptpFollowUpSnapshots)?p.ptpFollowUpSnapshots:[];
+  const status=p=>typeof mfPhaseBStatus==='function'?mfPhaseBStatus(p):String(p?.status||'OPEN').toUpperCase();
+  const customerKeyForLoan=l=>typeof mfPhaseBCustomerForLoan==='function'?mfPhaseBCustomerForLoan(l):String(l?.customerKey||'');
+
+  function currentCustomerKey(){return String($('mf-phaseb-customer-detail')?.dataset?.selected||'').trim();}
+
+  function ensureModal(){
+    let m=$('mf-phaseb-customer-ptp-history-modal');
+    if(m)return m;
+    m=document.createElement('div');m.id='mf-phaseb-customer-ptp-history-modal';m.className='modal-overlay';
+    m.innerHTML=`<div class="modal-card mf-phaseb-customer-ptp-history-card" style="max-width:980px;width:min(980px,96vw);max-height:88vh;overflow:auto"><div class="modal-title"><span><i class="fa-solid fa-clock-rotate-left" style="color:#60a5fa"></i> Customer PTP & Follow-up Activity</span><i class="fa-solid fa-xmark" id="mf-phaseb-customer-ptp-history-close" style="cursor:pointer;color:#94a3b8"></i></div><div id="mf-phaseb-customer-ptp-history-body"></div></div>`;
+    document.body.appendChild(m);
+    $('mf-phaseb-customer-ptp-history-close').onclick=()=>m.classList.remove('active');
+    return m;
+  }
+
+  function renderHistoryModal(key){
+    const m=ensureModal(),body=$('mf-phaseb-customer-ptp-history-body');
+    const loans=(state.loans||[]).filter(l=>customerKeyForLoan(l)===String(key));
+    const ptps=(state.ptps||[]).filter(p=>String(p.customerKey)===String(key));
+    const fus=(state.recoveryFollowUps||[]).filter(f=>String(f.customerKey)===String(key));
+    const primary=loans[0];
+    if(!primary){body.innerHTML='<div class="mf-phaseb-empty">Customer record not found.</div>';m.classList.add('active');return;}
+    const totalPtp=ptps.reduce((s,p)=>s+amount(p),0),totalPaid=ptps.reduce((s,p)=>s+Math.min(amount(p),received(p)),0),totalBal=ptps.reduce((s,p)=>s+balance(p),0);
+    body.innerHTML=`<div class="mf-phaseb-history-preview">
+      <div class="statement-box" style="padding:11px;border-radius:10px">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start">
+          <div><b style="color:#fff;font-size:.9rem">${E(primary.name||'-')}</b><div class="mf-phaseb-meta">${E(primary.phone||'No phone')} · ${loans.length} loan account${loans.length===1?'':'s'}</div></div>
+          <div class="mf-phaseb-meta" style="text-align:right">Live operational view<br><b style="color:#cbd5e1">No separate PTP history ledger is created</b></div>
+        </div>
+      </div>
+      <div class="mf-phaseb-summary-grid">
+        <div class="mf-phaseb-summary-item"><small>Current PTP</small><b>${E(money(totalPtp))}</b></div>
+        <div class="mf-phaseb-summary-item"><small>PTP Paid</small><b style="color:#34d399">${E(money(totalPaid))}</b></div>
+        <div class="mf-phaseb-summary-item"><small>PTP Balance</small><b style="color:#fbbf24">${E(money(totalBal))}</b></div>
+        <div class="mf-phaseb-summary-item"><small>Open Follow-ups</small><b>${E(fus.filter(f=>String(f.status||'OPEN')==='OPEN').length)}</b></div>
+      </div>
+      ${ptps.length?ptps.map(p=>{
+        const l=loan(p.loanId), f=fus.find(x=>String(x.ptpId)===String(p.id)&&String(x.status||'OPEN')==='OPEN'), rs=receipts(p).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+        return `<div class="statement-box" style="padding:11px;border-radius:10px;margin-top:8px">
+          <div style="display:flex;justify-content:space-between;gap:7px;align-items:flex-start;flex-wrap:wrap"><div><b style="color:#fff">PTP · ${E(l?.name||'-')}</b><div class="mf-phaseb-meta">${E(l?.id||p.loanId||'-')} · Promise Date ${E(dateLabel(p.promisedDate))}</div></div><span class="mf-phaseb-status open">${E(status(p))}</span></div>
+          <div class="mf-phaseb-follow-meta"><div><small>Total PTP</small><b>${E(money(amount(p)))}</b></div><div><small>Paid</small><b style="color:#34d399">${E(money(Math.min(amount(p),received(p))))}</b></div><div><small>Remaining</small><b style="color:#fbbf24">${E(money(balance(p)))}</b></div><div><small>Next Follow-up</small><b>${E(dateLabel(p.nextFollowUpDate||f?.dueDate))}</b></div></div>
+          <div style="margin-top:8px;font-size:.68rem;font-weight:900;color:#fff">PTP Payment Activity</div>
+          ${rs.length?`<div style="margin-top:5px;display:flex;flex-direction:column;gap:5px">${rs.map((r,i)=>`<div class="mf-phaseb-history-line"><div><b>Payment ${i+1}</b> · ${E(dateLabel(r.date))} · <b style="color:#34d399">${E(money(r.amount))}</b></div><div class="mf-phaseb-meta">${E(r.notes||'No note')}</div></div>`).join('')}</div>`:'<div class="mf-phaseb-meta" style="margin-top:5px">No operational PTP payment recorded yet.</div>'}
+          <div style="margin-top:8px;font-size:.68rem;font-weight:900;color:#fff">Follow-up Activity</div>
+          ${followSnapshots(p).length?`<div style="margin-top:5px;display:flex;flex-direction:column;gap:5px">${followSnapshots(p).slice().sort((a,b)=>String(a.at||'').localeCompare(String(b.at||''))).map((h,i)=>`<div class="mf-phaseb-history-line"><div><b>Follow-up ${i+1}</b> · ${E(dateLabel(h.date))} · ${E(h.outcome||'FOLLOW-UP')}</div><div class="mf-phaseb-meta">Next date ${E(dateLabel(h.nextDate))} · PTP balance ${E(money(h.balance))}${h.payment?` · Payment ${E(money(h.payment))}`:''}${h.notes?` · ${E(h.notes)}`:''}</div></div>`).join('')}</div>`:'<div class="mf-phaseb-meta" style="margin-top:5px">No follow-up outcome recorded yet.</div>'}
+          ${f?`<div class="mf-phaseb-history-line" style="margin-top:5px"><div><b>Current due date ${E(dateLabel(f.dueDate))}</b> · <b>${E(f.outcome||'PENDING')}</b> · ${E(String(f.status||'OPEN').toUpperCase())}</div><div class="mf-phaseb-meta">${E(f.outcomeNotes||f.notes||'No current outcome note.')}</div></div>`:''}
+        </div>`;
+      }).join(''):'<div class="mf-phaseb-empty">No current PTP commitment is active for this customer.</div>'}
+      <div class="mf-phaseb-meta" style="margin-top:8px;padding:8px;border:1px solid var(--border-subtle);border-radius:8px">PTP/follow-up activity shown here is operational only. Actual customer collections continue to be recorded through the existing Customer Recovery engine and are not duplicated here.</div>
+    </div>`;
+    m.classList.add('active');
+  }
+
+  // Replace the old Customer 360 renderer with a live, consolidated view. The
+  // selected customer key is preserved so a PTP/follow-up action can repaint 360
+  // immediately without a browser refresh.
+  window.openPhaseBCustomer360=function(key){
+    const box=$('mf-phaseb-customer-detail');if(!box)return;
+    const loans=(state.loans||[]).filter(l=>customerKeyForLoan(l)===String(key));
+    if(!loans.length){box.innerHTML='<div class="mf-phaseb-empty">Customer record not found.</div>';return;}
+    const primary=loans[0],ptps=(state.ptps||[]).filter(p=>String(p.customerKey)===String(key)),fus=(state.recoveryFollowUps||[]).filter(f=>String(f.customerKey)===String(key));
+    const collected=loans.reduce((s,l)=>s+(l.payments||[]).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
+    const outstanding=loans.reduce((s,l)=>s+(Number(typeof getLoanPending==='function'?getLoanPending(l):0)||0),0);
+    const active=loans.filter(l=>typeof mfLoanStatusLabel==='function'?mfLoanStatusLabel(l)==='ACTIVE':!l.foreclosed&&!l.postMaturitySettlement).length;
+    const currentPaid=ptps.reduce((s,p)=>s+Math.min(amount(p),received(p)),0),currentBalance=ptps.reduce((s,p)=>s+balance(p),0);
+    box.dataset.selected=String(key);
+    box.innerHTML=`<div style="display:flex;justify-content:space-between;gap:7px;align-items:flex-start;flex-wrap:wrap"><div><div style="font-size:.92rem;font-weight:900;color:#fff">${E(primary.name||'-')}</div><div class="mf-phaseb-meta">Customer contacts: ${E(typeof mfContactText==='function'?mfContactText(primary.phone,primary.phone2):(primary.phone||'-'))}</div><div class="mf-phaseb-meta">Address: ${E(primary.address||'-')}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="mf-phaseb-mini" onclick="openCustomerHistoryModalForPhaseB('${E(primary.id)}')">Open Loan History</button><button class="mf-phaseb-mini" onclick="openCustomerPtpHistory('${E(key)}')"><i class="fa-solid fa-clock-rotate-left"></i> View Customer PTP History</button></div></div>
+    <div class="mf-phaseb-summary-grid" style="margin-top:8px"><div class="mf-phaseb-summary-item"><small>Loan Accounts</small><b>${loans.length}</b></div><div class="mf-phaseb-summary-item"><small>Active Loans</small><b>${active}</b></div><div class="mf-phaseb-summary-item"><small>Current Outstanding</small><b>${money(outstanding)}</b></div><div class="mf-phaseb-summary-item"><small>Recorded Customer Payments</small><b>${money(collected)}</b></div><div class="mf-phaseb-summary-item"><small>Current PTP Paid</small><b style="color:#34d399">${money(currentPaid)}</b></div><div class="mf-phaseb-summary-item"><small>Current PTP Balance</small><b style="color:#fbbf24">${money(currentBalance)}</b></div></div>
+    <div style="margin-top:9px;font-size:.67rem;font-weight:900;color:#fff">Current PTP / Follow-up Snapshot</div>
+    <div class="mf-phaseb-loans">${ptps.length?ptps.map(p=>{const f=fus.find(x=>String(x.ptpId)===String(p.id)&&String(x.status||'OPEN')==='OPEN');return `<div class="mf-phaseb-loan"><div style="display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap"><b>PTP ${E(dateLabel(p.promisedDate))}</b><span>${E(status(p))}</span></div><div style="margin-top:4px">Total ${E(money(amount(p)))} · Paid <b style="color:#34d399">${E(money(Math.min(amount(p),received(p))))}</b> · Balance <b style="color:#fbbf24">${E(money(balance(p)))}</b></div><div class="mf-phaseb-meta">Next follow-up: ${E(dateLabel(p.nextFollowUpDate||f?.dueDate))}${f?.outcome?` · Last outcome: ${E(f.outcome)}`:''}</div></div>`}).join(''):'<div class="mf-phaseb-meta">No current PTP commitment.</div>'}</div>
+    <div style="margin-top:8px;font-size:.67rem;font-weight:900;color:#fff">Loan Accounts</div><div class="mf-phaseb-loans">${loans.map(l=>{const p=state.products?.[l.product]||{};return `<div class="mf-phaseb-loan"><b>${E(l.id)}</b> · ${E(p.name||l.product||'-')} · ${E(typeof mfLoanStatusLabel==='function'?mfLoanStatusLabel(l):'-')}<br>Disbursed ${E(dateLabel(l.disbursalDate))} · Outstanding <b>${E(typeof mfPhaseBOutstandingText==='function'?mfPhaseBOutstandingText(l):money(getLoanPending(l)))}</b> · Collector ${E(l.collectorName||'-')}<br>Guarantor: ${E(l.guarantorName||'-')}${typeof mfGuarantorContactText==='function'&&mfGuarantorContactText(l)?` · ${E(mfGuarantorContactText(l))}`:''}</div>`}).join('')}</div>`;
+  };
+
+  window.openCustomerPtpHistory=function(key){renderHistoryModal(String(key||currentCustomerKey()));};
+
+  // Keep a compact operational snapshot of each follow-up outcome inside the same
+  // current PTP record. This is not a separate history ledger and has no financial effect.
+  document.addEventListener('click',e=>{
+    const b=e.target?.closest?.('#mf-v9-save-outcome');if(!b)return;
+    const followId=String(b.dataset.followId||'');
+    setTimeout(()=>{
+      try{
+        const f=(state.recoveryFollowUps||[]).find(x=>String(x.id)===followId),p=f&&(state.ptps||[]).find(x=>String(x.id)===String(f.ptpId));
+        if(!p)return;
+        if(!Array.isArray(p.ptpFollowUpSnapshots))p.ptpFollowUpSnapshots=[];
+        const stamp={id:'PTP-FU-'+Date.now(),at:new Date().toISOString(),date:typeof mfPhaseBToday==='function'?mfPhaseBToday():new Date().toISOString().slice(0,10),outcome:f.outcome||'FOLLOW-UP',nextDate:f.dueDate||p.nextFollowUpDate||'',balance:balance(p),payment:f.outcome==='PARTIAL PAYMENT'?Number((p.ptpReceipts||[]).slice(-1)[0]?.amount||0):0,notes:String(f.outcomeNotes||f.notes||'').trim()};
+        const last=p.ptpFollowUpSnapshots[p.ptpFollowUpSnapshots.length-1];
+        if(!last||String(last.outcome)!==String(stamp.outcome)||String(last.nextDate)!==String(stamp.nextDate)||Number(last.balance)!==Number(stamp.balance)||Number(last.payment)!==Number(stamp.payment)||String(last.notes)!==String(stamp.notes)){p.ptpFollowUpSnapshots.push(stamp);if(typeof persistPhaseB==='function')persistPhaseB();}
+        if(currentCustomerKey())window.openPhaseBCustomer360(currentCustomerKey());
+      }catch(err){console.warn('PTP follow-up snapshot skipped',err);}
+    },0);
+  },true);
+
+  // Make Customer 360 part of the same render transaction as PTP and Follow-up.
+  // This removes the need for Ctrl+R / browser refresh after an operational update.
+  const baseRender=window.renderPhaseB;
+  if(typeof baseRender==='function'){
+    window.renderPhaseB=function(){
+      const selected=currentCustomerKey();
+      const result=baseRender.apply(this,arguments);
+      if(selected){try{window.openPhaseBCustomer360(selected);}catch(e){console.warn('Customer 360 live refresh skipped',e);}}
+      return result;
+    };
+  }
+
+  // Also repaint 360 after direct PTP/follow-up renders used by legacy paths.
+  const wrapRender=name=>{
+    const fn=window[name];if(typeof fn!=='function')return;
+    window[name]=function(){const selected=currentCustomerKey();const r=fn.apply(this,arguments);if(selected){try{window.openPhaseBCustomer360(selected);}catch(e){}}return r;};
+  };
+  wrapRender('renderPhaseBPTPList');
+  wrapRender('renderPhaseBFollowUps');
+
+  const style=document.createElement('style');style.id='mf-phaseb-v11-customer360-live-css';style.textContent=`
+    .mf-phaseb-customer-ptp-history-card .mf-phaseb-history-line{padding:7px 8px;border:1px solid var(--border-subtle);border-radius:8px;background:rgba(255,255,255,.018)}
+    .mf-phaseb-customer-ptp-history-card .mf-phaseb-summary-grid{margin-top:8px}
+    @media(max-width:700px){.mf-phaseb-customer-ptp-history-card{width:96vw!important}.mf-phaseb-customer-ptp-history-card .mf-phaseb-follow-meta{grid-template-columns:1fr 1fr}}
+    @media(max-width:480px){.mf-phaseb-customer-ptp-history-card .mf-phaseb-follow-meta{grid-template-columns:1fr}}
+  `;document.head.appendChild(style);
+
+  // V10's cleanup removes the old dead history button. This V11 button is a new,
+  // functional control and is deliberately reintroduced only inside Customer 360.
+  setTimeout(()=>{try{const key=currentCustomerKey();if(key)window.openPhaseBCustomer360(key);}catch(e){}},3000);
+})();
+</script>
 </body>
 </html>
