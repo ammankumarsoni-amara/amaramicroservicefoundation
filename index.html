@@ -763,6 +763,18 @@
 .mf-advanced-tool b{display:block;color:#fff;font-size:.76rem;margin-bottom:3px;}
 .mf-advanced-tool span{display:block;color:#94a3b8;font-size:.62rem;line-height:1.4;min-height:34px;}
 .mf-advanced-tool button{width:100%;margin-top:7px;justify-content:center;}
+.mf-phasea-map{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px;}
+.mf-phasea-card{padding:10px;border:1px solid rgba(148,163,184,.16);border-radius:10px;background:rgba(255,255,255,.025);min-width:0;}
+.mf-phasea-card b{display:block;color:#fff;font-size:.75rem;margin-bottom:4px;}
+.mf-phasea-card span{display:block;color:#94a3b8;font-size:.62rem;line-height:1.45;}
+.mf-phasea-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 10px;border-radius:9px;background:rgba(52,211,153,.05);border:1px solid rgba(52,211,153,.18);font-size:.66rem;color:#cbd5e1;line-height:1.4;}
+.mf-phasea-status .ok{color:#34d399;font-weight:850;}
+.mf-phasea-impact-row{display:grid;grid-template-columns:150px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid rgba(148,163,184,.10);font-size:.64rem;line-height:1.45;}
+.mf-phasea-impact-row:last-child{border-bottom:0;}
+.mf-phasea-impact-row b{color:#fff;}
+.mf-phasea-impact-row span{color:#94a3b8;}
+@media(max-width:760px){.mf-phasea-map{grid-template-columns:1fr;}.mf-phasea-impact-row{grid-template-columns:1fr;gap:2px;}.mf-phasea-card{padding:9px;}}
+
 .mf-audit-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-bottom:10px;}
 .mf-audit-stat{padding:9px;border-radius:9px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);text-align:center;}
 .mf-audit-stat small{display:block;color:#94a3b8;font-size:.58rem;}
@@ -2721,6 +2733,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     <div class="mf-advanced-tool"><b><i class="fa-solid fa-chart-column" style="color:#60a5fa;"></i> Reporting Audit</b><span>Read-only check of calendar/financial-year reporting, actual collections, revenue reconciliation and export totals.</span><button class="btn-header btn-blue" type="button" onclick="openReportingAuditModal()">Audit Reports</button></div>
                     <div class="mf-advanced-tool"><b><i class="fa-solid fa-clock-rotate-left" style="color:#fbbf24;"></i> Backup Versions</b><span>Automatic local snapshots are kept in IndexedDB so you can safely review or restore an earlier version.</span><button class="btn-header btn-blue" type="button" onclick="openBackupVersionsModal()">Version History</button></div>
                     <div class="mf-advanced-tool"><b><i class="fa-solid fa-mobile-screen-button" style="color:#93c5fd;"></i> Responsive QA</b><span>Preview this exact app at mobile, tablet and laptop widths and run overflow/clipping diagnostics.</span><button class="btn-header btn-blue" type="button" onclick="openResponsiveQAModal()">Open QA Mode</button></div>
+                    <div class="mf-advanced-tool"><b><i class="fa-solid fa-diagram-project" style="color:#a78bfa;"></i> Phase A Control Map</b><span>Read-only view of canonical calculation boundaries, event impacts and the consolidated exception/reconciliation checks.</span><button class="btn-header btn-blue" type="button" onclick="openPhaseAControlModal()">Open Control Map</button></div>
                 </div>
             </div>
 
@@ -2784,6 +2797,29 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px;"><button class="btn-header btn-green" onclick="createManualVersionedBackup()"><i class="fa-solid fa-camera"></i> Create Snapshot Now</button><button class="btn-header btn-blue" onclick="renderBackupVersionList()"><i class="fa-solid fa-rotate"></i> Refresh</button></div>
             <div id="mf-backup-version-status" style="font-size:.66rem;color:#94a3b8;margin-bottom:8px;"></div>
             <div id="mf-backup-version-list" class="mf-version-list"></div>
+        </div>
+    </div>
+
+    <!-- PHASE A: FOUNDATION / INTEGRITY CONTROL MAP -->
+    <div class="modal-overlay" id="modal-phase-a-control">
+        <div class="modal-card" style="max-width:1080px;width:96%;">
+            <div class="modal-title"><span><i class="fa-solid fa-diagram-project" style="color:#a78bfa;"></i> Phase A — Foundation & Integrity Control Map</span><i class="fa-solid fa-xmark" onclick="closeModal('modal-phase-a-control')" style="cursor:pointer;color:#94a3b8;"></i></div>
+            <div style="padding:9px 10px;border-radius:9px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.18);font-size:.66rem;color:#cbd5e1;line-height:1.5;margin-bottom:10px;">Read-only control layer. It documents the existing canonical calculation boundaries, defines which business events may affect which projections, and consolidates existing integrity/reconciliation audits. It does <b>not</b> edit loans, products, payments, settlements, foreclosure, security, Firebase or Google Drive data.</div>
+            <div id="mf-phasea-status" class="mf-phasea-status"></div>
+            <div class="mf-phasea-map">
+                <div class="mf-phasea-card"><b>Canonical Calculation Sources</b><span>Existing financial reconciliation, finance snapshot, executive reporting, monthly trend and existing loan/mathematical/reporting audits remain the authoritative calculation sources.</span></div>
+                <div class="mf-phasea-card"><b>Impact Contracts</b><span>Payment, payment-mode edit, amount edit, foreclosure, settlement, borrowing repayment, expense and PTP events are separated so only permitted downstream projections are affected.</span></div>
+                <div class="mf-phasea-card"><b>Reporting Reconciliation</b><span>Calendar Year and Financial Year use the existing reporting-period engine. Monthly roll-up and annual figures are checked against the same reporting calculations.</span></div>
+                <div class="mf-phasea-card"><b>Exception Foundation</b><span>Existing Loan Integrity, Mathematical Impact and Reporting Audit findings are normalized into one read-only exception collection. No automatic financial correction is performed.</span></div>
+            </div>
+            <div style="margin-top:12px;padding:9px 10px;border-radius:9px;background:rgba(15,23,42,.55);border:1px solid var(--border-subtle);">
+                <div style="font-size:.7rem;font-weight:850;color:#fff;margin-bottom:5px;">Event → Allowed Impact Map</div>
+                <div id="mf-phasea-impact-map"></div>
+            </div>
+            <div style="margin-top:12px;padding:9px 10px;border-radius:9px;background:rgba(15,23,42,.55);border:1px solid var(--border-subtle);">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;"><div style="font-size:.7rem;font-weight:850;color:#fff;">Current Consolidated Exceptions</div><button class="btn-header btn-blue" onclick="runPhaseAControlAudit(true)"><i class="fa-solid fa-rotate"></i> Run Control Audit</button></div>
+                <div id="mf-phasea-exceptions" style="margin-top:8px;"></div>
+            </div>
         </div>
     </div>
 
@@ -10850,6 +10886,77 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(showAlert) alert(critical||warning?`Reporting audit complete: ${critical} critical issue(s), ${warning} warning(s).`:`Reporting audit passed with no inconsistencies detected.`);
             return window.__mfLastReportingAudit;
         }
+        // ================= PHASE A: FOUNDATION / INTEGRITY CONTROL MAP =================
+        // This layer is intentionally read-only. It reuses the existing canonical calculation
+        // and audit functions; it does not rewrite business data or alter any existing formula.
+        const mfPhaseACanonicalSources=Object.freeze([
+            {key:'financialReconciliation',label:'Financial Reconciliation',fn:'mfFinancialReconciliation',purpose:'Canonical all-time financial reconciliation used by dashboard/audit foundations.'},
+            {key:'financeSnapshot',label:'Finance Snapshot',fn:'getFinanceSnapshot',purpose:'Period-aware financial/reporting projection source.'},
+            {key:'executiveReport',label:'Executive Report Data',fn:'mfExecutiveReportData',purpose:'Annual Calendar/FY management reporting and reconciliation source.'},
+            {key:'monthlyTrend',label:'Annual Monthly Trend',fn:'mfAnnualMonthlyTrend',purpose:'Monthly roll-up used for annual reconciliation.'},
+            {key:'loanAudit',label:'Loan Integrity Audit',fn:'runLoanIntegrityAudit',purpose:'Loan, schedule, payment, penalty, settlement and foreclosure integrity checks.'},
+            {key:'mathAudit',label:'Mathematical Impact Audit',fn:'runMathematicalImpactAudit',purpose:'Cross-module payment, closure, borrowing and reporting reconciliation checks.'},
+            {key:'reportingAudit',label:'Reporting Audit',fn:'runReportingAudit',purpose:'Calendar/FY activity visibility, principal and reporting reconciliation checks.'}
+        ]);
+
+        const mfPhaseAImpactContracts=Object.freeze({
+            PAYMENT:{label:'Customer payment',affects:['Loan payment history','Actual collection','Principal / interest / pre-EMI allocation','Outstanding','Payment-mode totals','Calendar/FY reporting','Monthly trend','Dashboard financial projections','PDF / Excel reporting','PTP status when applicable (future Phase B)','Notifications / exceptions (future phases)'],doesNotAffect:['Original product configuration','Original disbursal capital','Unrelated loans/customers']},
+            PAYMENT_MODE_EDIT:{label:'Payment-mode edit only',affects:['Selected payment-mode total','Mode reconciliation','Related reporting projections'],doesNotAffect:['Payment amount','Principal / interest allocation','Outstanding','Gross revenue','Unrelated modes except the source/target mode totals']},
+            PAYMENT_AMOUNT_EDIT:{label:'Payment amount edit',affects:['Actual collection','Accounting allocation','Outstanding','Revenue components where applicable','Payment-mode amount','Calendar/FY reporting','Monthly trend','Dashboard','PDF / Excel','Reconciliation / exceptions'],doesNotAffect:['Original loan/product configuration unless an existing business rule explicitly derives a value from the payment']},
+            FORECLOSURE:{label:'Foreclosure / pre-closure',affects:['Closure record','Principal paid','Pre-closure interest','Foreclosure fee','GST when stored/applied','Actual settlement collection','Reporting / dashboard projections','Reconciliation'],doesNotAffect:['Unrelated loans','Product master settings','Security/cloud settings']},
+            SETTLEMENT:{label:'Post-maturity settlement',affects:['Settlement received','Principal allocation','Contractual interest','Recovery interest','Waiver','Loan status/outstanding','Reporting / dashboard projections','Reconciliation'],doesNotAffect:['PTP as cash until actual receipt','Unrelated customer/loan records']},
+            BORROWING_REPAYMENT:{label:'Lender / borrowing repayment',affects:['Lender principal repayment','Lender interest','Lender GST','Lender cost','Funding/finance reporting','Reconciliation'],doesNotAffect:['Customer collection','Customer principal recovery','Customer product calculations']},
+            EXPENSE:{label:'Expense / salary entry',affects:['OPEX','Net surplus','Period reporting','Monthly trend','Dashboard / PDF / Excel'],doesNotAffect:['Loan principal','Customer collection','Customer EMI mathematics']},
+            PTP:{label:'Promise to Pay / follow-up',affects:['Recovery workload','Follow-up queue','Customer 360 (future Phase B)','Notifications (future Phase E)','Exceptions (future Phase D)'],doesNotAffect:['Cash / actual collection','Principal recovery','Interest revenue','Outstanding until an actual payment is recorded']}
+        });
+
+        function mfPhaseAGetCanonicalSourceStatus(){
+            return mfPhaseACanonicalSources.map(x=>({ ...x,available:typeof window[x.fn]==='function' }));
+        }
+        function mfPhaseACollectExceptions(){
+            const all=[];
+            const push=(source,rows)=>{(rows||[]).forEach(x=>all.push({source,severity:x.severity||'info',message:x.message||'Exception detected.',detail:x.detail||'',loanId:x.loanId||'',customer:x.customer||''}));};
+            try{const a=runLoanIntegrityAudit(false);push('Loan Integrity',a.issues);}catch(e){all.push({source:'Loan Integrity',severity:'critical',message:'Loan Integrity audit could not run.',detail:e?.message||String(e)});}
+            try{const a=runMathematicalImpactAudit(false);push('Mathematical Impact',a.issues);}catch(e){all.push({source:'Mathematical Impact',severity:'critical',message:'Mathematical Impact audit could not run.',detail:e?.message||String(e)});}
+            try{const a=runReportingAudit(false);push('Reporting',a.issues);}catch(e){all.push({source:'Reporting',severity:'critical',message:'Reporting audit could not run.',detail:e?.message||String(e)});}
+            const canonical=mfPhaseAGetCanonicalSourceStatus();
+            canonical.filter(x=>!x.available).forEach(x=>all.push({source:'Architecture',severity:'critical',message:`Canonical source unavailable: ${x.label}.`,detail:`Expected function ${x.fn} is not available.`}));
+            return all;
+        }
+        function renderPhaseAImpactMap(){
+            const box=document.getElementById('mf-phasea-impact-map'); if(!box)return;
+            box.innerHTML=Object.values(mfPhaseAImpactContracts).map(x=>`<div class="mf-phasea-impact-row"><b>${financeEsc(x.label)}</b><span><strong style="color:#34d399;">Affects:</strong> ${x.affects.map(financeEsc).join(' · ')}<br><strong style="color:#94a3b8;">Does not affect:</strong> ${x.doesNotAffect.map(financeEsc).join(' · ')}</span></div>`).join('');
+        }
+        function renderPhaseAControlStatus(){
+            const box=document.getElementById('mf-phasea-status'); if(!box)return;
+            const sources=mfPhaseAGetCanonicalSourceStatus(), missing=sources.filter(x=>!x.available);
+            box.innerHTML=missing.length?`<span style="color:#f87171;font-weight:850;">✗ ${missing.length} canonical source(s) unavailable</span><span>Control layer is read-only; review the missing source before implementation continues.</span>`:`<span class="ok">✓ Canonical sources available</span><span>${sources.length} calculation/audit boundaries detected · No business data was changed.</span>`;
+        }
+        function renderPhaseAExceptions(rows){
+            const box=document.getElementById('mf-phasea-exceptions'); if(!box)return;
+            const counts={critical:0,warning:0,info:0}; (rows||[]).forEach(x=>counts[x.severity]=(counts[x.severity]||0)+1);
+            const head=`<div class="mf-audit-summary"><div class="mf-audit-stat"><small>Critical</small><b style="color:#f87171;">${counts.critical}</b></div><div class="mf-audit-stat"><small>Warnings</small><b style="color:#fbbf24;">${counts.warning}</b></div><div class="mf-audit-stat"><small>Info</small><b style="color:#60a5fa;">${counts.info}</b></div><div class="mf-audit-stat"><small>Total</small><b style="color:#fff;">${rows.length}</b></div></div>`;
+            if(!rows.length){box.innerHTML=head+`<div style="margin-top:8px;padding:16px;text-align:center;border:1px solid rgba(52,211,153,.2);background:rgba(52,211,153,.05);border-radius:10px;color:#34d399;font-weight:800;">✓ No exceptions detected by the Phase A control checks.</div>`;return;}
+            const sorted=[...rows].sort((a,b)=>({critical:0,warning:1,info:2}[a.severity]??3)-({critical:0,warning:1,info:2}[b.severity]??3));
+            box.innerHTML=head+`<div style="margin-top:8px;max-height:42vh;overflow:auto;">${sorted.map(x=>`<div class="mf-audit-row ${financeEsc(x.severity)}"><span class="mf-audit-pill ${financeEsc(x.severity)}">${financeEsc(String(x.severity).toUpperCase())}</span><div><div style="color:#fff;font-weight:750;">${financeEsc(x.message)}</div>${x.detail?`<div style="color:#94a3b8;margin-top:2px;">${financeEsc(x.detail)}</div>`:''}</div><span style="color:#64748b;font-size:.58rem;">${financeEsc(x.source||'')}</span></div>`).join('')}</div>`;
+        }
+        function runPhaseAControlAudit(showAlert=false){
+            renderPhaseAControlStatus();
+            const rows=mfPhaseACollectExceptions();
+            window.__mfPhaseAControlAudit={at:new Date().toISOString(),issues:rows,counts:{critical:rows.filter(x=>x.severity==='critical').length,warning:rows.filter(x=>x.severity==='warning').length,info:rows.filter(x=>x.severity==='info').length}};
+            renderPhaseAExceptions(rows);
+            if(showAlert)alert(rows.some(x=>x.severity==='critical')?`Phase A control audit found ${window.__mfPhaseAControlAudit.counts.critical} critical issue(s).`:`Phase A control audit completed. ${rows.length} exception(s) found.`);
+            return window.__mfPhaseAControlAudit;
+        }
+        function openPhaseAControlModal(){
+            closeModal('modal-cloud');
+            document.getElementById('modal-phase-a-control')?.classList.add('active');
+            renderPhaseAControlStatus();
+            renderPhaseAImpactMap();
+            runPhaseAControlAudit(false);
+        }
+        // ================= END PHASE A FOUNDATION / INTEGRITY CONTROL MAP =================
+
         function openReportingAuditModal(){closeModal('modal-cloud');document.getElementById('modal-reporting-audit')?.classList.add('active');runReportingAudit(false);}
         function exportReportingAudit(){
             const report=window.__mfLastReportingAudit||runReportingAudit(false), rows=report.issues||[];
