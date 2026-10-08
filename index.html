@@ -12612,72 +12612,281 @@ try{renderPhaseB();}catch(e){console.warn('Phase B linked workflow initial rende
   setTimeout(boot,150);
 })();
 </script>
-<script id="mf-phaseb-v7-ptp-followup-payment-link">
+<script id="mf-phaseb-v9-ptp-followup-final">
 (function(){
-'use strict';
-const esc=v=>typeof financeEsc==='function'?financeEsc(v):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const money=v=>typeof mfMoney==='function'?mfMoney(v):'₹'+Number(v||0).toLocaleString('en-IN');
-const loan=id=>(state.loans||[]).find(l=>String(l.id)===String(id));
-const ptp=id=>(state.ptps||[]).find(p=>String(p.id)===String(id));
-const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0;};
-const rawAmt=p=>num(p&&p._rawAmount!=null?p._rawAmount:(p&&p.amountText!=null?p.amountText:p&&p.amount));
-const collected=l=>!l?0:(Array.isArray(l.payments)?l.payments:[]).reduce((a,p)=>a+num(p&&p.amount),0)+(Array.isArray(l.pendingParts)?l.pendingParts:[]).reduce((a,p)=>a+num(p&&p.amount),0);
-const received=p=>{const l=loan(p&&p.loanId);return Math.max(0,collected(l)-num(p&&p.paymentBaselineTotal));};
-const remaining=p=>Math.max(0,rawAmt(p)-received(p));
-const full=p=>rawAmt(p)>0&&remaining(p)<=0.005;
-const active=p=>!full(p)&&!['CANCELLED','SUPERSEDED'].includes(String(p&&p.status||'OPEN').toUpperCase());
-const persistSafe=()=>{try{persist();}catch(e){console.warn('V7 persist failed',e);}};
-const renderSafe=()=>{try{if(typeof window.renderPhaseB==='function')window.renderPhaseB();else if(typeof renderPhaseB==='function')renderPhaseB();}catch(e){console.warn('V7 render skipped',e);}};
-const ensure=()=>{if(typeof mfPhaseBEnsureState==='function')mfPhaseBEnsureState();};
-function ensureFollow(p){
- if(!p)return null;ensure();
- let f=(state.recoveryFollowUps||[]).find(x=>String(x.ptpId)===String(p.id)&&String(x.status||'OPEN')==='OPEN');
- const l=loan(p.loanId),now=new Date().toISOString(),due=p.nextFollowUpDate||p.promisedDate||(typeof mfPhaseBToday==='function'?mfPhaseBToday():now.slice(0,10));
- if(f){f.loanId=l&&l.id||p.loanId;f.customerKey=String(p.customerKey||l&&l.customerKey||'');f.dueDate=due;f.channel=p.channel||f.channel||'Phone';f.updatedAt=now;return f;}
- f={id:'FU-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),ptpId:String(p.id),loanId:p.loanId,customerKey:String(p.customerKey||l&&l.customerKey||''),dueDate:due,channel:p.channel||'Phone',reason:'PTP Follow-up',notes:'',status:'OPEN',createdAt:now,updatedAt:now};
- state.recoveryFollowUps.push(f);return f;
-}
-function reconcile(){ensure();let changed=false,now=new Date().toISOString();(state.ptps||[]).forEach(p=>{if(full(p)){if(String(p.status||'OPEN').toUpperCase()!=='KEPT'){p.status='KEPT';p.updatedAt=now;changed=true;}(state.recoveryFollowUps||[]).filter(f=>String(f.ptpId)===String(p.id)&&String(f.status||'OPEN')==='OPEN').forEach(f=>{f.status='DONE';f.completedAt=f.completedAt||now;f.outcome=f.outcome||'PTP FULLY PAID';f.updatedAt=now;changed=true;});}});return changed;}
-window.savePhaseBPTP=function(){
- ensure();const save=document.querySelector('#modal-phaseb-ptp .btn-green'),editId=save&&save.dataset.editId||'';
- const loanId=String(document.getElementById('mf-phaseb-ptp-loan')&&document.getElementById('mf-phaseb-ptp-loan').value||'').trim(),l=loan(loanId);
- const date=String(document.getElementById('mf-phaseb-ptp-date')&&document.getElementById('mf-phaseb-ptp-date').value||''),amt=String(document.getElementById('mf-phaseb-ptp-amount')&&document.getElementById('mf-phaseb-ptp-amount').value||'').trim();
- const fdRaw=String(document.getElementById('mf-phaseb-ptp-follow-date')&&document.getElementById('mf-phaseb-ptp-follow-date').value||''),fd=fdRaw||date;
- if(!l||typeof mfPhaseBValidDate!=='function'||!mfPhaseBValidDate(date)||!amt||!Number.isFinite(Number(amt))||Number(amt)<0){alert('Please enter a valid PTP loan, Promise Date and exact Promise Amount.');return;}
- if(!mfPhaseBValidDate(fd)){alert('Please select a valid Next Follow-up Date.');return;}
- const now=new Date().toISOString(),channel=document.getElementById('mf-phaseb-ptp-channel')&&document.getElementById('mf-phaseb-ptp-channel').value||'Phone',notes=String(document.getElementById('mf-phaseb-ptp-notes')&&document.getElementById('mf-phaseb-ptp-notes').value||'').trim();
- if(editId){const p=ptp(editId);if(!p)return;p.loanId=l.id;p.customerKey=typeof mfPhaseBCustomerForLoan==='function'?mfPhaseBCustomerForLoan(l):String(l.customerKey||'');p.promisedDate=date;p.amount=Number(amt);p.amountText=amt;p._rawAmount=amt;p.channel=channel;p.nextFollowUpDate=fd;p.notes=notes;if(p.paymentBaselineTotal==null)p.paymentBaselineTotal=collected(l);p.updatedAt=now;ensureFollow(p);delete save.dataset.editId;}
- else {const p={id:'PTP-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),loanId:l.id,customerKey:typeof mfPhaseBCustomerForLoan==='function'?mfPhaseBCustomerForLoan(l):String(l.customerKey||''),promisedDate:date,amount:Number(amt),amountText:amt,_rawAmount:amt,channel:channel,nextFollowUpDate:fd,notes:notes,status:'OPEN',createdAt:now,updatedAt:now,paymentBaselineTotal:collected(l)};state.ptps.push(p);ensureFollow(p);}
- persistSafe();if(typeof closeModal==='function')closeModal('modal-phaseb-ptp');renderSafe();
-};
-window.mfPhaseBEditPTP=function(id){ensure();const p=ptp(id),l=loan(p&&p.loanId);if(!p)return;if(!l){alert('The linked loan is no longer available.');return;}if(p.paymentBaselineTotal==null){p.paymentBaselineTotal=collected(l);persistSafe();}document.getElementById('mf-phaseb-ptp-title').textContent='Edit Promise to Pay';if(typeof mfPhaseBPopulateLoanSelect==='function')mfPhaseBPopulateLoanSelect('mf-phaseb-ptp-loan');document.getElementById('mf-phaseb-ptp-loan').value=p.loanId;document.getElementById('mf-phaseb-ptp-date').value=p.promisedDate||'';document.getElementById('mf-phaseb-ptp-follow-date').value=p.nextFollowUpDate||p.promisedDate||'';document.getElementById('mf-phaseb-ptp-amount').value=String(p._rawAmount!=null?p._rawAmount:p.amountText!=null?p.amountText:p.amount||'');document.getElementById('mf-phaseb-ptp-channel').value=p.channel||'Phone';document.getElementById('mf-phaseb-ptp-notes').value=p.notes||'';const save=document.querySelector('#modal-phaseb-ptp .btn-green');if(save){save.dataset.editId=p.id;save.innerHTML='<i class="fa-solid fa-floppy-disk"></i> Save Changes';}document.getElementById('modal-phaseb-ptp').classList.add('active');};
-window.mfPhaseBSetPTPStatus=function(id,status){ensure();const p=ptp(id);if(!p)return;const st=String(status||'').toUpperCase();if(st==='KEPT'&&!full(p)){alert('PTP is not fully paid. Remaining '+money(remaining(p))+'. Record the actual payment first.');return;}if(!['KEPT','BROKEN','CANCELLED','OPEN','SUPERSEDED'].includes(st))return;p.status=st;p.updatedAt=new Date().toISOString();const f=(state.recoveryFollowUps||[]).find(x=>String(x.ptpId)===String(p.id)&&String(x.status||'OPEN')==='OPEN');if(f&&st!=='OPEN'){f.status='DONE';f.completedAt=f.completedAt||new Date().toISOString();f.updatedAt=new Date().toISOString();}persistSafe();renderSafe();};
-window.mfPhaseBDeletePTP=function(id){ensure();if(!ptp(id))return;if(!confirm('Delete this PTP operational record? This does not change any loan financial calculation.'))return;state.ptps=state.ptps.filter(x=>String(x.id)!==String(id));state.recoveryFollowUps=state.recoveryFollowUps.filter(x=>String(x.ptpId)!==String(id));persistSafe();renderSafe();};
-window.renderPhaseBPTPList=function(){
- ensure();reconcile();const box=document.getElementById('mf-phaseb-ptp-list'),count=document.getElementById('mf-phaseb-ptp-result-count');if(!box)return;
- const q=String(document.getElementById('mf-phaseb-ptp-search')&&document.getElementById('mf-phaseb-ptp-search').value||'').trim().toLowerCase(),filter=String(document.getElementById('mf-phaseb-ptp-status')&&document.getElementById('mf-phaseb-ptp-status').value||'ALL'),sort=String(document.getElementById('mf-phaseb-ptp-sort')&&document.getElementById('mf-phaseb-ptp-sort').value||'DATE_ASC');
- let rows=(state.ptps||[]).filter(p=>{if(full(p))return false;const l=loan(p.loanId);if(!l)return false;const hay=[l.name,l.id,l.phone,l.phone2,l.guarantorName,l.guarantorPhone,l.guarantorPhone2,l.husbandName,l.address,l.product].filter(Boolean).join(' ').toLowerCase();if(q&&!hay.includes(q))return false;const st=typeof mfPhaseBStatus==='function'?mfPhaseBStatus(p):String(p.status||'OPEN').toUpperCase();if(filter==='DUE'&&st!=='DUE')return false;if(filter!=='ALL'&&filter!=='DUE'&&st!==filter)return false;return true;});
- rows.sort((a,b)=>sort==='CREATED_DESC'?String(b.createdAt||'').localeCompare(String(a.createdAt||'')):sort==='DATE_DESC'?String(b.promisedDate||'').localeCompare(String(a.promisedDate||'')):String(a.promisedDate||'').localeCompare(String(b.promisedDate||'')));
- if(count)count.textContent=rows.length+' active PTP'+(rows.length===1?'':'s')+' · fully paid PTPs auto-cleared from this register';
- if(!rows.length){box.innerHTML='<div class="mf-phaseb-empty">No active PTP records match the current filter.</div>';return;}
- box.innerHTML=rows.map(p=>{const l=loan(p.loanId),pa=rawAmt(p),rc=Math.min(pa,received(p)),rm=Math.max(0,pa-rc),pct=pa>0?Math.min(100,rc/pa*100):0,st=typeof mfPhaseBStatus==='function'?mfPhaseBStatus(p):'OPEN';return '<div class="mf-phaseb-row"><div class="mf-phaseb-row-main"><div><div class="mf-phaseb-name">'+esc(l&&l.name||'Unknown customer')+'</div><div class="mf-phaseb-meta">'+esc(l&&l.id||p.loanId||'-')+' · '+esc(l&&l.phone||'No phone')+' · '+esc(p.channel||'Phone')+'</div></div><div class="mf-phaseb-value">Promise<br><b>'+esc(typeof mfPhaseBDateLabel==='function'?mfPhaseBDateLabel(p.promisedDate):p.promisedDate||'-')+'</b></div><div class="mf-phaseb-value">Remaining<br><b>'+esc(money(rm))+'</b></div><div><span class="mf-phaseb-status '+String(st).toLowerCase()+'">'+esc(st)+'</span></div></div><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:7px"><div class="mf-phaseb-summary-item"><small>PTP Amount</small><b>'+esc(money(pa))+'</b></div><div class="mf-phaseb-summary-item"><small>Received</small><b style="color:#34d399">'+esc(money(rc))+'</b></div><div class="mf-phaseb-summary-item"><small>Balance</small><b style="color:#fbbf24">'+esc(money(rm))+'</b></div></div><div style="height:6px;background:rgba(255,255,255,.08);border-radius:8px;margin-top:7px;overflow:hidden"><div style="width:'+pct.toFixed(2)+'%;height:100%;background:#34d399"></div></div><div class="mf-phaseb-meta" style="margin-top:6px">Promise '+esc(typeof mfPhaseBDateLabel==='function'?mfPhaseBDateLabel(p.promisedDate):p.promisedDate||'-')+' · Next Follow-up '+esc(typeof mfPhaseBDateLabel==='function'?mfPhaseBDateLabel(p.nextFollowUpDate||p.promisedDate):p.nextFollowUpDate||p.promisedDate||'-')+' · '+esc(p.notes||'No note')+'</div><div class="mf-phaseb-actions" style="margin-top:7px"><button class="mf-phaseb-mini" onclick="openCollectModal(\''+esc(p.loanId)+'\',\'PARTIAL\')">Record / View Payment</button><button class="mf-phaseb-mini" onclick="mfPhaseBEditPTP(\''+esc(p.id)+'\')">Edit PTP</button>'+(st!=='BROKEN'?'<button class="mf-phaseb-mini" onclick="mfPhaseBSetPTPStatus(\''+esc(p.id)+'\',\'BROKEN\')">Broken</button>':'')+(st!=='CANCELLED'?'<button class="mf-phaseb-mini" onclick="mfPhaseBSetPTPStatus(\''+esc(p.id)+'\',\'CANCELLED\')">Cancel</button>':'')+'<button class="mf-phaseb-mini" onclick="mfPhaseBDeletePTP(\''+esc(p.id)+'\')">Delete</button></div></div>';}).join('');
-};
-window.renderPhaseBFollowUps=function(){
- ensure();reconcile();(state.ptps||[]).filter(active).forEach(ensureFollow);const box=document.getElementById('mf-phaseb-followup-list'),count=document.getElementById('mf-phaseb-follow-result-count');if(!box)return;const q=String(document.getElementById('mf-phaseb-follow-search')&&document.getElementById('mf-phaseb-follow-search').value||'').trim();
- if(!q){if(count)count.textContent='Search a customer, mobile, guarantor or Loan ID to load the PTP-linked Follow-up Queue.';box.innerHTML='<div class="mf-phaseb-empty"><b style="color:#cbd5e1">Follow-up Queue is ready.</b><br>Every saved PTP is linked here automatically. Search to load the actionable queue.</div>';return;}
- const ts=typeof tokens==='function'?tokens(q):q.toLowerCase().split(/\s+/).filter(Boolean);let rows=(state.recoveryFollowUps||[]).filter(f=>String(f.ptpId||'')&&String(f.status||'OPEN')==='OPEN'&&active(ptp(f.ptpId)));
- rows=rows.filter(f=>{const p=ptp(f.ptpId),l=loan(f.loanId);if(!p||!l)return false;const hay=[l.name,l.id,l.phone,l.phone2,l.guarantorName,l.guarantorPhone,l.guarantorPhone2,l.husbandName,l.address,l.product,p.promisedDate,p.nextFollowUpDate,p.amount].filter(Boolean).join(' ').toLowerCase();return ts.every(t=>hay.includes(String(t).toLowerCase()));});
- rows.sort((a,b)=>String(a.dueDate||'').localeCompare(String(b.dueDate||''))||String(a.createdAt||'').localeCompare(String(b.createdAt||'')));if(count)count.textContent=rows.length+' open PTP-linked follow-up'+(rows.length===1?'':'s')+' found';if(!rows.length){box.innerHTML='<div class="mf-phaseb-empty">No open PTP-linked follow-up matches this search.</div>';return;}
- const today=typeof mfPhaseBToday==='function'?mfPhaseBToday():new Date().toISOString().slice(0,10);box.innerHTML=rows.map(f=>{const p=ptp(f.ptpId),l=loan(f.loanId),pa=rawAmt(p),rc=Math.min(pa,received(p)),rm=Math.max(0,pa-rc),st=String(f.dueDate||'')<today?'OVERDUE':String(f.dueDate||'')===today?'DUE TODAY':'UPCOMING';return '<div class="mf-phaseb-row"><div style="display:flex;justify-content:space-between;gap:7px;align-items:flex-start"><div><div class="mf-phaseb-name">'+esc(l&&l.name||'-')+'</div><div class="mf-phaseb-meta">'+esc(l&&l.id||'-')+' · PTP '+esc(typeof mfPhaseBDateLabel==='function'?mfPhaseBDateLabel(p.promisedDate):p.promisedDate||'-')+' · '+esc(f.channel||p.channel||'Phone')+'</div></div><span class="mf-phaseb-status '+(st==='OVERDUE'?'broken':st==='DUE TODAY'?'due':'open')+'">'+st+'</span></div><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:7px"><div class="mf-phaseb-summary-item"><small>PTP</small><b>'+esc(money(pa))+'</b></div><div class="mf-phaseb-summary-item"><small>Paid</small><b style="color:#34d399">'+esc(money(rc))+'</b></div><div class="mf-phaseb-summary-item"><small>Remaining</small><b style="color:#fbbf24">'+esc(money(rm))+'</b></div><div class="mf-phaseb-summary-item"><small>Follow-up</small><b>'+esc(typeof mfPhaseBDateLabel==='function'?mfPhaseBDateLabel(f.dueDate):f.dueDate||'-')+'</b></div></div><div class="mf-phaseb-meta" style="margin-top:6px">Actual payment is recorded only through the existing loan collection engine; this queue only reflects the resulting payment/partial-payment data.</div><div class="mf-phaseb-actions" style="margin-top:7px"><button class="mf-phaseb-mini" onclick="openCollectModal(\''+esc(f.loanId)+'\',\'PARTIAL\')">Record / View Payment</button><button class="mf-phaseb-mini" onclick="mfPhaseBOpenFollowOutcome(\''+esc(f.id)+'\')">Follow-up Taken</button><button class="mf-phaseb-mini" onclick="mfPhaseBRescheduleFollowUp(\''+esc(f.id)+'\')">Reschedule</button></div></div>';}).join('');
-};
-window.mfPhaseBRescheduleFollowUp=function(id){ensure();const f=(state.recoveryFollowUps||[]).find(x=>String(x.id)===String(id));if(!f)return;const d=prompt('Enter next follow-up date (YYYY-MM-DD):',f.dueDate||'');if(!d)return;if(typeof mfPhaseBValidDate==='function'&&!mfPhaseBValidDate(d)){alert('Please enter a valid date in YYYY-MM-DD format.');return;}f.dueDate=d;f.status='OPEN';f.outcome='RESCHEDULED';f.updatedAt=new Date().toISOString();persistSafe();renderSafe();};
-if(typeof window.handleCollectSubmit==='function'&&!window.__mfV7CollectWrapped){const orig=window.handleCollectSubmit;window.handleCollectSubmit=function(e){orig(e);try{reconcile();persistSafe();renderSafe();}catch(err){console.warn('V7 payment refresh skipped',err);}};window.__mfV7CollectWrapped=true;}
-// No startup polling, no startup normalization, and no replacement of the canonical
-// startup renderer. The existing Phase-B tab renderer calls the patched list functions
-// only when the user opens/refreshes Phase B. Payment/PTP actions explicitly refresh it.
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const E=v=>typeof financeEsc==='function'?financeEsc(v):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const N=v=>String(v??'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+  const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0;};
+  const money=v=>typeof mfMoney==='function'?mfMoney(v):`₹${num(v).toLocaleString('en-IN')}`;
+  const today=()=>typeof mfPhaseBToday==='function'?mfPhaseBToday():new Date().toISOString().slice(0,10);
+  const validDate=v=>typeof mfPhaseBValidDate==='function'?mfPhaseBValidDate(v):/^\d{4}-\d{2}-\d{2}$/.test(String(v||''));
+  const loan=id=>(state.loans||[]).find(l=>String(l.id)===String(id));
+  const ensure=()=>{if(typeof mfPhaseBEnsureState==='function')mfPhaseBEnsureState();};
+  const active=p=>p && !['KEPT','BROKEN','CANCELLED','SUPERSEDED'].includes(String(p.status||'OPEN').toUpperCase());
+  const amount=p=>num(p&&p._rawAmount!=null?p._rawAmount:(p&&p.amountText!=null?p.amountText:p&&p.amount));
+  const dateLabel=v=>typeof mfPhaseBDateLabel==='function'?mfPhaseBDateLabel(v):(v||'-');
 
+  // Phase-B operational records are part of the state shell. The scalable V2 journal
+  // previously tracked loans/products/etc. but not ptps/recoveryFollowUps, so a PTP could
+  // disappear after Ctrl+R. Mark the shell explicitly and flush a canonical local snapshot
+  // for this low-frequency operational action. No financial calculation is changed.
+  function persistPhaseB(){
+    try{ if(typeof mfScaleMarkDirty==='function') mfScaleMarkDirty('root'); }catch(e){}
+    try{ if(typeof mfV2MarkDirty==='function') mfV2MarkDirty(); }catch(e){}
+    try{
+      if(typeof mfPerfV2QueuePersist==='function'){
+        mfPerfV2QueuePersist().then(async()=>{
+          try{ if(typeof idbPutSnapshot==='function') await idbPutSnapshot({clearJournal:true}); }catch(e){console.warn('Phase-B snapshot flush deferred',e);}
+          try{ if(typeof scheduleFirebasePush==='function') scheduleFirebasePush(); }catch(e){}
+        }).catch(()=>{try{if(typeof persist==='function')persist();}catch(e){}});
+      }else if(typeof persist==='function'){
+        persist();
+      }
+    }catch(e){try{if(typeof persist==='function')persist();}catch(_){} }
+  }
+
+  function receiptRows(p){
+    const rows=Array.isArray(p?.ptpReceipts)?p.ptpReceipts:[];
+    return rows.filter(r=>num(r?.amount)>0).map((r,i)=>({id:String(r.id||i),date:String(r.date||today()),amount:num(r.amount),notes:String(r.notes||'')}));
+  }
+  function received(p){return receiptRows(p).reduce((s,r)=>s+r.amount,0);}
+  function balance(p){return Math.max(0,amount(p)-received(p));}
+  function ensureReceiptStore(p){if(!Array.isArray(p.ptpReceipts))p.ptpReceipts=[];}
+
+  // Clean the old history model once, without touching loans or financial transactions.
+  // Terminal PTP records are not part of this rough working register. Legacy partial chains
+  // from earlier Phase-B builds are collapsed into one current PTP record.
+  function normalizePTPRegister(){
+    ensure();
+    let changed=false;
+    const all=(state.ptps||[]).slice();
+    const byId=new Map(all.map(p=>[String(p.id),p]));
+    const remove=new Set();
+
+    all.forEach(p=>{
+      const s=String(p.status||'OPEN').toUpperCase();
+      if(['KEPT','BROKEN','CANCELLED','SUPERSEDED'].includes(s)) remove.add(String(p.id));
+    });
+
+    // Convert the old PARTIAL representation into the current single-register model.
+    all.forEach(p=>{
+      if(remove.has(String(p.id)))return;
+      ensureReceiptStore(p);
+      if(String(p.status||'').toUpperCase()==='PARTIAL'){
+        const paid=num(p.partialAmountReported);
+        if(paid>0 && !p.ptpReceipts.length){p.ptpReceipts.push({id:'legacy-'+Date.now(),date:String(p.partialPaymentDate||today()),amount:paid,notes:'Imported from previous Phase-B partial record'});}
+        p.status='OPEN';
+        if(p.partialRemainingDate)p.nextFollowUpDate=p.partialRemainingDate;
+        delete p.partialAmountReported;delete p.partialRemainingAmount;delete p.partialRemainingDate;delete p.partialPaymentDate;
+        changed=true;
+      }
+    });
+
+    // Collapse a previous buggy partial-payment chain: latest record becomes the one current
+    // PTP, carrying the original promise amount and cumulative operational receipts.
+    const activeRows=all.filter(p=>!remove.has(String(p.id))&&active(p));
+    const byLoan=new Map();
+    activeRows.forEach(p=>{const k=String(p.loanId||'');if(k)(byLoan.get(k)||byLoan.set(k,[]).get(k)).push(p);});
+    for(const rows of byLoan.values()){
+      if(rows.length<=1)continue;
+      const latest=rows.slice().sort((a,b)=>String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')))[0];
+      const chain=[];let cur=latest;
+      while(cur&&cur.previousPtpId&&byId.has(String(cur.previousPtpId))){
+        const prev=byId.get(String(cur.previousPtpId));
+        if(!chain.includes(prev))chain.push(prev);else break;
+        cur=prev;
+      }
+      if(chain.length){
+        const root=chain[chain.length-1];
+        const rootAmount=amount(root);
+        const existing=receiptRows(root);
+        const newer=chain.slice().reverse().flatMap(x=>receiptRows(x));
+        const legacyPaid=Math.max(0,rootAmount-amount(latest));
+        const receipts=existing.concat(newer);
+        if(!receipts.length&&legacyPaid>0)receipts.push({id:'chain-'+Date.now(),date:String(latest.partialPaymentDate||latest.updatedAt||today()).slice(0,10),amount:legacyPaid,notes:'Recovered from previous partial PTP chain'});
+        latest._rawAmount=String(rootAmount);latest.amountText=String(rootAmount);latest.amount=rootAmount;
+        latest.ptpReceipts=receipts;
+        latest.status='OPEN';
+        const rec=received(latest);
+        latest.receivedAmount=Math.min(rootAmount,rec);latest.balance=Math.max(0,rootAmount-latest.receivedAmount);
+        chain.forEach(x=>remove.add(String(x.id)));
+        rows.forEach(x=>{if(String(x.id)!==String(latest.id))remove.add(String(x.id));});
+        changed=true;
+      }else{
+        // One current working register entry per loan/customer.
+        rows.forEach(x=>{if(String(x.id)!==String(latest.id))remove.add(String(x.id));});
+        changed=true;
+      }
+    }
+
+    if(remove.size){
+      state.ptps=state.ptps.filter(p=>!remove.has(String(p.id)));
+      state.recoveryFollowUps=state.recoveryFollowUps.filter(f=>!remove.has(String(f.ptpId)));
+      changed=true;
+    }
+
+    // Ensure every current PTP has exactly one linked open follow-up.
+    const activeIds=new Set();
+    (state.ptps||[]).forEach(p=>{
+      if(!loan(p.loanId))return;
+      activeIds.add(String(p.id));
+      ensureReceiptStore(p);
+      p.receivedAmount=Math.min(amount(p),received(p));
+      p.balance=Math.max(0,amount(p)-p.receivedAmount);
+      if(p.balance<=0.005){
+        remove.add(String(p.id));
+        return;
+      }
+      let f=(state.recoveryFollowUps||[]).find(x=>String(x.ptpId)===String(p.id));
+      const due=p.nextFollowUpDate||p.promisedDate||today(),now=new Date().toISOString();
+      if(!f){
+        f={id:'FU-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),ptpId:String(p.id),loanId:p.loanId,customerKey:typeof mfPhaseBCustomerForLoan==='function'?mfPhaseBCustomerForLoan(loan(p.loanId)):String(loan(p.loanId)?.customerKey||''),dueDate:due,channel:p.channel||'Phone',reason:'PTP Follow-up',notes:'',status:'OPEN',createdAt:now,updatedAt:now};state.recoveryFollowUps.push(f);changed=true;
+      }else{
+        if(String(f.status||'OPEN')!=='OPEN'){f.status='OPEN';changed=true;}
+        if(String(f.dueDate||'')!==String(due)){f.dueDate=due;changed=true;}
+      }
+    });
+    if(remove.size){state.ptps=state.ptps.filter(p=>!remove.has(String(p.id)));state.recoveryFollowUps=state.recoveryFollowUps.filter(f=>!remove.has(String(f.ptpId)));changed=true;}
+    state.recoveryFollowUps=state.recoveryFollowUps.filter(f=>String(f.ptpId||'')&&activeIds.has(String(f.ptpId))&&String(f.status||'OPEN')==='OPEN');
+    return changed;
+  }
+
+  function searchHay(p){
+    const l=loan(p.loanId),prod=state.products?.[l?.product]||{};
+    return N([l?.name,l?.id,l?.phone,l?.phone2,l?.guarantorName,l?.guarantorPhone,l?.guarantorPhone2,l?.address,prod?.name,prod?.code,p?.promisedDate,p?.nextFollowUpDate,p?.amount,p?.amountText].filter(Boolean).join(' '));
+  }
+
+  function renderPTP(){
+    ensure();const normalized=normalizePTPRegister();if(normalized)persistPhaseB();
+    const box=$('mf-phaseb-ptp-list'),count=$('mf-phaseb-ptp-result-count');if(!box)return;
+    const q=N($('mf-phaseb-ptp-search')?.value||$('mf-phaseb-active-ptp-search')?.value||'');
+    let rows=(state.ptps||[]).filter(active);
+    if(q){const ts=q.split(' ').filter(Boolean);rows=rows.filter(p=>ts.every(t=>searchHay(p).includes(t)));}
+    rows.sort((a,b)=>String(a.nextFollowUpDate||a.promisedDate||'').localeCompare(String(b.nextFollowUpDate||b.promisedDate||''))||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+    if(count)count.textContent=rows.length?`${rows.length} active PTP commitment${rows.length===1?'':'s'} · live balance register`:'No active PTP commitment found';
+    if(!rows.length){box.innerHTML='<div class="mf-phaseb-empty"><b style="color:#cbd5e1">PTP Register is clear.</b><br>Only current, unpaid commitments appear here. When the balance becomes ₹0, the entry is removed automatically.</div>';return;}
+    box.innerHTML=rows.map(p=>{
+      const l=loan(p.loanId),paid=Math.min(amount(p),received(p)),bal=Math.max(0,amount(p)-paid),due=p.nextFollowUpDate||p.promisedDate;
+      return `<div class="mf-phaseb-row"><div class="mf-phaseb-row-main" style="grid-template-columns:minmax(170px,1.5fr) minmax(90px,.7fr) minmax(90px,.7fr) auto;"><div><div class="mf-phaseb-name">${E(l?.name||'Unknown customer')}</div><div class="mf-phaseb-meta">${E(l?.id||p.loanId||'-')} · ${E(l?.phone||'No phone')}</div></div><div class="mf-phaseb-value">PTP<br><b>${E(money(amount(p)))}</b></div><div class="mf-phaseb-value">Balance<br><b style="color:#fbbf24">${E(money(bal))}</b></div><span class="mf-phaseb-status open">ACTIVE</span></div><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:7px"><div class="mf-phaseb-summary-item"><small>Paid</small><b style="color:#34d399">${E(money(paid))}</b></div><div class="mf-phaseb-summary-item"><small>Next Follow-up</small><b>${E(dateLabel(due))}</b></div><div class="mf-phaseb-summary-item"><small>Payments</small><b>${E(receiptRows(p).length)}</b></div></div><div class="mf-phaseb-meta" style="margin-top:6px">Original PTP ${E(dateLabel(p.promisedDate))} · This is the live working register; no PTP history is retained.</div></div>`;
+    }).join('');
+  }
+
+  function renderFollowups(){
+    ensure();const normalized=normalizePTPRegister();if(normalized)persistPhaseB();
+    const box=$('mf-phaseb-followup-list'),count=$('mf-phaseb-follow-result-count');if(!box)return;
+    const q=N($('mf-phaseb-follow-search')?.value||'');
+    if(!q){if(count)count.textContent='Search customer, mobile, guarantor or Loan ID to load current PTP follow-ups.';box.innerHTML='<div class="mf-phaseb-empty"><b style="color:#cbd5e1">Follow-up Queue is ready.</b><br>Only current PTP follow-ups are shown. Completed commitments leave the queue automatically.</div>';return;}
+    const ts=q.split(' ').filter(Boolean);
+    let rows=(state.recoveryFollowUps||[]).filter(f=>String(f.status||'OPEN')==='OPEN'&&f.ptpId);
+    rows=rows.filter(f=>{const p=(state.ptps||[]).find(x=>String(x.id)===String(f.ptpId));return p&&active(p)&&ts.every(t=>searchHay(p).includes(t)||N([f.dueDate,f.notes].join(' ')).includes(t));});
+    rows.sort((a,b)=>String(a.dueDate||'').localeCompare(String(b.dueDate||''))||String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
+    if(count)count.textContent=`${rows.length} current PTP follow-up${rows.length===1?'':'s'} found`;
+    if(!rows.length){box.innerHTML='<div class="mf-phaseb-empty">No current PTP follow-up matches this search.</div>';return;}
+    const t=today();
+    box.innerHTML=rows.map(f=>{
+      const p=(state.ptps||[]).find(x=>String(x.id)===String(f.ptpId)),l=loan(f.loanId),paid=Math.min(amount(p),received(p)),bal=Math.max(0,amount(p)-paid),d=String(f.dueDate||p.nextFollowUpDate||p.promisedDate||''),st=d<t?'OVERDUE':d===t?'DUE TODAY':'UPCOMING';
+      const receiptText=receiptRows(p).length?` · ${receiptRows(p).length} PTP payment${receiptRows(p).length===1?'':'s'} recorded`:'';
+      return `<div class="mf-phaseb-row"><div style="display:flex;justify-content:space-between;gap:7px;align-items:flex-start"><div><div class="mf-phaseb-name">${E(l?.name||'-')}</div><div class="mf-phaseb-meta">${E(l?.id||'-')} · PTP ${E(dateLabel(p.promisedDate))}</div></div><span class="mf-phaseb-status ${st==='OVERDUE'?'broken':st==='DUE TODAY'?'due':'open'}">${st}</span></div><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:7px"><div class="mf-phaseb-summary-item"><small>Total PTP</small><b>${E(money(amount(p)))}</b></div><div class="mf-phaseb-summary-item"><small>Paid</small><b style="color:#34d399">${E(money(paid))}</b></div><div class="mf-phaseb-summary-item"><small>Remaining</small><b style="color:#fbbf24">${E(money(bal))}</b></div><div class="mf-phaseb-summary-item"><small>Next Date</small><b>${E(dateLabel(d))}</b></div></div><div class="mf-phaseb-meta" style="margin-top:6px">Live PTP replica${receiptText}. All PTP payments are operational records here; actual loan collection remains in Customer Recovery.</div><div class="mf-phaseb-actions" style="margin-top:7px"><button class="mf-phaseb-mini" onclick="mfPhaseBOpenFollowOutcome('${E(f.id)}')">Follow-up Taken</button></div></div>`;
+    }).join('');
+  }
+
+  function outcomeModal(id){
+    ensure();const f=(state.recoveryFollowUps||[]).find(x=>String(x.id)===String(id));if(!f)return;
+    const p=(state.ptps||[]).find(x=>String(x.id)===String(f.ptpId)),l=loan(f.loanId);if(!p||!l)return;
+    let modal=$('modal-phaseb-followup');if(!modal)return;
+    const paid=Math.min(amount(p),received(p)),bal=Math.max(0,amount(p)-paid);
+    modal.innerHTML=`<div class="modal-card" style="max-width:680px;width:min(680px,96vw)"><div class="modal-title"><span><i class="fa-solid fa-phone-volume" style="color:#34d399"></i> Follow-up Taken</span><i class="fa-solid fa-xmark" onclick="closeModal('modal-phaseb-followup')" style="cursor:pointer;color:#94a3b8"></i></div><div style="padding:9px;border:1px solid rgba(96,165,250,.18);border-radius:9px;background:rgba(96,165,250,.035);font-size:.7rem;line-height:1.5"><b>${E(l.name||'-')}</b> · ${E(l.id||'-')}<br>Total PTP: <b>${E(money(amount(p)))}</b> · Paid: <b style="color:#34d399">${E(money(paid))}</b> · Remaining: <b style="color:#fbbf24">${E(money(bal))}</b><br>Current follow-up: ${E(dateLabel(f.dueDate))}</div><div style="margin-top:9px"><label>Outcome</label><select id="mf-v9-outcome" style="width:100%;padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff"><option value="FULL">Promise fulfilled — full remaining amount received</option><option value="PARTIAL">Partial payment received</option><option value="NEXT_DATE">No payment — customer gave next date</option></select></div><div id="mf-v9-partial-box" style="margin-top:8px;display:none"><label>PTP Payment Received Now</label><input id="mf-v9-paid" type="text" inputmode="decimal" placeholder="e.g. 2000" autocomplete="off" style="width:100%;padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff"><div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:7px"><div><label>Balance After This Payment</label><input id="mf-v9-balance" readonly style="width:100%;padding:9px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid var(--border-subtle);color:#fbbf24"></div><div><label>Next Follow-up Date</label><input id="mf-v9-next-date" type="date" style="width:100%;padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff"></div></div></div><div id="mf-v9-next-box" style="margin-top:8px;display:none"><label>Next Follow-up Date</label><input id="mf-v9-next-only" type="date" style="width:100%;padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff"></div><div style="margin-top:8px"><label>Notes</label><textarea id="mf-v9-notes" rows="3" placeholder="Optional recovery note" style="width:100%;padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;resize:vertical"></textarea></div><div style="display:flex;justify-content:flex-end;gap:7px;margin-top:10px"><button class="btn-header" onclick="closeModal('modal-phaseb-followup')">Cancel</button><button class="btn-header btn-blue" id="mf-v9-save-outcome">Save Outcome</button></div></div>`;
+    $('mf-v9-save-outcome').dataset.followId=String(f.id);
+    const toggle=()=>{const v=$('mf-v9-outcome').value;$('mf-v9-partial-box').style.display=v==='PARTIAL'?'block':'none';$('mf-v9-next-box').style.display=v==='NEXT_DATE'?'block':'none';};
+    $('mf-v9-outcome').addEventListener('change',toggle);
+    $('mf-v9-paid').addEventListener('input',()=>{$('mf-v9-balance').value=money(Math.max(0,bal-num($('mf-v9-paid').value)));});
+    $('mf-v9-save-outcome').addEventListener('click',()=>saveOutcome());
+    function saveOutcome(){
+      const outcome=$('mf-v9-outcome').value,notes=String($('mf-v9-notes').value||'').trim(),now=new Date().toISOString();
+      const liveF=(state.recoveryFollowUps||[]).find(x=>String(x.id)===String(f.id)),liveP=liveF&&(state.ptps||[]).find(x=>String(x.id)===String(liveF.ptpId));if(!liveF||!liveP)return;
+      const total=amount(liveP),already=Math.min(total,received(liveP)),remaining=Math.max(0,total-already);
+      if(outcome==='FULL'){
+        ensureReceiptStore(liveP);if(remaining>0)liveP.ptpReceipts.push({id:'PTP-R-'+Date.now(),date:today(),amount:remaining,notes});
+        liveP.receivedAmount=total;liveP.balance=0;state.ptps=state.ptps.filter(x=>String(x.id)!==String(liveP.id));state.recoveryFollowUps=state.recoveryFollowUps.filter(x=>String(x.ptpId)!==String(liveP.id));
+      }else if(outcome==='PARTIAL'){
+        const paid=num($('mf-v9-paid').value),nextDate=String($('mf-v9-next-date').value||'');
+        if(!(paid>0)||paid>=remaining){alert(`Enter a partial amount greater than 0 and less than the remaining ${money(remaining)}.`);return;}
+        if(!validDate(nextDate)){alert('Select the next follow-up date for the remaining balance.');return;}
+        ensureReceiptStore(liveP);liveP.ptpReceipts.push({id:'PTP-R-'+Date.now(),date:today(),amount:paid,notes});
+        const newBal=Math.max(0,total-received(liveP));liveP.receivedAmount=total-newBal;liveP.balance=newBal;liveP.nextFollowUpDate=nextDate;liveP.updatedAt=now;
+        liveF.dueDate=nextDate;liveF.status='OPEN';liveF.outcome='PARTIAL PAYMENT';liveF.outcomeNotes=notes;liveF.updatedAt=now;liveF.completedAt=null;
+      }else{
+        const nextDate=String($('mf-v9-next-only').value||'');if(!validDate(nextDate)){alert('Select the next follow-up date.');return;}
+        liveP.nextFollowUpDate=nextDate;liveP.updatedAt=now;liveF.dueDate=nextDate;liveF.status='OPEN';liveF.outcome='NEXT DATE GIVEN';liveF.outcomeNotes=notes;liveF.updatedAt=now;liveF.completedAt=null;
+      }
+      persistPhaseB();closeModal('modal-phaseb-followup');renderSafe();
+    }
+    modal.classList.add('active');
+  }
+
+  function renderSafe(){try{if(typeof window.renderPhaseB==='function')window.renderPhaseB();else{renderPTP();renderFollowups();}}catch(e){console.warn('Phase-B render skipped',e);}}
+
+  // PTP save: one live register entry per loan. No history record is generated.
+  window.savePhaseBPTP=function(){
+    ensure();const save=$('modal-phaseb-ptp')?.querySelector('.btn-green'),editId=save?.dataset.editId||'',loanId=String($('mf-phaseb-ptp-loan')?.value||'').trim(),l=loan(loanId),date=String($('mf-phaseb-ptp-date')?.value||''),amtText=String($('mf-phaseb-ptp-amount')?.value||'').trim(),fd=String($('mf-phaseb-ptp-follow-date')?.value||'');
+    if(!l||!validDate(date)||!amtText||!Number.isFinite(Number(amtText))||Number(amtText)<=0||!validDate(fd)){alert('Please enter valid PTP, amount and Next Follow-up details.');return;}
+    const now=new Date().toISOString();let p;
+    if(editId){p=(state.ptps||[]).find(x=>String(x.id)===String(editId));if(!p)return;p.loanId=l.id;p.customerKey=typeof mfPhaseBCustomerForLoan==='function'?mfPhaseBCustomerForLoan(l):String(l.customerKey||'');p.promisedDate=date;p.amount=Number(amtText);p.amountText=amtText;p._rawAmount=amtText;p.channel=$('mf-phaseb-ptp-channel')?.value||'Phone';p.nextFollowUpDate=fd;p.notes=String($('mf-phaseb-ptp-notes')?.value||'').trim();p.updatedAt=now;ensureReceiptStore(p);}
+    else{
+      const existing=(state.ptps||[]).find(x=>String(x.loanId)===String(l.id)&&active(x));if(existing){alert('This loan already has an active PTP. Update the existing PTP instead.');return;}
+      p={id:'PTP-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),loanId:l.id,customerKey:typeof mfPhaseBCustomerForLoan==='function'?mfPhaseBCustomerForLoan(l):String(l.customerKey||''),promisedDate:date,amount:Number(amtText),amountText:amtText,_rawAmount:amtText,channel:$('mf-phaseb-ptp-channel')?.value||'Phone',nextFollowUpDate:fd,notes:String($('mf-phaseb-ptp-notes')?.value||'').trim(),status:'OPEN',createdAt:now,updatedAt:now,ptpReceipts:[],receivedAmount:0,balance:Number(amtText)};state.ptps.push(p);
+    }
+    let f=(state.recoveryFollowUps||[]).find(x=>String(x.ptpId)===String(p.id));if(!f){f={id:'FU-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),ptpId:String(p.id),loanId:l.id,customerKey:typeof mfPhaseBCustomerForLoan==='function'?mfPhaseBCustomerForLoan(l):String(l.customerKey||''),dueDate:fd,channel:p.channel||'Phone',reason:'PTP Follow-up',notes:'',status:'OPEN',createdAt:now,updatedAt:now};state.recoveryFollowUps.push(f);}else{f.loanId=l.id;f.dueDate=fd;f.status='OPEN';f.updatedAt=now;}
+    persistPhaseB();if(typeof closeModal==='function')closeModal('modal-phaseb-ptp');renderSafe();
+  };
+
+  // Remove the old PTP-history entry point and old follow-up actions from the UI.
+  function removeLegacyUI(){
+    document.querySelectorAll('#mf-phaseb-ptp-history-btn,.mf-phaseb-history-only,#mf-phaseb-ptp-history-modal').forEach(el=>el.remove());
+    document.querySelectorAll('.mf-phaseb-card').forEach(card=>{
+      if(/Promise to Pay Register/i.test(card.textContent||'')){
+        card.querySelectorAll('button').forEach(b=>{if(/PTP History|View Customer PTP History/i.test(b.textContent||''))b.remove();});
+      }
+      if(/Follow-up Queue/i.test(card.textContent||'')){
+        card.querySelectorAll('button').forEach(b=>{if(/Record\s*\/\s*View Payment|View Payments|Reschedule/i.test(b.textContent||''))b.remove();});
+      }
+    });
+    document.querySelectorAll('button').forEach(b=>{if(/View Customer PTP History|PTP History/i.test(b.textContent||''))b.remove();});
+  }
+
+  window.renderPhaseBPTPList=renderPTP;
+  window.renderPhaseBFollowUps=renderFollowups;
+  window.mfPhaseBOpenFollowOutcome=outcomeModal;
+  window.outcomeOpen=outcomeModal;
+  // This workflow intentionally has no historical PTP register. Any legacy history modal
+  // from earlier Phase-B builds is disabled so old records cannot reappear through an old UI path.
+  window.openPtpHistoryModal=function(){
+    const m=$('mf-phaseb-ptp-history-modal');if(m)m.remove();
+    return false;
+  };
+  window.renderPtpHistoryModal=function(){return false;};
+  window.savePhaseBFollowUpOutcome=function(){};
+  window.mfPhaseBRescheduleFollowUp=function(){return;};
+  window.mfPhaseBOpenPTPPaymentLedger=function(){return;};
+  window.mfPhaseBGetPTPPaymentInfo=function(id){ensure();const p=(state.ptps||[]).find(x=>String(x.id)===String(id));if(!p)return null;return {amount:amount(p),received:Math.min(amount(p),received(p)),balance:balance(p),rows:receiptRows(p)};};
+  window.mfPhaseBSetPTPStatus=function(id,status){ensure();const p=(state.ptps||[]).find(x=>String(x.id)===String(id));if(!p)return;const s=String(status||'').toUpperCase();if(s==='OPEN')return;if(s==='KEPT'&&balance(p)>0.005){alert(`PTP is not fully paid. Remaining ${money(balance(p))}.`);return;}state.ptps=state.ptps.filter(x=>String(x.id)!==String(id));state.recoveryFollowUps=state.recoveryFollowUps.filter(f=>String(f.ptpId)!==String(id));persistPhaseB();renderSafe();};
+  window.mfPhaseBDeletePTP=function(id){ensure();const p=(state.ptps||[]).find(x=>String(x.id)===String(id));if(!p)return;if(!confirm('Delete this current PTP register entry? This does not change any financial calculation.'))return;state.ptps=state.ptps.filter(x=>String(x.id)!==String(id));state.recoveryFollowUps=state.recoveryFollowUps.filter(f=>String(f.ptpId)!==String(id));persistPhaseB();renderSafe();};
+
+  // Actual Customer Recovery remains the only financial payment engine. After it saves,
+  // refresh the operational PTP register from its existing payment event only if the PTP
+  // has explicitly been linked by a future approved reconciliation rule. We do NOT infer or
+  // subtract arbitrary loan collections here, preventing double-counting.
+
+  function bootV9(){
+    try{ensure();const changed=normalizePTPRegister();if(changed)persistPhaseB();}catch(e){console.warn('PTP register normalization skipped',e);}
+    try{removeLegacyUI();}catch(e){}
+    try{renderPTP();renderFollowups();}catch(e){console.warn('V9 Phase-B render skipped',e);}
+    try{removeLegacyUI();}catch(e){}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(bootV9,0));else setTimeout(bootV9,0);
 })();
 </script>
-
 </body>
 </html>
