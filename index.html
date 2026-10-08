@@ -7482,7 +7482,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             set('lp-rate-disp',(b.rate||0)+'% p.a. · '+(b.interestBasis||'Reducing Balance'),'innerText');
             const paidP=(b.repayments||[]).reduce((sum,x,i)=>i===Number(index)?sum:sum+(Number(x.principal)||0),0);set('lp-rem-disp',mfMoney(Math.max(0,Number(b.amount||0)-paidP)),'innerText');
             set('lp-gst-disp',b.applyGst?`Yes (${Number(b.interestGstPct||18).toLocaleString('en-IN',{maximumFractionDigits:4})}% on Int)`:'No','innerText');set('lp-emi-no',scheduled.no,'innerText');set('lp-due-date',formatToIndianDate(scheduled.dueDate),'innerText');
-            set('lp-gst',String(r._rawGst ?? (Number(r.gst)||0)));set('lp-gst-pct',String(r._rawGstPct ?? (b.applyGst?Number(b.interestGstPct||18):0)));set('lp-total-paid',String(r._rawTotalPaid ?? (Number(r.totalPaid)||'')));set('lp-mode',r.mode||'Bank Transfer');
+            set('lp-gst',String(r._rawGst ?? (Number(r.gst)||0)));set('lp-gst-pct',String(r._rawGstPct ?? (b.applyGst?Number(b.interestGstPct||18):0)));set('lp-mode',r.mode||'Bank Transfer');
+            // totalPaid is a legacy/redundant cache. The authoritative lender repayment total is always
+            // Principal + Interest + GST. Do not surface a stale cached total during Edit.
+            const editTotalText=mfDecAdd(mfDecAdd(String(r._rawPrincipal ?? (Number(r.principal)||0)),String(r._rawInterest ?? (Number(r.interest)||0))),String(r._rawGst ?? (Number(r.gst)||0)));
+            const editTotalOut=document.getElementById('lp-total-outflow'); if(editTotalOut)editTotalOut.innerText=mfMoney(mfSafeNumber(editTotalText));
             const gstWrap=document.getElementById('lp-gst-field-wrap'); if(gstWrap) gstWrap.style.display=b.applyGst?'':'none';
             // Show the ACTUAL amounts that were recorded for this installment (this is real entered data, not any suggestion).
             set('lp-principal',String(r._rawPrincipal ?? (Number(r.principal)||'')));set('lp-interest',String(r._rawInterest ?? (Number(r.interest)||'')));
@@ -7503,7 +7507,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         function calcLenderPaymentTotals(source='') {
-            const p = mfSafeNumber(mfExactText('lp-principal','0'));
+            // Keep lender-entry arithmetic on the same exact-decimal text engine used by the
+            // rest of the precision work. Never introduce a Number-based rounding step here.
+            const pText = mfExactText('lp-principal','0');
             const iText = mfExactText('lp-interest','0');
             const i = mfSafeNumber(iText);
             const pctEl = document.getElementById("lp-gst-pct");
@@ -7511,21 +7517,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             let gstPctText = mfExactText('lp-gst-pct','0');
             let gstPct = mfSafeNumber(gstPctText);
             let gstText = mfExactText('lp-gst','0');
-            let gst = Math.max(0,mfSafeNumber(gstText));
             if (source === 'pct' || source === 'reset' || !gstEl?.value) {
-                gstText = mfDecPercentOf(iText,gstPctText); gst=mfSafeNumber(gstText);
+                gstText = mfDecPercentOf(iText,gstPctText);
                 if (gstEl) gstEl.value = gstText;
             } else if (source === 'amount') {
                 gstPctText = i>0 ? mfDecPercentFromAmount(iText,gstText) : '0'; gstPct=mfSafeNumber(gstPctText);
                 if (pctEl) pctEl.value = gstPctText;
             }
+            const gst = Math.max(0,mfSafeNumber(gstText));
             const gstDisp = document.getElementById("lp-gst-amount-disp");
             if (gstDisp) gstDisp.innerText = gst.toLocaleString('en-IN',{maximumFractionDigits:2});
-            const total = p + i + gst;
-            const totalPaid = document.getElementById("lp-total-paid");
-            if (totalPaid && totalPaid.dataset.userEdited !== '1') totalPaid.value = total;
+            const totalText = mfDecAdd(mfDecAdd(pText,iText),gstText);
             const out = document.getElementById("lp-total-outflow");
-            if (out) out.innerText = mfMoney(total);
+            if (out) out.innerText = mfMoney(mfSafeNumber(totalText));
         }
 
         function handleLenderPaySubmit(e) {
@@ -10806,8 +10810,15 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             });
             (state.borrowings||[]).forEach(b=>(b.repayments||[]).forEach((r,i)=>{
                 checkedBorrowings++;
-                const total=Number(r.totalPaid)||0, split=(Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0);
-                if(Math.abs(total-split)>0.005) add('critical',`Borrowing ${b.id||'-'} repayment #${i+1} does not reconcile.`,`Total paid ₹${total} vs Principal + Interest + GST ₹${split}`);
+                // totalPaid is a legacy redundant cache and is NOT an accounting source of truth.
+                // Phase A therefore does not compare it against the real repayment components.
+                // The canonical lender total is Principal + Interest + GST, calculated from the
+                // exact-decimal component text. Existing stale totalPaid values are left untouched
+                // (zero migration / zero manual re-entry) and are ignored by reporting.
+                const principalText=String(r._rawPrincipal ?? (Number(r.principal)||0));
+                const interestText=String(r._rawInterest ?? (Number(r.interest)||0));
+                const gstText=String(r._rawGst ?? (Number(r.gst)||0));
+                mfDecAdd(mfDecAdd(principalText,interestText),gstText);
             }));
             // 2) Calendar + Financial Year reports: canonical annual numbers must match their
             // monthly roll-up, mode breakdown and reconciliation checks. This verifies impact
@@ -10889,6 +10900,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         // ================= PHASE A: FOUNDATION / INTEGRITY CONTROL MAP =================
         // This layer is intentionally read-only. It reuses the existing canonical calculation
         // and audit functions; it does not rewrite business data or alter any existing formula.
+        // Phase A precision guardrail: lender repayment totals are derived from exact component text;
+        // legacy totalPaid is never authoritative. This is intentionally additive and read-only for old data.
         const mfPhaseACanonicalSources=Object.freeze([
             {key:'financialReconciliation',label:'Financial Reconciliation',fn:'mfFinancialReconciliation',purpose:'Canonical all-time financial reconciliation used by dashboard/audit foundations.'},
             {key:'financeSnapshot',label:'Finance Snapshot',fn:'getFinanceSnapshot',purpose:'Period-aware financial/reporting projection source.'},
@@ -11557,7 +11570,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const addOut=(mode,cat,amt)=>{ const m=mfResolveTransactionMode(mode); if(!outflowByMode[m]) outflowByMode[m]={Salary:0,Expense:0,'Lender Repayment':0,total:0}; outflowByMode[m][cat]+=Number(amt)||0; outflowByMode[m].total+=Number(amt)||0; };
                 d.payroll.forEach(x=>addOut(x.sp.mode,'Salary',x.sp.amount));
                 d.expenses.forEach(x=>addOut(x.mode,'Expense',x.amount));
-                d.lender.forEach(x=>x.filteredRepayments.forEach(r=>addOut(r.mode,'Lender Repayment',r.totalPaid||((Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0)))));
+                d.lender.forEach(x=>x.filteredRepayments.forEach(r=>{
+                    // Reporting must never trust a stale legacy totalPaid cache.
+                    const totalText=mfDecAdd(mfDecAdd(String(r._rawPrincipal ?? (Number(r.principal)||0)),String(r._rawInterest ?? (Number(r.interest)||0))),String(r._rawGst ?? (Number(r.gst)||0)));
+                    addOut(r.mode,'Lender Repayment',mfSafeNumber(totalText));
+                }));
                 const totalOutflow=Object.values(outflowByMode).reduce((a,x)=>a+x.total,0);
                 const outflowRows=Object.keys(outflowByMode).sort((a,b)=>outflowByMode[b].total-outflowByMode[a].total).map(m=>`<tr><td><b>${financeEsc(m)}</b></td><td>${money(outflowByMode[m].Salary)}</td><td>${money(outflowByMode[m].Expense)}</td><td>${money(outflowByMode[m]['Lender Repayment'])}</td><td><b>${money(outflowByMode[m].total)}</b></td></tr>`);
 
