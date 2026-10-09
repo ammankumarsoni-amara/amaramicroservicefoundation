@@ -13347,5 +13347,77 @@ function start(){bindRisk();const root=document.getElementById('modal-phasec-por
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
 </script>
+<script id="mf-phasec-v16-asof-reconciliation-audit">
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const n=v=>Number(v)||0;
+const money=v=>'₹'+Number(v||0).toLocaleString('en-IN',{maximumFractionDigits:2});
+const today=()=>typeof mfIsoToday==='function'?mfIsoToday():(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;})();
+const fmt=d=>{if(!d)return '—';try{return typeof formatToIndianDate==='function'?formatToIndianDate(d):d;}catch(e){return d;}};
+const futurePayments=l=>(Array.isArray(l?.payments)?l.payments:[]).map((p,i)=>({p,i,date:String(p?.date||p?.paidDate||'').slice(0,10),principal:n(p?.principal),amount:n(p?.amount)})).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&x.date>today()&&(Math.abs(x.principal)>0.005||Math.abs(x.amount)>0.005));
+function classifyLoan(id){
+ const l=(Array.isArray(state?.loans)?state.loans:[]).find(x=>String(x.id)===String(id));if(!l)return null;
+ const prod=state.products?.[l.product]||{};
+ const raw=(Array.isArray(l.payments)?l.payments:[]);
+ const allPrincipal=raw.reduce((s,p)=>s+n(p?.principal),0);
+ let asOfPrincipal=allPrincipal;
+ try{if(typeof mfPrincipalRecoveredThrough==='function')asOfPrincipal=n(mfPrincipalRecoveredThrough(l,today()));}catch(e){}
+ const principal=Math.max(0,n(prod.amount));
+ const residual=Math.max(0,principal-asOfPrincipal);
+ const future=futurePayments(l);
+ const futurePrincipal=future.reduce((s,x)=>s+x.principal,0);
+ const futureTotal=future.reduce((s,x)=>s+x.amount,0);
+ const scheduledPending=Math.max(0,typeof getLoanPending==='function'?n(getLoanPending(l)):0);
+ const allPaymentTotal=raw.reduce((s,p)=>s+n(p?.amount),0);
+ return {loan:l,principal,allPrincipal,asOfPrincipal,residual,future,futurePrincipal,futureTotal,scheduledPending,allPaymentTotal};
+}
+function applyAuditContext(){
+ const audit=window.__mfPhaseCAudit;if(!audit||!Array.isArray(audit.issues))return;
+ audit.issues=audit.issues.map(issue=>{
+  const m=String(issue.msg||'').match(/^([^:]+):/);if(!m)return issue;
+  const x=classifyLoan(m[1]);if(!x||!x.future.length||x.residual<=0.005||Math.abs(x.futurePrincipal-x.residual)>0.01)return issue;
+  const dates=x.future.map(f=>`${fmt(f.date)} (${money(f.principal)} principal; ${money(f.amount)} payment)`).join('; ');
+  return {...issue,sev:'warning',msg:`${m[1]}: ${money(x.residual)} principal remains in the as-of view because matching principal allocation is on future-dated payment record(s).`,detail:`Confirmed source: principal ${money(x.principal)} − principal allocations through ${fmt(today())} ${money(x.asOfPrincipal)} = ${money(x.residual)}. All-date payment principal rows total ${money(x.allPrincipal)}. Future-dated row(s): ${dates}. Scheduled-balance engine currently counts all stored payment amounts (pending ${money(x.scheduledPending)}), while as-of principal reporting excludes payment dates after ${fmt(today())}. This is a date-basis reconciliation finding, not proof of missing customer payment. Recommended action: verify the actual receipt date on the listed payment record(s); if the date was entered incorrectly, correct it through the normal payment-edit workflow. Do not change principal amounts or force the loan balance to zero.`};
+ });
+ window.__mfPhaseCAudit=audit;
+ const box=$('pc-audit');if(!box)return;
+ const rows=[...box.querySelectorAll('.pc-audit-row')];
+ rows.forEach(row=>{
+  const strong=row.querySelector('strong');if(!strong)return;
+  const m=strong.textContent.match(/^([^:]+):/);if(!m)return;
+  const x=classifyLoan(m[1]);if(!x||!x.future.length||x.residual<=0.005||Math.abs(x.futurePrincipal-x.residual)>0.01)return;
+  const issue=audit.issues.find(z=>String(z.msg).startsWith(m[1]+':'));
+  if(issue){strong.textContent=issue.msg;const small=row.querySelector('small');if(small)small.textContent=issue.detail;row.classList.remove('critical');row.classList.add('warning');}
+ });
+ const count=box.querySelector('.pc-audit-count');if(count){const critical=audit.issues.filter(x=>x.sev==='critical').length,warning=audit.issues.filter(x=>x.sev==='warning').length;count.innerHTML=`<strong>${critical}</strong> critical · <strong>${warning}</strong> warning`;}
+}
+function injectTraceContext(){
+ const el=$('pc-drilldown-modal-v14');if(!el)return;
+ const title=el.querySelector('header strong')?.textContent||'';const m=title.match(/Loan Calculation Trace\s*[—-]\s*(.+)$/);if(!m)return;
+ const x=classifyLoan(m[1].trim());if(!x)return;
+ const trace=el.querySelector('.pc-v14-trace');if(!trace)return;
+ if(trace.querySelector('.pc-v16-reconciliation'))return;
+ const futureHtml=x.future.length?`<div class="pc-v16-future-list"><b>Future-dated payment rows</b><ul>${x.future.map(f=>`<li>Row ${f.i+1}: ${fmt(f.date)} · principal ${money(f.principal)} · payment ${money(f.amount)}</li>`).join('')}</ul></div>`:'<p>No future-dated payment rows were found in the loaded payment records.</p>';
+ const box=document.createElement('section');box.className='pc-v16-reconciliation';
+ const matches=x.future.length&&x.residual>0.005&&Math.abs(x.futurePrincipal-x.residual)<=0.01;
+ box.innerHTML=`<h3>As-of date vs all-records reconciliation</h3><div class="pc-v16-grid"><div><small>As-of date</small><b>${fmt(today())}</b></div><div><small>Principal in records through as-of date</small><b>${money(x.asOfPrincipal)}</b></div><div><small>Principal across all payment rows</small><b>${money(x.allPrincipal)}</b></div><div><small>Future-dated principal</small><b>${money(x.futurePrincipal)}</b></div><div><small>Product principal minus as-of principal</small><b>${money(x.residual)}</b></div><div><small>Scheduled balance (existing engine)</small><b>${money(x.scheduledPending)}</b></div></div><p><b>Finding:</b> ${matches?`The ${money(x.residual)} residual exactly matches principal recorded on payment date(s) after the as-of date. The summary uses payments through ${fmt(today())}; the payment table shows all saved rows. The scheduled-balance engine counts all saved payment amounts, including future-dated rows, which explains why the account can appear closed while the as-of principal view still has a residual.`:`The summary uses the existing as-of principal function while the detail table lists all saved payment rows. Future-dated principal rows total ${money(x.futurePrincipal)}. This evidence alone does not establish a data-entry error; inspect the dates and allocation rows before making any change.`}</p>${futureHtml}<p><b>Recommended resolution:</b> verify the actual receipt date for each listed row against the original receipt/register. If a date was entered incorrectly, use the existing payment-edit workflow to correct that date only after verification. If it was genuinely an advance receipt, confirm the business rule for advance payments and reporting cutoff. Do not alter principal/interest allocations or manually force outstanding to zero.</p><p><b>Repair safety:</b> no automatic correction was made. This is intentional because changing a payment date or allocation affects financial reporting.</p>`;
+ trace.insertBefore(box,trace.firstChild);
+ const table=trace.querySelector('table.pc-table');if(table){const rows=[...table.querySelectorAll('tbody tr')];rows.forEach((tr,i)=>{const f=x.future.find(q=>q.i===i);if(f){tr.classList.add('pc-v16-future-row');const mode=tr.lastElementChild;if(mode)mode.innerHTML=`${mode.textContent} <span class="pc-v16-flag">FUTURE-DATED</span>`;}});}
+}
+function install(){
+ const oldRefresh=window.refreshPhaseCPortfolio;
+ if(typeof oldRefresh==='function'&&!oldRefresh.__v16AuditWrapped){const w=function(){const r=oldRefresh.apply(this,arguments);try{applyAuditContext();}catch(e){}return r;};w.__v16AuditWrapped=true;w.__v16Original=oldRefresh;window.refreshPhaseCPortfolio=w;}
+ const oldOpen=window.openPhaseCDrilldown;
+ if(typeof oldOpen==='function'&&!oldOpen.__v16TraceWrapped){const w=function(){const r=oldOpen.apply(this,arguments);try{injectTraceContext();}catch(e){}return r;};w.__v16TraceWrapped=true;w.__v16Original=oldOpen;window.openPhaseCDrilldown=w;}
+ const oldModalOpen=window.openPhaseCPortfolioModal;
+ if(typeof oldModalOpen==='function'&&!oldModalOpen.__v16AuditWrapped){const w=function(){const r=oldModalOpen.apply(this,arguments);try{applyAuditContext();}catch(e){}return r;};w.__v16AuditWrapped=true;w.__v16Original=oldModalOpen;window.openPhaseCPortfolioModal=w;}
+ const style=document.createElement('style');style.id='mf-phasec-v16-style';style.textContent=`.pc-v16-reconciliation{border:1px solid #f59e0b;background:rgba(120,53,15,.2);border-radius:10px;padding:12px;margin:10px 0;color:#fef3c7}.pc-v16-reconciliation h3{margin:0 0 8px;color:#fde68a}.pc-v16-reconciliation p{font-size:.76rem;line-height:1.5}.pc-v16-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:7px}.pc-v16-grid>div{background:rgba(15,23,42,.5);border:1px solid rgba(253,230,138,.15);border-radius:7px;padding:8px}.pc-v16-grid small{display:block;color:#fcd34d;font-size:.65rem}.pc-v16-grid b{display:block;margin-top:4px;color:#fff;overflow-wrap:anywhere}.pc-v16-future-list{padding:8px;background:rgba(127,29,29,.22);border-radius:7px}.pc-v16-future-list ul{margin:5px 0 0 18px}.pc-v16-future-row{background:rgba(245,158,11,.15)!important}.pc-v16-flag{display:inline-block;margin-left:5px;padding:2px 4px;border-radius:4px;background:#92400e;color:#fef3c7;font-size:10px;font-weight:800}@media(max-width:600px){.pc-v16-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}`;
+ if(!document.getElementById(style.id))document.head.appendChild(style);
+ try{applyAuditContext();}catch(e){}
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+})();
+</script>
 </body>
 </html>
