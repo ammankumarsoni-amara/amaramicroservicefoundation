@@ -13419,5 +13419,111 @@ function install(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
 </script>
+<script id="mf-v17-unified-audit-repair-workflow">
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const esc=v=>typeof financeEsc==='function'?financeEsc(v):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=v=>'₹'+Number(v||0).toLocaleString('en-IN',{maximumFractionDigits:2});
+const num=v=>Number(v)||0;
+const isoToday=()=>typeof mfIsoToday==='function'?mfIsoToday():(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;})();
+const fmt=d=>{if(!d)return '—';try{return typeof formatToIndianDate==='function'?formatToIndianDate(d):d;}catch(e){return d;}};
+function loanById(id){return (Array.isArray(window.state?.loans)?window.state.loans:[]).find(l=>String(l.id)===String(id));}
+function futureRows(l){return (Array.isArray(l?.payments)?l.payments:[]).map((p,i)=>({p,i,date:String(p?.date||p?.paidDate||'').slice(0,10),amount:num(p?.amount),principal:num(p?.principal)})).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&x.date>isoToday()&&(Math.abs(x.amount)>.005||Math.abs(x.principal)>.005));}
+function phaseCReconcile(l){
+ const prod=window.state?.products?.[l?.product]||{}; const principal=Math.max(0,num(prod.amount));
+ const payments=Array.isArray(l?.payments)?l.payments:[];
+ const allPrincipal=payments.reduce((s,p)=>s+num(p?.principal),0);
+ let asOfPrincipal=allPrincipal; try{if(typeof mfPrincipalRecoveredThrough==='function')asOfPrincipal=num(mfPrincipalRecoveredThrough(l,isoToday()));}catch(e){}
+ const future=futureRows(l); const futurePrincipal=future.reduce((s,x)=>s+x.principal,0);
+ const residual=Math.max(0,principal-asOfPrincipal);
+ let pending=0;try{pending=Math.max(0,num(typeof getLoanPending==='function'?getLoanPending(l):0));}catch(e){}
+ const sched=(()=>{try{return typeof mfLoanScheduleRows==='function'?mfLoanScheduleRows(l):[];}catch(e){return [];}})();
+ const unpaid=sched.filter(r=>!r.paid); const paid=sched.length-unpaid.length;
+ const allDatesTotal=payments.reduce((s,p)=>s+num(p?.amount),0);
+ const status=(()=>{try{return typeof mfLoanOperationalStatus==='function'?mfLoanOperationalStatus(l):String(l?.status||'UNKNOWN');}catch(e){return String(l?.status||'UNKNOWN');}})();
+ return {loan:l,principal,allPrincipal,asOfPrincipal,future,futurePrincipal,residual,pending,sched,unpaid,paid,allDatesTotal,status};
+}
+function enrichPhaseC(){
+ const audit=window.__mfPhaseCAudit;if(!audit||!Array.isArray(audit.issues))return;
+ const today=isoToday();
+ audit.issues=audit.issues.map(issue=>{
+  const msg=String(issue.msg||'');const m=msg.match(/^([^:]+):/);if(!m)return issue;
+  const l=loanById(m[1]);if(!l)return issue;
+  const x=phaseCReconcile(l);
+  if(x.future.length&&x.residual>.005&&Math.abs(x.futurePrincipal-x.residual)<=.01){
+   const dates=x.future.map(f=>`${fmt(f.date)} (${money(f.principal)} principal; ${money(f.amount)} total payment)`).join('; ');
+   return {...issue,sev:'info',category:'DATE_BASIS_RECONCILIATION',msg:`${m[1]}: as-of date difference ${money(x.residual)} matches future-dated payment allocation; not a confirmed loan-closure error.`,detail:`As-of ${fmt(today)}, principal allocations are ${money(x.asOfPrincipal)} of ${money(x.principal)}. All stored payment rows total ${money(x.allPrincipal)} principal. Future-dated row(s): ${dates}. Scheduled balance from the existing engine is ${money(x.pending)} and schedule rows are ${x.paid} paid / ${x.unpaid.length} unpaid. These measures use different date bases; no financial record was changed. Verify the receipt date and whether the payment is genuinely future-dated before any repair.`};
+  }
+  return issue;
+ });
+ const c=audit.issues.filter(x=>x.sev==='critical').length,w=audit.issues.filter(x=>x.sev==='warning').length,i=audit.issues.filter(x=>x.sev==='info').length;
+ audit.critical=c;audit.warning=w;audit.info=i;window.__mfPhaseCAudit=audit;
+ const box=$('pc-audit');if(box){const count=box.querySelector('.pc-audit-count');if(count)count.innerHTML=`<strong>${c}</strong> critical · <strong>${w}</strong> warning · <strong>${i}</strong> info`;}
+}
+function injectTrace(){
+ const el=$('pc-drilldown-modal-v14');if(!el)return;
+ const title=el.querySelector('header strong')?.textContent||'';const m=title.match(/Loan Calculation Trace\s*[—-]\s*(.+)$/);if(!m)return;
+ const l=loanById(m[1].trim());if(!l)return;
+ const trace=el.querySelector('.pc-v14-trace');if(!trace||trace.querySelector('.pc-v17-date-basis'))return;
+ const oldV16=trace.querySelector('.pc-v16-reconciliation');if(oldV16)oldV16.remove();
+ const x=phaseCReconcile(l);const matches=x.future.length&&x.residual>.005&&Math.abs(x.futurePrincipal-x.residual)<=.01;
+ const closureAligned=x.pending<=.005&&x.unpaid.length===0&&String(x.status).toUpperCase()==='CLOSED';
+ const closureText=closureAligned?'Schedule closure check: PASS — status is CLOSED, scheduled balance is zero and no unpaid schedule rows remain. This is evaluated separately from as-of principal timing.':(x.unpaid.length||x.pending>.005)?`Schedule closure check: REVIEW — status ${x.status}, scheduled balance ${money(x.pending)}, unpaid rows ${x.unpaid.length}. Inspect schedule/closure evidence; do not auto-correct.`:`Schedule closure check: REVIEW — operational status is ${x.status}; compare it with the schedule and settlement/foreclosure records.`;
+ const rows=x.future.length?`<ul>${x.future.map(f=>`<li>Payment row ${f.i+1}: ${esc(fmt(f.date))} · total ${money(f.amount)} · principal ${money(f.principal)}</li>`).join('')}</ul>`:'<p>No future-dated payment rows detected.</p>';
+ const box=document.createElement('section');box.className='pc-v17-date-basis';
+ box.innerHTML=`<h3>Separate audit segments: date-basis reconciliation vs loan closure</h3><div class="pc-v17-grid"><div><small>As-of date</small><b>${esc(fmt(isoToday()))}</b></div><div><small>Principal through as-of date</small><b>${money(x.asOfPrincipal)}</b></div><div><small>Principal across all records</small><b>${money(x.allPrincipal)}</b></div><div><small>Future-dated principal</small><b>${money(x.futurePrincipal)}</b></div><div><small>Principal less as-of recovery</small><b>${money(x.residual)}</b></div><div><small>Existing scheduled balance</small><b>${money(x.pending)}</b></div><div><small>Schedule rows paid / unpaid</small><b>${x.paid} / ${x.unpaid.length}</b></div><div><small>Stored operational status</small><b>${esc(x.status)}</b></div></div><p><b>Finding:</b> ${matches?'The as-of principal difference matches the future-dated principal rows. This is a date-basis difference and is not, by itself, proof of an incorrect payment or invalid closure.':'The date-basis difference does not exactly reconcile to future-dated principal rows. Further row-level review is required; do not infer a cause from the summary alone.'}</p><h4>Evidence — future-dated payment rows</h4>${rows}<h4>Recommended next step</h4><p>Verify each listed receipt date against the real receipt/register. If the customer actually paid on that date, keep the transaction date and treat it according to the chosen as-of reporting cutoff. If the date was entered incorrectly, use the existing payment-edit workflow to correct the date only after verification. Do not change principal/interest allocation, payment amount, closure status, or outstanding merely to clear this finding.</p><p><b>Loan closure audit — separate segment:</b> ${esc(closureText)} The date-basis reconciliation does not change the canonical closure calculation.</p>`;
+ trace.insertBefore(box,trace.firstChild);
+}
+// Common A–E finding contract. Existing audits remain their source of truth; this layer standardizes their presentation and never writes business data.
+const customRegistry=window.__mfUnifiedAuditSources||{};
+window.mfRegisterUnifiedAuditSource=function(source,findings){customRegistry[String(source||'Unknown')]=Array.isArray(findings)?findings:[];window.__mfUnifiedAuditSources=customRegistry;};
+function normalize(source,rows){return (rows||[]).map((x,index)=>{
+ const severity=String(x.severity||x.sev||'info').toLowerCase();const message=String(x.message||x.msg||'Audit finding');const detail=String(x.detail||'');const loanId=String(x.loanId||((message.match(/^([^:]+):/)||[])[1]||''));
+ let reason=detail||'The source audit identified a condition that needs review; additional evidence may be required.';
+ let evidence=loanId?`Loan/reference: ${loanId}. Evidence is from the currently loaded application state.`:'Evidence is from the source audit output and currently loaded application state.';
+ let recommendation='Review the underlying record and compare it with the relevant canonical calculation/report.';
+ let repair='Use the existing authorized edit/reversal workflow only after verifying the source evidence. Re-run the audit afterward.';
+ let safety='No automatic change has been made. Do not alter principal, interest, payment date, outstanding or status only to clear a warning.';
+ const text=(message+' '+detail).toLowerCase();
+ if(/future.?dated|date.?basis|as.of date/.test(text)){recommendation='Verify the actual receipt date and keep reporting cutoff separate from all-records totals.';repair='If the date is wrong, correct the date through the existing payment-edit workflow after verification; if it is genuine, keep the record and classify it as a date-basis finding.';}
+ else if(/closed|outstanding|principal allocation|reconcil/.test(text)){recommendation='Compare payment allocation rows, schedule completion, operational status and canonical outstanding independently.';repair='Open the account calculation trace; correct only a verified underlying record through its existing workflow. Re-run the source audit.';}
+ else if(/ptp|follow.?up|promise/.test(text)){recommendation='Check PTP-to-loan and follow-up linkage; PTP operational amounts must not be treated as actual collections.';repair='Use the Phase B PTP/Follow-up workflow; do not post financial payments from an operational PTP outcome.';}
+ return {id:`${source}-${index}-${loanId}`,source,severity,message,detail,loanId,reason,evidence,recommendation,repair,safety};
+ });}
+function collectAll(){
+ const all=[];
+ try{if(typeof window.mfPhaseACollectExceptions==='function')all.push(...normalize('Phase A',window.mfPhaseACollectExceptions()));}catch(e){all.push(...normalize('Phase A',[{severity:'critical',message:'Phase A audit failed to execute',detail:String(e?.message||e)}]));}
+ try{if(typeof window.mfPhaseBRunAudit==='function'){const b=window.mfPhaseBRunAudit(false);all.push(...normalize('Phase B',b?.issues||[]));}}catch(e){all.push(...normalize('Phase B',[{severity:'critical',message:'Phase B audit failed to execute',detail:String(e?.message||e)}]));}
+ try{if(!$('modal-phasec-portfolio')&&typeof window.openPhaseCPortfolioModal==='function'){window.openPhaseCPortfolioModal();$('modal-phasec-portfolio')?.classList.remove('active');}if(typeof window.refreshPhaseCPortfolio==='function')window.refreshPhaseCPortfolio();enrichPhaseC();const c=window.__mfPhaseCAudit;all.push(...normalize('Phase C',(c?.issues||[]).map(x=>({severity:x.sev,message:x.msg,detail:x.detail,loanId:(String(x.msg||'').match(/^([^:]+):/)||[])[1]||''}))));}catch(e){all.push(...normalize('Phase C',[{severity:'critical',message:'Phase C audit could not be refreshed',detail:String(e?.message||e)}]));}
+ Object.entries(window.__mfUnifiedAuditSources||{}).forEach(([source,rows])=>all.push(...normalize(source,rows)));
+ return all;
+}
+function guidanceForPhaseDandE(){return `<div class="mf-v17-roadmap"><b>Phase D / Phase E audit coverage</b><p>The unified finding contract is ready for these phases. Their full functional audit rules must be registered when those modules are implemented; this screen does not claim that not-yet-built checks have run.</p><div><b>Required for every future finding:</b> severity · reason · source evidence · affected record · recommendation · safe repair route · recheck result · audit timestamp.</div></div>`;}
+function openCentre(){
+ if($('mf-v17-unified-audit-modal')){$('mf-v17-unified-audit-modal').remove();}
+ const modal=document.createElement('div');modal.id='mf-v17-unified-audit-modal';modal.className='modal-overlay';modal.style.cssText='display:flex;z-index:2147483200';
+ modal.innerHTML=`<div class="modal-card mf-v17-audit-card"><div class="modal-title"><span><i class="fa-solid fa-shield-halved" style="color:#67e8f9"></i> Unified Audit & Safe Repair Centre — Phases A–E</span><button type="button" class="btn-header" id="mf-v17-audit-close">×</button></div><p class="mf-v17-intro">One common audit workflow across phases. Findings are read-only; a fix is offered only through an existing verified workflow. This centre never edits financial data automatically.</p><div class="mf-v17-toolbar"><button type="button" class="btn-header btn-blue" id="mf-v17-run-audits">Run available audits</button><label>Phase <select id="mf-v17-phase-filter"><option value="ALL">All available</option><option>Phase A</option><option>Phase B</option><option>Phase C</option><option value="Phase D">Phase D</option><option value="Phase E">Phase E</option></select></label><label>Severity <select id="mf-v17-sev-filter"><option value="ALL">All severities</option><option value="critical">Critical</option><option value="warning">Warning</option><option value="info">Info</option></select></label></div><div id="mf-v17-audit-counts"></div><div id="mf-v17-audit-findings"></div>${guidanceForPhaseDandE()}</div>`;
+ document.body.appendChild(modal);modal.querySelector('#mf-v17-audit-close').onclick=()=>modal.remove();modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+ let findings=[];
+ const render=()=>{const phase=$('mf-v17-phase-filter').value,sev=$('mf-v17-sev-filter').value;const visible=findings.filter(x=>(phase==='ALL'||x.source===phase)&&(sev==='ALL'||x.severity===sev));const counts={critical:findings.filter(x=>x.severity==='critical').length,warning:findings.filter(x=>x.severity==='warning').length,info:findings.filter(x=>x.severity==='info').length};$('mf-v17-audit-counts').innerHTML=`<div class="mf-v17-counts"><div>Critical <b>${counts.critical}</b></div><div>Warnings <b>${counts.warning}</b></div><div>Info <b>${counts.info}</b></div><div>Findings <b>${findings.length}</b></div></div>`;$('mf-v17-audit-findings').innerHTML=visible.length?visible.map((x,i)=>`<article class="mf-v17-finding ${esc(x.severity)}"><header><span>${esc(x.severity.toUpperCase())}</span><b>${esc(x.source)}</b><strong>${esc(x.message)}</strong></header><p><b>Reason / existing detail</b><br>${esc(x.reason)}</p><p><b>Evidence</b><br>${esc(x.evidence)}</p><p><b>Recommendation</b><br>${esc(x.recommendation)}</p><p><b>Safe repair workflow</b><br>${esc(x.repair)}</p><p class="mf-v17-safety"><b>Safety boundary</b><br>${esc(x.safety)}</p>${x.loanId?`<button type="button" class="btn-header btn-blue mf-v17-inspect" data-loan="${esc(x.loanId)}" data-source="${esc(x.source)}">Inspect related account / source ↗</button>`:''}</article>`).join(''):'<div class="mf-v17-empty">No findings match these filters. Run the available audits again after any verified correction.</div>';};
+ const run=()=>{findings=collectAll();render();};$('mf-v17-run-audits').onclick=run;$('mf-v17-phase-filter').onchange=render;$('mf-v17-sev-filter').onchange=render;
+ $('mf-v17-audit-findings').addEventListener('click',e=>{const b=e.target.closest('.mf-v17-inspect');if(!b)return;const id=b.dataset.loan,source=b.dataset.source;if(source==='Phase C'&&typeof window.openPhaseCDrilldown==='function'){modal.remove();if(typeof window.openPhaseCPortfolioModal==='function')window.openPhaseCPortfolioModal();setTimeout(()=>{try{window.openPhaseCDrilldown('loan',id);setTimeout(injectTrace,0);}catch(err){alert('Account detail could not open: '+String(err?.message||err));}},100);}else if(source==='Phase A'){modal.remove();if(typeof window.openPhaseAControlModal==='function')window.openPhaseAControlModal();}else{alert(`Finding source: ${source}\nReference: ${id}\nOpen the source module and verify the record before editing. No data was changed.`);}});
+ run();
+}
+window.openUnifiedAuditRepairCentre=openCentre;
+function installCard(){const grid=document.querySelector('.mf-advanced-tool-grid');if(!grid||$('mf-v17-unified-audit-card'))return;const card=document.createElement('div');card.className='mf-advanced-tool';card.id='mf-v17-unified-audit-card';card.innerHTML='<b><i class="fa-solid fa-shield-halved" style="color:#67e8f9"></i> Unified Audit & Safe Repair Centre</b><span>Standard reason, evidence, recommendation, safe repair route and recheck workflow for available Phase A–C audits. Phase D/E checks plug into the same contract when implemented.</span><button type="button" class="btn-header btn-blue" id="mf-v17-open-audit">Open Unified Audit Centre</button>';grid.appendChild(card);$('mf-v17-open-audit').onclick=openCentre;}
+function install(){
+ // Replace V16's generic warning classification with a separate date-basis information finding.
+ const refresh=window.refreshPhaseCPortfolio;if(typeof refresh==='function'&&!refresh.__v17Wrap){const wrapped=function(){const r=refresh.apply(this,arguments);try{enrichPhaseC();}catch(e){}return r;};wrapped.__v17Wrap=true;wrapped.__v17Original=refresh;window.refreshPhaseCPortfolio=wrapped;}
+ const open=window.openPhaseCDrilldown;if(typeof open==='function'&&!open.__v17Wrap){const wrapped=function(){const r=open.apply(this,arguments);try{injectTrace();}catch(e){}return r;};wrapped.__v17Wrap=true;wrapped.__v17Original=open;window.openPhaseCDrilldown=wrapped;}
+ const st=document.createElement('style');st.id='mf-v17-audit-style';st.textContent=`.mf-v17-audit-card{width:min(1100px,96vw)!important;max-height:92vh;overflow:auto}.mf-v17-intro,.mf-v17-roadmap{font-size:.76rem;line-height:1.5;color:#cbd5e1}.mf-v17-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}.mf-v17-toolbar label{display:flex;gap:5px;align-items:center;font-size:.72rem}.mf-v17-toolbar select{background:#0f172a;color:#fff;border:1px solid #475569;border-radius:6px;padding:6px}.mf-v17-counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:8px 0}.mf-v17-counts>div{padding:8px;background:#0f2745;border:1px solid #334155;border-radius:8px;font-size:.7rem}.mf-v17-counts b{display:block;font-size:1.05rem}.mf-v17-finding{border:1px solid #475569;border-radius:9px;padding:10px;margin:8px 0;background:rgba(15,23,42,.62);font-size:.74rem;line-height:1.5}.mf-v17-finding.critical{border-color:#ef4444}.mf-v17-finding.warning{border-color:#f59e0b}.mf-v17-finding.info{border-color:#38bdf8}.mf-v17-finding header{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.mf-v17-finding header span{font-weight:900;font-size:.62rem;padding:3px 6px;border-radius:5px;background:#334155}.mf-v17-finding p{margin:7px 0}.mf-v17-safety{padding:7px;background:rgba(14,116,144,.16);border-radius:6px}.mf-v17-empty,.mf-v17-roadmap{padding:12px;border:1px solid #334155;border-radius:8px;margin-top:8px}.mf-v17-roadmap p{margin:5px 0}.pc-v17-date-basis{border:1px solid #38bdf8;background:rgba(8,47,73,.45);border-radius:10px;padding:12px;margin:10px 0;color:#e0f2fe}.pc-v17-date-basis h3,.pc-v17-date-basis h4{color:#67e8f9;margin:8px 0}.pc-v17-date-basis p,.pc-v17-date-basis li{font-size:.76rem;line-height:1.5}.pc-v17-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:7px}.pc-v17-grid>div{background:rgba(15,23,42,.6);border:1px solid rgba(103,232,249,.18);border-radius:7px;padding:8px}.pc-v17-grid small{display:block;color:#7dd3fc;font-size:.65rem}.pc-v17-grid b{display:block;margin-top:4px;overflow-wrap:anywhere}@media(max-width:600px){.mf-v17-counts{grid-template-columns:repeat(2,minmax(0,1fr))}.mf-v17-audit-card{width:98vw!important;padding:9px!important}.pc-v17-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}`;
+ if(!$('mf-v17-audit-style'))document.head.appendChild(st);
+ installCard();
+ try{enrichPhaseC();}catch(e){}
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+})();
+</script>
 </body>
 </html>
