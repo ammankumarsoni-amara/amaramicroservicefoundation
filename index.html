@@ -13137,7 +13137,7 @@ const accountInfo=l=>{
  const dueToday=rows.some(r=>!r.paid&&r.dueDate===today);
  const oldest=overdue[0]?.dueDate||''; const days=oldest?dateDiff(oldest,today):0;
  let bucket='Current'; if(days>90)bucket='90+ Days'; else if(days>60)bucket='61–90 Days'; else if(days>30)bucket='31–60 Days'; else if(days>0)bucket='1–30 Days';
- return {status:overdue.length?'OVERDUE':dueToday?'DUE':'ACTIVE',risk:true,bucket,days,oldest,overdueCount:overdue.length};
+ return {status:overdue.length?'OVERDUE':dueToday?'DUE':'ACTIVE',risk:true,bucket,days,oldest,overdueCount:overdue.length,dueToday};
 };
 const agingInfo=l=>accountInfo(l);
 const riskFlags=l=>{const a=agingInfo(l);return {par30:a.days>30,par60:a.days>60,par90:a.days>90};};
@@ -13151,7 +13151,7 @@ function buildPortfolio(){
    return {loan:l,p,status:st,risk,out,rec,age,flags,disb:num(p.amount),collections:actualCollections(l),productKey:String(l.product||'')};
  }).filter(Boolean);
  const totalDisb=rows.reduce((s,r)=>s+r.disb,0), totalOut=rows.reduce((s,r)=>s+(r.risk?r.out:0),0), totalRec=rows.reduce((s,r)=>s+r.rec,0);
- const open=rows.filter(r=>r.risk), overdue=rows.filter(r=>r.risk&&r.age.days>0), dueToday=rows.filter(r=>r.risk&&r.status==='DUE');
+ const open=rows.filter(r=>r.risk), overdue=rows.filter(r=>r.risk&&r.age.days>0), dueToday=rows.filter(r=>r.risk&&r.age.dueToday);
  const buckets={'Current':[],'1–30 Days':[],'31–60 Days':[],'61–90 Days':[],'90+ Days':[]}; open.forEach(r=>buckets[r.age.bucket]?.push(r));
  const par30=open.filter(r=>r.flags.par30).reduce((s,r)=>s+r.out,0), par60=open.filter(r=>r.flags.par60).reduce((s,r)=>s+r.out,0), par90=open.filter(r=>r.flags.par90).reduce((s,r)=>s+r.out,0);
  return {rows,totalDisb,totalOut,totalRec,open,overdue,dueToday,buckets,par30,par60,par90};
@@ -13166,7 +13166,7 @@ function vintageRows(pf,yearFilter){
  return [...map.values()].sort((a,b)=>a.key.localeCompare(b.key));
 }
 function pct(a,b){return b>0?(a/b)*100:0;}
-function bucketCard(label,arr,totalOut){const out=arr.reduce((s,r)=>s+r.out,0);return `<button type="button" class="pc-bucket pc-clickable" onclick="openPhaseCDrilldown('bucket',${JSON.stringify(label)})" aria-label="Open ${esc(label)} accounts"><div><span>${esc(label)}</span><b>${arr.length}</b></div><strong>${money(out)}</strong><small>${pct(out,totalOut).toFixed(1)}% of open principal · View accounts ↗</small></button>`;}
+function bucketCard(label,arr,totalOut){const out=arr.reduce((s,r)=>s+r.out,0);return `<button type="button" class="pc-bucket pc-clickable" onclick="openPhaseCDrilldownEncoded('bucket','${encodeURIComponent(label)}')" aria-label="Open ${esc(label)} accounts"><div><span>${esc(label)}</span><b>${arr.length}</b></div><strong>${money(out)}</strong><small>${pct(out,totalOut).toFixed(1)}% of open principal · View accounts ↗</small></button>`;}
 function statusPill(st){const map={OVERDUE:'danger',DUE:'warn',ACTIVE:'ok',CLOSED:'muted',SETTLED:'muted',FORECLOSED:'muted'};return `<span class="pc-pill ${map[st]||'muted'}">${esc(st)}</span>`;}
 function renderOverview(pf){
  const openOut=pf.totalOut, par30Pct=pct(pf.par30,openOut), par60Pct=pct(pf.par60,openOut), par90Pct=pct(pf.par90,openOut);
@@ -13192,10 +13192,10 @@ function renderOverview(pf){
 }
 
 function renderProduct(){
- const pf=buildPortfolio(), rows=productRows(pf);$('pc-product').innerHTML=`<div class="pc-note">Product performance is calculated from the existing loan/product records. It is analytical only; no product, EMI or loan values are changed.</div><div class="pc-table-wrap"><table class="pc-table"><thead><tr><th>Product</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding Principal</th><th>Principal Recovered</th><th>Overdue</th><th>PAR 30</th><th>PAR 60</th><th>PAR 90</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr class="pc-table-clickable" tabindex="0" role="button" onclick="openPhaseCDrilldown('product',${JSON.stringify(r.key)})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPhaseCDrilldown('product',${JSON.stringify(r.key)})}"><td><b>${esc(r.name)}</b><small>${esc(r.key)} · View accounts ↗</small></td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)} <small>${pct(r.par30,r.out).toFixed(1)}%</small></td><td>${money(r.par60)} <small>${pct(r.par60,r.out).toFixed(1)}%</small></td><td>${money(r.par90)} <small>${pct(r.par90,r.out).toFixed(1)}%</small></td></tr>`).join(''):`<tr><td colspan="10" class="pc-empty">No product records found.</td></tr>`}</tbody></table></div>`;
+ const pf=buildPortfolio(), rows=productRows(pf);$('pc-product').innerHTML=`<div class="pc-note">Product performance is calculated from the existing loan/product records. It is analytical only; no product, EMI or loan values are changed.</div><div class="pc-table-wrap"><table class="pc-table"><thead><tr><th>Product</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding Principal</th><th>Principal Recovered</th><th>Overdue</th><th>PAR 30</th><th>PAR 60</th><th>PAR 90</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr class="pc-table-clickable" tabindex="0" role="button" onclick="openPhaseCDrilldownEncoded('product','${encodeURIComponent(r.key)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPhaseCDrilldownEncoded('product','${encodeURIComponent(r.key)}')}"><td><b>${esc(r.name)}</b><small>${esc(r.key)} · View accounts ↗</small></td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)} <small>${pct(r.par30,r.out).toFixed(1)}%</small></td><td>${money(r.par60)} <small>${pct(r.par60,r.out).toFixed(1)}%</small></td><td>${money(r.par90)} <small>${pct(r.par90,r.out).toFixed(1)}%</small></td></tr>`).join(''):`<tr><td colspan="10" class="pc-empty">No product records found.</td></tr>`}</tbody></table></div>`;
 }
 function renderVintage(){
- const pf=buildPortfolio(), sel=$('pc-vintage-year');const yr=sel?.value||'ALL';const rows=vintageRows(pf,yr);$('pc-vintage').innerHTML=`<div class="pc-note">Vintage = loan disbursal month cohort. Current outstanding and PAR are shown as of today; this does not rewrite historical transaction dates.</div><div class="pc-table-wrap"><table class="pc-table"><thead><tr><th>Vintage</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR 30</th><th>PAR 60</th><th>PAR 90</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr class="pc-table-clickable" tabindex="0" role="button" onclick="openPhaseCDrilldown('vintage',${JSON.stringify(r.key)})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPhaseCDrilldown('vintage',${JSON.stringify(r.key)})}"><td><b>${esc(r.key)}</b><small>View accounts ↗</small></td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)} <small>${pct(r.par30,r.out).toFixed(1)}%</small></td><td>${money(r.par60)} <small>${pct(r.par60,r.out).toFixed(1)}%</small></td><td>${money(r.par90)} <small>${pct(r.par90,r.out).toFixed(1)}%</small></td></tr>`).join(''):`<tr><td colspan="10" class="pc-empty">No vintage records match this year.</td></tr>`}</tbody></table></div>`;
+ const pf=buildPortfolio(), sel=$('pc-vintage-year');const yr=sel?.value||'ALL';const rows=vintageRows(pf,yr);$('pc-vintage').innerHTML=`<div class="pc-note">Vintage = loan disbursal month cohort. Current outstanding and PAR are shown as of today; this does not rewrite historical transaction dates.</div><div class="pc-table-wrap"><table class="pc-table"><thead><tr><th>Vintage</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR 30</th><th>PAR 60</th><th>PAR 90</th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr class="pc-table-clickable" tabindex="0" role="button" onclick="openPhaseCDrilldownEncoded('vintage','${encodeURIComponent(r.key)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPhaseCDrilldownEncoded('vintage','${encodeURIComponent(r.key)}')}"><td><b>${esc(r.key)}</b><small>View accounts ↗</small></td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)} <small>${pct(r.par30,r.out).toFixed(1)}%</small></td><td>${money(r.par60)} <small>${pct(r.par60,r.out).toFixed(1)}%</small></td><td>${money(r.par90)} <small>${pct(r.par90,r.out).toFixed(1)}%</small></td></tr>`).join(''):`<tr><td colspan="10" class="pc-empty">No vintage records match this year.</td></tr>`}</tbody></table></div>`;
 }
 function renderAudit(){
  const pf=buildPortfolio(), issues=[];const add=(sev,msg,detail='')=>issues.push({sev,msg,detail});
@@ -13205,7 +13205,7 @@ function renderAudit(){
  if(pf.par30-pf.totalOut>0.005)add('critical','Portfolio PAR30 exceeds open principal.','Risk principal cannot exceed open principal.');
  const pr=productRows(pf), vr=vintageRows(pf,'ALL');const prOut=pr.reduce((s,r)=>s+r.out,0),vrOut=vr.reduce((s,r)=>s+r.out,0);if(Math.abs(prOut-pf.totalOut)>0.005)add('critical','Product outstanding does not reconcile to portfolio outstanding.',`${money(prOut)} vs ${money(pf.totalOut)}`);if(Math.abs(vrOut-pf.totalOut)>0.005)add('critical','Vintage outstanding does not reconcile to portfolio outstanding.',`${money(vrOut)} vs ${money(pf.totalOut)}`);
  const critical=issues.filter(x=>x.sev==='critical').length,warning=issues.filter(x=>x.sev==='warning').length;
- $('pc-audit').innerHTML=`<div class="pc-audit-head"><div><b>Phase C analytical audit</b><span>Read-only. No record is modified.</span></div><div class="pc-audit-count"><strong>${critical}</strong> critical · <strong>${warning}</strong> warning</div></div>${issues.length?issues.map(x=>{const m=String(x.msg).match(/^([^:]+):/);const loanId=m?.[1];return `<div class="pc-audit-row ${x.sev}"><b>${esc(x.sev.toUpperCase())}</b><div><strong>${esc(x.msg)}</strong><small>${esc(x.detail)}</small>${loanId?`<button type="button" class="pc-inline-action" onclick="openPhaseCDrilldown('loan',${JSON.stringify(loanId)})">Inspect account calculation ↗</button>`:''}</div></div>`}).join(''):`<div class="pc-pass"><i class="fa-solid fa-circle-check"></i><b>Phase C portfolio audit passed.</b><span>Portfolio aging, PAR hierarchy and Product/Vintage reconciliation checks found no inconsistencies in the analytical layer.</span></div>`}`;
+ $('pc-audit').innerHTML=`<div class="pc-audit-head"><div><b>Phase C analytical audit</b><span>Read-only. No record is modified.</span></div><div class="pc-audit-count"><strong>${critical}</strong> critical · <strong>${warning}</strong> warning</div></div>${issues.length?issues.map(x=>{const m=String(x.msg).match(/^([^:]+):/);const loanId=m?.[1];return `<div class="pc-audit-row ${x.sev}"><b>${esc(x.sev.toUpperCase())}</b><div><strong>${esc(x.msg)}</strong><small>${esc(x.detail)}</small>${loanId?`<button type="button" class="pc-inline-action" onclick="openPhaseCDrilldownEncoded('loan','${encodeURIComponent(loanId)}')">Inspect account calculation ↗</button>`:''}</div></div>`}).join(''):`<div class="pc-pass"><i class="fa-solid fa-circle-check"></i><b>Phase C portfolio audit passed.</b><span>Portfolio aging, PAR hierarchy and Product/Vintage reconciliation checks found no inconsistencies in the analytical layer.</span></div>`}`;
  window.__mfPhaseCAudit={at:new Date().toISOString(),critical,warning,issues};
  return {pf,issues};
 }
@@ -13288,7 +13288,7 @@ function show(type,key){
  if(type==='all')title='Gross Portfolio Disbursed — Account Breakdown';
  else if(type==='open'){rows=all.filter(r=>r.risk);title='Open Principal Outstanding — Account Breakdown';}
  else if(type==='overdue'){rows=all.filter(r=>r.risk&&r.days>0);title='Overdue Accounts';}
- else if(type==='due'){rows=all.filter(r=>r.risk&&r.status==='DUE');title='Due Today Accounts';}
+ else if(type==='due'){rows=all.filter(r=>r.risk&&Array.isArray(r.due)&&r.due.length>0);title='Due Today Accounts';}
  else if(type==='par30'){rows=all.filter(r=>r.risk&&r.flags.par30);title='PAR 30 — At-Risk Accounts';}
  else if(type==='par60'){rows=all.filter(r=>r.risk&&r.flags.par60);title='PAR 60 — At-Risk Accounts';}
  else if(type==='par90'){rows=all.filter(r=>r.risk&&r.flags.par90);title='PAR 90 — At-Risk Accounts';}
@@ -13311,6 +13311,40 @@ window.openPhaseCDrilldown=show;window.closePhaseCDrilldown=close;
 // Keep filters functional after every re-render, including after a data refresh.
 const refresh=window.refreshPhaseCPortfolio;
 if(typeof refresh==='function'&&!refresh.__v14Wrapped){const wrapped=function(){const result=refresh.apply(this,arguments);return result;};wrapped.__v14Wrapped=true;window.refreshPhaseCPortfolio=wrapped;}
+})();
+</script>
+<script id="mf-phasec-v15-interaction-audit-fix">
+(function(){
+'use strict';
+// HTML attributes must never embed JSON double-quotes inside a double-quoted onclick.
+// Encode all dynamic keys in the markup, then decode them here before dispatch.
+window.openPhaseCDrilldownEncoded=function(type,encodedKey){
+  let key='';
+  try{key=decodeURIComponent(String(encodedKey||''));}catch(e){key=String(encodedKey||'');}
+  try{
+    if(typeof window.openPhaseCDrilldown!=='function') throw new Error('Phase C drill-down handler is unavailable.');
+    return window.openPhaseCDrilldown(type,key);
+  }catch(e){
+    console.error('Phase C drill-down failed:',e);
+    const existing=document.getElementById('pc-v15-error');if(existing)existing.remove();
+    const box=document.createElement('div');box.id='pc-v15-error';box.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#020617dd;display:flex;align-items:center;justify-content:center;padding:16px';
+    box.innerHTML='<section style="max-width:560px;background:#0b2340;color:#fff;border:1px solid #f59e0b;border-radius:12px;padding:18px;font:14px system-ui"><b>Phase C detail could not open</b><p style="line-height:1.5">The detail window hit a technical error. No financial record was changed.</p><p style="color:#fde68a;overflow-wrap:anywhere"></p><button type="button" style="padding:7px 12px" aria-label="Close error">Close</button></section>';
+    box.querySelector('p:nth-of-type(2)').textContent=String(e&&e.message||e||'Unknown error');box.querySelector('button').onclick=()=>box.remove();document.body.appendChild(box);return false;
+  }
+};
+// Rebind search/status after each overview re-render and expose all relevant contact fields in search.
+function bindRisk(){
+ const input=document.getElementById('pc-risk-search'),status=document.getElementById('pc-risk-status');
+ if(input&&!input.dataset.v15Bound){input.dataset.v15Bound='1';input.addEventListener('input',()=>{
+   const q=input.value;const pos=input.selectionStart;
+   try{if(typeof window.refreshPhaseCPortfolio==='function')window.refreshPhaseCPortfolio();}catch(e){console.error(e);}
+   const next=document.getElementById('pc-risk-search');if(next){next.value=q;try{next.focus();next.setSelectionRange(pos,pos);}catch(e){}}
+ });}
+ if(status&&!status.dataset.v15Bound){status.dataset.v15Bound='1';status.addEventListener('change',()=>{try{if(typeof window.refreshPhaseCPortfolio==='function')window.refreshPhaseCPortfolio();}catch(e){console.error(e);}});}
+}
+const obs=new MutationObserver(()=>bindRisk());
+function start(){bindRisk();const root=document.getElementById('modal-phasec-portfolio');if(root)obs.observe(root,{subtree:true,childList:true});}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
 </script>
 </body>
