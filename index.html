@@ -1188,6 +1188,49 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 @media(max-width:520px){#modal-payment-management .mfpm-cash-settings{grid-template-columns:1fr}#modal-payment-management .mfpm-cash-settings>div:first-child,#modal-payment-management .mfpm-cash-current{grid-column:auto}#modal-payment-management .mfpm-section-head{align-items:stretch}#modal-payment-management .mfpm-section-head .btn-header{width:100%;justify-content:center}#modal-mfpm-bank-form .mfpm-form-grid{grid-template-columns:1fr;gap:13px}#modal-mfpm-bank-form .mfpm-full{grid-column:auto}#modal-mfpm-bank-form .mfpm-form-foot{display:grid;grid-template-columns:1fr 1fr}#modal-mfpm-bank-form .mfpm-form-foot button{justify-content:center}}
 </style>
 
+
+<style id="mfpm-ui-alignment-final-v2">
+/* Clear typographic hierarchy and consistent spacing for Payment Management */
+#modal-payment-management .mfpm-modal{font-size:14px;line-height:1.5;}
+#modal-payment-management .mfpm-intro{display:block;margin:0 0 20px;padding:15px 18px;font-size:.86rem;line-height:1.7;}
+#modal-payment-management .mfpm-kpis{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:0 0 20px;align-items:stretch;}
+#modal-payment-management .mfpm-kpi{display:flex;flex-direction:column;justify-content:space-between;gap:8px;min-width:0;min-height:88px;padding:16px;}
+#modal-payment-management .mfpm-kpi small{display:block;min-height:2.6em;font-size:.72rem;line-height:1.45;letter-spacing:.045em;white-space:normal;overflow-wrap:anywhere;}
+#modal-payment-management .mfpm-kpi b{display:block;margin:0;font-size:1.25rem;line-height:1.35;white-space:normal;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;}
+#modal-payment-management .mfpm-cash-settings{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(210px,.8fr) auto;gap:16px;align-items:end;padding:18px;margin:0 0 20px;}
+#modal-payment-management .mfpm-cash-settings>div:first-child b{display:block;margin-bottom:5px;font-size:.98rem;line-height:1.4;}
+#modal-payment-management .mfpm-cash-settings>div:first-child small{display:block;font-size:.8rem;line-height:1.65;}
+#modal-payment-management .mfpm-cash-settings label{font-size:.78rem;line-height:1.5;}
+#modal-payment-management .mfpm-cash-current{grid-column:1/-1;margin-top:0;padding-top:13px;font-size:.86rem;line-height:1.5;}
+#modal-payment-management .mfpm-section{padding:20px;margin:0 0 18px;}
+#modal-payment-management .mfpm-section-head{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:0 0 18px;padding:0 0 15px;border-bottom:1px solid rgba(147,190,211,.15);}
+#modal-payment-management .mfpm-section-head>div:first-child{display:block;min-width:0;flex:1;}
+#modal-payment-management .mfpm-section-head b{display:block!important;margin:0 0 6px;font-size:1rem;line-height:1.45;white-space:normal;}
+#modal-payment-management .mfpm-section-head small{display:block!important;margin:0;max-width:780px;font-size:.8rem;line-height:1.65;white-space:normal;}
+#modal-payment-management .mfpm-section-head .btn-header{flex:0 0 auto;min-height:42px;padding:10px 15px;}
+#modal-payment-management .mfpm-bank-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+#modal-payment-management .mfpm-note{margin:12px 0 0;font-size:.82rem;line-height:1.7;overflow-wrap:anywhere;}
+#modal-payment-management .mfpm-recon-controls{display:grid;grid-template-columns:minmax(170px,.8fr) minmax(250px,1.35fr) auto;align-items:end;gap:14px;margin:16px 0;}
+#modal-payment-management .mfpm-recon-controls label{display:block;min-width:0;font-size:.78rem;line-height:1.5;}
+#modal-payment-management .mfpm-recon-controls select,#modal-payment-management .mfpm-recon-controls input{display:block;width:100%;max-width:100%;box-sizing:border-box;margin-top:7px;min-height:42px;padding:10px 12px;font-size:.82rem;}
+#modal-payment-management .mfpm-recon-controls input[type=file]{padding:8px;}
+#modal-payment-management .mfpm-filters{display:grid;grid-template-columns:minmax(180px,.8fr) minmax(170px,.7fr) minmax(240px,1.5fr);gap:12px;margin:16px 0;}
+#modal-payment-management .mfpm-filters>*{min-width:0;width:100%;box-sizing:border-box;}
+#modal-payment-management .mfpm-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;}
+#modal-mfpm-bank-form.active,#modal-mfpm-upi.active,#modal-mfpm-movement.active{align-items:center;justify-content:center;padding:18px;box-sizing:border-box;}
+#modal-mfpm-bank-form>.mfpm-small-modal,#modal-mfpm-upi>.mfpm-small-modal,#modal-mfpm-movement>.mfpm-small-modal{width:min(680px,95vw)!important;max-width:680px!important;max-height:90vh;overflow:auto;box-sizing:border-box;padding:26px!important;border:1px solid rgba(82,190,228,.3);border-radius:18px;background:linear-gradient(150deg,#102b43,#0b1728 75%);box-shadow:0 24px 80px rgba(0,0,0,.55);}
+#modal-mfpm-bank-form .modal-title,#modal-mfpm-upi .modal-title,#modal-mfpm-movement .modal-title{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 22px;padding:0 0 16px;border-bottom:1px solid rgba(142,190,217,.18);font-size:1.12rem;line-height:1.4;}
+#modal-mfpm-bank-form .mfpm-form-grid,#modal-mfpm-upi .mfpm-form-grid,#modal-mfpm-movement .mfpm-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:18px 20px;}
+#modal-mfpm-bank-form .mfpm-form-grid>div,#modal-mfpm-upi .mfpm-form-grid>div,#modal-mfpm-movement .mfpm-form-grid>div{min-width:0;}
+#modal-mfpm-bank-form .mfpm-form-grid label,#modal-mfpm-upi .mfpm-form-grid label,#modal-mfpm-movement .mfpm-form-grid label{display:block;margin:0 0 8px;font-size:.8rem;line-height:1.45;font-weight:700;color:#c0d4e2;}
+#modal-mfpm-bank-form .mfpm-form-grid input,#modal-mfpm-bank-form .mfpm-form-grid select,#modal-mfpm-upi .mfpm-form-grid input,#modal-mfpm-upi .mfpm-form-grid select,#modal-mfpm-movement .mfpm-form-grid input,#modal-mfpm-movement .mfpm-form-grid select{display:block;width:100%;min-width:0;min-height:44px;box-sizing:border-box;margin:0;padding:11px 12px;border:1px solid rgba(129,177,207,.3);border-radius:9px;background:#0b1d2d;color:#f3f8fc;font-size:.86rem;line-height:1.4;}
+#modal-mfpm-bank-form .mfpm-form-grid input:focus,#modal-mfpm-bank-form .mfpm-form-grid select:focus,#modal-mfpm-upi .mfpm-form-grid input:focus,#modal-mfpm-upi .mfpm-form-grid select:focus,#modal-mfpm-movement .mfpm-form-grid input:focus,#modal-mfpm-movement .mfpm-form-grid select:focus{border-color:#2bc0df;box-shadow:0 0 0 3px rgba(43,192,223,.13);outline:none;}
+#modal-mfpm-bank-form .mfpm-form-foot,#modal-mfpm-upi .mfpm-form-foot,#modal-mfpm-movement .mfpm-form-foot{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:24px;padding-top:18px;border-top:1px solid rgba(142,190,217,.17);}
+#modal-mfpm-bank-form .mfpm-form-foot button,#modal-mfpm-upi .mfpm-form-foot button,#modal-mfpm-movement .mfpm-form-foot button{min-height:42px;padding:10px 17px;border-radius:9px;}
+@media(max-width:900px){#modal-payment-management .mfpm-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}#modal-payment-management .mfpm-recon-controls{grid-template-columns:1fr 1fr;}#modal-payment-management .mfpm-recon-controls button{grid-column:1/-1;justify-self:start;} }
+@media(max-width:600px){#modal-payment-management.active,#modal-mfpm-bank-form.active,#modal-mfpm-upi.active,#modal-mfpm-movement.active{padding:9px;}#modal-payment-management>.mfpm-modal{width:100%!important;max-height:94vh;padding:14px!important;border-radius:15px;}#modal-payment-management>.mfpm-modal>.modal-title{top:-14px;margin:-14px -14px 15px;padding:14px;}#modal-payment-management .mfpm-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}#modal-payment-management .mfpm-kpi{min-height:82px;padding:12px;}#modal-payment-management .mfpm-kpi small{font-size:.66rem;}#modal-payment-management .mfpm-kpi b{font-size:1rem;}#modal-payment-management .mfpm-cash-settings{grid-template-columns:1fr;gap:13px;padding:14px;}#modal-payment-management .mfpm-cash-settings>div:first-child,#modal-payment-management .mfpm-cash-current{grid-column:auto;}#modal-payment-management .mfpm-cash-settings button{width:100%;}#modal-payment-management .mfpm-section{padding:14px;margin-bottom:13px;}#modal-payment-management .mfpm-section-head{align-items:stretch;flex-direction:column;gap:12px;margin-bottom:14px;padding-bottom:13px;}#modal-payment-management .mfpm-section-head .btn-header{width:100%;justify-content:center;}#modal-payment-management .mfpm-bank-list,#modal-payment-management .mfpm-filters,#modal-payment-management .mfpm-recon-controls{grid-template-columns:1fr;}#modal-payment-management .mfpm-recon-controls button{grid-column:auto;width:100%;}#modal-mfpm-bank-form>.mfpm-small-modal,#modal-mfpm-upi>.mfpm-small-modal,#modal-mfpm-movement>.mfpm-small-modal{width:100%!important;max-height:94vh;padding:17px!important;border-radius:15px;}#modal-mfpm-bank-form .mfpm-form-grid,#modal-mfpm-upi .mfpm-form-grid,#modal-mfpm-movement .mfpm-form-grid{grid-template-columns:1fr;gap:14px;}#modal-mfpm-bank-form .mfpm-full,#modal-mfpm-upi .mfpm-full,#modal-mfpm-movement .mfpm-full{grid-column:auto;}#modal-mfpm-bank-form .mfpm-form-foot,#modal-mfpm-upi .mfpm-form-foot,#modal-mfpm-movement .mfpm-form-foot{display:grid;grid-template-columns:1fr 1fr;}#modal-mfpm-bank-form .mfpm-form-foot button,#modal-mfpm-upi .mfpm-form-foot button,#modal-mfpm-movement .mfpm-form-foot button{width:100%;justify-content:center;}}
+</style>
+
 </head>
 <body>
 <div id="app-lock-overlay" aria-modal="true" role="dialog" aria-label="App Lock">
@@ -2869,25 +2912,25 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           <span><i class="fa-solid fa-building-columns" style="color:#60a5fa"></i> Payment Management</span>
           <i class="fa-solid fa-xmark" onclick="closeModal('modal-payment-management')" style="cursor:pointer;color:#94a3b8"></i>
         </div>
-        <div class="mfpm-intro">Manage bank accounts, linked UPI IDs, cash movements and statement matching in one place. Source details are recorded for audit and never change loan or EMI calculations.</div>
+        <div class="mfpm-intro">Manage bank accounts and UPI IDs, record cash or bank transfers, and compare bank statements with your recorded transactions. These details do not change loan or EMI calculations.</div>
         <div class="mfpm-kpis" id="mfpm-kpis"></div>
         <div class="mfpm-cash-settings"><div><b>Cash in Hand</b><small>Opening cash is a balance, not income. Deposits reduce cash; withdrawals increase it.</small></div><label>Opening Balance (₹)<input id="mfpm-cash-opening" type="number" min="0" step="0.01" value="0"></label><button type="button" class="btn-header btn-blue" onclick="mfPMSaveCashOpening()">Save Cash Opening</button><div class="mfpm-cash-current">Calculated Cash Balance: <b id="mfpm-cash-balance">₹0.00</b></div></div>
         <div class="mfpm-section">
-          <div class="mfpm-section-head"><div><b>1. Bank Account Master</b><small>Add each bank account once. Account numbers are masked in the list.</small></div><button class="btn-header btn-blue" type="button" onclick="mfPMOpenBankForm()"><i class="fa-solid fa-plus"></i> Add Bank</button></div>
+          <div class="mfpm-section-head"><div><b>1. Bank Accounts</b><small>Add and manage your business bank accounts. Account numbers are masked for safety.</small></div><button class="btn-header btn-blue" type="button" onclick="mfPMOpenBankForm()"><i class="fa-solid fa-plus"></i> Add Bank</button></div>
           <div id="mfpm-bank-list" class="mfpm-bank-list"></div>
         </div>
         <div class="mfpm-section">
-          <div class="mfpm-section-head"><div><b>2. Cash / Bank Movements</b><small>Cash deposit, cash withdrawal and inter-bank transfer are balance movements, not income or expense.</small></div><button class="btn-header btn-blue" type="button" onclick="mfPMOpenMovementForm()"><i class="fa-solid fa-right-left"></i> Record Movement</button></div>
+          <div class="mfpm-section-head"><div><b>2. Cash & Bank Transfers</b><small>Record cash deposits, cash withdrawals, or transfers between your own accounts. These update balances only—not income or expenses.</small></div><button class="btn-header btn-blue" type="button" onclick="mfPMOpenMovementForm()"><i class="fa-solid fa-right-left"></i> Record Movement</button></div>
           <div id="mfpm-movement-list" class="mfpm-table-wrap"></div>
         </div>
         <div class="mfpm-section">
-          <div class="mfpm-section-head"><div><b>3. Bank Statement Reconciliation</b><small>Import a CSV/XLSX bank statement, then match it against source-tagged ledger entries. Matching never changes the underlying transaction or its financial allocation.</small></div><button class="btn-header btn-blue" type="button" onclick="mfPMAutoReconcile()"><i class="fa-solid fa-scale-balanced"></i> Auto Match</button></div>
+          <div class="mfpm-section-head"><div><b>3. Bank Statement Matching</b><small>Upload a bank statement in CSV or Excel format. We’ll compare its entries with your recorded transactions and show matches or differences. Your original transactions and amounts stay unchanged.</small></div><button class="btn-header btn-blue" type="button" onclick="mfPMAutoReconcile()"><i class="fa-solid fa-scale-balanced"></i> Auto Match</button></div>
           <div class="mfpm-recon-controls"><label>Bank Account<select id="mfpm-statement-bank"></select></label><label>Statement File (.csv / .xlsx / .xls)<input id="mfpm-statement-file" type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"></label><button class="btn-header btn-blue" type="button" onclick="mfPMImportStatement()"><i class="fa-solid fa-file-import"></i> Import Statement</button></div>
-          <div id="mfpm-statement-status" class="mfpm-note">Choose a bank and import a statement. Supported columns are Date, Amount or Debit/Credit, Reference/UTR, and Description/Narration.</div>
+          <div id="mfpm-statement-status" class="mfpm-note">Choose the bank account, then upload its statement. CSV and Excel files should include a date and amount; debit/credit, reference or UTR, and description columns help match entries more accurately.</div>
           <div id="mfpm-statement-lines" class="mfpm-table-wrap"></div>
         </div>
         <div class="mfpm-section">
-          <div class="mfpm-section-head"><div><b>4. Source-wise Transaction Ledger</b><small>Shows recorded business transactions that have source metadata plus internal movements. A missing source is flagged rather than guessed.</small></div><div class="mfpm-actions"><button class="btn-header btn-blue" type="button" onclick="mfPMExportExcel()"><i class="fa-solid fa-file-excel"></i> Export Excel</button><button class="btn-header btn-blue" type="button" onclick="mfPMPrintReport()"><i class="fa-solid fa-file-pdf"></i> Print / PDF</button><button class="btn-header btn-blue" type="button" onclick="mfPMRender()"><i class="fa-solid fa-rotate"></i> Refresh</button></div></div>
+          <div class="mfpm-section-head"><div><b>4. Transaction Ledger</b><small>Review money received, money paid, and internal transfers by bank account. Missing payment details are flagged for review.</small></div><div class="mfpm-actions"><button class="btn-header btn-blue" type="button" onclick="mfPMExportExcel()"><i class="fa-solid fa-file-excel"></i> Export Excel</button><button class="btn-header btn-blue" type="button" onclick="mfPMPrintReport()"><i class="fa-solid fa-file-pdf"></i> Print / PDF</button><button class="btn-header btn-blue" type="button" onclick="mfPMRender()"><i class="fa-solid fa-rotate"></i> Refresh</button></div></div>
           <div class="mfpm-filters">
             <select id="mfpm-ledger-bank-filter" onchange="mfPMRenderLedger()"><option value="ALL">All Bank Accounts</option></select>
             <select id="mfpm-ledger-direction-filter" onchange="mfPMRenderLedger()"><option value="ALL">Money In & Out</option><option value="IN">Money In</option><option value="OUT">Money Out</option><option value="TRANSFER">Internal Movement</option></select>
@@ -2897,7 +2940,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           <div id="mfpm-ledger-table" class="mfpm-table-wrap"></div>
         </div>
         <div class="mfpm-note"><b>Important accounting distinction:</b> opening balance and cash/bank transfers affect source balances only. Loan disbursement, collection, settlement, penalties, expenses, payroll and borrowing repayments retain their own business classifications. An opening balance is not income, and an internal transfer is not revenue/expense.</div>
-        <div class="mfpm-section"><div class="mfpm-section-head"><div><b>5. Payment Management Audit Trail</b><small>Bank/UPI master changes and internal movement voids are logged with timestamp and device context.</small></div></div><div id="mfpm-audit-list" class="mfpm-table-wrap"></div></div>
+        <div class="mfpm-section"><div class="mfpm-section-head"><div><b>5. Change History</b><small>Review saved bank and UPI changes, and corrections to cash or bank transfers.</small></div></div><div id="mfpm-audit-list" class="mfpm-table-wrap"></div></div>
       </div>
     </div>
 
@@ -14475,7 +14518,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
       return `<div class="mfpm-bank-card"><div class="mfpm-bank-title"><b>${esc(a.bankName)} · ${esc(a.accountHolder||'Account')}</b><span class="mfpm-status">${a.active===false?'Inactive':'Active'}</span></div>
         <div class="mfpm-bank-meta">Branch: ${esc(a.branch||'-')} · IFSC: ${esc(a.ifsc||'-')}<br>Account: ${esc(masked(a.accountNumber))} · Type: ${esc(a.accountType||'-')}<br>Registered Mobile: ${esc(a.registeredMobile||'-')}<br>Opening Balance: ${money(a.openingBalance||0)} · Calculated Source Balance: <b>${money(accountBalance(a.id))}</b><br>Active UPI IDs: ${upis.length}</div>
         <div class="mfpm-actions"><button class="btn-header btn-blue" onclick="mfPMOpenBankForm('${esc(a.id)}')"><i class="fa-solid fa-pen"></i> Edit</button><button class="btn-header btn-blue" onclick="mfPMOpenUpi('${esc(a.id)}')"><i class="fa-solid fa-qrcode"></i> Manage UPI IDs</button><button class="btn-header" onclick="mfPMToggleBank('${esc(a.id)}')">${a.active===false?'Activate':'Deactivate'}</button></div></div>`;
-    }).join(''):'<div class="mfpm-note">No bank accounts configured yet. Add HDFC, Axis, SBI or any other account once. UPI IDs are managed inside each bank account.</div>';
+    }).join(''):'<div class="mfpm-note">No bank accounts added yet. Select “Add Bank” to register your first account. You can add the related UPI IDs after saving the account.</div>';
   }
   window.mfPMOpenBankForm=function(id=''){
     ensure();const a=accountById(id);
