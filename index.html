@@ -1161,6 +1161,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             <div class="btn-action-group">
                 <button type="button" class="btn-header btn-green" onclick="openCloudModal()"><i class="fa-solid fa-cloud-arrow-up"></i> Cloud Sync</button>
                 <button type="button" class="btn-header btn-blue" onclick="openCompanyProfileModal()"><i class="fa-solid fa-building"></i> Company Profile</button>
+                <button type="button" class="btn-header btn-blue" id="mfpm-header-open" onclick="openPaymentManagement()"><i class="fa-solid fa-building-columns"></i> Payment Management</button>
                 <button type="button" class="btn-header btn-purple" onclick="openAddClientModal()"><i class="fa-solid fa-user-plus"></i> + New Loan</button>
                 <button type="button" class="btn-header btn-blue" onclick="openExecutiveReportPicker('excel')"><i class="fa-solid fa-file-excel"></i> Excel Report</button>
                 <button type="button" class="btn-header btn-blue" onclick="openExecutiveReportPicker('pdf')"><i class="fa-solid fa-file-pdf"></i> PDF Report</button>
@@ -1646,10 +1647,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div class="form-group">
                     <label>Disbursal Payment Mode *</label>
                     <select id="fc-disbursal-mode" required onchange="previewProductSummary()">
-                        <option value="Cash">Cash</option>
-                        <option value="UPI">UPI (GPay / PhonePe / Other Payment Bank)</option>
-                        <option value="Bank Transfer">Bank Transfer / Cheque</option>
-                        <option value="Cash + UPI (Both)">Cash + UPI / Bank Transfer / Cheque (Mixed)</option>
+                        <option value="Cash">Cash</option><option value="UPI">UPI</option><option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option><option value="Cheque / DD">Cheque / Demand Draft</option><option value="Mixed">Mixed Payment (multiple components)</option>
                     </select>
                     <small style="display:block;color:#64748b;font-size:.63rem;line-height:1.4;margin-top:4px;">Records how the loan amount was actually disbursed to the customer. This does not change EMI or interest calculations.</small>
                 </div>
@@ -1774,9 +1772,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div class="form-group">
                     <label>Payment Mode</label>
                     <select id="ps-mode">
-                        <option value="Bank Transfer">Bank Transfer / UPI</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Cheque">Cheque</option>
+                        <option value="Cash">Cash</option><option value="UPI">UPI</option><option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option><option value="Cheque">Cheque / Demand Draft</option><option value="Mixed">Mixed Payment (multiple components)</option>
                     </select>
                 </div>
 
@@ -1829,9 +1825,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     <div class="form-group">
                         <label>Paid By Mode</label>
                         <select id="ex-mode">
-                            <option value="Cash">Cash</option>
-                            <option value="UPI">UPI / GPay</option>
-                            <option value="Bank">Bank Account</option>
+                            <option value="Cash">Cash</option><option value="UPI">UPI</option><option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option><option value="Cheque / DD">Cheque / Demand Draft</option><option value="Mixed">Mixed Payment (multiple components)</option>
                         </select>
                     </div>
                 </div>
@@ -1987,6 +1981,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     </div>
                 </div>
 
+                <div class="form-group"><label>Funds Received Through *</label><select id="b-received-mode" required><option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option><option value="UPI">UPI</option><option value="Cash">Cash</option><option value="Cheque / DD">Cheque / Demand Draft</option><option value="Mixed">Mixed Payment (multiple components)</option></select><small style="display:block;color:#64748b;font-size:.63rem;margin-top:4px;">Source metadata only; borrowing principal and lender-cost calculations are unchanged.</small></div>
                 <button type="submit" class="btn-submit" id="btn-save-borrowing">Save Borrowing Loan</button>
                 <button type="button" class="btn-delete" id="btn-delete-borrowing" style="display: none;" onclick="deleteBorrowingAction()">Delete Loan</button>
             </form>
@@ -2074,9 +2069,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div class="form-group">
                     <label>Payment Mode</label>
                     <select id="lp-mode">
-                        <option value="Bank Transfer">Bank Transfer / UPI</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Cheque">Cheque</option>
+                        <option value="Cash">Cash</option><option value="UPI">UPI</option><option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option><option value="Cheque">Cheque / Demand Draft</option><option value="Mixed">Mixed Payment (multiple components)</option>
                     </select>
                 </div>
 
@@ -2257,10 +2250,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div class="form-group">
                     <label>Payment Mode</label>
                     <select id="pay-mode">
-                        <option value="Cash">Cash</option>
-                        <option value="UPI">UPI (GPay / PhonePe / Other Payment Bank)</option>
-                        <option value="Bank Transfer">Bank Transfer / Cheque</option>
-                        <option value="Cash + UPI (Both)">Cash + UPI / Bank Transfer / Cheque (Mixed)</option>
+                        <option value="Cash">Cash</option><option value="UPI">UPI</option><option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option><option value="Cheque / DD">Cheque / Demand Draft</option><option value="Mixed">Mixed Payment (multiple components)</option>
                     </select>
                 </div>
 
@@ -2309,7 +2299,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div class="form-group">
                     <label>Payment Mode</label>
                     <select id="rp-mode">
-                        <option value="Cash">Cash</option><option value="UPI">UPI (GPay / PhonePe / Other Payment Bank)</option><option value="Bank Transfer">Bank Transfer / Cheque</option><option value="Cash + UPI (Both)">Cash + UPI / Bank Transfer / Cheque (Mixed)</option>
+                        <option value="Cash">Cash</option><option value="UPI">UPI</option><option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option><option value="Cheque / DD">Cheque / Demand Draft</option><option value="Mixed">Mixed Payment (multiple components)</option>
                     </select>
                 </div>
                 <button type="submit" class="btn-submit" style="background: linear-gradient(135deg, #f59e0b, #d97706);">✓ Mark Penalty Received</button>
@@ -2482,9 +2472,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div class="form-group">
                     <label>Settlement Mode</label>
                     <select id="fc-s-mode">
-                        <option value="Cash">Cash</option>
-                        <option value="UPI">UPI / Bank Transfer</option>
-                        <option value="Bank Cheque">Bank Cheque / DD</option>
+                        <option value="Cash">Cash</option><option value="UPI">UPI</option><option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option><option value="Bank Cheque">Cheque / Demand Draft</option><option value="Mixed">Mixed Payment (multiple components)</option>
                     </select>
                 </div>
 
@@ -2526,7 +2514,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 </div>
 
                 <div class="mf-settlement-grid">
-                    <div class="form-group"><label>Payment Mode <span style="color:#f87171">*</span></label><select id="pm-mode" required><option value="Cash">Cash</option><option value="UPI">UPI (GPay / PhonePe / Other Payment Bank)</option><option value="Bank Transfer">Bank Transfer / Cheque</option><option value="Cash + UPI (Both)">Cash + UPI / Bank Transfer / Cheque (Mixed)</option></select></div>
+                    <div class="form-group"><label>Payment Mode <span style="color:#f87171">*</span></label><select id="pm-mode" required><option value="Cash">Cash</option><option value="UPI">UPI</option><option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option><option value="Cheque / DD">Cheque / Demand Draft</option><option value="Mixed">Mixed Payment (multiple components)</option></select></div>
                     <div class="form-group"><label>Waiver / Adjustment (₹)</label><input type="number" id="pm-waiver" readonly style="background:rgba(255,255,255,.07);color:#fbbf24;font-weight:800;"></div>
                 </div>
                 <div id="pm-preview-note" style="margin:8px 0 12px;padding:10px;border-radius:9px;background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.2);font-size:.74rem;color:#cbd5e1;line-height:1.55;"></div>
@@ -2820,6 +2808,105 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         </div>
     </div>
 
+
+    <!-- PAYMENT MANAGEMENT: BANK MASTER, BANK-LINKED UPI, LEDGER & INTERNAL MOVEMENTS -->
+    <div class="modal-overlay" id="modal-payment-management">
+      <div class="modal-card mfpm-modal">
+        <div class="modal-title">
+          <span><i class="fa-solid fa-building-columns" style="color:#60a5fa"></i> Payment Management</span>
+          <i class="fa-solid fa-xmark" onclick="closeModal('modal-payment-management')" style="cursor:pointer;color:#94a3b8"></i>
+        </div>
+        <div class="mfpm-intro">One shared source register for HDFC, Axis, SBI and any additional bank. UPI IDs belong to a selected bank account; transactions keep their own source details. Payment-source details never recalculate loan amounts, EMI allocation, interest, penalty, settlement or foreclosure.</div>
+        <div class="mfpm-kpis" id="mfpm-kpis"></div>
+        <div class="mfpm-cash-settings"><div><b>Cash in Hand</b><small>Opening cash is a balance, not income. Cash deposits reduce cash in hand; cash withdrawals increase it.</small></div><label>Opening Balance (₹)<input id="mfpm-cash-opening" type="number" min="0" step="0.01" value="0"></label><button type="button" class="btn-header btn-blue" onclick="mfPMSaveCashOpening()">Save Cash Opening</button><div class="mfpm-cash-current">Calculated Cash Balance: <b id="mfpm-cash-balance">₹0.00</b></div></div>
+        <div class="mfpm-section">
+          <div class="mfpm-section-head"><div><b>1. Bank Account Master</b><small>Add each bank account once. Account numbers are masked in the list.</small></div><button class="btn-header btn-blue" type="button" onclick="mfPMOpenBankForm()"><i class="fa-solid fa-plus"></i> Add Bank</button></div>
+          <div id="mfpm-bank-list" class="mfpm-bank-list"></div>
+        </div>
+        <div class="mfpm-section">
+          <div class="mfpm-section-head"><div><b>2. Cash / Bank Movements</b><small>Cash deposit, cash withdrawal and inter-bank transfer are balance movements, not income or expense.</small></div><button class="btn-header btn-blue" type="button" onclick="mfPMOpenMovementForm()"><i class="fa-solid fa-right-left"></i> Record Movement</button></div>
+          <div id="mfpm-movement-list" class="mfpm-table-wrap"></div>
+        </div>
+        <div class="mfpm-section">
+          <div class="mfpm-section-head"><div><b>3. Bank Statement Reconciliation</b><small>Import a CSV/XLSX bank statement, then match it against source-tagged ledger entries. Matching never changes the underlying transaction or its financial allocation.</small></div><button class="btn-header btn-blue" type="button" onclick="mfPMAutoReconcile()"><i class="fa-solid fa-scale-balanced"></i> Auto Match</button></div>
+          <div class="mfpm-recon-controls"><label>Bank Account<select id="mfpm-statement-bank"></select></label><label>Statement File (.csv / .xlsx / .xls)<input id="mfpm-statement-file" type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"></label><button class="btn-header btn-blue" type="button" onclick="mfPMImportStatement()"><i class="fa-solid fa-file-import"></i> Import Statement</button></div>
+          <div id="mfpm-statement-status" class="mfpm-note">Choose a bank and import a statement. Supported columns are Date, Amount or Debit/Credit, Reference/UTR, and Description/Narration.</div>
+          <div id="mfpm-statement-lines" class="mfpm-table-wrap"></div>
+        </div>
+        <div class="mfpm-section">
+          <div class="mfpm-section-head"><div><b>4. Source-wise Transaction Ledger</b><small>Shows recorded business transactions that have source metadata plus internal movements. A missing source is flagged rather than guessed.</small></div><div class="mfpm-actions"><button class="btn-header btn-blue" type="button" onclick="mfPMExportExcel()"><i class="fa-solid fa-file-excel"></i> Export Excel</button><button class="btn-header btn-blue" type="button" onclick="mfPMPrintReport()"><i class="fa-solid fa-file-pdf"></i> Print / PDF</button><button class="btn-header btn-blue" type="button" onclick="mfPMRender()"><i class="fa-solid fa-rotate"></i> Refresh</button></div></div>
+          <div class="mfpm-filters">
+            <select id="mfpm-ledger-bank-filter" onchange="mfPMRenderLedger()"><option value="ALL">All Bank Accounts</option></select>
+            <select id="mfpm-ledger-direction-filter" onchange="mfPMRenderLedger()"><option value="ALL">Money In & Out</option><option value="IN">Money In</option><option value="OUT">Money Out</option><option value="TRANSFER">Internal Movement</option></select>
+            <input id="mfpm-ledger-search" placeholder="Search customer, reference, UTR or narration" oninput="mfPMRenderLedger()">
+          </div>
+          <div id="mfpm-ledger-summary"></div>
+          <div id="mfpm-ledger-table" class="mfpm-table-wrap"></div>
+        </div>
+        <div class="mfpm-note"><b>Important accounting distinction:</b> opening balance and cash/bank transfers affect source balances only. Loan disbursement, collection, settlement, penalties, expenses, payroll and borrowing repayments retain their own business classifications. An opening balance is not income, and an internal transfer is not revenue/expense.</div>
+        <div class="mfpm-section"><div class="mfpm-section-head"><div><b>5. Payment Management Audit Trail</b><small>Bank/UPI master changes and internal movement voids are logged with timestamp and device context.</small></div></div><div id="mfpm-audit-list" class="mfpm-table-wrap"></div></div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-mfpm-bank-form">
+      <div class="modal-card mfpm-small-modal">
+        <div class="modal-title"><span id="mfpm-bank-form-title">Add Bank Account</span><i class="fa-solid fa-xmark" onclick="closeModal('modal-mfpm-bank-form')" style="cursor:pointer;color:#94a3b8"></i></div>
+        <form id="mfpm-bank-form" onsubmit="mfPMSaveBank(event)">
+          <input type="hidden" id="mfpm-bank-id">
+          <div class="mfpm-form-grid">
+            <div><label>Bank Name *</label><input id="mfpm-bank-name" required placeholder="HDFC Bank"></div>
+            <div><label>Account Holder / Name *</label><input id="mfpm-bank-holder" required placeholder="Business Current Account"></div>
+            <div><label>Branch *</label><input id="mfpm-bank-branch" required placeholder="Branch name / city"></div>
+            <div><label>IFSC Code *</label><input id="mfpm-bank-ifsc" required maxlength="11" placeholder="HDFC0000000" autocapitalize="characters"></div>
+            <div><label>Account Number *</label><input id="mfpm-bank-number" required inputmode="numeric" autocomplete="off" placeholder="Bank account number"></div>
+            <div><label>Registered Mobile</label><input id="mfpm-bank-mobile" inputmode="tel" maxlength="15" placeholder="Bank registered mobile"></div>
+            <div><label>Account Type *</label><select id="mfpm-bank-type" required><option value="Current">Current</option><option value="Savings">Savings</option><option value="Cash Credit / OD">Cash Credit / OD</option><option value="Other">Other</option></select></div>
+            <div><label>Opening Balance (₹, optional)</label><input id="mfpm-bank-opening" type="number" min="0" step="0.01" value="0"></div>
+            <div class="mfpm-full"><label>Notes (optional)</label><input id="mfpm-bank-notes" placeholder="Optional internal note"></div>
+          </div>
+          <div class="mfpm-form-foot"><button type="button" class="btn-header" onclick="closeModal('modal-mfpm-bank-form')">Cancel</button><button type="submit" class="btn-header btn-blue"><i class="fa-solid fa-floppy-disk"></i> Save Bank</button></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-mfpm-upi">
+      <div class="modal-card mfpm-small-modal">
+        <div class="modal-title"><span id="mfpm-upi-title">Manage Bank-linked UPI IDs</span><i class="fa-solid fa-xmark" onclick="closeModal('modal-mfpm-upi')" style="cursor:pointer;color:#94a3b8"></i></div>
+        <div id="mfpm-upi-bank-summary" class="mfpm-note"></div>
+        <form id="mfpm-upi-form" onsubmit="mfPMSaveUpi(event)">
+          <input type="hidden" id="mfpm-upi-bank-id"><input type="hidden" id="mfpm-upi-id">
+          <div class="mfpm-form-grid">
+            <div><label>UPI App *</label><select id="mfpm-upi-app" required><option value="PhonePe">PhonePe</option><option value="Google Pay">Google Pay</option><option value="Paytm">Paytm</option><option value="BHIM">BHIM</option><option value="Other">Other (enter app name)</option></select></div>
+            <div id="mfpm-upi-custom-wrap" style="display:none"><label>Other App Name *</label><input id="mfpm-upi-custom" placeholder="Enter UPI app name"></div>
+            <div class="mfpm-full"><label>UPI ID *</label><input id="mfpm-upi-vpa" required placeholder="business@upi" autocapitalize="none" autocomplete="off"></div>
+            <div><label>Registered Mobile (optional)</label><input id="mfpm-upi-mobile" inputmode="tel" placeholder="UPI registered mobile"></div>
+            <div><label>Status</label><select id="mfpm-upi-active"><option value="true">Active</option><option value="false">Inactive</option></select></div>
+          </div>
+          <div class="mfpm-form-foot"><button type="button" class="btn-header" onclick="closeModal('modal-mfpm-upi')">Close</button><button type="submit" class="btn-header btn-blue">Save UPI ID</button></div>
+        </form>
+        <div id="mfpm-upi-list" class="mfpm-upi-list"></div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-mfpm-movement">
+      <div class="modal-card mfpm-small-modal">
+        <div class="modal-title"><span>Record Cash / Bank Movement</span><i class="fa-solid fa-xmark" onclick="closeModal('modal-mfpm-movement')" style="cursor:pointer;color:#94a3b8"></i></div>
+        <form id="mfpm-movement-form" onsubmit="mfPMSaveMovement(event)">
+          <div class="mfpm-form-grid">
+            <div class="mfpm-full"><label>Movement Type *</label><select id="mfpm-movement-type" required onchange="mfPMUpdateMovementFields()"><option value="CASH_DEPOSIT">Cash deposited into bank</option><option value="CASH_WITHDRAWAL">Cash withdrawn from bank</option><option value="BANK_TRANSFER">Transfer between own bank accounts</option></select></div>
+            <div><label>Date *</label><input id="mfpm-movement-date" type="date" required></div>
+            <div><label>Amount (₹) *</label><input id="mfpm-movement-amount" type="number" min="0.01" step="0.01" required></div>
+            <div id="mfpm-movement-bank-wrap"><label>Bank Account *</label><select id="mfpm-movement-bank" required></select></div>
+            <div id="mfpm-movement-to-wrap" style="display:none"><label>Destination Bank Account *</label><select id="mfpm-movement-to" required></select></div>
+            <div><label>Reference / Deposit Slip / UTR</label><input id="mfpm-movement-ref" placeholder="Optional reference"></div>
+            <div class="mfpm-full"><label>Narration</label><input id="mfpm-movement-note" placeholder="e.g. Cash deposit to HDFC"></div>
+          </div>
+          <div class="mfpm-note">This records an internal movement only. It does not create revenue, expense, EMI collection or loan disbursement.</div>
+          <div class="mfpm-form-foot"><button type="button" class="btn-header" onclick="closeModal('modal-mfpm-movement')">Cancel</button><button type="submit" class="btn-header btn-blue">Save Movement</button></div>
+        </form>
+      </div>
+    </div>
+
     <!-- ADVANCED MAINTENANCE: LOAN AUDIT -->
     <div class="modal-overlay" id="modal-loan-audit">
         <div class="modal-card" style="max-width:1080px;width:96%;">
@@ -3040,6 +3127,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             borrowings: [],
             staff: [],
             expenses: [],
+            // Payment Management master data and internal cash/bank movements.
+            paymentAccounts: [],
+            paymentTransfers: [],
+            paymentAuditLog: [],
+            paymentStatementLines: [],
+            paymentCashOpeningBalance: 0,
             customCategories: [],
             // Phase B operational records. These are non-financial recovery records;
             // they never replace or mutate the canonical loan/payment calculations.
@@ -4128,7 +4221,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function mfV2LastHash(){return String(localStorage.getItem('MF_V2_FINAL_CLEAN_LAST_HASH')||'');}
         function mfV2SetHash(h){try{localStorage.setItem('MF_V2_FINAL_CLEAN_LAST_HASH',String(h||''));}catch(e){}}
         function mfV2Error(e,action){const m=String(e?.message||e||'').replace(/^FirebaseError:\s*/,'');return '⚠️ '+action+' failed: '+m;}
-        function mfV2HasBusinessData(){return !!((state.loans||[]).length||(state.borrowings||[]).length||(state.products&&Object.keys(state.products).length)||(state.staff||[]).length||(state.expenses||[]).length);}
+        function mfV2HasBusinessData(){return !!((state.loans||[]).length||(state.borrowings||[]).length||(state.products&&Object.keys(state.products).length)||(state.staff||[]).length||(state.expenses||[]).length||(state.paymentAccounts||[]).length||(state.paymentTransfers||[]).length||(state.paymentStatementLines||[]).length||(Number(state.paymentCashOpeningBalance)||0));}
         function mfV2BaselineReady(){return localStorage.getItem('MF_V2_FINAL_CLEAN_BASELINE_READY')==='1';}
         function mfV2ArmBaseline(){try{localStorage.setItem('MF_V2_FINAL_CLEAN_BASELINE_READY','1');}catch(e){}}
         // STATUS-FIX: restore the secure Firebase status helper used by V2 UI paths.
@@ -5946,7 +6039,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById('ps-amount').value=p.amount||0;
             const monthList=['January','February','March','April','May','June','July','August','September','October','November','December']; populateSalaryMonthOptions(p.salaryMonth ? monthList.indexOf(p.salaryMonth)+1 : '', p.salaryYear || p.year || '');
             setDmyValues('ps',p.date||new Date().toISOString().split('T')[0]);
-            document.getElementById('ps-mode').value=p.mode||'Bank Transfer';
+            document.getElementById('ps-mode').value=p.mode||'Bank Transfer'; if(window.mfPMSetInlineMeta)mfPMSetInlineMeta('ps-mode',p.paymentMeta||null);
             document.querySelector('#modal-pay-salary .modal-title span').innerText='Edit Staff Salary Payment';
             document.querySelector('#form-pay-salary button[type="submit"]').innerText='✓ Update Salary Payment';
             closeModal('modal-staff-detail');
@@ -5968,7 +6061,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById('ps-amount').value=s.salary;
             populateSalaryMonthOptions();
             setDmyValues('ps',new Date().toISOString().split('T')[0]);
-            document.getElementById('ps-mode').value='Bank Transfer';
+            document.getElementById('ps-mode').value='Bank Transfer'; if(window.mfPMResetInline)mfPMResetInline('ps-mode');
             document.querySelector('#modal-pay-salary .modal-title span').innerText='Record Staff Salary Payment';
             document.querySelector('#form-pay-salary button[type="submit"]').innerText='✓ Record Salary Paid';
             document.getElementById('modal-pay-salary').classList.add('active');
@@ -5979,9 +6072,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const staffId=document.getElementById('ps-staff-id').value, editIndex=Number(document.getElementById('ps-payment-index').value);
             const amt=parseFloat(document.getElementById('ps-amount').value), salaryMonthNum=Number(document.getElementById('ps-salary-month').value), salaryYear=Number(document.getElementById('ps-salary-year').value);
             const date=getDmyIsoString('ps'), mode=document.getElementById('ps-mode').value;
+            const sourceResult=mfPMReadInlineMeta('ps-mode',amt,mode,'OUT'); if(!sourceResult.ok)return;
             const monthsList=['January','February','March','April','May','June','July','August','September','October','November','December'], salaryMonth=monthsList[salaryMonthNum-1];
             const s=state.staff.find(x=>x.id===staffId); if(!s) return; if(!Array.isArray(s.salaryPayments)) s.salaryPayments=[];
-            const rec={amount:amt,salaryMonth,salaryYear,month:salaryMonth+' '+salaryYear,year:salaryYear,date,mode};
+            const rec={amount:amt,salaryMonth,salaryYear,month:salaryMonth+' '+salaryYear,year:salaryYear,date,mode,paymentMeta:sourceResult.meta};
             if(editIndex>=0 && s.salaryPayments[editIndex]) { s.salaryPayments[editIndex]=rec; alert(`Salary payment updated for ${s.name} — ${salaryMonth} ${salaryYear}.`); }
             else { s.salaryPayments.push(rec); alert(`Salary of ₹${amt.toLocaleString('en-IN')} paid to ${s.name} for ${salaryMonth} ${salaryYear}!`); }
             closeModal('modal-pay-salary'); persist();
@@ -5992,7 +6086,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById('ex-mode-action').value='ADD'; document.getElementById('ex-edit-index').value='-1';
             document.getElementById('ex-amount').value=''; document.getElementById('ex-desc').value='';
             populateExpensePeriodOptions(); setDmyValues('ex',new Date().toISOString().split('T')[0]);
-            document.getElementById('ex-mode').value='Cash';
+            document.getElementById('ex-mode').value='Cash'; if(window.mfPMResetInline)mfPMResetInline('ex-mode');
             document.querySelector('#modal-expense .modal-title span').innerText='Record Business Expense';
             document.getElementById('btn-save-expense').innerText='✓ Save Expense';
             document.getElementById('modal-expense').classList.add('active');
@@ -6002,7 +6096,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const e=state.expenses[index]; if(!e) return;
             updateCategoryDropdown();
             document.getElementById('ex-mode-action').value='EDIT'; document.getElementById('ex-edit-index').value=index;
-            document.getElementById('ex-category').value=e.category; document.getElementById('ex-amount').value=e.amount||0; document.getElementById('ex-desc').value=e.desc||''; document.getElementById('ex-mode').value=e.mode||'Cash';
+            document.getElementById('ex-category').value=e.category; document.getElementById('ex-amount').value=e.amount||0; document.getElementById('ex-desc').value=e.desc||''; document.getElementById('ex-mode').value=e.mode||'Cash'; if(window.mfPMSetInlineMeta)mfPMSetInlineMeta('ex-mode',e.paymentMeta||null);
             populateExpensePeriodOptions(e.expenseMonth || (e.date ? new Date(e.date).getMonth()+1 : ''), e.expenseYear || (e.date ? new Date(e.date).getFullYear() : ''));
             setDmyValues('ex',e.date||new Date().toISOString().split('T')[0]);
             document.querySelector('#modal-expense .modal-title span').innerText='Edit Business Expense';
@@ -6013,8 +6107,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function handleExpenseSubmit(e) {
             e.preventDefault();
             const cat=document.getElementById('ex-category').value, amt=parseFloat(document.getElementById('ex-amount').value), mode=document.getElementById('ex-mode').value, desc=document.getElementById('ex-desc').value, date=getDmyIsoString('ex');
+            const sourceResult=mfPMReadInlineMeta('ex-mode',amt,mode,'OUT'); if(!sourceResult.ok)return;
             const expenseMonth=Number(document.getElementById('ex-month-period').value), expenseYear=Number(document.getElementById('ex-year-period').value), monthsList=['January','February','March','April','May','June','July','August','September','October','November','December'];
-            const rec={category:cat,amount:amt,mode,desc,date,expenseMonth,expenseYear,month:monthsList[expenseMonth-1],year:expenseYear};
+            const rec={category:cat,amount:amt,mode,paymentMeta:sourceResult.meta,desc,date,expenseMonth,expenseYear,month:monthsList[expenseMonth-1],year:expenseYear};
             const action=document.getElementById('ex-mode-action').value, idx=Number(document.getElementById('ex-edit-index').value);
             if(action==='EDIT' && state.expenses[idx]) { rec.id=state.expenses[idx].id; state.expenses[idx]=rec; }
             else { rec.id='EXP-'+(100+state.expenses.length+1); state.expenses.push(rec); }
@@ -6330,7 +6425,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     <div><small>Penalty Due</small><b>₹${previousPenalty.toLocaleString('en-IN')}</b></div>
                     <div class="mf-loan-book-total"><small>Collect Now</small><strong>₹${collectNow.toLocaleString('en-IN')}</strong></div>
                 </div>
-                <div class="mf-loan-book-meta">Disbursed ${formatToIndianDate(l.disbursalDate)} · Maturity ${formatToIndianDate(mfLoanScheduleDueIso(l,Number(p.tenure)||0))} · Mode ${financeEsc(mfDisbursalModeLabel(l.disbursalMode))}</div>
+                <div class="mf-loan-book-meta">Disbursed ${formatToIndianDate(l.disbursalDate)} · Maturity ${formatToIndianDate(mfLoanScheduleDueIso(l,Number(p.tenure)||0))} · Mode ${financeEsc(mfDisbursalModeLabel(l.disbursalMode,l.disbursalPaymentMeta))}</div>
                 <div class="collection-client-actions"><button class="btn-edit-sm" onclick="openLoanFromProduct('${l.id}')">Statement</button>${current.length||previous.length?`<button class="btn-collect-sm" onclick="openCollectModal('${l.id}')">Collect EMI</button>`:''}</div>
             </div>`;
         }
@@ -6367,7 +6462,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const oldest=snap.earlierItems[0];
             const previousLabel=snap.earlierItems.length ? `${snap.earlierItems.length} EMI${snap.earlierItems.length>1?'s':''} · ₹${snap.earlierBalance.toLocaleString('en-IN')} · ${formatToIndianDate(snap.earlierItems[0].dueDate)} → ${formatToIndianDate(snap.earlierItems[snap.earlierItems.length-1].dueDate)}` : 'None';
             return `<article class="collection-client-sheet compact-recovery-row ${a?'has-pending':''}">
-                <div class="collection-client-head"><div class="collection-client-identity"><div class="collection-client-name">${financeEsc(l.name)}</div><div class="collection-client-meta">${financeEsc(l.id)} · ${financeEsc(p.name||l.product)} · ${financeEsc(loanCollectorName(l))} · <span title="Customer contacts">C: ${financeEsc(mfContactText(l.phone,l.phone2))}</span>${mfGuarantorContactText(l)?` · <span title="Guarantor contacts">G: ${financeEsc(mfGuarantorContactText(l))}</span>`:''}</div><div class="collection-client-dates">Disbursed ${formatToIndianDate(l.disbursalDate)} · Maturity ${formatToIndianDate(mfLoanScheduleDueIso(l,Number(p.tenure)||0))} · Mode ${financeEsc(mfDisbursalModeLabel(l.disbursalMode))}</div></div><span class="collection-status ${a?'attention':'ready'}">${a?'PREVIOUS DUES':'CURRENT COLLECTION'}</span></div>
+                <div class="collection-client-head"><div class="collection-client-identity"><div class="collection-client-name">${financeEsc(l.name)}</div><div class="collection-client-meta">${financeEsc(l.id)} · ${financeEsc(p.name||l.product)} · ${financeEsc(loanCollectorName(l))} · <span title="Customer contacts">C: ${financeEsc(mfContactText(l.phone,l.phone2))}</span>${mfGuarantorContactText(l)?` · <span title="Guarantor contacts">G: ${financeEsc(mfGuarantorContactText(l))}</span>`:''}</div><div class="collection-client-dates">Disbursed ${formatToIndianDate(l.disbursalDate)} · Maturity ${formatToIndianDate(mfLoanScheduleDueIso(l,Number(p.tenure)||0))} · Mode ${financeEsc(mfDisbursalModeLabel(l.disbursalMode,l.disbursalPaymentMeta))}</div></div><span class="collection-status ${a?'attention':'ready'}">${a?'PREVIOUS DUES':'CURRENT COLLECTION'}</span></div>
                 <div class="collection-recovery-line"><div><small>Current / Selected Range</small><b>${currentLabel}</b></div><div><small>Previous Pending</small><b>${previousLabel}</b></div><div><small>Penalty Due</small><b>₹${snap.earlierPenalty.toLocaleString('en-IN')}</b></div><div class="collection-recovery-total"><small>Collect Now</small><strong>₹${snap.combinedTotal.toLocaleString('en-IN')}</strong></div></div>
                 <div class="collection-recovery-note">${a?`<b>Clear previous dues first:</b> ${snap.earlierItems.length} unpaid EMI${snap.earlierItems.length>1?'s':''} before the selected range${snap.earlierPenalty>0?` · penalty due ₹${snap.earlierPenalty.toLocaleString('en-IN')}`:''}.`:'Ready for current collection in the selected range.'}</div>
                 <div class="collection-client-actions"><button class="btn-edit-sm" onclick="openLoanFromProduct('${l.id}')">Statement</button>${currentUnpaid.length?`<button class="btn-collect-sm" onclick="openCollectModal('${l.id}')">Collect EMI</button>`:''}</div>
@@ -6583,7 +6678,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                       prevBalance=prev.reduce((s,x)=>s+x.balance,0), prevPenalty=prev.reduce((s,x)=>s+x.penaltyDue,0),
                       rangeTotal=group.reduce((s,r)=>s+(Number(r.totalDue??r.emi)||0),0);
                 group.forEach(r=>data.push([
-                    l.name,mfLoanTypeLabel(l),l.id,loanCollectorName(l),l.phone||'',l.phone2||'',l.guarantorPhone||'',(l.guarantorPhone2||l.guarantorSecondaryPhone||''),mfDisbursalModeLabel(l.disbursalMode),p.name||l.product,
+                    l.name,mfLoanTypeLabel(l),l.id,loanCollectorName(l),l.phone||'',l.phone2||'',l.guarantorPhone||'',(l.guarantorPhone2||l.guarantorSecondaryPhone||''),mfDisbursalModeLabel(l.disbursalMode,l.disbursalPaymentMeta),p.name||l.product,
                     l.disbursalDate,mfLoanScheduleDueIso(l,Number(p.tenure)||0),r.no,r.dueDate,Number(r.totalDue??r.emi)||0,
                     r.upcomingStatus,r.overdueDays,prev.map(x=>`#${x.no}`).join(', '),prevBalance,prevPenalty,prevBalance+prevPenalty,
                     rangeTotal,prevBalance+prevPenalty+rangeTotal
@@ -6834,7 +6929,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById('pm-customer-summary').innerHTML=`<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;"><div><b style="color:#fff;font-size:1rem;">${financeEsc(loan.name)}</b><div style="font-size:.7rem;color:#94a3b8;margin-top:2px;">${financeEsc(loan.id)} · ${financeEsc(loan.phone||'-')} · ${financeEsc(p.name||'-')}</div></div><div style="text-align:right;"><span style="font-size:.68rem;color:#94a3b8;">Contractual Pending</span><br><b style="color:#f87171;font-size:1.05rem;">₹${getLoanPending(loan).toLocaleString('en-IN')}</b></div></div>`;
             setDmyValues('pm-s',loan.postMaturitySettlement?.settlementDate||today);
             document.getElementById('pm-actual-amount').value=loan.postMaturitySettlement?._rawActualReceived ?? (loan.postMaturitySettlement?.actualReceived??'');
-            document.getElementById('pm-mode').value=loan.postMaturitySettlement?.mode||'Cash';
+            document.getElementById('pm-mode').value=loan.postMaturitySettlement?.mode||'Cash'; if(window.mfPMSetInlineMeta)mfPMSetInlineMeta('pm-mode',loan.postMaturitySettlement?.paymentMeta||null);
             updatePostMaturitySettlementPreview();
             document.getElementById('modal-post-maturity-settlement').classList.add('active');
         }
@@ -6855,6 +6950,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             e.preventDefault(); const id=document.getElementById('pm-loan-id').value; const loan=state.loans.find(l=>l.id===id); if(!loan)return;
             let settleDate=''; try{settleDate=getDmyIsoString('pm-s');}catch(err){}
             const actual=Number(document.getElementById('pm-actual-amount').value)||0; const mode=document.getElementById('pm-mode').value;
+            const sourceResult=mfPMReadInlineMeta('pm-mode',actual,mode,'IN'); if(!sourceResult.ok)return;
             if(!settleDate){alert('Please select the actual settlement date.');return;}
             const c=getPostMaturitySettlementCalc(loan,settleDate);
             if(c.overdueDays<=0){alert(`Settlement date must be after the contractual maturity date (${formatToIndianDate(c.maturityIso)}).`);return;}
@@ -6865,7 +6961,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 : getLoanPartialSum(loan);
             const totalContractualInterest=Math.max(0,(Number(state.products[loan.product]?.interest)||0)*(Number(state.products[loan.product]?.tenure)||0))+mfLoanPreEmiDue(loan);
             const alloc=mfSettlementAllocation(loan,actual,c);
-            loan.postMaturitySettlement={settlementDate:settleDate,maturityDate:c.maturityIso,_rawActualReceived:String(document.getElementById('pm-actual-amount').value||actual),overdueDays:c.overdueDays,recoveryMonths:c.recoveryMonths,recoveryRate:c.rate,contractualPending:c.contractualPending,recoveryInterest:c.recoveryInterest,recoveryInterestReceived:alloc.recoveryInterestReceived,contractualInterestReceived:alloc.contractualInterestReceived,principalReceived:alloc.principalReceived,preEmiInterestReceived:alloc.preEmiReceived,calculatedSettlement:c.calculatedSettlement,actualReceived:actual,waiverAmount:waiver,mode,partialAmountAlreadyCollected,recordedAt:new Date().toISOString(),workingNote:{pendingEmis:c.pendingEmis,emi:c.emi,pendingPrincipal:c.pendingPrincipal,pendingInterest:c.pendingInterest,totalContractualInterest,totalScheduledPending:c.scheduledPending}};
+            loan.postMaturitySettlement={settlementDate:settleDate,maturityDate:c.maturityIso,_rawActualReceived:String(document.getElementById('pm-actual-amount').value||actual),overdueDays:c.overdueDays,recoveryMonths:c.recoveryMonths,recoveryRate:c.rate,contractualPending:c.contractualPending,recoveryInterest:c.recoveryInterest,recoveryInterestReceived:alloc.recoveryInterestReceived,contractualInterestReceived:alloc.contractualInterestReceived,principalReceived:alloc.principalReceived,preEmiInterestReceived:alloc.preEmiReceived,calculatedSettlement:c.calculatedSettlement,actualReceived:actual,waiverAmount:waiver,mode,paymentMeta:sourceResult.meta,partialAmountAlreadyCollected,recordedAt:new Date().toISOString(),workingNote:{pendingEmis:c.pendingEmis,emi:c.emi,pendingPrincipal:c.pendingPrincipal,pendingInterest:c.pendingInterest,totalContractualInterest,totalScheduledPending:c.scheduledPending}};
             loan.pendingParts=[]; loan.status='SETTLED'; loan.closedBy='POST_MATURITY_SETTLEMENT';
             closeModal('modal-post-maturity-settlement'); persist(); alert(`Loan ${loan.id} (${loan.name}) settled after maturity. Received ₹${actual.toLocaleString('en-IN')}; waiver ₹${waiver.toLocaleString('en-IN')}.`);
         }
@@ -7073,6 +7169,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function openAddBorrowingModal() {
             document.getElementById("b-mode").value = "ADD";
             document.getElementById("modal-borrowing-heading").innerText = "Add Borrowed Capital Loan";
+            const receiveMode=document.getElementById('b-received-mode');if(receiveMode)receiveMode.value='Bank Transfer';if(window.mfPMResetInline)mfPMResetInline('b-received-mode');
             document.getElementById("b-lender-name").value = "";
             document.getElementById("b-amount").value = "";
             document.getElementById("b-rate").value = "12";
@@ -7102,6 +7199,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("b-mode").value = "EDIT";
             document.getElementById("b-id").value = b.id;
             document.getElementById("modal-borrowing-heading").innerText = `Edit Borrowing (${b.id})`;
+            const receiveMode=document.getElementById('b-received-mode');if(receiveMode)receiveMode.value=b.receivedMode||'Bank Transfer';if(window.mfPMSetInlineMeta)mfPMSetInlineMeta('b-received-mode',b.receivedPaymentMeta||null);
             document.getElementById("b-lender-name").value = b.lenderName;
             document.getElementById("b-category").value = b.category;
             document.getElementById("b-amount").value = b.amount;
@@ -7274,6 +7372,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const applyGst = document.getElementById("b-apply-gst").checked;
             const interestGstPct = Math.max(0, parseFloat(document.getElementById("b-interest-gst-pct")?.value) || 18);
             const date = getDmyIsoString("b");
+            const receivedMode=$('b-received-mode')?.value||'Bank Transfer';
+            const netBorrowingReceived=Math.max(0,amount-processingFee-processingGst-otherCharges-otherGst);
+            const receivedSourceResult=mode==='ADD'?mfPMReadInlineMeta('b-received-mode',netBorrowingReceived,receivedMode,'IN'):{ok:true,meta:null};
+            if(!receivedSourceResult.ok)return;
 
             if (!Number.isFinite(tenure) || tenure < 1) {
                 alert("Please enter a valid loan tenure in months.");
@@ -7287,6 +7389,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     lenderName: lenderName,
                     category: category,
                     amount: amount,
+                    receivedMode: receivedMode,
+                    receivedPaymentMeta: receivedSourceResult.meta,
                     rate: rate,
                     tenure: tenure,
                     interestBasis: interestBasis,
@@ -7629,7 +7733,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const gstWrap=document.getElementById('lp-gst-field-wrap'); if(gstWrap) gstWrap.style.display=b.applyGst?'':'none';
                 const pct=document.getElementById('lp-gst-pct'); if(pct)pct.value=b.applyGst?18:0;
                 const total=document.getElementById('lp-total-paid'); if(total){total.dataset.userEdited='';total.value='';}
-                const mode=document.getElementById('lp-mode'); if(mode)mode.value='Bank Transfer';
+                const mode=document.getElementById('lp-mode'); if(mode)mode.value='Bank Transfer'; if(window.mfPMResetInline)mfPMResetInline('lp-mode');
                 if(typeof initDmySelectors==='function')initDmySelectors('lp');
                 const now=new Date(); const actual=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`; if(typeof setDmyValues==='function')setDmyValues('lp',actual);
                 const em=document.getElementById('lp-emi-month');if(em)em.value=String(next.dueDate).slice(5,7);const ey=document.getElementById('lp-emi-year');if(ey)ey.value=String(next.dueDate).slice(0,4);
@@ -7650,7 +7754,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             set('lp-rate-disp',(b.rate||0)+'% p.a. · '+(b.interestBasis||'Reducing Balance'),'innerText');
             const paidP=(b.repayments||[]).reduce((sum,x,i)=>i===Number(index)?sum:sum+(Number(x.principal)||0),0);set('lp-rem-disp',mfMoney(Math.max(0,Number(b.amount||0)-paidP)),'innerText');
             set('lp-gst-disp',b.applyGst?`Yes (${Number(b.interestGstPct||18).toLocaleString('en-IN',{maximumFractionDigits:4})}% on Int)`:'No','innerText');set('lp-emi-no',scheduled.no,'innerText');set('lp-due-date',formatToIndianDate(scheduled.dueDate),'innerText');
-            set('lp-gst',String(r._rawGst ?? (Number(r.gst)||0)));set('lp-gst-pct',String(r._rawGstPct ?? (b.applyGst?Number(b.interestGstPct||18):0)));set('lp-mode',r.mode||'Bank Transfer');
+            set('lp-gst',String(r._rawGst ?? (Number(r.gst)||0)));set('lp-gst-pct',String(r._rawGstPct ?? (b.applyGst?Number(b.interestGstPct||18):0)));set('lp-mode',r.mode||'Bank Transfer');if(window.mfPMSetInlineMeta)mfPMSetInlineMeta('lp-mode',r.paymentMeta||null);
             // totalPaid is a legacy/redundant cache. The authoritative lender repayment total is always
             // Principal + Interest + GST. Do not surface a stale cached total during Edit.
             const editTotalText=mfDecAdd(mfDecAdd(String(r._rawPrincipal ?? (Number(r.principal)||0)),String(r._rawInterest ?? (Number(r.interest)||0))),String(r._rawGst ?? (Number(r.gst)||0)));
@@ -7709,11 +7813,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const editIndex=Number(document.getElementById('lp-edit-index')?.value||-1);
             const actualPaidDate=getDmyIsoString('lp');
             const mode=document.getElementById('lp-mode')?.value||'Bank Transfer / UPI';
+            const lenderTotal=Number(document.getElementById('lp-total-paid')?.value)||0;
+            const sourceResult=mfPMReadInlineMeta('lp-mode',lenderTotal,mode,'OUT'); if(!sourceResult.ok)return;
             const p=Number(document.getElementById('lp-principal')?.value)||0;
             const i=Number(document.getElementById('lp-interest')?.value)||0;
             const g=Number(document.getElementById('lp-gst')?.value)||0;
             if(p<=0 && i<=0){ alert('Please enter the Principal and/or Interest amount actually paid for this installment.'); return; }
-            const record={date:actualPaidDate,dueDate:scheduled.dueDate,emiNo:emiNo,emiMonth:String(scheduled.dueDate).slice(5,7),emiYear:Number(String(scheduled.dueDate).slice(0,4)),principal:p,interest:i,gst:g,totalPaid:Number(document.getElementById('lp-total-paid')?.value)||mfSafeNumber(mfDecAdd(mfDecAdd(String(p),String(i)),String(g))),mode:mode,
+            const record={date:actualPaidDate,dueDate:scheduled.dueDate,emiNo:emiNo,emiMonth:String(scheduled.dueDate).slice(5,7),emiYear:Number(String(scheduled.dueDate).slice(0,4)),principal:p,interest:i,gst:g,totalPaid:Number(document.getElementById('lp-total-paid')?.value)||mfSafeNumber(mfDecAdd(mfDecAdd(String(p),String(i)),String(g))),mode:mode,paymentMeta:sourceResult.meta,
                 _rawPrincipal:mfExactText('lp-principal',String(p)),_rawInterest:mfExactText('lp-interest',String(i)),_rawGst:mfExactText('lp-gst',String(g)),_rawGstPct:mfExactText('lp-gst-pct',String(b.applyGst?b.interestGstPct||18:0)),_rawTotalPaid:mfExactText('lp-total-paid',mfDecAdd(mfDecAdd(String(p),String(i)),String(g)))};
             if(editIndex>=0){
                 if(!b.repayments[editIndex])return;
@@ -7755,7 +7861,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("fc-guarantor-name").value = "";
             document.getElementById("fc-guarantor-phone").value = "";
             document.getElementById("fc-guarantor-phone2").value = "";
-            document.getElementById("fc-disbursal-mode").value = "Cash";
+            document.getElementById("fc-disbursal-mode").value = "Cash"; if(window.mfPMResetInline)mfPMResetInline('fc-disbursal-mode');
             document.getElementById("fc-collector").value = "";
             document.getElementById("fc-address").value = "";
             const today=new Date().toISOString().split('T')[0];
@@ -7783,7 +7889,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("fc-guarantor-name").value = loan.guarantorName || "";
             document.getElementById("fc-guarantor-phone").value = loan.guarantorPhone || "";
             document.getElementById("fc-guarantor-phone2").value = loan.guarantorPhone2 || loan.guarantorSecondaryPhone || "";
-            document.getElementById("fc-disbursal-mode").value = loan.disbursalMode || "Cash";
+            document.getElementById("fc-disbursal-mode").value = loan.disbursalMode || "Cash"; if(window.mfPMSetInlineMeta)mfPMSetInlineMeta('fc-disbursal-mode',loan.disbursalPaymentMeta||null);
             populateLoanCollectorSelect();
             document.getElementById("fc-collector").value = loan.collectorId || "";
             document.getElementById("fc-address").value = loan.address || "";
@@ -7889,12 +7995,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const g=mfGuarantorContactText(loan);
             return `Customer: ${c}${g ? ` · Guarantor: ${g}` : ''}`;
         }
-        function mfDisbursalModeLabel(mode) {
+        function mfDisbursalModeLabel(mode, paymentMeta=null) {
             const m=String(mode||'').trim();
-            if(m==='UPI') return 'UPI (GPay / PhonePe / Other Payment Bank)';
-            if(m==='Bank Transfer') return 'Bank Transfer / Cheque';
-            if(m==='Cash + UPI (Both)') return 'Mixed (Cash + UPI / Bank Transfer / Cheque)';
-            return m || 'Cash';
+            let label=m==='UPI'?'UPI':m==='Bank Transfer'?'Bank Transfer (NEFT / RTGS / IMPS)':m==='Cash + UPI (Both)'?'Mixed Payment':(m||'Cash');
+            const source=paymentMeta&&window.mfPMSourceLabel?window.mfPMSourceLabel(paymentMeta):'';
+            return source ? `${label} · ${source}` : label;
         }
 
         function handleClientSubmit(e) {
@@ -7914,6 +8019,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const date = getDmyIsoString("fc");
             const product = state.products[prod];
             if(!product){ alert("Please select a valid loan product."); return; }
+            const disbursalSourceResult=mfPMReadInlineMeta('fc-disbursal-mode',Math.max(0,(Number(product.amount)||0)-(Number(product.fileCharge)||0)),disbursalMode,'OUT');
+            if(!disbursalSourceResult.ok)return;
             let firstDueDate=getClientFixedDateIso() || mfDefaultFirstDueIso({product:prod,disbursalDate:date});
             let preEmiInterest=0, preEmiDays=0;
             if(!firstDueDate || firstDueDate < date){ alert("The first EMI date cannot be before the disbursal date."); return; }
@@ -7928,11 +8035,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const customerKey=sourceLoan?.customerKey || mfFindCustomerKey(name,phone);
                 const mainLoanId=sourceLoan ? mfResolveMainLoanId(sourceLoan) : '';
                 const historyCount=(state.loans||[]).filter(x=>String(x.customerKey||'')===String(customerKey)).length;
-                state.loans.push({id:newId,name,phone,phone2,guarantorName,guarantorPhone,guarantorPhone2,collectorId,collectorName:collector?collector.name:"",address,product:prod,disbursalDate:date,disbursalMode,payments:[],foreclosed:false,foreclosureData:null,firstDueDate:firstDueDate||null,fixedDueDate:firstDueDate||null,preEmiDays,preEmiInterest,preEmiInterestReceived:0,preEmiDate:null,loanType,sourceLoanId:mainLoanId,rootLoanId:mainLoanId||newId,customerKey,customerSequence:historyCount+1});
+                state.loans.push({id:newId,name,phone,phone2,guarantorName,guarantorPhone,guarantorPhone2,collectorId,collectorName:collector?collector.name:"",address,product:prod,disbursalDate:date,disbursalMode,disbursalPaymentMeta:disbursalSourceResult.meta,payments:[],foreclosed:false,foreclosureData:null,firstDueDate:firstDueDate||null,fixedDueDate:firstDueDate||null,preEmiDays,preEmiInterest,preEmiInterestReceived:0,preEmiDate:null,loanType,sourceLoanId:mainLoanId,rootLoanId:mainLoanId||newId,customerKey,customerSequence:historyCount+1});
             } else {
                 const id = document.getElementById("fc-id").value;
                 const loan = state.loans.find(l => l.id === id); if(!loan)return;
-                loan.name=name; loan.phone=phone; loan.phone2=phone2; loan.guarantorName=guarantorName; loan.guarantorPhone=guarantorPhone; loan.guarantorPhone2=guarantorPhone2; loan.collectorId=collectorId; loan.collectorName=collector?collector.name:""; loan.address=address; loan.product=prod; loan.disbursalDate=date; loan.disbursalMode=disbursalMode;
+                loan.name=name; loan.phone=phone; loan.phone2=phone2; loan.guarantorName=guarantorName; loan.guarantorPhone=guarantorPhone; loan.guarantorPhone2=guarantorPhone2; loan.collectorId=collectorId; loan.collectorName=collector?collector.name:""; loan.address=address; loan.product=prod; loan.disbursalDate=date; loan.disbursalMode=disbursalMode; loan.disbursalPaymentMeta=disbursalSourceResult.meta;
                 loan.firstDueDate=firstDueDate||null; loan.fixedDueDate=firstDueDate||null; loan.preEmiDays=preEmiDays; loan.preEmiInterest=preEmiInterest; loan.preEmiInterestReceived=0; loan.preEmiDate=null;
             }
             closeModal("modal-client"); persist();
@@ -7996,6 +8103,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById("fc-gst-amount").value=editMode?String(fd._rawGstAmount ?? (fd.gstAmount||0)):((Number(currentForeclosureOrigLoan*5/100)*18)/100);
             document.getElementById("fc-gst-amount").dataset.userEdited=editMode?'1':'';
             document.getElementById("fc-s-mode").value=editMode?(fd.mode||'Cash'):'Cash';
+            if(window.mfPMSetInlineMeta)mfPMSetInlineMeta('fc-s-mode',editMode?(fd.paymentMeta||null):null);
             setDmyValues("fc-s",editMode&&fd.settlementDate?fd.settlementDate:mfIsoToday());
             if(editMode){
                 // Reopen exactly what was saved. Do not recalculate the stored fee from a derived percentage.
@@ -8098,11 +8206,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const gstAmt = parseFloat(document.getElementById("fc-gst-amount").value);
             const settleDate = getDmyIsoString("fc-s");
             const mode = document.getElementById("fc-s-mode").value;
-
             const loan = state.loans.find(l => l.id === loanId);
             const partialAmountAlreadyCollected = Math.max(0, getLoanPartialSum(loan));
             const pc = mfPreClosureDetails(loan, settleDate);
             const netSettleAmt = mfSafeNumber(mfDecAdd(mfDecAdd(mfDecAdd(String(remPrin),String(pc.interest)),String(feeAmt)),String(gstAmt)));
+            const sourceResult=mfPMReadInlineMeta('fc-s-mode',netSettleAmt,mode,'IN'); if(!sourceResult.ok)return;
+            sourceResult.meta.transactionAmount=netSettleAmt;
 
             loan.foreclosed = true;
             loan.foreclosureData = {
@@ -8121,7 +8230,8 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 _rawGstAmount: mfExactText('fc-gst-amount',String(gstAmt)),
                 _rawGstPercent: mfExactText('fc-gst-pct',String(getForeclosureGstPct())),
                 settlementAmount: netSettleAmt,
-                mode: mode
+                mode: mode,
+                paymentMeta: sourceResult.meta
             };
             // The partial queue is now represented permanently in foreclosureData so the closed
             // account cannot double-count or lose that historical collection.
@@ -8589,7 +8699,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             document.getElementById('rp-loan-id').value = loanId;
             document.getElementById('rp-idx').value = idx;
             document.getElementById('rp-info').innerText = `EMI #${due.installmentNum} — ₹${due.amount.toLocaleString('en-IN')} penalty applied on ${formatToIndianDate(due.appliedDate)}`;
-            document.getElementById('rp-mode').value = 'Cash';
+            document.getElementById('rp-mode').value = 'Cash'; if(window.mfPMResetInline)mfPMResetInline('rp-mode');
             setDmyValues('rp', new Date().toISOString().split('T')[0]);
             document.getElementById('modal-receive-penalty').classList.add('active');
         }
@@ -8603,6 +8713,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if (!due) return;
             const recDate = getDmyIsoString('rp');
             const mode = document.getElementById('rp-mode').value;
+            const sourceResult=mfPMReadInlineMeta('rp-mode',Number(due.amount)||0,mode,'IN'); if(!sourceResult.ok)return;
             // The installment this penalty belongs to is already paid — fold the amount into that
             // payment's penalty field now, exactly the moment it enters revenue/reports.
             const pay = loan.payments[due.installmentNum - 1];
@@ -8610,8 +8721,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             due.status = 'received';
             due.receivedDate = recDate;
             due.receivedMode = mode;
+            due.paymentMeta = sourceResult.meta;
             if (!loan.penaltyReceipts) loan.penaltyReceipts = [];
-            loan.penaltyReceipts.push({installmentNum:Number(due.installmentNum)||0,amount:Number(due.amount)||0,appliedDate:due.appliedDate||recDate,receivedDate:recDate,mode,status:'received',duePenaltyIndex:idx});
+            loan.penaltyReceipts.push({installmentNum:Number(due.installmentNum)||0,amount:Number(due.amount)||0,appliedDate:due.appliedDate||recDate,receivedDate:recDate,mode,paymentMeta:sourceResult.meta,status:'received',duePenaltyIndex:idx});
             closeModal('modal-receive-penalty');
             persist();
         }
@@ -8709,11 +8821,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 while (need > EPS && loan.pendingParts.length) {
                     const part = loan.pendingParts[0];
                     if (part.amount <= need + EPS) {
-                        consumed.push({ date: part.date, amount: part.amount, mode: part.mode });
+                        consumed.push({ date: part.date, amount: part.amount, mode: part.mode, paymentMeta: part.paymentMeta||null });
                         need -= part.amount;
                         loan.pendingParts.shift();
                     } else {
-                        consumed.push({ date: part.date, amount: need, mode: part.mode });
+                        consumed.push({ date: part.date, amount: need, mode: part.mode, paymentMeta: part.paymentMeta||null });
                         part.amount = +(part.amount - need).toFixed(2);
                         need = 0;
                     }
@@ -8730,6 +8842,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     interest: prod.interest,
                     preEmiInterest: instNum===1 ? mfLoanPreEmiDue(loan) : 0,
                     parts: consumed,
+                    paymentMeta: consumed.length===1 ? (consumed[0].paymentMeta||null) : {mode:'Mixed',channel:'MIXED',direction:'IN',components:consumed.map((part)=>({amount:Number(part.amount)||0,mode:part.mode,paymentMeta:part.paymentMeta||null}))},
                     penaltyAppliedDate: mfPenaltyAppliedDueDate(loan,instNum,loan.pendingPenaltyAppliedDate || lastPart.date),
                     penaltyReceivedDate: loan.pendingPenalty > 0 ? lastPart.date : null,
                     penaltyReceivedMode: loan.pendingPenalty > 0 ? (consumed.length > 1 ? `Partial Payments (${consumed.length} parts combined)` : (consumed[0].mode || 'Cash')) : null
@@ -8754,12 +8867,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         // `penaltyTiming` mirrors the Full EMI 'NOW'/'DUE' choice: 'NOW' folds it straight into that
         // installment's penalty (counted in revenue immediately); 'DUE' logs it to the deferred
         // penalty ledger instead, once the installment it belongs to actually completes.
-        function addPartialPayment(loanId, amount, date, mode, penalty, penaltyTiming) {
+        function addPartialPayment(loanId, amount, date, mode, penalty, penaltyTiming, paymentMeta=null) {
             const loan = state.loans.find(l => l.id === loanId);
             const prod = state.products[loan.product];
             if (!loan || !prod || !(amount > 0)) return;
             if (!loan.pendingParts) loan.pendingParts = [];
-            loan.pendingParts.push({ date: date, amount: Number(amount), mode: mode, _rawAmount: String(amount) });
+            loan.pendingParts.push({ date: date, amount: Number(amount), mode: mode, paymentMeta: paymentMeta||null, _rawAmount: String(amount) });
             if (penaltyTiming === 'DUE') {
                 loan.pendingDuePenalty = (loan.pendingDuePenalty || 0) + (Number(penalty) || 0);
                 loan.pendingDuePenaltyAppliedDate = mfPenaltyAppliedDueDate(loan, loan.payments.length + 1, date);
@@ -8787,8 +8900,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             };
             const rawModes = (pay.parts && pay.parts.length) ? pay.parts.map(p => p.mode) : [pay.mode];
             const labels = [...new Set(rawModes.map(displayMode).filter(Boolean))];
-            if (!labels.length) return null;
-            return labels.join(' + ');
+            const base=labels.join(' + ');
+            const source=window.mfPMSourceLabel?window.mfPMSourceLabel(pay.paymentMeta):'';
+            return [base,source].filter(Boolean).join(' · ');
         }
 
         function showPaymentParts(loanId, idx) {
@@ -8966,10 +9080,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     </div>
                     <div class="bulk-emi-cell">
                         <span class="bulk-emi-cell-label">Payment Mode</span>
-                        <select class="bulk-emi-row-mode" data-emi-no="${r.no}" aria-label="Payment mode for EMI #${r.no}" onchange="updateBulkEmiPreview()">${getCollectionPaymentModeOptions('Cash')}</select>
+                        <select id="bulk-mode-${r.no}" class="bulk-emi-row-mode" data-emi-no="${r.no}" aria-label="Payment mode for EMI #${r.no}" onchange="updateBulkEmiPreview()">${getCollectionPaymentModeOptions('Cash')}</select>
                     </div>
                 </div>`;
             }).join('');
+            if(typeof mfPMInitPanels==='function')mfPMInitPanels();
         }
 
         function handleBulkEmiCheck(el){
@@ -9053,12 +9168,21 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 const invalid=rows.find(r=>!r.collectionPaymentDate);
                 if(invalid){ alert(`Please select a valid Actual Paid Date for EMI #${invalid.no}.`); return; }
             }
-            // Save directly from the collection window. No confirmation/success pop-ups are shown;
-            // the selected rows, due dates, editable received dates and payment modes are already visible.
-            rows.sort((a,b)=>a.no-b.no).forEach(r=>{
-                const paymentDate=r.collectionPaymentDate || r.dueDate;
-                loan.payments.push({date:paymentDate,dueDate:r.dueDate,amount:Number(r.totalDue)||Number(r.emi)||0,penalty:0,mode:r.collectionMode||'Cash',principal:Number(r.principal)||0,interest:Number(r.interest)||0,preEmiInterest:Number(r.preEmiInterest)||0});
-            });
+            // Source metadata is captured per EMI. Mixed Payment uses Manual mode so each EMI can carry its own component split.
+            const bulkMode=String(document.getElementById('bulk-emi-mode')?.value||'ALL');
+            let sharedMeta=null;
+            if(bulkMode==='ALL'){
+                const sharedMode=document.getElementById('bulk-emi-payment-mode')?.value||'Cash';
+                if(String(sharedMode).toLowerCase().includes('mixed')||String(sharedMode).toLowerCase().includes('both')){alert('For Mixed Payment, switch to Manual selection so each EMI can have its own component split.');return;}
+                const sharedResult=mfPMReadInlineMeta('bulk-emi-payment-mode',null,sharedMode,'IN');if(!sharedResult.ok)return;sharedMeta=sharedResult.meta;
+            }
+            const prepared=[];
+            for(const r of rows.sort((a,b)=>a.no-b.no)){
+                const amt=Number(r.totalDue)||Number(r.emi)||0;let meta=sharedMeta;
+                if(bulkMode!=='ALL'){const sel=document.querySelector(`#bulk-emi-checklist .bulk-emi-row-mode[data-emi-no="${r.no}"]`);const m=sel?.value||r.collectionMode||'Cash';const result=mfPMReadInlineMeta(`bulk-mode-${r.no}`,amt,m,'IN');if(!result.ok)return;meta=result.meta;}
+                prepared.push({...r,_sourceMeta:meta});
+            }
+            prepared.forEach(r=>{const paymentDate=r.collectionPaymentDate||r.dueDate;loan.payments.push({date:paymentDate,dueDate:r.dueDate,amount:Number(r.totalDue)||Number(r.emi)||0,penalty:0,mode:r.collectionMode||'Cash',paymentMeta:r._sourceMeta,principal:Number(r.principal)||0,interest:Number(r.interest)||0,preEmiInterest:Number(r.preEmiInterest)||0});});
             closeModal('modal-bulk-emi');
             persist();
             renderFeed();
@@ -9087,6 +9211,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const nextTotalDue = mfLoanInstallmentAmount(loan, nextInstNo);
             const nextPreEmi = nextInstNo===1 ? mfLoanPreEmiDue(loan) : 0;
             document.getElementById("pay-amount").value = nextTotalDue;
+            document.getElementById("pay-mode").value = "Cash"; if(window.mfPMResetInline)mfPMResetInline('pay-mode');
             document.getElementById("split-p").innerText = "₹" + prod.principal;
             document.getElementById("split-i").innerText = "₹" + prod.interest;
             const splitPre=document.getElementById("split-preemi"); if(splitPre) splitPre.innerText = "₹" + nextPreEmi.toLocaleString("en-IN");
@@ -9141,6 +9266,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             setCollectionDueDateReadOnly(true);
             setDmyValues("pay-rec", pay.date);
             document.getElementById("pay-mode").value = pay.mode && ['Cash','UPI','GPay','PhonePe','Bank Transfer','Other','Bank','Cash + UPI (Both)','Cash + UPI / Bank Transfer / Cheque (Mixed)'].includes(pay.mode) ? pay.mode : 'Cash';
+            if(window.mfPMSetInlineMeta)mfPMSetInlineMeta('pay-mode',pay.paymentMeta||null);
 
             setCollectMode('FULL');
             updatePenaltyModeVisibility();
@@ -9230,9 +9356,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const recDate = getDmyIsoString("pay-rec");
             const mode = document.getElementById("pay-mode").value;
             const collectMode = document.getElementById("pay-mode-type").value;
+            const sourceResult=mfPMReadInlineMeta('pay-mode',amt,mode,'IN');
+            if(!sourceResult.ok)return;
             const penaltyVal = parseFloat(document.getElementById("pay-penalty").value) || 0;
             const penaltyTiming = document.getElementById("pay-penalty-timing").value;
             const editIdx = document.getElementById("pay-edit-idx").value;
+            if((String(mode).toLowerCase()==='mixed'||String(mode).toLowerCase().includes('mixed')||String(mode).toLowerCase().includes('both'))&&penaltyVal>0&&penaltyTiming!=='DUE'){
+                alert('For Mixed Payment with penalty collected immediately, record the EMI and penalty as separate source-verified transactions. Set penalty timing to Due, save the EMI, then use Receive Penalty to enter the penalty amount and its own source split. This prevents the component total from being allocated twice.');return;
+            }
 
             const loan = state.loans.find(l => l.id === id);
             const prod = state.products[loan.product];
@@ -9249,6 +9380,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 pay.dueDate = mfLoanScheduleDueIso(loan, idx + 1);
                 pay.date = recDate;
                 pay.mode = mode;
+                pay.paymentMeta = sourceResult.meta;
                 pay.penalty = penaltyVal;
                 pay.preEmiInterest = idx===0 && amt >= mfLoanInstallmentAmount(loan,1) - 0.01 ? mfLoanPreEmiDue(loan) : 0;
                 closeModal("modal-collect");
@@ -9261,7 +9393,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
             if (collectMode === 'PARTIAL') {
                 if (!(amt > 0)) { alert('Enter an amount greater than 0.'); return; }
-                addPartialPayment(id, amt, recDate, mode, penaltyVal, penaltyTiming);
+                addPartialPayment(id, amt, recDate, mode, penaltyVal, penaltyTiming, sourceResult.meta);
                 closeModal("modal-collect");
                 persist();
                 renderFeed();
@@ -9284,6 +9416,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 penalty: collectNow ? penaltyVal : 0,
                 _rawPenalty: mfExactText('pay-penalty',String(penaltyVal)),
                 mode: mode,
+                paymentMeta: sourceResult.meta,
                 principal: prod.principal,
                 interest: prod.interest,
                 preEmiInterest,
@@ -9294,7 +9427,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
             if (collectNow && penaltyVal > 0) {
                 if (!loan.penaltyReceipts) loan.penaltyReceipts = [];
-                loan.penaltyReceipts.push({installmentNum:loan.payments.length,amount:Number(penaltyVal)||0,appliedDate:mfPenaltyAppliedDueDate(loan,loan.payments.length,recDate),receivedDate:recDate,mode,status:'received'});
+                loan.penaltyReceipts.push({installmentNum:loan.payments.length,amount:Number(penaltyVal)||0,appliedDate:mfPenaltyAppliedDueDate(loan,loan.payments.length,recDate),receivedDate:recDate,mode,paymentMeta:{...sourceResult.meta,transactionId:(sourceResult.meta.transactionId||'TXN')+'-PEN',transactionAmount:Number(penaltyVal)||0},status:'received'});
             }
             if (!collectNow && penaltyVal > 0) {
                 addDuePenalty(loan, loan.payments.length, penaltyVal, recDate);
@@ -9509,7 +9642,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 } else if (pay) {
                     badge = `<span class="badge-paid">PAID</span>`;
                     const paidVia = getPaidViaLabel(pay);
-                    if (paidVia) badge += `<div style="margin-top:4px;display:block;width:max-content;max-width:100%;font-size:.62rem;line-height:1.15;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(148,163,184,.15);border:1px solid rgba(148,163,184,.4);color:#cbd5e1;white-space:normal;">${paidVia}</div>`;
+                    if (paidVia) badge += `<div style="margin-top:4px;display:block;width:max-content;max-width:100%;font-size:.62rem;line-height:1.15;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(148,163,184,.15);border:1px solid rgba(148,163,184,.4);color:#cbd5e1;white-space:normal;">${financeEsc(paidVia)}</div>`;
                     paidStr = formatToIndianDate(pay.date);
                     if (pay.parts && pay.parts.length > 1) {
                         badge += ` <button type="button" class="no-print" onclick="showPaymentParts('${l.id}', ${i-1})" style="background:rgba(96,165,250,.15); border:1px solid rgba(96,165,250,.4); color:#93c5fd; font-size:.62rem; font-weight:700; padding:2px 6px; border-radius:999px; cursor:pointer;">${pay.parts.length} parts</button>`;
@@ -9631,7 +9764,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <div><span style="color:#94a3b8;">Plan:</span> <b style="color:#60a5fa;">${p.name}</b></div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Disbursal Date:</span> <b style="color:#fff;">${formatToIndianDate(l.disbursalDate)}</b></div>
                         <div><span style="color:#94a3b8;">Loan Amount:</span> <b style="color:#fff;">₹${p.amount.toLocaleString('en-IN')}</b></div>
-                        <div style="text-align:right;"><span style="color:#94a3b8;">Disbursal Mode:</span> <b style="color:#34d399;">${mfDisbursalModeLabel(l.disbursalMode)}</b></div>
+                        <div style="text-align:right;"><span style="color:#94a3b8;">Disbursal Mode:</span> <b style="color:#34d399;">${financeEsc(mfDisbursalModeLabel(l.disbursalMode,l.disbursalPaymentMeta))}</b></div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Total Recovered:</span> <b style="color:#34d399;">₹${totalPaidGross.toLocaleString('en-IN')}</b></div>
                         ${l.foreclosed ? `<div><span style="color:#94a3b8;">Pre-Closure Interest:</span> <b style="color:#34d399;">₹${preClosureInterest.toLocaleString('en-IN',{maximumFractionDigits:2})}</b></div>` : ''}
                         <div><span style="color:#94a3b8;">Tenure:</span> ${p.tenure} EMIs (₹${p.emi})</div>
@@ -9703,7 +9836,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         function openPostMaturitySettlementEdit(loanId){
             const loan=state.loans.find(l=>l.id===loanId); const pm=loan?.postMaturitySettlement; if(!loan||!pm)return;
-            document.getElementById('pm-loan-id').value=loanId; setDmyValues('pm-s',pm.settlementDate||mfIsoToday()); document.getElementById('pm-actual-amount').value=String(pm._rawActualReceived ?? (pm.actualReceived||0)); document.getElementById('pm-mode').value=pm.mode||'Cash';
+            document.getElementById('pm-loan-id').value=loanId; setDmyValues('pm-s',pm.settlementDate||mfIsoToday()); document.getElementById('pm-actual-amount').value=String(pm._rawActualReceived ?? (pm.actualReceived||0)); document.getElementById('pm-mode').value=pm.mode||'Cash'; if(window.mfPMSetInlineMeta)mfPMSetInlineMeta('pm-mode',pm.paymentMeta||null);
             updatePostMaturitySettlementPreview(); document.getElementById('modal-post-maturity-settlement').classList.add('active');
         }
 
@@ -9757,7 +9890,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         <div style="text-align:right;"><span style="color:#94a3b8;">Customer Mobile(s):</span> <b style="color:#fff;">${financeEsc(mfContactText(l.phone,l.phone2))}</b></div>
                         <div><span style="color:#94a3b8;">Plan:</span> <b style="color:#60a5fa;">${p.name}</b></div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Disbursal Date:</span> <b style="color:#fff;">${formatToIndianDate(l.disbursalDate)}</b></div>
-                        <div><span style="color:#94a3b8;">Disbursal Mode:</span> <b style="color:#34d399;">${mfDisbursalModeLabel(l.disbursalMode)}</b></div>
+                        <div><span style="color:#94a3b8;">Disbursal Mode:</span> <b style="color:#34d399;">${financeEsc(mfDisbursalModeLabel(l.disbursalMode,l.disbursalPaymentMeta))}</b></div>
                         <div><span style="color:#94a3b8;">Loan Amount:</span> <b style="color:#fff;">₹${p.amount.toLocaleString('en-IN')}</b></div>
                         <div style="text-align:right;"><span style="color:#94a3b8;">Total Scheduled Payable (EMIs + applicable Pre-EMI Interest):</span> <b style="color:#fff;">₹${(p.emi * p.tenure + mfLoanPreEmiDue(l)).toLocaleString('en-IN')}</b></div>
                         <div><span style="color:#94a3b8;">Tenure:</span> ${p.tenure} EMIs (₹${p.emi} each)</div>
@@ -9879,7 +10012,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             <tr><td style="border:none; padding:4px 0;"><b>Loan Account No:</b></td><td style="border:none; padding:4px 0;">${l.id}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Sanctioned Loan Amount:</b></td><td style="border:none; padding:4px 0;">₹${p.amount.toLocaleString('en-IN')}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Loan Disbursal Date:</b></td><td style="border:none; padding:4px 0;">${formatToIndianDate(l.disbursalDate)}</td></tr>
-                            <tr><td style="border:none; padding:4px 0;"><b>Disbursal Payment Mode:</b></td><td style="border:none; padding:4px 0;">${mfDisbursalModeLabel(l.disbursalMode)}</td></tr>
+                            <tr><td style="border:none; padding:4px 0;"><b>Disbursal Payment Mode:</b></td><td style="border:none; padding:4px 0;">${financeEsc(mfDisbursalModeLabel(l.disbursalMode,l.disbursalPaymentMeta))}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Foreclosure Date:</b></td><td style="border:none; padding:4px 0;">${formatToIndianDate(l.foreclosureData.settlementDate)}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Remaining Principal:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.principalPaid||0).toLocaleString('en-IN')}</td></tr>
                             ${Number(l.foreclosureData.partialAmountAlreadyCollected||0)>0 ? `<tr><td style="border:none; padding:4px 0;"><b>Partial Amount Already Collected:</b></td><td style="border:none; padding:4px 0;">₹${Number(l.foreclosureData.partialAmountAlreadyCollected).toLocaleString('en-IN')}</td></tr>` : ''}
@@ -9950,7 +10083,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                             <tr><td style="border:none; padding:4px 0;"><b>Loan Account No:</b></td><td style="border:none; padding:4px 0;">${l.id}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Sanctioned Loan Amount:</b></td><td style="border:none; padding:4px 0;">₹${p.amount.toLocaleString('en-IN')}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Loan Disbursal Date:</b></td><td style="border:none; padding:4px 0;">${formatToIndianDate(l.disbursalDate)}</td></tr>
-                            <tr><td style="border:none; padding:4px 0;"><b>Disbursal Payment Mode:</b></td><td style="border:none; padding:4px 0;">${mfDisbursalModeLabel(l.disbursalMode)}</td></tr>
+                            <tr><td style="border:none; padding:4px 0;"><b>Disbursal Payment Mode:</b></td><td style="border:none; padding:4px 0;">${financeEsc(mfDisbursalModeLabel(l.disbursalMode,l.disbursalPaymentMeta))}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Total EMIs Serviced:</b></td><td style="border:none; padding:4px 0;">${p.tenure} Installments</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Pre-EMI Interest:</b></td><td style="border:none; padding:4px 0;">₹${preEmiInterest.toLocaleString('en-IN',{maximumFractionDigits:2})}</td></tr>
                             <tr><td style="border:none; padding:4px 0;"><b>Total Amount Paid:</b></td><td style="border:none; padding:4px 0;">₹${paidGross.toLocaleString('en-IN')}</td></tr>
@@ -11821,7 +11954,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     const profile=`<div class="finance-profile-cell"><b>${customerName}</b><span class="finance-pill">${financeEsc(l.id)}</span>${guarantorName?`<small>C/O / Guarantor: <b>${guarantorName}</b></small>`:''}</div>`;
                     const contacts=`<div class="finance-contact-cell"><span><b>Customer:</b> ${customerPhones}</span>${guarantorName?`<span><b>Guarantor:</b> ${guarantorPhones}</span>`:''}</div>`;
                     const productCell=`<div class="finance-profile-cell"><b>${financeEsc(p.name||'Custom')}</b><small>Loan Amount: ${money(p.amount)}</small></div>`;
-                    const disbCell=x.includeDisb?`<div class="finance-profile-cell"><b>${formatToIndianDate(l.disbursalDate)}</b><small>${financeEsc(mfDisbursalModeLabel(l.disbursalMode))}</small></div>`:`-`;
+                    const disbCell=x.includeDisb?`<div class="finance-profile-cell"><b>${formatToIndianDate(l.disbursalDate)}</b><small>${financeEsc(mfDisbursalModeLabel(l.disbursalMode,l.disbursalPaymentMeta))}</small></div>`:`-`;
                     return [profile,contacts,productCell,disbCell,x.includeDisb?money(p.amount):'₹0',money(paid),money(out),`<span class="finance-status-pill ${status.toLowerCase()}">${status}</span>`];
                 });
                 const periodCapitalGiven=marketDisbursed.reduce((a,x)=>a+(x.includeDisb?(Number(x.p.amount)||0):0),0);
@@ -11934,7 +12067,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(type==='gross') return d.disbursed.map(x=>[x.loan.id,x.loan.name,mfLoanTypeLabel(x.loan),x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.includeDisb?x.p.fileCharge:0,x.interest,x.preEmiInterest,x.penalty,x.foreclosureFee,x.preClosureInterest,x.postMaturityInterest,x.settlementWaiver||0,x.totalProfit,x.reportBasis]);
             if(type==='lender') return d.lender.flatMap(x=>x.filteredRepayments.map(r=>[r.date,x.b.lenderName,r.principal,r.interest,r.gst||0,(Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0),r.mode||'']));
             if(type==='opex') return [...d.payroll.map(x=>[x.sp.date,x.st.name,'Payroll',x.sp.amount,x.sp.mode||'']),...d.expenses.map(x=>[x.date,x.category,x.desc,x.amount,x.mode||''])];
-            if(type==='disbursed') return d.disbursed.filter(x=>x.includeDisb||x.activityInPeriod).map(x=>[x.loan.id,x.loan.name,mfLoanTypeLabel(x.loan),x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode),x.includeDisb?x.p.amount:0,x.paymentPrincipal||0,x.activityInPeriod?'Actual period activity':'Disbursed in period',(()=>{const fs=mfLoanOperationalStatus(x.loan);return (fs==='OVERDUE'||fs==='DUE')?'DUE':fs;})()]);
+            if(type==='disbursed') return d.disbursed.filter(x=>x.includeDisb||x.activityInPeriod).map(x=>[x.loan.id,x.loan.name,mfLoanTypeLabel(x.loan),x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode,x.loan.disbursalPaymentMeta),x.includeDisb?x.p.amount:0,x.paymentPrincipal||0,x.activityInPeriod?'Actual period activity':'Disbursed in period',(()=>{const fs=mfLoanOperationalStatus(x.loan);return (fs==='OVERDUE'||fs==='DUE')?'DUE':fs;})()]);
             return [['Gross Revenue',d.gross],['Lender Cost',d.lenderCost],['Staff Salaries',d.salaries],['General Expenses',d.generalExp],['TRUE IN-HAND NET SURPLUS',d.net]];
         }
         function exportFinanceDetailReport(){
@@ -12124,7 +12257,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             if(button?.disabled) return false;
             const confirmed=confirm(
                 'Are you sure you want to CLEAR ALL DATA?\n\n' +
-                'All entered business records on this device will be removed: customers/loans and payments, products, capital borrowings, staff, expenses, custom categories, PTP/follow-ups and company profile. If Firebase is connected and signed in, its live business records will also be cleared.\n\n' +
+                'All entered business records on this device will be removed: customers/loans and payments, products, capital borrowings, staff, expenses, bank/UPI source masters, internal cash/bank movements, custom categories, PTP/follow-ups and company profile. If Firebase is connected and signed in, its live business records will also be cleared.\n\n' +
                 'App code, calculations, reports, layout, audit phases, App Lock, cloud encryption PIN, sign-in and connection settings will remain. Google Drive backups and local Version History recovery points will NOT be deleted; they can return data only after you explicitly choose Restore. This action cannot be undone from this screen.'
             );
             if(!confirmed) return false;
@@ -12165,6 +12298,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     state.borrowings=[];
                     state.staff=[];
                     state.expenses=[];
+                    state.paymentAccounts=[];
+                    state.paymentTransfers=[];
+                    state.paymentAuditLog=[];
+                    state.paymentStatementLines=[];
+                    state.paymentCashOpeningBalance=0;
                     state.customCategories=[];
                     state.ptps=[];
                     state.recoveryFollowUps=[];
@@ -13493,7 +13631,50 @@ function refreshPhaseCPortfolio(){refresh();}
 window.openPhaseCPortfolioModal=open;window.refreshPhaseCPortfolio=refreshPhaseCPortfolio;
 
 function exportPhaseCPortfolioExcel(){try{const pf=buildPortfolio(),pr=productRows(pf),vr=vintageRows(pf,'ALL');if(typeof XLSX==='undefined')throw new Error('Excel engine is not available.');const wb=XLSX.utils.book_new();const ov=[['PHASE C — PORTFOLIO INTELLIGENCE'],['As of',pcToday()],[],['Metric','Value'],['Total Loan Accounts',pf.rows.length],['Open/Risk Accounts',pf.open.length],['Gross Portfolio Disbursed',pf.totalDisb],['Open Principal Outstanding',pf.totalOut],['Overdue Accounts',pf.overdue.length],['PAR 30',pf.par30],['PAR 60',pf.par60],['PAR 90',pf.par90]];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ov),'01_Aging_PAR');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Product','Accounts','Open','Disbursed','Outstanding','Principal Recovered','Overdue','PAR30','PAR60','PAR90'],...pr.map(r=>[r.name,r.accounts,r.open,r.disb,r.out,r.rec,r.overdue,r.par30,r.par60,r.par90])]),'02_Product');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Vintage','Accounts','Open','Disbursed','Outstanding','Principal Recovered','Overdue','PAR30','PAR60','PAR90'],...vr.map(r=>[r.key,r.accounts,r.open,r.disb,r.out,r.rec,r.overdue,r.par30,r.par60,r.par90])]),'03_Vintage');const audit=window.__mfPhaseCAudit||{critical:0,warning:0,issues:[]};XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Severity','Finding','Detail'],...audit.issues.map(x=>[x.sev,x.msg,x.detail])]),'04_Audit');XLSX.writeFile(wb,`${String(state.bizName||'MicroFinance').replace(/\s+/g,'_')}_Phase_C_Portfolio_Intelligence.xlsx`);}catch(e){alert(e.message||String(e));}}
-function printPhaseCPortfolio(){const pf=buildPortfolio(),pr=productRows(pf),vr=vintageRows(pf,'ALL');const rows=(a)=>a.map(r=>`<tr>${r.map(x=>`<td>${esc(typeof x==='number'?Number(x).toLocaleString('en-IN',{maximumFractionDigits:2}):x)}</td>`).join('')}</tr>`).join('');const html=`<html><head><title>Phase C Portfolio Intelligence</title><style>body{font-family:Arial,sans-serif;color:#111;padding:24px;font-size:11px}h1{font-size:20px}h2{font-size:15px;margin-top:24px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #bbb;padding:5px;text-align:left}th{background:#eee}small{display:block;color:#555}</style></head><body><h1>${esc(state.bizName||'MicroFinance')} — Phase C Portfolio Intelligence</h1><p>As of ${esc(pcToday())}</p><h2>Aging & PAR</h2><table><tr><th>Metric</th><th>Value</th></tr>${rows([['Loan Accounts',pf.rows.length],['Open/Risk Accounts',pf.open.length],['Gross Disbursed',pf.totalDisb],['Open Principal',pf.totalOut],['Overdue Accounts',pf.overdue.length],['PAR 30',pf.par30],['PAR 60',pf.par60],['PAR 90',pf.par90]])}</table><h2>Product Performance</h2><table><tr><th>Product</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR30</th><th>PAR60</th><th>PAR90</th></tr>${pr.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)}</td><td>${money(r.par60)}</td><td>${money(r.par90)}</td></tr>`).join('')}</table><h2>Vintage Analysis</h2><table><tr><th>Vintage</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR30</th><th>PAR60</th><th>PAR90</th></tr>${vr.map(r=>`<tr><td>${esc(r.key)}</td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)}</td><td>${money(r.par60)}</td><td>${money(r.par90)}</td></tr>`).join('')}</table><\/body></html>`;const w=window.open('','_blank');if(!w)return;w.document.write(html);w.document.close();w.onload=()=>{w.focus();w.print();};}
+function printPhaseCPortfolio(){const pf=buildPortfolio(),pr=productRows(pf),vr=vintageRows(pf,'ALL');const rows=(a)=>a.map(r=>`<tr>${r.map(x=>`<td>${esc(typeof x==='number'?Number(x).toLocaleString('en-IN',{maximumFractionDigits:2}):x)}</td>`).join('')}</tr>`).join('');const html=`<html><head><title>Phase C Portfolio Intelligence</title><style>body{font-family:Arial,sans-serif;color:#111;padding:24px;font-size:11px}h1{font-size:20px}h2{font-size:15px;margin-top:24px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #bbb;padding:5px;text-align:left}th{background:#eee}small{display:block;color:#555}
+/* Payment Management: shared bank masters and responsive source details */
+.mfpm-modal{width:min(1180px,97vw);max-width:1180px}
+.mfpm-small-modal{width:min(680px,96vw);max-width:680px}
+.mfpm-intro,.mfpm-note{padding:10px 11px;border:1px solid rgba(96,165,250,.18);background:rgba(96,165,250,.045);border-radius:10px;color:#94a3b8;font-size:.68rem;line-height:1.5;margin-bottom:10px}
+.mfpm-note b{color:#e2e8f0}
+.mfpm-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:10px 0}
+.mfpm-kpi{padding:9px;border:1px solid var(--border-subtle);border-radius:10px;background:rgba(255,255,255,.025);min-width:0}
+.mfpm-kpi small{display:block;color:#94a3b8;font-size:.59rem;font-weight:750}
+.mfpm-kpi b{display:block;color:#fff;font-size:.95rem;margin-top:3px;overflow-wrap:anywhere}
+.mfpm-section{border:1px solid var(--border-subtle);border-radius:11px;padding:10px;margin-top:10px;min-width:0}
+.mfpm-section-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.mfpm-section-head b{display:block;color:#fff;font-size:.8rem}.mfpm-section-head small{display:block;color:#64748b;font-size:.62rem;margin-top:3px;line-height:1.4}
+.mfpm-bank-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.mfpm-bank-card{padding:10px;border:1px solid var(--border-subtle);border-radius:10px;background:rgba(255,255,255,.02);min-width:0}
+.mfpm-bank-title{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.mfpm-bank-title b{color:#fff;font-size:.8rem}.mfpm-bank-meta{font-size:.63rem;color:#94a3b8;line-height:1.5;overflow-wrap:anywhere;margin-top:5px}
+.mfpm-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.mfpm-actions button{font-size:.62rem;padding:6px 8px}
+.mfpm-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.mfpm-form-grid label{display:block;color:#94a3b8;font-size:.63rem;font-weight:750;margin-bottom:4px}
+.mfpm-form-grid input,.mfpm-form-grid select,.mfpm-filters input,.mfpm-filters select,.mfpm-inline input,.mfpm-inline select{width:100%;min-width:0;box-sizing:border-box;padding:9px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;font-size:.72rem}
+.mfpm-form-grid select option,.mfpm-inline select option{background:#0f172a;color:#fff}
+.mfpm-full{grid-column:1/-1}
+.mfpm-form-foot{display:flex;justify-content:flex-end;gap:7px;flex-wrap:wrap;margin-top:12px}
+.mfpm-upi-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.mfpm-upi-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px;border:1px solid var(--border-subtle);border-radius:8px;font-size:.67rem;min-width:0}
+.mfpm-upi-row span{overflow-wrap:anywhere;color:#cbd5e1}.mfpm-filters{display:grid;grid-template-columns:minmax(180px,.8fr) minmax(140px,.6fr) minmax(220px,1.4fr);gap:7px;margin:8px 0}
+.mfpm-table-wrap{overflow:auto;max-width:100%;border:1px solid var(--border-subtle);border-radius:9px}
+.mfpm-table{border-collapse:collapse;width:100%;min-width:720px;font-size:.65rem}.mfpm-table th,.mfpm-table td{padding:8px;border-bottom:1px solid var(--border-subtle);text-align:left;vertical-align:top}.mfpm-table th{position:sticky;top:0;background:#172235;color:#94a3b8;font-weight:800}.mfpm-table td{color:#cbd5e1}.mfpm-table .money{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.mfpm-inline{display:none;margin:8px 0 10px;padding:9px;border:1px solid rgba(96,165,250,.22);border-radius:9px;background:rgba(96,165,250,.045);min-width:0}
+.mfpm-inline-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.mfpm-inline label{display:block;color:#94a3b8;font-size:.6rem;font-weight:750;margin-bottom:4px}
+.mfpm-inline small{display:block;color:#64748b;font-size:.6rem;line-height:1.4;margin-top:5px}
+.mfpm-mixed-row{display:grid;grid-template-columns:minmax(90px,.7fr) minmax(110px,1fr) minmax(100px,.8fr) minmax(120px,1fr);gap:6px;padding:7px 0;border-bottom:1px solid var(--border-subtle)}
+.mfpm-mixed-row:last-child{border-bottom:0}
+@media(max-width:760px){.mfpm-bank-list{grid-template-columns:1fr}.mfpm-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.mfpm-filters{grid-template-columns:1fr}.mfpm-modal{width:97vw}.mfpm-mixed-row{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.mfpm-form-grid,.mfpm-inline-grid{grid-template-columns:1fr}.mfpm-full{grid-column:auto}.mfpm-mixed-row{grid-template-columns:1fr}.mfpm-kpi b{font-size:.82rem}.mfpm-section{padding:8px}.mfpm-section-head .btn-header{width:100%;justify-content:center}}
+
+
+.mfpm-cash-settings{display:grid;grid-template-columns:minmax(180px,1.4fr) minmax(150px,.8fr) auto;gap:8px;align-items:end;padding:10px;border:1px solid var(--border-subtle);border-radius:10px;margin:8px 0;background:rgba(255,255,255,.02)}
+.mfpm-cash-settings b{display:block;color:#fff;font-size:.75rem}.mfpm-cash-settings small{display:block;color:#94a3b8;font-size:.61rem;line-height:1.4;margin-top:3px}.mfpm-cash-settings label{font-size:.61rem;color:#94a3b8}.mfpm-cash-settings input{display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:8px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff}.mfpm-cash-current{grid-column:1/-1;font-size:.7rem;color:#94a3b8}.mfpm-cash-current b{display:inline;color:#34d399}
+@media(max-width:560px){.mfpm-cash-settings{grid-template-columns:1fr}.mfpm-cash-current{grid-column:auto}.mfpm-cash-settings button{width:100%;justify-content:center}}
+
+.mfpm-recon-controls{display:grid;grid-template-columns:minmax(160px,.8fr) minmax(220px,1.3fr) auto;gap:8px;align-items:end;margin:8px 0}.mfpm-recon-controls label{display:block;color:#94a3b8;font-size:.62rem;font-weight:750}.mfpm-recon-controls select,.mfpm-recon-controls input{display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:8px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border-subtle);color:#fff;font-size:.68rem}.mfpm-recon-controls input::file-selector-button{margin-right:8px;padding:5px;border:0;border-radius:5px}
+@media(max-width:680px){.mfpm-recon-controls{grid-template-columns:1fr}.mfpm-recon-controls button{width:100%;justify-content:center}}
+</style></head><body><h1>${esc(state.bizName||'MicroFinance')} — Phase C Portfolio Intelligence</h1><p>As of ${esc(pcToday())}</p><h2>Aging & PAR</h2><table><tr><th>Metric</th><th>Value</th></tr>${rows([['Loan Accounts',pf.rows.length],['Open/Risk Accounts',pf.open.length],['Gross Disbursed',pf.totalDisb],['Open Principal',pf.totalOut],['Overdue Accounts',pf.overdue.length],['PAR 30',pf.par30],['PAR 60',pf.par60],['PAR 90',pf.par90]])}</table><h2>Product Performance</h2><table><tr><th>Product</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR30</th><th>PAR60</th><th>PAR90</th></tr>${pr.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)}</td><td>${money(r.par60)}</td><td>${money(r.par90)}</td></tr>`).join('')}</table><h2>Vintage Analysis</h2><table><tr><th>Vintage</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR30</th><th>PAR60</th><th>PAR90</th></tr>${vr.map(r=>`<tr><td>${esc(r.key)}</td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)}</td><td>${money(r.par60)}</td><td>${money(r.par90)}</td></tr>`).join('')}</table><\/body></html>`;const w=window.open('','_blank');if(!w)return;w.document.write(html);w.document.close();w.onload=()=>{w.focus();w.print();};}
 window.exportPhaseCPortfolioExcel=exportPhaseCPortfolioExcel;window.printPhaseCPortfolio=printPhaseCPortfolio;
 
 function installCard(){const grid=document.querySelector('.mf-advanced-tool-grid');if(!grid||document.getElementById('mf-phasec-launch-card'))return;const card=document.createElement('div');card.className='mf-advanced-tool';card.id='mf-phasec-launch-card';card.innerHTML='<b><i class="fa-solid fa-chart-line" style="color:#a78bfa"></i> Phase C — Portfolio Intelligence</b><span>Portfolio Aging, PAR 30/60/90, Product Performance and Vintage Analysis from the existing canonical data.</span><button class="btn-header btn-blue" type="button" onclick="openPhaseCPortfolioModal()">Open Portfolio Intelligence</button>';grid.appendChild(card);}
@@ -13991,5 +14172,449 @@ function install(){const grid=document.querySelector('.mf-advanced-tool-grid');i
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
 </script>
+
+<script>
+/* ================= PAYMENT MANAGEMENT CORE =================
+   Source masters and payment metadata are separate from loan math.
+   This layer never computes EMI, interest, penalty, settlement or foreclosure.
+*/
+(function(){
+  const $=id=>document.getElementById(id);
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const money=v=>'₹'+(Number(v)||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const today=()=>new Date().toISOString().slice(0,10);
+  const makeId=prefix=>prefix+'-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,7).toUpperCase();
+  function ensure(){ if(!Array.isArray(state.paymentAccounts))state.paymentAccounts=[]; if(!Array.isArray(state.paymentTransfers))state.paymentTransfers=[]; if(!Array.isArray(state.paymentAuditLog))state.paymentAuditLog=[]; }
+  function activeBanks(){ensure();return state.paymentAccounts.filter(a=>a.active!==false);}
+  function accountById(id){return (state.paymentAccounts||[]).find(a=>String(a.id)===String(id));}
+  function upiById(bankId,upiId){const a=accountById(bankId);return (a?.upiSources||[]).find(u=>String(u.id)===String(upiId));}
+  function masked(n){const v=String(n||'');return v.length<=4?'••••':('••••'+v.slice(-4));}
+  function bankLabel(a){return `${a.bankName||'Bank'} · ${a.accountHolder||'Account'} · ${masked(a.accountNumber)}`;}
+  function optsBanks(selected=''){
+    const rows=activeBanks();
+    return '<option value="">Select bank account</option>'+rows.map(a=>`<option value="${esc(a.id)}" ${String(a.id)===String(selected)?'selected':''}>${esc(bankLabel(a))}</option>`).join('');
+  }
+  function optsUpi(bankId,selected=''){
+    const a=accountById(bankId),rows=(a?.upiSources||[]).filter(u=>u.active!==false);
+    return '<option value="">Select UPI ID</option>'+rows.map(u=>`<option value="${esc(u.id)}" ${String(u.id)===String(selected)?'selected':''}>${esc(u.appName)} · ${esc(u.upiId)}</option>`).join('');
+  }
+  function modeKind(mode){
+    const v=String(mode||'').toLowerCase();
+    if(v.includes('mixed')||v.includes('both'))return 'MIXED';
+    if(v==='cash')return 'CASH';
+    if(v.includes('upi')||v.includes('gpay')||v.includes('phonepe'))return 'UPI';
+    if(v.includes('cheque')||v.includes('dd'))return 'CHEQUE';
+    if(v.includes('bank')||v.includes('transfer')||v.includes('neft')||v.includes('rtgs')||v.includes('imps'))return 'BANK';
+    return 'CASH';
+  }
+  const channelOptions=`<option value="">Select channel</option><option value="UPI">UPI</option><option value="NEFT">NEFT</option><option value="RTGS">RTGS</option><option value="IMPS">IMPS</option><option value="BANK_TRANSFER">Other Bank Transfer</option><option value="CHEQUE">Cheque</option><option value="DD">Demand Draft</option>`;
+  function panelHTML(prefix){
+    return `<div class="mfpm-inline" id="mfpm-inline-${prefix}" data-prefix="${prefix}">
+      <div style="font-size:.66rem;font-weight:850;color:#bfdbfe;margin-bottom:6px"><i class="fa-solid fa-link"></i> Payment Source Details</div>
+      <div class="mfpm-inline-grid">
+        <div class="mfpm-bank-field"><label>Bank Account</label><select id="mfpm-${prefix}-bank" onchange="mfPMRefreshInline('${prefix}')">${optsBanks()}</select></div>
+        <div class="mfpm-channel-field"><label>Payment Channel</label><select id="mfpm-${prefix}-channel" onchange="mfPMRefreshInline('${prefix}')">${channelOptions}</select></div>
+        <div class="mfpm-upi-field"><label>Bank-linked UPI ID</label><select id="mfpm-${prefix}-upi">${optsUpi('')}</select></div>
+        <div><label>UTR / Transaction Reference</label><input id="mfpm-${prefix}-ref" placeholder="Reference if available"></div>
+        <div class="mfpm-cheque-field"><label>Cheque / DD Number</label><input id="mfpm-${prefix}-cheque" placeholder="Cheque / DD number"></div>
+        <div><label>Narration (optional)</label><input id="mfpm-${prefix}-note" placeholder="Short payment note"></div>
+      </div>
+      <div id="mfpm-${prefix}-mixed" style="display:none;margin-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:.65rem;color:#fff">Mixed Payment Components</b><button type="button" class="mfpm-mini-btn" onclick="mfPMAddMixedRow('${prefix}')">+ Add Component</button></div>
+        <div id="mfpm-${prefix}-mixed-rows"></div>
+        <div id="mfpm-${prefix}-mixed-total" style="text-align:right;font-size:.67rem;color:#34d399;margin-top:5px"></div>
+      </div>
+      <small>Choose the bank first; only UPI IDs linked to that bank are offered. Source metadata is recorded separately and does not alter the financial calculation.</small>
+    </div>`;
+  }
+  const mixedDraft={};
+  function addPanel(sel){
+    if(!sel||sel.dataset.mfpmReady==='1')return;
+    const prefix=sel.id;
+    if(!prefix)return;
+    const holder=sel.closest('.form-group')||sel.parentElement;
+    if(!holder)return;
+    holder.insertAdjacentHTML('afterend',panelHTML(prefix));
+    sel.dataset.mfpmReady='1';
+    sel.addEventListener('change',()=>window.mfPMUpdateInline(prefix));
+    window.mfPMUpdateInline(prefix);
+  }
+  window.mfPMInitPanels=function(){
+    ['fc-disbursal-mode','ps-mode','ex-mode','lp-mode','pay-mode','rp-mode','fc-s-mode','pm-mode','b-received-mode','bulk-emi-payment-mode'].forEach(id=>addPanel($(id)));
+    // Bulk rows are rendered on demand; attach source panels to each per-EMI mode selector too.
+    document.querySelectorAll('select.bulk-emi-row-mode[id]').forEach(addPanel);
+  };
+  window.mfPMResetInline=function(prefix){
+    if(mixedDraft[prefix])delete mixedDraft[prefix];
+    ['bank','channel','upi','ref','cheque','note'].forEach(k=>{const el=$(`mfpm-${prefix}-${k}`);if(el)el.value='';});
+    if($(prefix))window.mfPMUpdateInline(prefix);
+  };
+  window.mfPMSetInlineMeta=function(prefix,meta){
+    const mode=$(prefix);if(!mode)return;if(!meta){window.mfPMResetInline(prefix);return;}
+    if(Array.isArray(meta.components)&&meta.components.length){mixedDraft[prefix]=meta.components.map(c=>({mode:c.mode||'Cash',amount:String(c.amount??''),bankId:c.bankAccountId||c.paymentMeta?.bankAccountId||'',upiId:c.upiSourceId||c.paymentMeta?.upiSourceId||'',ref:c.reference||c.paymentMeta?.reference||''}));mode.value='Mixed';window.mfPMUpdateInline(prefix);renderMixedRows(prefix);return;}
+    const bank=$(`mfpm-${prefix}-bank`),channel=$(`mfpm-${prefix}-channel`),upi=$(`mfpm-${prefix}-upi`),ref=$(`mfpm-${prefix}-ref`),cheque=$(`mfpm-${prefix}-cheque`),note=$(`mfpm-${prefix}-note`);
+    if(bank)bank.value=meta.bankAccountId||'';window.mfPMUpdateInline(prefix);if(channel)channel.value=meta.channel||'';if(upi)upi.value=meta.upiSourceId||'';if(ref)ref.value=meta.reference||'';if(cheque)cheque.value=meta.chequeNo||'';if(note)note.value=meta.narration||'';
+  };
+  window.mfPMRefreshInline=function(prefix){
+    const bank=$(`mfpm-${prefix}-bank`),upi=$(`mfpm-${prefix}-upi`);
+    if(bank&&upi){const old=upi.value;upi.innerHTML=optsUpi(bank.value,old);}
+  };
+  window.mfPMUpdateInline=function(prefix){
+    const sel=$(prefix),panel=$(`mfpm-inline-${prefix}`); if(!sel||!panel)return;
+    const kind=modeKind(sel.value);
+    panel.style.display=kind==='CASH'?'none':'block';
+    const mixed=$(`mfpm-${prefix}-mixed`);
+    if(mixed)mixed.style.display=kind==='MIXED'?'block':'none';
+    const bankField=panel.querySelector('.mfpm-bank-field'),channelField=panel.querySelector('.mfpm-channel-field'),upiField=panel.querySelector('.mfpm-upi-field'),chequeField=panel.querySelector('.mfpm-cheque-field');
+    if(bankField)bankField.style.display=kind==='MIXED'?'none':(kind==='CASH'?'none':'block');
+    if(channelField)channelField.style.display=kind==='MIXED'?'none':(kind==='CASH'?'none':'block');
+    if(upiField)upiField.style.display=kind==='UPI'?'block':'none';
+    if(chequeField)chequeField.style.display=kind==='CHEQUE'?'block':'none';
+    const channel=$(`mfpm-${prefix}-channel`);
+    if(channel&&kind!=='MIXED'){
+      if(kind==='UPI')channel.value='UPI';
+      else if(kind==='CHEQUE')channel.value=String(sel.value).toLowerCase().includes('dd')?'DD':'CHEQUE';
+      else if(kind==='BANK'&&channel.value==='UPI')channel.value='';
+    }
+    window.mfPMRefreshInline(prefix);
+    if(kind==='MIXED'&&!mixedDraft[prefix])mixedDraft[prefix]=[{mode:'Cash',amount:'',bankId:'',upiId:'',ref:''}];
+    if(kind==='MIXED')renderMixedRows(prefix);
+  };
+  function renderMixedRows(prefix){
+    const host=$(`mfpm-${prefix}-mixed-rows`);if(!host)return;
+    const rows=mixedDraft[prefix]||[];
+    host.innerHTML=rows.map((r,i)=>`<div class="mfpm-mixed-row" data-mixed-index="${i}">
+      <div><label>Component Mode</label><select data-k="mode" onchange="mfPMMixedChange('${prefix}',${i},'mode',this.value)"><option value="Cash" ${r.mode==='Cash'?'selected':''}>Cash</option><option value="UPI" ${r.mode==='UPI'?'selected':''}>UPI</option><option value="Bank Transfer" ${r.mode==='Bank Transfer'?'selected':''}>Bank Transfer</option><option value="Cheque / DD" ${r.mode==='Cheque / DD'?'selected':''}>Cheque / DD</option></select></div>
+      <div><label>Amount (₹)</label><input data-k="amount" type="number" min="0.01" step="0.01" value="${esc(r.amount)}" onchange="mfPMMixedChange('${prefix}',${i},'amount',this.value)"></div>
+      <div style="${r.mode==='Cash'?'display:none':''}"><label>Bank Account</label><select data-k="bankId" onchange="mfPMMixedChange('${prefix}',${i},'bankId',this.value)">${optsBanks(r.bankId)}</select></div>
+      <div style="${r.mode==='UPI'?'':'display:none'}"><label>UPI ID</label><select data-k="upiId" onchange="mfPMMixedChange('${prefix}',${i},'upiId',this.value)">${optsUpi(r.bankId,r.upiId)}</select></div>
+      <div><label>Reference / Cheque No.</label><input data-k="ref" value="${esc(r.ref||'')}" onchange="mfPMMixedChange('${prefix}',${i},'ref',this.value)"></div>
+      ${rows.length>1?`<button type="button" class="mfpm-mini-btn" onclick="mfPMRemoveMixedRow('${prefix}',${i})">Remove</button>`:''}
+    </div>`).join('');
+    const total=rows.reduce((n,r)=>n+(Number(r.amount)||0),0);
+    const out=$(`mfpm-${prefix}-mixed-total`);if(out)out.textContent='Component Total: '+money(total);
+  }
+  window.mfPMMixedChange=function(prefix,index,key,value){
+    if(!mixedDraft[prefix])mixedDraft[prefix]=[];
+    const row=mixedDraft[prefix][index];if(!row)return;
+    row[key]=value;
+    if(key==='mode'){row.bankId='';row.upiId='';}
+    if(key==='bankId')row.upiId='';
+    renderMixedRows(prefix);
+  };
+  window.mfPMAddMixedRow=function(prefix){mixedDraft[prefix]=mixedDraft[prefix]||[];mixedDraft[prefix].push({mode:'Cash',amount:'',bankId:'',upiId:'',ref:''});renderMixedRows(prefix);};
+  window.mfPMRemoveMixedRow=function(prefix,index){mixedDraft[prefix]=(mixedDraft[prefix]||[]).filter((_,i)=>i!==index);renderMixedRows(prefix);};
+  function mfPMAudit(action,entityType,entityId,before=null,after=null){
+    ensure();
+    const safe=x=>{if(!x)return null;const y=JSON.parse(JSON.stringify(x));if(y.accountNumber)y.accountNumber=masked(y.accountNumber);if(Array.isArray(y.upiSources))y.upiSources=y.upiSources.map(u=>({...u}));return y;};
+    state.paymentAuditLog.push({id:makeId('PMAUDIT'),timestamp:new Date().toISOString(),action,entityType,entityId:String(entityId||''),deviceId:String(window.mfFirebaseDeviceId||localStorage.getItem('MF_DEVICE_ID_V2_FINAL_CLEAN')||'LOCAL'),before:safe(before),after:safe(after)});
+    if(state.paymentAuditLog.length>5000)state.paymentAuditLog.splice(0,state.paymentAuditLog.length-5000);
+  }
+  function renderAudit(){const el=$('mfpm-audit-list');if(!el)return;const rows=(state.paymentAuditLog||[]).slice().reverse().slice(0,50);el.innerHTML=rows.length?`<table class="mfpm-table"><thead><tr><th>Timestamp</th><th>Action</th><th>Record</th><th>Device</th><th>Summary</th></tr></thead><tbody>${rows.map(a=>`<tr><td>${esc(a.timestamp||'')}</td><td>${esc(a.action||'')}</td><td>${esc(a.entityType||'')}<br>${esc(a.entityId||'')}</td><td>${esc(a.deviceId||'LOCAL')}</td><td>${esc(a.after?.bankName||a.after?.appName||a.after?.type||a.after?.status||'Source record change')}</td></tr>`).join('')}</tbody></table>`:'<div class="mfpm-note">No Payment Management master changes recorded yet.</div>';}
+  window.mfPMAudit=mfPMAudit;
+  window.mfPMReadInlineMeta=function(prefix,amount,mode,direction='IN'){
+    const kind=modeKind(mode),panel=$(`mfpm-inline-${prefix}`);
+    if(kind==='CASH')return {ok:true,meta:{transactionId:makeId('TXN'),recordedAt:new Date().toISOString(),deviceId:String(window.mfFirebaseDeviceId||'LOCAL'),mode:'Cash',channel:'CASH',direction,transactionAmount:Number(amount)||0,bankAccountId:'',upiSourceId:'',reference:'',narration:'',components:[]}};
+    if(!panel){alert('Payment source panel is not ready. Reopen the payment form and try again.');return {ok:false};}
+    if(kind==='MIXED'){
+      const rows=(mixedDraft[prefix]||[]).map(r=>({...r,amount:Number(r.amount)||0})).filter(r=>r.amount>0);
+      if(!rows.length){alert('Mixed Payment requires at least one component with a positive amount.');return {ok:false};}
+      const sum=rows.reduce((n,r)=>n+r.amount,0);
+      if(Number(amount)>0&&Math.abs(sum-Number(amount))>0.009){alert(`Mixed Payment total ${money(sum)} does not match the transaction amount ${money(amount)}.`);return {ok:false};}
+      for(const r of rows){
+        if(r.mode!=='Cash'&&!r.bankId){alert('Select the bank account for every non-cash Mixed Payment component.');return {ok:false};}
+        if(r.mode==='UPI'&&!r.upiId){alert('Select the bank-linked UPI ID for every UPI component.');return {ok:false};}
+        if(r.bankId&&!accountById(r.bankId)){alert('A selected bank account no longer exists. Refresh the Payment Management source list.');return {ok:false};}
+        if(r.upiId&&!upiById(r.bankId,r.upiId)){alert('A selected UPI ID is not linked to the chosen bank.');return {ok:false};}
+      }
+      return {ok:true,meta:{transactionId:makeId('TXN'),recordedAt:new Date().toISOString(),deviceId:String(window.mfFirebaseDeviceId||'LOCAL'),mode:'Mixed',channel:'MIXED',direction,transactionAmount:Number(amount)||sum,components:rows.map(r=>{const a=accountById(r.bankId),u=upiById(r.bankId,r.upiId);return {componentId:makeId('COMP'),mode:r.mode,amount:r.amount,bankAccountId:r.bankId||'',bankNameSnapshot:a?.bankName||'',accountHolderSnapshot:a?.accountHolder||'',accountMaskedSnapshot:a?masked(a.accountNumber):'',branchSnapshot:a?.branch||'',ifscSnapshot:a?.ifsc||'',upiSourceId:r.upiId||'',upiAppSnapshot:u?.appName||'',upiIdSnapshot:u?.upiId||'',reference:r.ref||'',channel:r.mode==='UPI'?'UPI':r.mode==='Cheque / DD'?'CHEQUE/DD':r.mode==='Bank Transfer'?'BANK_TRANSFER':'CASH'};})}};
+    }
+    const bankId=$(`mfpm-${prefix}-bank`)?.value||'',channel=$(`mfpm-${prefix}-channel`)?.value||'',upiId=$(`mfpm-${prefix}-upi`)?.value||'',reference=$(`mfpm-${prefix}-ref`)?.value?.trim()||'',chequeNo=$(`mfpm-${prefix}-cheque`)?.value?.trim()||'',narration=$(`mfpm-${prefix}-note`)?.value?.trim()||'';
+    if(!bankId){alert('Choose the bank account first in Payment Source Details. Add the bank under Payment Management if it is not listed.');return {ok:false};}
+    if(!accountById(bankId)){alert('Selected bank account is no longer active. Refresh the form and choose an active account.');return {ok:false};}
+    if(kind==='UPI'&&!upiId){alert('Choose a UPI ID linked to the selected bank. Add it from Payment Management → Manage UPI IDs.');return {ok:false};}
+    if(kind==='BANK'&&!channel){alert('Choose the actual bank transfer channel (NEFT, RTGS, IMPS or Other Bank Transfer).');return {ok:false};}
+    if(kind==='CHEQUE'&&(!channel||!chequeNo)){alert('Select Cheque/DD channel and enter its number.');return {ok:false};}
+    const u=upiId?upiById(bankId,upiId):null;
+    return {ok:true,meta:{transactionId:makeId('TXN'),recordedAt:new Date().toISOString(),deviceId:String(window.mfFirebaseDeviceId||'LOCAL'),mode:kind,channel:kind==='UPI'?'UPI':channel,bankAccountId:bankId,bankNameSnapshot:accountById(bankId)?.bankName||'',accountHolderSnapshot:accountById(bankId)?.accountHolder||'',accountMaskedSnapshot:masked(accountById(bankId)?.accountNumber||''),branchSnapshot:accountById(bankId)?.branch||'',ifscSnapshot:accountById(bankId)?.ifsc||'',upiSourceId:upiId,upiApp:u?.appName||'',upiId:u?.upiId||'',reference,chequeNo,narration,direction,transactionAmount:Number(amount)||0,components:[]}};
+  };
+
+  window.openPaymentManagement=function(){ensure();window.mfPMInitPanels();mfPMRender();$('modal-payment-management')?.classList.add('active');};
+  function populateStatementBank(){const el=$('mfpm-statement-bank');if(!el)return;const old=el.value;el.innerHTML=optsBanks(old);}
+  function renderStatementLines(){
+    const el=$('mfpm-statement-lines');if(!el)return;const rows=(state.paymentStatementLines||[]).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    const count=rows.length,matched=rows.filter(x=>x.status==='MATCHED').length,diff=rows.filter(x=>x.status==='DIFFERENCE').length,unmatched=rows.filter(x=>x.status!=='MATCHED'&&x.status!=='DIFFERENCE').length;
+    const status=$('mfpm-statement-status');if(status&&count)status.innerHTML=`Imported ${count} lines · Matched ${matched} · Differences ${diff} · Unmatched ${unmatched}. Matching is informational only; review differences before closing the period.`;
+    el.innerHTML=rows.length?`<table class="mfpm-table"><thead><tr><th>Date</th><th>Bank</th><th>Direction</th><th>Amount</th><th>Reference</th><th>Description</th><th>Match Status</th><th>Matched Ledger Entry</th><th>Action</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.date||'-')}</td><td>${esc(accountById(r.bankAccountId)?.bankName||'-')}</td><td>${esc(r.direction||'-')}</td><td class="money">${money(r.amount)}</td><td>${esc(r.reference||'-')}</td><td>${esc(r.narration||'-')}</td><td>${esc(r.status||'UNMATCHED')}</td><td>${esc(r.matchedType||'-')}<br>${esc(r.matchedLedgerId||'')}${r.difference?'<br>Difference '+money(r.difference):''}</td><td>${r.status==='MATCHED'||r.status==='DIFFERENCE'?`<button class="mfpm-mini-btn" onclick="mfPMUnmatchStatement('${esc(r.id)}')">Clear Match</button>`:'-'}</td></tr>`).join('')}</tbody></table>`:'<div class="mfpm-note">No bank statement lines imported yet.</div>';
+  }
+  function statementDate(v){
+    if(v instanceof Date&&!isNaN(v)){return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;}
+    if(typeof v==='number'&&window.XLSX?.SSF?.parse_date_code){const d=XLSX.SSF.parse_date_code(v);if(d)return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;}
+    const t=String(v??'').trim();if(!t)return '';
+    let m=t.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);if(m)return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+    const d=new Date(t);return isNaN(d)?'':`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function statementAmount(v){const n=Number(String(v??'').replace(/[₹,\s]/g,''));return Number.isFinite(n)?Math.round(n*100)/100:0;}
+  window.mfPMImportStatement=async function(){
+    ensure();const bankId=$('mfpm-statement-bank')?.value,file=$('mfpm-statement-file')?.files?.[0];if(!bankId||!accountById(bankId)){alert('Select the bank account for this statement.');return;}if(!file){alert('Choose a CSV or Excel bank statement file.');return;}if(typeof XLSX==='undefined'){alert('The spreadsheet import library is not available.');return;}
+    try{
+      const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array',cellDates:true}),ws=wb.Sheets[wb.SheetNames[0]],raw=XLSX.utils.sheet_to_json(ws,{defval:'',raw:true});if(!raw.length){alert('No statement rows were found in the first worksheet.');return;}
+      const keys=Object.keys(raw[0]||{}),findKey=patterns=>keys.find(k=>patterns.some(p=>p.test(String(k).trim())));
+      const dateKey=findKey([/^date$/i,/txn.*date/i,/transaction.*date/i,/posting.*date/i,/value.*date/i]);
+      const amountKey=findKey([/^amount$/i,/transaction.*amount/i,/txn.*amount/i]);
+      const debitKey=findKey([/^debit$/i,/debit/i,/withdrawal/i,/money.*out/i,/paid.*out/i]);const creditKey=findKey([/^credit$/i,/credit/i,/deposit/i,/money.*in/i,/paid.*in/i]);
+      const refKey=findKey([/utr/i,/rrn/i,/reference/i,/transaction.*id/i,/cheque.*no/i,/ref.*no/i]);
+      const descKey=findKey([/narration/i,/description/i,/particular/i,/remarks/i,/details/i]);const dirKey=findKey([/^type$/i,/dr.?cr/i,/direction/i,/debit.?credit/i]);
+      if(!dateKey||(!amountKey&&!debitKey&&!creditKey)){alert('Could not identify the required Date and Amount or Debit/Credit columns. Use clear column headings and try again.');return;}
+      const imported=[],seen=new Set((state.paymentStatementLines||[]).map(x=>[x.bankAccountId,x.date,x.direction,Number(x.amount).toFixed(2),String(x.reference||'').toLowerCase()].join('|')));
+      raw.forEach(row=>{
+        const date=statementDate(row[dateKey]);if(!date)return;let amount=0,direction='';
+        const debit=debitKey?statementAmount(row[debitKey]):0,credit=creditKey?statementAmount(row[creditKey]):0;
+        if(debit>0||credit>0){amount=debit>0?debit:credit;direction=debit>0?'OUT':'IN';}
+        else{const rawAmount=statementAmount(row[amountKey]);amount=Math.abs(rawAmount);const dv=String(dirKey?row[dirKey]:'').toLowerCase();direction=rawAmount<0||/debit|withdraw|paid.?out|dr\b/.test(dv)?'OUT':/credit|deposit|received|cr\b/.test(dv)?'IN':'';}
+        if(!(amount>0)||!direction)return;const reference=String(refKey?row[refKey]:'').trim(),narration=String(descKey?row[descKey]:'').trim(),sig=[date,direction,amount.toFixed(2),reference].join('|');if(seen.has(sig))return;seen.add(sig);
+        imported.push({id:makeId('STMT'),bankAccountId:bankId,date,amount,direction,reference,narration,status:'UNMATCHED',matchedLedgerId:'',matchedType:'',difference:0,importedAt:new Date().toISOString(),fileName:file.name});
+      });
+      if(!imported.length){alert('No valid debit/credit statement rows were found. Check the Date, Amount, Debit/Credit and Type columns.');return;}
+      state.paymentStatementLines.push(...imported);mfPMAudit('IMPORT','Bank Statement',bankId,null,{fileName:file.name,lineCount:imported.length});persist();mfPMRender();
+      const status=$('mfpm-statement-status');if(status)status.textContent=`Imported ${imported.length} statement lines from ${file.name}. Click Auto Match to reconcile them against recorded source transactions.`;
+    }catch(err){console.error('Statement import failed',err);alert('Could not import this statement. Check the file format and column headings.');}
+  };
+  function ledgerRowsForBank(bankId){
+    const out=[];collectLedgerRows().forEach(r=>{
+      const dir=r.direction==='INTERNAL'?(String(r.type).includes('Deposit')?'IN':'OUT'):r.direction==='TRANSFER'?(String(r.type).includes('In')?'IN':'OUT'):r.direction;
+      if(r.meta?.components?.length){r.meta.components.forEach(c=>{if(String(c.bankAccountId||'')===String(bankId))out.push({...r,id:c.componentId||r.id,amount:Number(c.amount)||0,direction:dir,reference:c.reference||r.reference||r.meta?.reference||'',meta:{...c,bankAccountId:c.bankAccountId||'',upiSourceId:c.upiSourceId||''}});});}
+      else if(String(r.meta?.bankAccountId||'')===String(bankId))out.push({...r,direction:dir,reference:r.reference||r.meta?.reference||''});
+    });return out;
+  }
+  window.mfPMAutoReconcile=function(){
+    ensure();const bankId=$('mfpm-statement-bank')?.value;if(!bankId){alert('Select the bank account whose statement you want to reconcile.');return;}
+    const ledger=ledgerRowsForBank(bankId),used=new Set((state.paymentStatementLines||[]).filter(x=>x.status==='MATCHED').map(x=>x.matchedLedgerId));let matched=0,differences=0;
+    (state.paymentStatementLines||[]).filter(x=>x.bankAccountId===bankId&&x.status!=='MATCHED').forEach(line=>{
+      const dateDistance=r=>Math.abs((new Date(r.date+'T00:00:00').getTime()-new Date(line.date+'T00:00:00').getTime())/86400000);
+      const available=ledger.filter(r=>!used.has(String(r.id))&&r.direction===line.direction&&dateDistance(r)<=3);
+      const exactRef=available.filter(r=>line.reference&&r.reference&&String(r.reference).toLowerCase()===String(line.reference).toLowerCase());
+      const exactAmount=(exactRef.length?exactRef:available).filter(r=>Math.abs(Number(r.amount)-Number(line.amount))<0.01);
+      if(exactAmount.length===1){const r=exactAmount[0];line.status='MATCHED';line.matchedLedgerId=String(r.id);line.matchedType=r.type;line.difference=0;line.matchReason=line.reference?'Reference + amount + date':'Amount + direction + date';used.add(String(r.id));matched++;return;}
+      const refDiff=exactRef.find(r=>Math.abs(Number(r.amount)-Number(line.amount))>=0.01);
+      if(refDiff){line.status='DIFFERENCE';line.matchedLedgerId=String(refDiff.id);line.matchedType=refDiff.type;line.difference=Math.round((Number(line.amount)-Number(refDiff.amount))*100)/100;line.matchReason='Reference matched, amount differs';used.add(String(refDiff.id));differences++;}
+      else{line.status='UNMATCHED';line.matchedLedgerId='';line.matchedType='';line.difference=0;line.matchReason='No unique match found';}
+    });
+    mfPMAudit('AUTO_RECONCILE','Bank Statement',bankId,null,{matched,differences,checked:(state.paymentStatementLines||[]).filter(x=>x.bankAccountId===bankId).length});persist();mfPMRender();
+    const status=$('mfpm-statement-status');if(status)status.textContent=`Auto Match complete: ${matched} matched, ${differences} amount differences. Remaining lines require review. No financial transaction was changed.`;
+  };
+  window.mfPMUnmatchStatement=function(id){const line=(state.paymentStatementLines||[]).find(x=>x.id===id);if(!line)return;const before={...line};line.status='UNMATCHED';line.matchedLedgerId='';line.matchedType='';line.difference=0;line.matchReason='Manually cleared';mfPMAudit('UNMATCH','Bank Statement Line',id,before,line);persist();mfPMRender();};
+  function populateStatementBank(){const el=$('mfpm-statement-bank');if(!el)return;const old=el.value;el.innerHTML=optsBanks(old);}
+  function renderStatementLines(){const el=$('mfpm-statement-lines');if(!el)return;const rows=(state.paymentStatementLines||[]).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));const matched=rows.filter(x=>x.status==='MATCHED').length,diff=rows.filter(x=>x.status==='DIFFERENCE').length,unmatched=rows.filter(x=>x.status!=='MATCHED'&&x.status!=='DIFFERENCE').length;const status=$('mfpm-statement-status');if(status&&rows.length)status.textContent=`Imported ${rows.length} lines · Matched ${matched} · Differences ${diff} · Unmatched ${unmatched}. Matching is informational only; review differences before closing the period.`;el.innerHTML=rows.length?`<table class="mfpm-table"><thead><tr><th>Date</th><th>Bank</th><th>Direction</th><th>Amount</th><th>Reference</th><th>Description</th><th>Status</th><th>Matched Entry</th><th>Action</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.date||'-')}</td><td>${esc(accountById(r.bankAccountId)?.bankName||'-')}</td><td>${esc(r.direction||'-')}</td><td class="money">${money(r.amount)}</td><td>${esc(r.reference||'-')}</td><td>${esc(r.narration||'-')}</td><td>${esc(r.status||'UNMATCHED')}</td><td>${esc(r.matchedType||'-')}<br>${esc(r.matchedLedgerId||'')}${r.difference?'<br>Difference '+money(r.difference):''}</td><td>${r.status==='MATCHED'||r.status==='DIFFERENCE'?`<button class="mfpm-mini-btn" onclick="mfPMUnmatchStatement('${esc(r.id)}')">Clear Match</button>`:'-'}</td></tr>`).join('')}</tbody></table>`:'<div class="mfpm-note">No bank statement lines imported yet.</div>';}
+  window.mfPMRender=function(){ensure();renderKpis();renderBanks();renderMovements();populateLedgerBankFilter();populateStatementBank();renderStatementLines();renderLedger();renderAudit();document.querySelectorAll('.mfpm-inline[data-prefix]').forEach(p=>{const prefix=p.dataset.prefix,bank=$(`mfpm-${prefix}-bank`),old=bank?.value||'';if(bank)bank.innerHTML=optsBanks(old);window.mfPMRefreshInline(prefix);if(mixedDraft[prefix])renderMixedRows(prefix);});};
+  function renderKpis(){
+    const ac=activeBanks(),upis=ac.reduce((n,a)=>n+(a.upiSources||[]).filter(u=>u.active!==false).length,0);
+    const rows=collectLedgerRows(),inflow=rows.filter(r=>r.direction==='IN').reduce((n,r)=>n+r.amount,0),outflow=rows.filter(r=>r.direction==='OUT').reduce((n,r)=>n+r.amount,0);
+    const el=$('mfpm-kpis');if(el)el.innerHTML=`<div class="mfpm-kpi"><small>Active Bank Accounts</small><b>${ac.length}</b></div><div class="mfpm-kpi"><small>Active Bank-linked UPI IDs</small><b>${upis}</b></div><div class="mfpm-kpi"><small>Source-tagged Money In</small><b>${money(inflow)}</b></div><div class="mfpm-kpi"><small>Source-tagged Money Out</small><b>${money(outflow)}</b></div><div class="mfpm-kpi"><small>Calculated Cash in Hand</small><b>${money(cashBalance())}</b></div>`;
+    const opening=$('mfpm-cash-opening'),balance=$('mfpm-cash-balance');if(opening&&document.activeElement!==opening)opening.value=String(Number(state.paymentCashOpeningBalance)||0);if(balance)balance.textContent=money(cashBalance());
+  }
+  function renderBanks(){
+    const el=$('mfpm-bank-list');if(!el)return;
+    const rows=(state.paymentAccounts||[]);
+    el.innerHTML=rows.length?rows.map(a=>{
+      const upis=(a.upiSources||[]).filter(u=>u.active!==false);
+      return `<div class="mfpm-bank-card"><div class="mfpm-bank-title"><b>${esc(a.bankName)} · ${esc(a.accountHolder||'Account')}</b><span class="mfpm-status">${a.active===false?'Inactive':'Active'}</span></div>
+        <div class="mfpm-bank-meta">Branch: ${esc(a.branch||'-')} · IFSC: ${esc(a.ifsc||'-')}<br>Account: ${esc(masked(a.accountNumber))} · Type: ${esc(a.accountType||'-')}<br>Registered Mobile: ${esc(a.registeredMobile||'-')}<br>Opening Balance: ${money(a.openingBalance||0)} · Calculated Source Balance: <b>${money(accountBalance(a.id))}</b><br>Active UPI IDs: ${upis.length}</div>
+        <div class="mfpm-actions"><button class="btn-header btn-blue" onclick="mfPMOpenBankForm('${esc(a.id)}')"><i class="fa-solid fa-pen"></i> Edit</button><button class="btn-header btn-blue" onclick="mfPMOpenUpi('${esc(a.id)}')"><i class="fa-solid fa-qrcode"></i> Manage UPI IDs</button><button class="btn-header" onclick="mfPMToggleBank('${esc(a.id)}')">${a.active===false?'Activate':'Deactivate'}</button></div></div>`;
+    }).join(''):'<div class="mfpm-note">No bank accounts configured yet. Add HDFC, Axis, SBI or any other account once. UPI IDs are managed inside each bank account.</div>';
+  }
+  window.mfPMOpenBankForm=function(id=''){
+    ensure();const a=accountById(id);
+    $('mfpm-bank-form').reset();$('mfpm-bank-id').value=a?.id||'';
+    $('mfpm-bank-form-title').textContent=a?'Edit Bank Account':'Add Bank Account';
+    $('mfpm-bank-name').value=a?.bankName||'';$('mfpm-bank-holder').value=a?.accountHolder||'';
+    $('mfpm-bank-branch').value=a?.branch||'';$('mfpm-bank-ifsc').value=a?.ifsc||'';
+    $('mfpm-bank-number').value=a?.accountNumber||'';$('mfpm-bank-mobile').value=a?.registeredMobile||'';
+    $('mfpm-bank-type').value=a?.accountType||'Current';$('mfpm-bank-opening').value=String(a?.openingBalance??0);
+    $('mfpm-bank-notes').value=a?.notes||'';$('modal-mfpm-bank-form').classList.add('active');
+  };
+  window.mfPMSaveBank=function(e){
+    e.preventDefault();ensure();
+    const name=$('mfpm-bank-name').value.trim(),holder=$('mfpm-bank-holder').value.trim(),branch=$('mfpm-bank-branch').value.trim(),ifsc=$('mfpm-bank-ifsc').value.trim().toUpperCase(),num=$('mfpm-bank-number').value.trim(),mobile=$('mfpm-bank-mobile').value.trim(),opening=Number($('mfpm-bank-opening').value)||0,id=$('mfpm-bank-id').value;
+    if(!name||!holder||!branch||!ifsc||!num){alert('Bank name, account holder, branch, IFSC and account number are required.');return;}if(!Number.isFinite(opening)||opening<0){alert('Opening balance cannot be negative.');return;}
+    if(!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)){alert('IFSC format is not valid. Check the 11-character bank IFSC.');return;}
+    if(!/^\d{6,20}$/.test(num)){alert('Account number should contain 6–20 digits only.');return;}
+    if(!/^\d{10,15}$/.test(mobile)&&mobile){alert('Enter a valid registered mobile number (10–15 digits) or leave blank.');return;}
+    const duplicate=(state.paymentAccounts||[]).find(a=>a.id!==id&&String(a.accountNumber)===num&&String(a.ifsc).toUpperCase()===ifsc);
+    if(duplicate){alert('This bank account and IFSC already exist in Payment Management.');return;}
+    const prev=accountById(id);
+    const rec={id:id||makeId('BANK'),bankName:name,accountHolder:holder,branch,ifsc,accountNumber:num,registeredMobile:mobile,accountType:$('mfpm-bank-type').value,openingBalance:Math.round(opening*100)/100,notes:$('mfpm-bank-notes').value.trim(),active:prev?prev.active!==false:true,upiSources:prev?.upiSources||[],createdAt:prev?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
+    if(prev){const i=state.paymentAccounts.findIndex(a=>a.id===id);state.paymentAccounts[i]=rec;}else state.paymentAccounts.push(rec);
+    mfPMAudit(prev?'UPDATE':'CREATE','Bank Account',rec.id,prev,rec);
+    closeModal('modal-mfpm-bank-form');persist();mfPMRender();
+  };
+  window.mfPMToggleBank=function(id){const a=accountById(id);if(!a)return;if(a.active!==false&&((state.loans||[]).some(l=>l.disbursalPaymentMeta?.bankAccountId===id)||(state.loans||[]).some(l=>(l.payments||[]).some(p=>p.paymentMeta?.bankAccountId===id)))){if(!confirm('This account is referenced by transactions. Deactivate it? Historical records will remain linked.'))return;}const before={...a};a.active=a.active===false;a.updatedAt=new Date().toISOString();mfPMAudit(a.active?'ACTIVATE':'DEACTIVATE','Bank Account',id,before,a);persist();mfPMRender();};
+  window.mfPMOpenUpi=function(bankId){
+    const a=accountById(bankId);if(!a){alert('Bank account not found.');return;}
+    $('mfpm-upi-form').reset();$('mfpm-upi-bank-id').value=bankId;$('mfpm-upi-id').value='';
+    $('mfpm-upi-title').textContent='Manage UPI IDs — '+a.bankName;
+    $('mfpm-upi-bank-summary').textContent=`${a.accountHolder} · ${a.bankName} · ${masked(a.accountNumber)} · ${a.branch}`;
+    $('mfpm-upi-custom-wrap').style.display='none';renderUpiList(a);$('modal-mfpm-upi').classList.add('active');
+  };
+  function renderUpiList(a){
+    const el=$('mfpm-upi-list');if(!el)return;
+    const rows=a.upiSources||[];
+    el.innerHTML='<div style="font-size:.69rem;font-weight:800;color:#fff;margin:12px 0 6px">Saved UPI IDs</div>'+(rows.length?rows.map(u=>`<div class="mfpm-upi-row"><span><b>${esc(u.appName)}</b> · ${esc(u.upiId)} · ${esc(u.registeredMobile||'No mobile')} · ${u.active===false?'Inactive':'Active'}</span><div class="mfpm-actions"><button type="button" class="btn-header btn-blue" onclick="mfPMEditUpi('${esc(a.id)}','${esc(u.id)}')">Edit</button><button type="button" class="btn-header" onclick="mfPMToggleUpi('${esc(a.id)}','${esc(u.id)}')">${u.active===false?'Activate':'Deactivate'}</button></div></div>`).join(''):'<div class="mfpm-note">No UPI IDs linked to this bank yet.</div>');
+  }
+  window.mfPMEditUpi=function(bankId,upiId){
+    const a=accountById(bankId),u=upiById(bankId,upiId);if(!a||!u)return;
+    $('mfpm-upi-bank-id').value=bankId;$('mfpm-upi-id').value=upiId;
+    const known=['PhonePe','Google Pay','Paytm','BHIM'];
+    $('mfpm-upi-app').value=known.includes(u.appName)?u.appName:'Other';
+    $('mfpm-upi-custom-wrap').style.display=known.includes(u.appName)?'none':'block';
+    $('mfpm-upi-custom').value=known.includes(u.appName)?'':u.appName;
+    $('mfpm-upi-vpa').value=u.upiId||'';$('mfpm-upi-mobile').value=u.registeredMobile||'';$('mfpm-upi-active').value=String(u.active!==false);
+  };
+  window.mfPMSaveUpi=function(e){
+    e.preventDefault();const bankId=$('mfpm-upi-bank-id').value,a=accountById(bankId);if(!a)return;
+    const rawApp=$('mfpm-upi-app').value,app=rawApp==='Other'?$('mfpm-upi-custom').value.trim():rawApp,vpa=$('mfpm-upi-vpa').value.trim(),mobile=$('mfpm-upi-mobile').value.trim(),id=$('mfpm-upi-id').value;
+    if(!app||!vpa||!vpa.includes('@')||/\s/.test(vpa)){alert('Enter an app name and a valid-looking UPI ID without spaces.');return;}
+    if(!/^\d{10,15}$/.test(mobile)&&mobile){alert('Enter a valid UPI registered mobile number or leave blank.');return;}
+    a.upiSources=Array.isArray(a.upiSources)?a.upiSources:[];
+    const dupe=a.upiSources.find(u=>u.id!==id&&u.upiId.toLowerCase()===vpa.toLowerCase());if(dupe){alert('This UPI ID is already linked to this bank.');return;}
+    const prev=upiById(bankId,id),rec={id:id||makeId('UPI'),appName:app,upiId:vpa,registeredMobile:mobile,active:$('mfpm-upi-active').value==='true',createdAt:prev?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
+    if(prev){const i=a.upiSources.findIndex(u=>u.id===id);a.upiSources[i]=rec;}else a.upiSources.push(rec);
+    mfPMAudit(prev?'UPDATE':'CREATE','UPI Source',rec.id,prev,rec);
+    $('mfpm-upi-id').value='';$('mfpm-upi-form').reset();$('mfpm-upi-bank-id').value=bankId;$('mfpm-upi-active').value='true';$('mfpm-upi-custom-wrap').style.display='none';
+    persist();renderUpiList(a);mfPMRender();
+  };
+  window.mfPMToggleUpi=function(bankId,upiId){const u=upiById(bankId,upiId);if(!u)return;const before={...u};u.active=u.active===false;u.updatedAt=new Date().toISOString();mfPMAudit(u.active?'ACTIVATE':'DEACTIVATE','UPI Source',upiId,before,u);persist();renderUpiList(accountById(bankId));mfPMRender();};
+  $('mfpm-upi-app')?.addEventListener('change',()=>{$('mfpm-upi-custom-wrap').style.display=$('mfpm-upi-app').value==='Other'?'block':'none';});
+
+  window.mfPMOpenMovementForm=function(){
+    ensure();$('mfpm-movement-form').reset();$('mfpm-movement-date').value=today();
+    const options=optsBanks();$('mfpm-movement-bank').innerHTML=options;$('mfpm-movement-to').innerHTML=options;
+    $('modal-mfpm-movement').classList.add('active');mfPMUpdateMovementFields();
+  };
+  window.mfPMUpdateMovementFields=function(){
+    const type=$('mfpm-movement-type').value,to=$('mfpm-movement-to-wrap'),bank=$('mfpm-movement-bank-wrap');
+    if(type==='BANK_TRANSFER'){to.style.display='block';$('mfpm-movement-to').required=true;$('mfpm-movement-bank').innerHTML=optsBanks();$('mfpm-movement-to').innerHTML=optsBanks();}
+    else{to.style.display='none';$('mfpm-movement-to').required=false;bank.style.display='block';}
+  };
+  window.mfPMSaveMovement=function(e){
+    e.preventDefault();ensure();const type=$('mfpm-movement-type').value,amount=Number($('mfpm-movement-amount').value)||0,bankId=$('mfpm-movement-bank').value,toId=$('mfpm-movement-to').value,date=$('mfpm-movement-date').value;
+    if(!(amount>0)||!date){alert('Enter a valid date and positive amount.');return;}
+    if(type==='BANK_TRANSFER'){
+      if(!bankId||!toId||bankId===toId){alert('Choose two different bank accounts for an own-account transfer.');return;}
+      if(!accountById(bankId)||!accountById(toId)){alert('Choose valid active bank accounts.');return;}
+    }else if(!bankId||!accountById(bankId)){alert('Choose a valid bank account.');return;}
+    const row={id:makeId('MOVE'),type,date,amount:Math.round(amount*100)/100,bankAccountId:bankId,toBankAccountId:type==='BANK_TRANSFER'?toId:'',reference:$('mfpm-movement-ref').value.trim(),narration:$('mfpm-movement-note').value.trim(),createdAt:new Date().toISOString()};
+    state.paymentTransfers.push(row);mfPMAudit('CREATE','Internal Movement',row.id,null,row);closeModal('modal-mfpm-movement');persist();mfPMRender();
+  };
+
+  function collectLedgerRows(){
+    ensure();const rows=[],push=(r)=>{if(!r||!(Number(r.amount)>0))return;rows.push({...r,amount:Math.round(Number(r.amount)*100)/100});};
+    (state.loans||[]).forEach(l=>{
+      if(l.disbursalPaymentMeta)push({id:l.disbursalPaymentMeta?.transactionId||'DISB-'+l.id,date:l.disbursalDate,type:'Loan Disbursement',direction:'OUT',amount:Number(l.disbursalPaymentMeta.transactionAmount??state.products?.[l.product]?.netDisbursement??state.products?.[l.product]?.amount)||0,loanId:l.id,customer:l.name,mode:l.disbursalMode,meta:l.disbursalPaymentMeta});
+      (l.pendingParts||[]).forEach((part,i)=>{if(part.paymentMeta)push({id:`PARTIAL-${l.id}-${i+1}`,date:part.date,type:'Pending Partial Collection',direction:'IN',amount:part.amount,loanId:l.id,customer:l.name,mode:part.mode,meta:part.paymentMeta,reference:part.paymentMeta?.reference||''});});
+      (l.payments||[]).forEach((p,i)=>{
+        if(Array.isArray(p.parts)&&p.parts.length){
+          p.parts.forEach((part,j)=>{if(part.paymentMeta)push({id:part.paymentMeta?.transactionId||`EMI-${l.id}-${i+1}-${j+1}`,date:part.date||p.date,type:'EMI Collection (Partial Part)',direction:'IN',amount:part.amount,loanId:l.id,customer:l.name,mode:part.mode,meta:part.paymentMeta,reference:part.paymentMeta?.reference||''});});
+        }else if(p.paymentMeta)push({id:p.paymentMeta?.transactionId||`EMI-${l.id}-${i+1}`,date:p.date,type:'EMI Collection',direction:'IN',amount:p.amount,loanId:l.id,customer:l.name,mode:p.mode,meta:p.paymentMeta,reference:p.paymentMeta?.reference||''});
+      });
+      if(l.foreclosureData?.paymentMeta)push({id:l.foreclosureData.paymentMeta?.transactionId||'FORECLOSURE-'+l.id,date:l.foreclosureData.settlementDate,type:'Foreclosure',direction:'IN',amount:l.foreclosureData.settlementAmount,loanId:l.id,customer:l.name,mode:l.foreclosureData.mode,meta:l.foreclosureData.paymentMeta});
+      if(l.postMaturitySettlement?.paymentMeta)push({id:l.postMaturitySettlement.paymentMeta?.transactionId||'SETTLEMENT-'+l.id,date:l.postMaturitySettlement.settlementDate,type:'Post-Maturity Settlement',direction:'IN',amount:l.postMaturitySettlement.actualReceived,loanId:l.id,customer:l.name,mode:l.postMaturitySettlement.mode,meta:l.postMaturitySettlement.paymentMeta});
+      (l.penaltyReceipts||[]).forEach((p,i)=>{if(p.paymentMeta)push({id:`PENALTY-${l.id}-${i+1}`,date:p.receivedDate,type:'Penalty Receipt',direction:'IN',amount:p.amount,loanId:l.id,customer:l.name,mode:p.mode,meta:p.paymentMeta,reference:p.paymentMeta?.reference||''});});
+    });
+    (state.expenses||[]).forEach((e,i)=>{if(e.paymentMeta)push({id:e.paymentMeta?.transactionId||'EXP-'+(e.id||i),date:e.date,type:'Expense',direction:'OUT',amount:e.amount,mode:e.mode,meta:e.paymentMeta,reference:e.paymentMeta?.reference||'',narration:e.desc||e.category});});
+    (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach((p,i)=>{if(p.paymentMeta)push({id:p.paymentMeta?.transactionId||`SAL-${st.id}-${i}`,date:p.date,type:'Payroll',direction:'OUT',amount:p.amount,mode:p.mode,meta:p.paymentMeta,narration:st.name,reference:p.paymentMeta?.reference||''});}));
+    (state.borrowings||[]).forEach(b=>{
+      if(b.receivedPaymentMeta)push({id:b.receivedPaymentMeta.transactionId||'BORROW-IN-'+b.id,date:b.date||b.borrowDate,type:'Capital Borrowing Received',direction:'IN',amount:b.receivedPaymentMeta.transactionAmount??Math.max(0,(Number(b.amount)||Number(b.principal)||0)-(Number(b.processingFee)||0)-(Number(b.processingGst)||0)-(Number(b.otherCharges)||0)-(Number(b.otherGst)||0)),mode:b.receivedMode,meta:b.receivedPaymentMeta});
+      (b.repayments||[]).forEach((p,i)=>{if(p.paymentMeta)push({id:p.paymentMeta?.transactionId||`BORROW-PAY-${b.id}-${i}`,date:p.date,type:'Capital Borrowing Repayment',direction:'OUT',amount:p.totalPaid||((Number(p.principal)||0)+(Number(p.interest)||0)+(Number(p.gst)||0)),mode:p.mode,meta:p.paymentMeta,reference:p.paymentMeta?.reference||''});});
+    });
+    (state.paymentTransfers||[]).forEach(m=>{
+      if(m.status==='VOID')return;
+      if(m.type==='CASH_DEPOSIT')push({id:m.id,date:m.date,type:'Cash Deposit into Bank',direction:'INTERNAL',amount:m.amount,mode:'Cash → Bank',meta:{bankAccountId:m.bankAccountId},reference:m.reference,narration:m.narration});
+      else if(m.type==='CASH_WITHDRAWAL')push({id:m.id,date:m.date,type:'Cash Withdrawal from Bank',direction:'INTERNAL',amount:m.amount,mode:'Bank → Cash',meta:{bankAccountId:m.bankAccountId},reference:m.reference,narration:m.narration});
+      else {push({id:m.id,date:m.date,type:'Own Bank Transfer — Out',direction:'TRANSFER',amount:m.amount,mode:'Bank Transfer',meta:{bankAccountId:m.bankAccountId},reference:m.reference,narration:m.narration});push({id:m.id+'-IN',date:m.date,type:'Own Bank Transfer — In',direction:'TRANSFER',amount:m.amount,mode:'Bank Transfer',meta:{bankAccountId:m.toBankAccountId},reference:m.reference,narration:m.narration});}
+    });
+    return rows.sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  }
+  function populateLedgerBankFilter(){
+    const el=$('mfpm-ledger-bank-filter');if(!el)return;const cur=el.value||'ALL';el.innerHTML='<option value="ALL">All Bank Accounts</option>'+activeBanks().map(a=>`<option value="${esc(a.id)}">${esc(bankLabel(a))}</option>`).join('');if([...el.options].some(o=>o.value===cur))el.value=cur;
+  }
+  function renderMovements(){
+    const el=$('mfpm-movement-list');if(!el)return;const rows=(state.paymentTransfers||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,15);
+    el.innerHTML=rows.length?`<table class="mfpm-table"><thead><tr><th>Date</th><th>Movement</th><th>Bank</th><th>Amount</th><th>Reference / Narration</th><th>Status / Action</th></tr></thead><tbody>${rows.map(m=>`<tr><td>${esc(m.date)}</td><td>${esc(m.type.replaceAll('_',' '))}</td><td>${esc(accountById(m.bankAccountId)?.bankName||'-')}${m.toBankAccountId?' → '+esc(accountById(m.toBankAccountId)?.bankName||'-'):''}</td><td class="money">${money(m.amount)}</td><td>${esc(m.reference||'-')}<br>${esc(m.narration||'')}</td><td>${m.status==='VOID'?'VOIDED':'ACTIVE'} ${m.status==='VOID'?'':`<button class="mfpm-mini-btn" onclick="mfPMDeleteMovement('${esc(m.id)}')">Void</button>`}</td></tr>`).join('')}</tbody></table>`:'<div class="mfpm-note">No internal movements recorded.</div>';
+  }
+  window.mfPMDeleteMovement=function(id){const m=(state.paymentTransfers||[]).find(x=>x.id===id);if(!m||m.status==='VOID')return;if(!confirm('Void this internal movement? The original record will remain in the audit trail, but it will no longer affect the calculated source balance.'))return;const before={...m};m.status='VOID';m.voidedAt=new Date().toISOString();mfPMAudit('VOID','Internal Movement',id,before,m);persist();mfPMRender();};
+  function renderLedger(){
+    const el=$('mfpm-ledger-table');if(!el)return;
+    const bankFilter=$('mfpm-ledger-bank-filter')?.value||'ALL',dir=$('mfpm-ledger-direction-filter')?.value||'ALL',q=String($('mfpm-ledger-search')?.value||'').trim().toLowerCase();
+    let rows=collectLedgerRows().filter(r=>{
+      const componentRows=r.meta?.components?.length?r.meta.components.map(c=>({...r,amount:Number(c.amount)||0,meta:{...c,...(c.paymentMeta||{}),bankAccountId:c.bankAccountId||c.paymentMeta?.bankAccountId||'',upiSourceId:c.upiSourceId||c.paymentMeta?.upiSourceId||''},mode:c.mode||r.mode})): [r];
+      r._components=componentRows;
+      return componentRows.some(x=>{
+        const bid=x.meta?.bankAccountId||'';
+        return (bankFilter==='ALL'||bid===bankFilter) && (dir==='ALL'||(dir==='TRANSFER'&&(x.direction==='TRANSFER'||x.direction==='INTERNAL'))||(dir!=='TRANSFER'&&x.direction===dir)) &&
+          (!q||[x.id,x.type,x.loanId,x.customer,x.mode,x.reference,x.narration,x.meta?.upiId,x.meta?.upiApp].filter(Boolean).join(' ').toLowerCase().includes(q));
+      });
+    });
+    const expanded=[];
+    rows.forEach(r=>(r._components||[r]).forEach(x=>{if((bankFilter==='ALL'||(x.meta?.bankAccountId||'')===bankFilter)&&(dir==='ALL'||(dir==='TRANSFER'&&(x.direction==='TRANSFER'||x.direction==='INTERNAL'))||(dir!=='TRANSFER'&&x.direction===dir))&&(!q||[x.id,x.type,x.loanId,x.customer,x.mode,x.reference,x.narration,x.meta?.upiId,x.meta?.upiApp].filter(Boolean).join(' ').toLowerCase().includes(q)))expanded.push(x);}));
+    const totalIn=expanded.filter(x=>x.direction==='IN').reduce((n,x)=>n+x.amount,0),totalOut=expanded.filter(x=>x.direction==='OUT').reduce((n,x)=>n+x.amount,0),internal=expanded.filter(x=>['INTERNAL','TRANSFER'].includes(x.direction)).reduce((n,x)=>n+x.amount,0);
+    const sum=$('mfpm-ledger-summary');if(sum)sum.innerHTML=`<div class="mfpm-kpis"><div class="mfpm-kpi"><small>Matched Rows</small><b>${expanded.length}</b></div><div class="mfpm-kpi"><small>Money In</small><b>${money(totalIn)}</b></div><div class="mfpm-kpi"><small>Money Out</small><b>${money(totalOut)}</b></div><div class="mfpm-kpi"><small>Internal Movements</small><b>${money(internal)}</b></div></div>`;
+    el.innerHTML=expanded.length?`<table class="mfpm-table"><thead><tr><th>Date</th><th>Type / Customer</th><th>Mode / Source</th><th>Bank / UPI</th><th>Reference</th><th>Direction</th><th>Amount</th></tr></thead><tbody>${expanded.map(r=>{const a=accountById(r.meta?.bankAccountId),u=upiById(r.meta?.bankAccountId,r.meta?.upiSourceId);return `<tr><td>${esc(r.date||'-')}</td><td>${esc(r.type)}<br>${esc(r.customer||r.loanId||r.narration||'')}</td><td>${esc(r.mode||r.meta?.channel||'-')}<br>${esc(r.meta?.channel||'')}</td><td>${esc(a?.bankName||((r.direction==='INTERNAL'||r.direction==='TRANSFER')?'Internal movement':'Cash / Source not linked'))}<br>${esc(u?u.appName+' · '+u.upiId:(r.meta?.upiId||''))}</td><td>${esc(r.reference||r.meta?.reference||'-')}</td><td>${esc(r.direction)}</td><td class="money">${money(r.amount)}</td></tr>`}).join('')}</tbody></table>`:'<div class="mfpm-note">No matching source-tagged transactions yet. Record new payments using the Payment Source Details fields in each transaction form.</div>';
+  }
+  function cashBalance(){
+    let bal=Number(state.paymentCashOpeningBalance)||0;
+    collectLedgerRows().forEach(r=>{
+      if(r.meta?.components?.length){r.meta.components.forEach(c=>{if(String(c.mode||'').toLowerCase()!=='cash')return;const n=Number(c.amount)||0;bal+=r.direction==='IN'?n:r.direction==='OUT'?-n:0;});}
+      else if(!r.meta?.bankAccountId&&String(r.meta?.channel||'').toUpperCase()==='CASH'){const n=Number(r.amount)||0;if(r.direction==='IN')bal+=n;else if(r.direction==='OUT')bal-=n;}
+    });
+    (state.paymentTransfers||[]).forEach(m=>{if(m.status==='VOID')return;if(m.type==='CASH_DEPOSIT')bal-=Number(m.amount)||0;else if(m.type==='CASH_WITHDRAWAL')bal+=Number(m.amount)||0;});
+    return Math.round(bal*100)/100;
+  }
+  window.mfPMSaveCashOpening=function(){const n=Number($('mfpm-cash-opening')?.value);if(!Number.isFinite(n)||n<0){alert('Cash opening balance cannot be negative.');return;}const before=Number(state.paymentCashOpeningBalance)||0;state.paymentCashOpeningBalance=Math.round(n*100)/100;mfPMAudit('UPDATE','Cash Opening Balance','CASH',{openingBalance:before},{openingBalance:state.paymentCashOpeningBalance});persist();mfPMRender();};
+  function accountBalance(accountId){
+    const a=accountById(accountId);if(!a)return 0;let bal=Number(a.openingBalance)||0;
+    collectLedgerRows().forEach(r=>{
+      if(r.meta?.components?.length){r.meta.components.forEach(c=>{if(String(c.bankAccountId||'')!==String(accountId))return;const n=Number(c.amount)||0;bal+=r.direction==='IN'?n:r.direction==='OUT'?-n:0;});}
+      else if(String(r.meta?.bankAccountId||'')===String(accountId)){const n=Number(r.amount)||0;if(r.direction==='IN')bal+=n;else if(r.direction==='OUT')bal-=n;else if(r.direction==='INTERNAL')bal+=String(r.type).includes('Deposit')?n:-n;else if(r.direction==='TRANSFER')bal+=String(r.type).includes('In')?n:-n;}
+    });return Math.round(bal*100)/100;
+  }
+  window.mfPMExportExcel=function(){
+    if(typeof XLSX==='undefined'){alert('Excel export library is not available.');return;}
+    const wb=XLSX.utils.book_new(),banks=[['Bank','Account Holder','Branch','IFSC','Masked Account','Type','Opening Balance','Calculated Source Balance','UPI IDs','Status']];
+    (state.paymentAccounts||[]).forEach(a=>banks.push([a.bankName,a.accountHolder,a.branch,a.ifsc,masked(a.accountNumber),a.accountType,Number(a.openingBalance)||0,accountBalance(a.id),(a.upiSources||[]).filter(u=>u.active!==false).length,a.active===false?'Inactive':'Active']));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(banks),'Bank_Sources');
+    const ledger=[['ID','Date','Type','Direction','Amount','Mode','Bank','UPI App','UPI ID','Reference','Loan ID','Customer','Narration']];
+    collectLedgerRows().forEach(r=>{const items=r.meta?.components?.length?r.meta.components.map(c=>({...r,amount:Number(c.amount)||0,meta:{...c,bankAccountId:c.bankAccountId||'',upiSourceId:c.upiSourceId||''},mode:c.mode||r.mode})): [r];items.forEach(x=>{const a=accountById(x.meta?.bankAccountId),u=upiById(x.meta?.bankAccountId,x.meta?.upiSourceId);ledger.push([x.id,x.date,x.type,x.direction,x.amount,x.mode||'',a?.bankName||'',u?.appName||x.meta?.upiApp||'',u?.upiId||x.meta?.upiId||'',x.reference||x.meta?.reference||'',x.loanId||'',x.customer||'',x.narration||x.meta?.narration||'']);});});
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ledger),'Source_Ledger');
+    const movements=[['ID','Date','Movement Type','Bank','Destination Bank','Amount','Reference','Narration']];(state.paymentTransfers||[]).forEach(m=>movements.push([m.id,m.date,m.type,accountById(m.bankAccountId)?.bankName||'Cash',accountById(m.toBankAccountId)?.bankName||'Cash',m.amount,m.reference||'',m.narration||'']));XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(movements),'Internal_Movements');const stmt=[['Date','Bank','Direction','Amount','Reference','Narration','Status','Matched Ledger ID','Difference']];(state.paymentStatementLines||[]).forEach(r=>stmt.push([r.date,accountById(r.bankAccountId)?.bankName||'',r.direction,r.amount,r.reference||'',r.narration||'',r.status||'',r.matchedLedgerId||'',r.difference||0]));XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(stmt),'Bank_Reconciliation');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Cash Opening Balance','Calculated Cash Balance'],[Number(state.paymentCashOpeningBalance)||0,cashBalance()]]),'Cash_Register');XLSX.writeFile(wb,`Payment_Management_${today()}.xlsx`);
+  };
+  window.mfPMPrintReport=function(){
+    const bh=(state.paymentAccounts||[]).map(a=>`<tr><td>${esc(a.bankName)}</td><td>${esc(a.accountHolder)}</td><td>${esc(a.branch)}</td><td>${esc(a.ifsc)}</td><td>${esc(masked(a.accountNumber))}</td><td>${money(a.openingBalance||0)}</td><td>${money(accountBalance(a.id))}</td></tr>`).join('');
+    const lh=collectLedgerRows().flatMap(r=>(r.meta?.components?.length?r.meta.components.map(c=>({...r,amount:Number(c.amount)||0,meta:{...c,bankAccountId:c.bankAccountId||'',upiSourceId:c.upiSourceId||''},mode:c.mode||r.mode})): [r]).map(x=>{const a=accountById(x.meta?.bankAccountId),u=upiById(x.meta?.bankAccountId,x.meta?.upiSourceId);return `<tr><td>${esc(x.date||'-')}</td><td>${esc(x.type)}</td><td>${esc(x.direction)}</td><td>${esc(x.customer||x.loanId||'-')}</td><td>${esc(x.meta?.bankNameSnapshot||a?.bankName||'Cash / Unlinked')}<br>${esc(x.meta?.branchSnapshot||a?.branch||'')} ${esc(x.meta?.accountMaskedSnapshot||'')}</td><td>${esc(u?.appName||x.meta?.upiAppSnapshot||x.meta?.upiApp||'-')}<br>${esc(u?.upiId||x.meta?.upiIdSnapshot||x.meta?.upiId||'')}</td><td>${esc(x.reference||x.meta?.reference||'-')}</td><td style="text-align:right">${money(x.amount)}</td></tr>`;})).join('');
+    const sh=(state.paymentStatementLines||[]).map(r=>`<tr><td>${esc(r.date||'-')}</td><td>${esc(accountById(r.bankAccountId)?.bankName||'-')}</td><td>${esc(r.direction||'-')}</td><td>${money(r.amount)}</td><td>${esc(r.reference||'-')}</td><td>${esc(r.status||'UNMATCHED')}</td><td>${esc(r.matchedType||'-')}</td><td>${r.difference?money(r.difference):'-'}</td></tr>`).join('');
+    const html=`<div class="mf-print-page"><h2>Payment Management — Bank Source Summary</h2><p>Generated ${esc(new Date().toLocaleString('en-IN'))}. Cash opening balance: ${money(state.paymentCashOpeningBalance||0)}; calculated cash in hand: ${money(cashBalance())}. Opening balances are not revenue; internal movements are not income/expense.</p><table><thead><tr><th>Bank</th><th>Account Holder</th><th>Branch</th><th>IFSC</th><th>Account</th><th>Opening</th><th>Calculated Source Balance</th></tr></thead><tbody>${bh||'<tr><td colspan="7">No bank accounts</td></tr>'}</tbody></table><h3>Source-tagged Transaction Ledger</h3><table><thead><tr><th>Date</th><th>Type</th><th>Direction</th><th>Customer / Loan</th><th>Bank</th><th>UPI App</th><th>UTR / Ref</th><th>Amount</th></tr></thead><tbody>${lh||'<tr><td colspan="8">No source-tagged transactions</td></tr>'}</tbody></table><h3>Bank Statement Reconciliation</h3><table><thead><tr><th>Date</th><th>Bank</th><th>Direction</th><th>Amount</th><th>Reference</th><th>Status</th><th>Matched Entry</th><th>Difference</th></tr></thead><tbody>${sh||'<tr><td colspan="8">No bank statement lines imported</td></tr>'}</tbody></table></div>`;
+    if(typeof mfPrintA4Shell==='function')mfPrintA4Shell('Payment Management Report',html);else{const w=window.open('','_blank');if(!w){alert('Please allow pop-ups to print.');return;}w.document.write('<html><body>'+html+'</body></html>');w.document.close();w.print();}
+  };
+  window.mfPMSourceLabel=function(meta){
+    if(!meta)return '';
+    const oneLabel=m=>{const x=m?.paymentMeta||m;const bid=m?.bankAccountId||x?.bankAccountId,uid=m?.upiSourceId||x?.upiSourceId;const a=accountById(bid),u=upiById(bid,uid);return [m?.bankNameSnapshot||x?.bankNameSnapshot||a?.bankName||'',u?.appName||m?.upiAppSnapshot||x?.upiApp||'',u?.upiId||m?.upiIdSnapshot||x?.upiId||'',x?.channel&&x.channel!=='CASH'?x.channel:'',x?.reference?'Ref '+x.reference:''].filter(Boolean).join(' · ');};
+    if(meta.components?.length)return meta.components.map(c=>[c.mode,oneLabel(c)].filter(Boolean).join(': ')).join(' + ');
+    return oneLabel(meta);
+  };
+  window.mfPMRenderLedger=renderLedger;
+
+  // Generic payment source panel read by transaction handlers.
+  window.mfPMReadInlineMeta=window.mfPMReadInlineMeta;
+  const origRead=window.mfPMReadInlineMeta;
+  // Initialize after all current markup has been parsed.
+  window.mfPMInitPanels();
+  document.addEventListener('click',ev=>{
+    const btn=ev.target?.closest?.('#mfpm-header-open');
+    if(btn){ev.preventDefault();window.openPaymentManagement();}
+  });
+})();
+</script>
+
 </body>
 </html>
