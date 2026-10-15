@@ -1135,6 +1135,59 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 @media(max-width:900px){.mf-phaseb-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.mf-phaseb-grid{grid-template-columns:1fr}.mf-phaseb-row-main{grid-template-columns:1fr 1fr}.mf-phaseb-actions{justify-content:flex-start}.mf-phaseb-filters{grid-template-columns:1fr 1fr}.mf-phaseb-filters input{grid-column:1/-1}}
 @media(max-width:560px){.mf-phaseb-kpis{grid-template-columns:1fr 1fr}.mf-phaseb-filters{grid-template-columns:1fr}.mf-phaseb-filters input{grid-column:auto}.mf-phaseb-form{grid-template-columns:1fr}.mf-phaseb-form .full{grid-column:auto}.mf-phaseb-row-main{grid-template-columns:1fr}.mf-phaseb-actions{justify-content:flex-start}}
 </style>
+<style id="mfpm-visual-refresh-v1">
+/* Payment Management — dedicated application UI styles (kept separate from report/print styles) */
+#modal-payment-management.active,#modal-mfpm-bank-form.active,#modal-mfpm-upi.active{align-items:center;justify-content:center;padding:18px;box-sizing:border-box;}
+#modal-payment-management>.mfpm-modal{width:min(1160px,96vw)!important;max-width:1160px!important;max-height:91vh;overflow:auto;box-sizing:border-box;padding:22px!important;border:1px solid rgba(89,190,255,.28);border-radius:20px;background:linear-gradient(155deg,#10253b 0%,#0b1728 65%,#0c1c2b 100%);box-shadow:0 24px 80px rgba(0,0,0,.52);scrollbar-width:thin;scrollbar-color:#3d6688 transparent;}
+#modal-payment-management>.mfpm-modal>.modal-title{position:sticky;top:-22px;z-index:5;margin:-22px -22px 18px;padding:18px 22px;background:linear-gradient(100deg,#123f63,#0b718f);border-bottom:1px solid rgba(148,220,255,.22);font-size:1.18rem;letter-spacing:.01em;}
+#modal-payment-management .mfpm-intro{padding:13px 15px;margin:0 0 16px;border:1px solid rgba(78,184,222,.22);border-left:4px solid #25b9d4;border-radius:12px;background:rgba(18,91,120,.18);color:#c7deeb;font-size:.82rem;line-height:1.65;}
+#modal-payment-management .mfpm-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 16px;}
+#modal-payment-management .mfpm-kpi{padding:15px 16px;border:1px solid rgba(131,183,214,.18);border-radius:14px;background:linear-gradient(145deg,rgba(28,57,81,.88),rgba(13,31,48,.94));box-shadow:inset 0 1px rgba(255,255,255,.035);}
+#modal-payment-management .mfpm-kpi small{font-size:.72rem;letter-spacing:.035em;text-transform:uppercase;color:#9db9cb;line-height:1.4;}
+#modal-payment-management .mfpm-kpi b{font-size:1.15rem;line-height:1.4;margin-top:7px;color:#f2f9ff;font-variant-numeric:tabular-nums;}
+#modal-payment-management .mfpm-cash-settings{grid-template-columns:minmax(190px,1.2fr) minmax(180px,.8fr) auto;gap:14px;align-items:center;padding:16px;margin:0 0 16px;border-radius:14px;border-color:rgba(69,192,206,.23);background:linear-gradient(100deg,rgba(13,99,112,.17),rgba(18,41,58,.65));}
+#modal-payment-management .mfpm-cash-settings>div:first-child b{font-size:.9rem;color:#f0f8ff;}
+#modal-payment-management .mfpm-cash-settings>div:first-child small{font-size:.74rem;line-height:1.55;color:#a9c2d1;}
+#modal-payment-management .mfpm-cash-settings label{display:block;color:#b8cedb;font-size:.74rem;font-weight:700;}
+#modal-payment-management .mfpm-cash-settings input{margin-top:7px;padding:11px 12px;font-size:.9rem;border-radius:9px;}
+#modal-payment-management .mfpm-cash-settings button{min-height:40px;white-space:nowrap;}
+#modal-payment-management .mfpm-cash-current{grid-column:1/-1;padding-top:11px;border-top:1px solid rgba(147,190,211,.13);font-size:.82rem;color:#bad0dd;}
+#modal-payment-management .mfpm-section{padding:17px;margin:0 0 14px;border:1px solid rgba(126,171,202,.19);border-radius:15px;background:rgba(10,27,43,.72);}
+#modal-payment-management .mfpm-section-head{gap:14px;margin-bottom:14px;align-items:center;}
+#modal-payment-management .mfpm-section-head>div:first-child{min-width:0;flex:1;}
+#modal-payment-management .mfpm-section-head b{font-size:.96rem;line-height:1.4;color:#f1f7fc;letter-spacing:.005em;}
+#modal-payment-management .mfpm-section-head small{font-size:.75rem;line-height:1.55;color:#9eb7c8;margin-top:5px;max-width:760px;}
+#modal-payment-management .mfpm-section-head .btn-header{min-height:39px;padding:9px 13px;border-radius:9px;white-space:nowrap;}
+#modal-payment-management .mfpm-bank-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+#modal-payment-management .mfpm-bank-card{padding:15px;border-radius:13px;border-color:rgba(117,169,202,.2);background:linear-gradient(140deg,rgba(28,52,73,.72),rgba(13,29,45,.82));}
+#modal-payment-management .mfpm-bank-title b{font-size:.94rem;line-height:1.45;}
+#modal-payment-management .mfpm-bank-meta{font-size:.76rem;line-height:1.7;color:#a9c0d0;}
+#modal-payment-management .mfpm-actions{gap:7px;margin-top:12px;}
+#modal-payment-management .mfpm-actions button{font-size:.72rem;padding:8px 10px;border-radius:8px;}
+#modal-payment-management .mfpm-filters{grid-template-columns:minmax(180px,.8fr) minmax(170px,.7fr) minmax(240px,1.5fr);gap:10px;margin:12px 0;}
+#modal-payment-management .mfpm-filters input,#modal-payment-management .mfpm-filters select{padding:11px 12px;font-size:.8rem;border-radius:9px;}
+#modal-payment-management .mfpm-table-wrap{border-radius:11px;border-color:rgba(117,169,202,.18);background:rgba(5,17,29,.3);}
+#modal-payment-management .mfpm-table{font-size:.76rem;}
+#modal-payment-management .mfpm-table th{padding:11px 12px;background:#18334a;color:#c2d8e7;}
+#modal-payment-management .mfpm-table td{padding:10px 12px;line-height:1.5;color:#d1e0ea;}
+#modal-payment-management .mfpm-note{padding:13px 15px;font-size:.78rem;line-height:1.65;color:#afc6d5;border-radius:12px;}
+#modal-payment-management .mfpm-recon-controls{grid-template-columns:minmax(170px,.8fr) minmax(250px,1.3fr) auto;gap:11px;margin:12px 0;}
+#modal-payment-management .mfpm-recon-controls label{font-size:.75rem;color:#b7cddb;}
+#modal-payment-management .mfpm-recon-controls select,#modal-payment-management .mfpm-recon-controls input{margin-top:7px;padding:10px 11px;font-size:.78rem;border-radius:9px;}
+#modal-mfpm-bank-form>.mfpm-small-modal,#modal-mfpm-upi>.mfpm-small-modal{width:min(760px,95vw)!important;max-width:760px!important;max-height:90vh;overflow:auto;box-sizing:border-box;padding:24px!important;border:1px solid rgba(82,190,228,.3);border-radius:20px;background:linear-gradient(150deg,#102b43,#0b1728 75%);box-shadow:0 24px 80px rgba(0,0,0,.55);}
+#modal-mfpm-bank-form .modal-title,#modal-mfpm-upi .modal-title{font-size:1.12rem;margin-bottom:22px;padding-bottom:14px;border-bottom:1px solid rgba(142,190,217,.18);}
+#modal-mfpm-bank-form .mfpm-form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:17px 18px;}
+#modal-mfpm-bank-form .mfpm-form-grid>div{min-width:0;}
+#modal-mfpm-bank-form .mfpm-form-grid label{display:block;margin:0 0 7px;color:#c0d4e2;font-size:.78rem;line-height:1.4;font-weight:700;}
+#modal-mfpm-bank-form .mfpm-form-grid input,#modal-mfpm-bank-form .mfpm-form-grid select{display:block;width:100%;min-height:43px;box-sizing:border-box;padding:11px 12px;border:1px solid rgba(129,177,207,.3);border-radius:9px;background:#0b1d2d;color:#f3f8fc;font-size:.86rem;outline:none;transition:border-color .16s,box-shadow .16s;}
+#modal-mfpm-bank-form .mfpm-form-grid input:focus,#modal-mfpm-bank-form .mfpm-form-grid select:focus{border-color:#2bc0df;box-shadow:0 0 0 3px rgba(43,192,223,.13);}
+#modal-mfpm-bank-form .mfpm-form-grid input::placeholder{color:#6f8b9f;}
+#modal-mfpm-bank-form .mfpm-form-foot{margin-top:24px;padding-top:17px;border-top:1px solid rgba(142,190,217,.17);gap:10px;}
+#modal-mfpm-bank-form .mfpm-form-foot button{min-height:41px;padding:10px 17px;border-radius:9px;}
+@media(max-width:800px){#modal-payment-management.active,#modal-mfpm-bank-form.active,#modal-mfpm-upi.active{padding:10px}#modal-payment-management>.mfpm-modal{width:100%!important;max-height:94vh;padding:15px!important;border-radius:15px}#modal-payment-management>.mfpm-modal>.modal-title{top:-15px;margin:-15px -15px 14px;padding:15px;font-size:1.05rem}#modal-payment-management .mfpm-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}#modal-payment-management .mfpm-kpi{padding:12px}#modal-payment-management .mfpm-kpi b{font-size:1rem}#modal-payment-management .mfpm-cash-settings{grid-template-columns:1fr 1fr;gap:11px}#modal-payment-management .mfpm-cash-settings>div:first-child{grid-column:1/-1}#modal-payment-management .mfpm-cash-settings button{width:100%}#modal-payment-management .mfpm-cash-current{grid-column:1/-1}#modal-payment-management .mfpm-bank-list{grid-template-columns:1fr}#modal-payment-management .mfpm-section{padding:13px}#modal-payment-management .mfpm-filters,#modal-payment-management .mfpm-recon-controls{grid-template-columns:1fr}#modal-mfpm-bank-form>.mfpm-small-modal,#modal-mfpm-upi>.mfpm-small-modal{width:100%!important;max-height:94vh;padding:17px!important;border-radius:15px}}
+@media(max-width:520px){#modal-payment-management .mfpm-cash-settings{grid-template-columns:1fr}#modal-payment-management .mfpm-cash-settings>div:first-child,#modal-payment-management .mfpm-cash-current{grid-column:auto}#modal-payment-management .mfpm-section-head{align-items:stretch}#modal-payment-management .mfpm-section-head .btn-header{width:100%;justify-content:center}#modal-mfpm-bank-form .mfpm-form-grid{grid-template-columns:1fr;gap:13px}#modal-mfpm-bank-form .mfpm-full{grid-column:auto}#modal-mfpm-bank-form .mfpm-form-foot{display:grid;grid-template-columns:1fr 1fr}#modal-mfpm-bank-form .mfpm-form-foot button{justify-content:center}}
+</style>
+
 </head>
 <body>
 <div id="app-lock-overlay" aria-modal="true" role="dialog" aria-label="App Lock">
@@ -2816,9 +2869,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           <span><i class="fa-solid fa-building-columns" style="color:#60a5fa"></i> Payment Management</span>
           <i class="fa-solid fa-xmark" onclick="closeModal('modal-payment-management')" style="cursor:pointer;color:#94a3b8"></i>
         </div>
-        <div class="mfpm-intro">One shared source register for HDFC, Axis, SBI and any additional bank. UPI IDs belong to a selected bank account; transactions keep their own source details. Payment-source details never recalculate loan amounts, EMI allocation, interest, penalty, settlement or foreclosure.</div>
+        <div class="mfpm-intro">Manage bank accounts, linked UPI IDs, cash movements and statement matching in one place. Source details are recorded for audit and never change loan or EMI calculations.</div>
         <div class="mfpm-kpis" id="mfpm-kpis"></div>
-        <div class="mfpm-cash-settings"><div><b>Cash in Hand</b><small>Opening cash is a balance, not income. Cash deposits reduce cash in hand; cash withdrawals increase it.</small></div><label>Opening Balance (₹)<input id="mfpm-cash-opening" type="number" min="0" step="0.01" value="0"></label><button type="button" class="btn-header btn-blue" onclick="mfPMSaveCashOpening()">Save Cash Opening</button><div class="mfpm-cash-current">Calculated Cash Balance: <b id="mfpm-cash-balance">₹0.00</b></div></div>
+        <div class="mfpm-cash-settings"><div><b>Cash in Hand</b><small>Opening cash is a balance, not income. Deposits reduce cash; withdrawals increase it.</small></div><label>Opening Balance (₹)<input id="mfpm-cash-opening" type="number" min="0" step="0.01" value="0"></label><button type="button" class="btn-header btn-blue" onclick="mfPMSaveCashOpening()">Save Cash Opening</button><div class="mfpm-cash-current">Calculated Cash Balance: <b id="mfpm-cash-balance">₹0.00</b></div></div>
         <div class="mfpm-section">
           <div class="mfpm-section-head"><div><b>1. Bank Account Master</b><small>Add each bank account once. Account numbers are masked in the list.</small></div><button class="btn-header btn-blue" type="button" onclick="mfPMOpenBankForm()"><i class="fa-solid fa-plus"></i> Add Bank</button></div>
           <div id="mfpm-bank-list" class="mfpm-bank-list"></div>
