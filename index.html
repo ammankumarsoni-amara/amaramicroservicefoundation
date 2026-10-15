@@ -2810,9 +2810,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
                 <div style="font-size:.82rem;font-weight:700;color:#fff;margin-bottom:6px;">1-Click Manual Backup & Restore</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-                    <button class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="downloadJsonBackup()"><i class="fa-solid fa-download"></i> Save Backup</button>
-                    <button class="btn-header btn-blue" style="background:#1e293b;color:#34d399;border:1px solid var(--border-subtle);justify-content:center;" onclick="document.getElementById('restore-file-input').click()"><i class="fa-solid fa-upload"></i> Restore</button>
+                <div class="mf-backup-actions">
+                    <button class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;min-width:0;" type="button" onclick="downloadJsonBackup()"><i class="fa-solid fa-download"></i> Save Backup</button>
+                    <button class="btn-header btn-blue" style="background:#1e293b;color:#34d399;border:1px solid var(--border-subtle);justify-content:center;min-width:0;" type="button" onclick="document.getElementById('restore-file-input').click()"><i class="fa-solid fa-upload"></i> Restore</button>
+                    <button id="mf-clear-all-data-btn" class="btn-header" style="background:#7f1d1d;color:#fff;border:1px solid #ef4444;justify-content:center;min-width:0;" type="button" onclick="mfClearAllBusinessData()"><i class="fa-solid fa-trash-can"></i> Clear All Data</button>
                 </div>
                 <input type="file" id="restore-file-input" accept=".json" style="display:none" onchange="handleRestoreFile(event)">
             </div>
@@ -3986,6 +3987,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         async function initializeSecureStorage(){
             try{
+                const clearPending=localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1';
                 const snap=await idbGetSnapshot();
                 const hasData=obj=>!!(obj && obj.products && (
                     (Array.isArray(obj.loans)?obj.loans.length:0)+
@@ -3993,9 +3995,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                     (Array.isArray(obj.staff)?obj.staff.length:0)+
                     (Array.isArray(obj.expenses)?obj.expenses.length:0)
                 ));
-                const validLocalSnapshot=!!(snap?.state && (hasData(snap.state) || String(snap.state.bizName||'').trim() || String(snap.state.companyProfile?.legalName||'').trim()));
+                const validLocalSnapshot=!clearPending && !!(snap?.state && (hasData(snap.state) || String(snap.state.bizName||'').trim() || String(snap.state.companyProfile?.legalName||'').trim()));
 
-                if(validLocalSnapshot){
+                if(clearPending){
+                    // Never reload a pre-clear snapshot. Reassert the blank state and finish
+                    // the local wipe before auth/startup reconciliation can run.
+                    state={bizName:'',companyProfile:{legalName:'',tagline:'',address:'',cityState:'',phone:'',email:'',website:'',registrationNo:'',gstin:'',licenseNo:''},activeFilter:'ALL',cloudWebhookUrl:'',products:{},loans:[],borrowings:[],staff:[],expenses:[],customCategories:[],ptps:[],recoveryFollowUps:[]};
+                    try{mfScaleReinstallStateProxy();}catch(e){}
+                    await mfClearAllLocalBusinessStores();
+                    try{mfV2SetHash(mfV2Fingerprint());mfV2ArmBaseline();}catch(e){}
+                }else if(validLocalSnapshot){
                     state=snap.state;
                     try{
                         const replay=await mfPerfV2ReplayJournal(snap);
@@ -4034,7 +4043,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 // automatic chance to adopt an already-verified cloud baseline. It is safe:
                 // mfV2Reconcile() can only adopt after server owner/fingerprint/count checks,
                 // and it never pushes an empty startup state during this bootstrap path.
-                if(mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser){
+                if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'){
+                    mfV2SetStatus('🟠 Clear All Data is pending cloud completion. Automatic cloud restore is paused; use an explicit Sync Now or Restore action.',true);
+                    markStorageReady();
+                    renderAll();
+                }else if(mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser){
                     try{
                         await mfV2Reconcile(validLocalSnapshot?'local-ready':'server-bootstrap');
                         window.mfFirebaseInitialSyncReady=true;
@@ -4259,6 +4272,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           delete out.payments; return out;
         }
         async function mfV2PullFromServer(showConfirm=false){
+          if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1' && !showConfirm) return false;
           if(!mfV2LocalStateReady || !mfDbReady) throw new Error('Local database is still initializing. Please wait a moment and try again.');
           if(!mfV2BaselineReady()) throw new Error('V2 baseline is not initialized. Restore the verified Google Drive backup on this device first.');
           if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser) throw new Error('Connect Firebase and sign in first.');
@@ -4266,13 +4280,14 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           const root=await mfV2GetRootServer(); if(!root.exists) return false;
           const meta=root.data()||{}; if(meta.ownerUid&&meta.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
           const entities=await mfV2ReadEntities(mfFirebaseUser.uid);
+          if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1' && !showConfirm) return false;
           if(!entities.loans.length && mfV2HasBusinessData()) throw new Error('Cloud database is incomplete: zero loan records returned. Local data was protected.');
           const shell=meta.shell&&typeof meta.shell==='object'?meta.shell:{};
           state={...shell,...entities};
           mfScaleReinstallStateProxy(); normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
           await idbPutSnapshot();
           mfV2SetHash(String(meta.stateFingerprint||'')); mfSetKnownCloudVersion(Number(meta.version||0)); mfV2ClearDirty();
-          try{localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
+          try{localStorage.removeItem('MF_LOCAL_DIRTY_AT');localStorage.removeItem('MF_CLEAR_ALL_DATA_PENDING');localStorage.removeItem('MF_CLEAR_ALL_DATA_TARGET');}catch(e){}
           renderAll(); mfV2SetStatus('🟢 New secure cloud data loaded — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
           return true;
         }
@@ -4318,6 +4333,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           return true;
         }
         async function mfV2AdoptVerifiedCloudBaseline(reason='cloud-bootstrap'){
+          // A Clear All Data action is authoritative on this device. Never auto-adopt stale cloud data while its explicit cloud-clear is pending.
+          if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'){
+            mfV2SetStatus('🟠 Clear All Data is pending cloud completion. Automatic cloud restore is paused; use Clear All Data, Sync Now, or an explicit backup restore.',true);
+            return false;
+          }
           // FRESH-DEVICE BOOTSTRAP: a verified baseline is a business/cloud property,
           // not a device-local Drive flag. A second device may read the existing secure
           // cloud baseline, but it must prove ownership and verify the reconstructed
@@ -4333,6 +4353,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           const expected=String(cloud.stateFingerprint||'');
           if(!expected)return false;
           const entities=await mfV2ReadEntities(mfFirebaseUser.uid);
+          if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1') return false;
           const shell=cloud.shell&&typeof cloud.shell==='object'?cloud.shell:{};
           const candidate={...shell,...entities};
           const actualFingerprint=mfStateFingerprintObject(candidate);
@@ -4365,6 +4386,12 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
 
         async function mfV2Reconcile(reason='auto'){
+          // A confirmed Clear All Data must never be undone by an automatic cloud pull.
+          // Pending clears are resolved only by an explicit Clear All Data / Sync Now / Restore action.
+          if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'){
+            mfV2SetStatus('🟠 Clear All Data is pending cloud completion. Automatic cloud restore/sync is paused until you explicitly finish it or restore a backup.',true);
+            return false;
+          }
           // HARD SAFETY GATE: Firebase must never reconcile against the startup/default
           // state. IndexedDB/local restore must finish first. A fresh device may first
           // adopt the already-verified cloud baseline; only then can reconciliation run.
@@ -4403,7 +4430,23 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           }finally{mfCleanSyncBusy=false;}
         }
         function scheduleFirebasePush(){clearTimeout(mfFirebasePushTimer);mfV2MarkDirty();mfFirebasePushTimer=setTimeout(()=>mfV2Reconcile('scheduled').catch(e=>mfV2SetStatus(mfV2Error(e,'Automatic sync'),true)),250);}
-        async function pushStateToFirebase(silent=false){try{mfV2MarkDirty();return await mfV2Reconcile('manual');}catch(e){mfV2SetStatus(mfV2Error(e,'Sync Now'),true);if(!silent)alert(mfV2Error(e,'Sync Now'));}}
+        async function pushStateToFirebase(silent=false){try{
+          if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'){
+            if(!mfV2LocalStateReady||!mfDbReady) throw new Error('Local database is still initializing. Please wait and try again.');
+            if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser) throw new Error('Connect Firebase and sign in first.');
+            if(!mfClearAllPendingTargetMatches()){
+              // A clear initiated offline or against another Firebase account must not erase
+              // a different company's existing cloud. A new empty cloud can be initialized safely.
+              const root=await mfV2Root().get({source:'server'});
+              if(root.exists) throw new Error('The pending Clear All Data belongs to a different or unverified Firebase target. No cloud data was changed. If you intend to clear this connected database, click Clear All Data while connected; if you intend to load it, use the confirmed Pull Latest or Restore action.');
+            }
+            mfScaleSetFullDirty();
+            const pushed=await mfV2PushToServer(true);
+            if(pushed){localStorage.removeItem('MF_CLEAR_ALL_DATA_PENDING');localStorage.removeItem('MF_CLEAR_ALL_DATA_TARGET');window.mfFirebaseInitialSyncReady=true;try{startFirebaseListener();}catch(e){}mfV2SetStatus('🟢 Explicit Sync Now completed. Current local data was pushed; automatic sync is active.',false);}
+            return pushed;
+          }
+          mfV2MarkDirty();return await mfV2Reconcile('manual');
+        }catch(e){mfV2SetStatus(mfV2Error(e,'Sync Now'),true);if(!silent)alert(mfV2Error(e,'Sync Now'));}}
         async function pullStateFromFirebase(showConfirm=false){try{return await mfV2PullFromServer(!!showConfirm);}catch(e){mfV2SetStatus(mfV2Error(e,'Pull Latest'),true);if(showConfirm)alert(mfV2Error(e,'Pull Latest'));}}
         function startFirebaseListener(){
           if(!mfV2LocalStateReady || !mfDbReady)return;
@@ -4423,6 +4466,11 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             await mfV2EnsureFirebase(cfg);mfFirebaseSyncCode=String(syncCode||localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'');
             if(!mfFirebaseUser){mfV2SetStatus('🔒 Firebase connected. Sign in to continue.',true);return;}
             window.mfFirebaseInitialSyncReady=false;
+            if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'){
+              mfV2SetStatus('🟠 Clear All Data is pending. No cloud data was fetched; use Sync Now to push the current local state or explicitly restore a backup.',true);
+              mfRefreshFirebaseSyncControls();
+              return;
+            }
             if(mfV2LocalStateReady && mfDbReady){
               const adopted=mfV2BaselineReady() || await mfV2AdoptVerifiedCloudBaseline('firebase-connect');
               if(adopted){
@@ -4481,7 +4529,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
             if(mfFirebaseUser){
               window.mfFirebaseInitialSyncReady=false;
-              if(mfV2LocalStateReady && mfDbReady){
+              if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'){
+                mfV2SetStatus('🟠 Clear All Data is pending. No cloud data was fetched; use Sync Now to push the current local state or explicitly restore a backup.',true);
+              }else if(mfV2LocalStateReady && mfDbReady){
                 const adopted=mfV2BaselineReady() || await mfV2AdoptVerifiedCloudBaseline('firebase-connect');
                 if(adopted){
                   await mfV2Reconcile('connect');
@@ -4520,6 +4570,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           mfV2ArmBaseline();
           mfV2MarkDirty();
           await mfV2PushToServer(true);
+          try{localStorage.removeItem('MF_CLEAR_ALL_DATA_PENDING');localStorage.removeItem('MF_CLEAR_ALL_DATA_TARGET');}catch(e){}
           window.mfFirebaseInitialSyncReady=true;
           try{startFirebaseListener();}catch(e){}
           mfV2SetStatus('🟢 Verified Google Drive baseline published to the new secure cloud. Automatic sync is active.',false);
@@ -11328,7 +11379,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                         if(confirm('Restore this backup?')){
                             state=parsed; mfScaleReinstallStateProxy(); mfScaleSetFullDirty(); normalizeOperationalPeriods(); normalizeBorrowingCosts();
                             await idbPutSnapshot();
-                            mfV2ArmBaseline(); mfV2MarkDirty(); scheduleFirebasePush();
+                            mfV2ArmBaseline(); mfV2MarkDirty();
+                            if(mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser){
+                                await mfV2PublishVerifiedDriveBaseline('manual-json-restore');
+                            }else scheduleFirebasePush();
                             renderAll(); alert('Database restored successfully into IndexedDB.'); closeModal('modal-cloud'); setTab('feed');
                         }
                     }else alert('Invalid backup file format!');
@@ -11979,6 +12033,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 </style>
 <style id="mf-company-profile-alignment-final">
 .company-address-input{resize:vertical;min-height:64px;line-height:1.35;box-sizing:border-box;}
+.mf-backup-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;align-items:stretch;}
+.mf-backup-actions>.btn-header{white-space:normal;overflow-wrap:anywhere;line-height:1.25;padding:8px 6px;}
+@media(max-width:560px){.mf-backup-actions{grid-template-columns:1fr 1fr;}.mf-backup-actions>#mf-clear-all-data-btn{grid-column:1/-1;}}
 .mf-print-company-header{width:100%;max-width:100%;overflow-wrap:anywhere;}
 .mf-print-company-header>div{max-width:100%;margin-left:auto;margin-right:auto;}
 .mf-print-company-header .mf-print-doc-title{white-space:normal;}
@@ -11999,6 +12056,204 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             mfStorageInitialized=true;
             document.documentElement.classList.remove('mf-storage-loading');
         }
+
+        // Clears local business snapshots, write-ahead journal, and derived/index stores while
+        // preserving the encrypted Drive wrapping key, user-accessible version-history recovery
+        // points, and a canonical empty current snapshot. History is available only by explicit restore.
+        // Used by the button and startup recovery if a previous clear was interrupted.
+        async function mfClearAllLocalBusinessStores(){
+            try{await mfPerfV2WriteChain;}catch(e){}
+            const db=await openMfDb();
+            await new Promise((resolve,reject)=>{
+                const names=Array.from(db.objectStoreNames);
+                const tx=db.transaction(names,'readwrite');
+                for(const name of names){
+                    const store=tx.objectStore(name);
+                    if(name===MF_IDB_HISTORY_STORE){
+                        // History is a backup/recovery feature, not active business state.
+                        // Preserve it for deliberate, user-initiated version restore only.
+                        continue;
+                    }
+                    if(name===MF_IDB_STORE){
+                        const req=store.openCursor();
+                        req.onsuccess=()=>{
+                            const cur=req.result;
+                            if(!cur)return;
+                            const key=String(cur.key);
+                            if(key!=='drive-wrap-key' && key!=='current')cur.delete();
+                            cur.continue();
+                        };
+                        const blank=mfCloneStateForPersistence();
+                        store.put({id:'current',version:1,updatedAt:new Date().toISOString(),state:blank,journalSeq:0,stateFingerprint:mfStateFingerprintObject(blank)});
+                    }else store.clear();
+                }
+                tx.oncomplete=resolve;
+                tx.onerror=()=>reject(tx.error||new Error('Could not clear local business records.'));
+                tx.onabort=()=>reject(tx.error||new Error('Local data clear was aborted.'));
+            });
+            try{
+                localStorage.removeItem('MF_LOCAL_DIRTY_AT');
+                localStorage.removeItem('MF_LOCAL_DIRTY_AT_V2');
+                localStorage.setItem('MF_LOCAL_SAVED_AT',new Date().toISOString());
+                localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_READY','1');
+                localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_HASH',mfLocalStateFingerprint());
+            }catch(e){}
+            return true;
+        }
+
+        function mfClearAllCurrentCloudTarget(){
+            let config=String(document.getElementById('firebase-config-input')?.value||localStorage.getItem('MF_FIREBASE_CONFIG')||'').trim();
+            try{if(config)config=mfStableStringify(JSON.parse(config));}catch(e){}
+            const syncCode=String(mfFirebaseSyncCode||document.getElementById('firebase-sync-code')?.value||localStorage.getItem('MF_FIREBASE_SYNC_CODE')||'').trim();
+            return {config,syncCode,uid:String(mfFirebaseUser?.uid||'')};
+        }
+        function mfClearAllPendingTargetMatches(){
+            try{
+                const saved=JSON.parse(localStorage.getItem('MF_CLEAR_ALL_DATA_TARGET')||'null');
+                const current=mfClearAllCurrentCloudTarget();
+                return !!(saved && saved.config && saved.syncCode && saved.uid && current.uid &&
+                    saved.config===current.config && saved.syncCode===current.syncCode && saved.uid===current.uid);
+            }catch(e){return false;}
+        }
+
+        // ================= CLEAR ALL BUSINESS DATA (EXPLICIT USER ACTION) =================
+        // Business records only. App code, calculations, UI, authentication, App Lock,
+        // cloud encryption PIN, Firebase configuration and Drive security settings stay intact.
+        async function mfClearAllBusinessData(){
+            const button=document.getElementById('mf-clear-all-data-btn');
+            if(button?.disabled) return false;
+            const confirmed=confirm(
+                'Are you sure you want to CLEAR ALL DATA?\n\n' +
+                'All entered business records on this device will be removed: customers/loans and payments, products, capital borrowings, staff, expenses, custom categories, PTP/follow-ups and company profile. If Firebase is connected and signed in, its live business records will also be cleared.\n\n' +
+                'App code, calculations, reports, layout, audit phases, App Lock, cloud encryption PIN, sign-in and connection settings will remain. Google Drive backups and local Version History recovery points will NOT be deleted; they can return data only after you explicitly choose Restore. This action cannot be undone from this screen.'
+            );
+            if(!confirmed) return false;
+
+            if(button){button.disabled=true;button.textContent='Clearing…';}
+            const connected=!!(mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser);
+            let cloudCleared=false;
+            // Persist this intent before mutating anything. If it cannot be persisted, abort
+            // before touching data; otherwise an old cloud snapshot could reappear on reload.
+            try{
+                localStorage.setItem('MF_CLEAR_ALL_DATA_PENDING','1');
+                localStorage.setItem('MF_CLEAR_ALL_DATA_TARGET',JSON.stringify(mfClearAllCurrentCloudTarget()));
+                if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')!=='1') throw new Error('Clear guard could not be saved.');
+            }catch(e){
+                try{localStorage.removeItem('MF_CLEAR_ALL_DATA_PENDING');localStorage.removeItem('MF_CLEAR_ALL_DATA_TARGET');}catch(ignore){}
+                if(button){button.disabled=false;button.innerHTML='<i class="fa-solid fa-trash-can"></i> Clear All Data';}
+                alert('Clear All Data was cancelled before changing any data because the browser could not save the safety guard. Free browser storage and try again.');
+                return false;
+            }
+            window.mfFirebaseInitialSyncReady=false;
+            try{if(mfFirebaseListenerUnsub){mfFirebaseListenerUnsub();mfFirebaseListenerUnsub=null;}mfFirebaseListenerKey='';}catch(e){}
+            try{clearTimeout(mfFirebasePushTimer);mfFirebasePushTimer=null;}catch(e){}
+            try{clearTimeout(mfVersionBackupTimer);mfVersionBackupTimer=null;}catch(e){}
+            try{clearTimeout(mfScaleMirrorTimer);mfScaleMirrorTimer=null;}catch(e){}
+
+            try{
+                const syncWaitDeadline=Date.now()+30000;
+            while(mfCleanSyncBusy && Date.now()<syncWaitDeadline){await new Promise(resolve=>setTimeout(resolve,50));}
+            if(mfCleanSyncBusy) throw new Error('A sync operation is still running. The clear safety guard is active; wait briefly and press Clear All Data again.');
+            try{await mfPerfV2WriteChain;}catch(e){/* pending marker protects against stale sync */}
+
+                // Clear only entered business data. Keep the existing state shape and all
+                // calculation functions/defaults intact; do not change financial algorithms.
+                mfScaleProxySuspend=true;
+                try{
+                    state.loans=[];
+                    state.products={};
+                    state.borrowings=[];
+                    state.staff=[];
+                    state.expenses=[];
+                    state.customCategories=[];
+                    state.ptps=[];
+                    state.recoveryFollowUps=[];
+                    state.bizName='';
+                    state.companyProfile={legalName:'',tagline:'',address:'',cityState:'',phone:'',email:'',website:'',registrationNo:'',gstin:'',licenseNo:''};
+                    state.activeFilter='ALL';
+                    state.cloudWebhookUrl='';
+                }finally{mfScaleProxySuspend=false;}
+                mfScaleReinstallStateProxy();
+                normalizeOperationalPeriods();
+                normalizeBorrowingCosts();
+                normalizeCompanyProfile();
+
+                // A deliberate clear establishes an empty local baseline. The marker above
+                // prevents automatic cloud adoption until cloud deletion is verified or the
+                // user explicitly chooses Sync Now / Pull Latest / Restore.
+                mfV2ArmBaseline();
+                mfScaleSetFullDirty();
+
+                await mfClearAllLocalBusinessStores();
+
+                // Reset all derived/local metadata that could make old records appear current.
+                try{
+                    mfScaleResetDirty();
+                    mfScaleLoanFingerprints.clear();
+                    mfScalePaymentCounts.clear();
+                    mfV2PendingDirty.loans.clear();mfV2PendingDirty.products.clear();
+                    mfV2PendingDirty.staff.clear();mfV2PendingDirty.expenses.clear();
+                    mfV2PendingDirty.borrowings.clear();mfV2PendingDirty.shell=false;mfV2PendingDirty.full=false;
+                    mfV2ClearDirty();
+                    localStorage.removeItem('MF_LOCAL_DIRTY_AT');
+                    localStorage.removeItem('MF_LOCAL_DIRTY_AT_V2');
+                    localStorage.setItem('MF_LOCAL_SAVED_AT',new Date().toISOString());
+                    localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_READY','1');
+                    localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_HASH',mfLocalStateFingerprint());
+                    mfV2SetHash(mfV2Fingerprint());
+                    mfV2ArmBaseline();
+                }catch(e){console.warn('Clear All Data bookkeeping cleanup warning:',e);}
+
+                mfLastVersionFingerprint='';
+                try{await mfScaleBuildLocalEntities(true);}catch(e){console.warn('Empty scalable index refresh skipped:',e);}
+                try{mfRefreshFirebaseSyncControls();}catch(e){}
+                try{renderAll();}catch(e){console.warn('UI refresh after clear skipped:',e);}
+                try{syncCompanyNameField();}catch(e){}
+
+                if(connected){
+                    try{
+                        // Re-check the exact Firebase project, sync code and authenticated UID
+                        // captured when the user confirmed Clear All Data. Never wipe a newly
+                        // selected company's cloud if the connection/account changed mid-operation.
+                        if(!mfClearAllPendingTargetMatches()){
+                            throw new Error('The Firebase project, sync code, or signed-in account changed during Clear All Data. Local data is cleared, but the live cloud was not touched. Reconnect to the original intended account and use Clear All Data again.');
+                        }
+                        // Force a full owner-scoped write of the empty state; the existing V2
+                        // writer deletes stale owned loan/product/payment/staff/expense/borrowing docs.
+                        mfScaleSetFullDirty();
+                        await mfV2PushToServer(true);
+                        cloudCleared=true;
+                        localStorage.removeItem('MF_CLEAR_ALL_DATA_PENDING');localStorage.removeItem('MF_CLEAR_ALL_DATA_TARGET');
+                        window.mfFirebaseInitialSyncReady=true;
+                        try{startFirebaseListener();}catch(e){}
+                    }catch(cloudErr){
+                        // Do NOT roll back local deletion or pull old cloud data. Keep the marker
+                        // so automatic reconciliation stays blocked; an explicit Sync Now retries.
+                        console.error('Clear All Data cloud deletion pending:',cloudErr);
+                    }
+                }
+
+                const msg=cloudCleared
+                    ? 'Clear All Data completed. Entered business records were cleared from this device and the connected live Firebase business database. App structure, calculations, reports, UI and security settings were preserved. Google Drive backup files remain available for manual restore.'
+                    : 'Local Clear All Data completed. App structure, calculations, reports, UI and security settings were preserved. Automatic cloud restore is paused so old data cannot return. To clear the live Firebase records too, connect to the intended Firebase project/account and click Clear All Data again. Google Drive backups and local Version History remain available only through an explicit Restore action.';
+                try{updateSecureCloudStatus(msg,!cloudCleared);}catch(e){}
+                try{mfV2SetStatus(cloudCleared?'🟢 Local and live Firebase business data cleared.':'🟠 Local data cleared; cloud completion is pending. Automatic restore is blocked.',!cloudCleared);}catch(e){}
+                alert(msg);
+                return cloudCleared || !connected;
+            }catch(err){
+                console.error('Clear All Data failed:',err);
+                // The user explicitly requested deletion. Never restore the old in-memory data
+                // on error; keep the pending marker so automatic sync cannot reintroduce it.
+                try{renderAll();}catch(e){}
+                try{mfV2SetStatus('🟠 Clear All Data did not finish cleanly. Automatic cloud restore remains paused; inspect local database status before retrying.',true);}catch(e){}
+                alert('Clear All Data did not finish completely: '+String(err?.message||err)+'. The app will block automatic cloud restore. Do not enter new data until you verify the local database, then retry Clear All Data.');
+                return false;
+            }finally{
+                if(button){button.disabled=false;button.innerHTML='<i class="fa-solid fa-trash-can"></i> Clear All Data';}
+            }
+        }
+        // ================= END CLEAR ALL BUSINESS DATA =================
+
         renderAll();
         populateSalaryMonthOptions();
     </script>
