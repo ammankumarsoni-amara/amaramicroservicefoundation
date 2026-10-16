@@ -13902,6 +13902,31 @@ function printPhaseCPortfolio(){const pf=buildPortfolio(),pr=productRows(pf),vr=
 @media(max-width:760px){.mfpm-inline{padding:13px!important;margin:12px 0!important}.mfpm-inline-grid{grid-template-columns:minmax(0,1fr)!important;gap:12px!important}.mfpm-inline-grid input,.mfpm-inline-grid select{min-height:46px!important;font-size:16px!important}.mfpm-mixed-row{grid-template-columns:minmax(0,1fr)!important}}
 </style>
 
+
+<style id="mfpm-smart-payment-source-ui">
+.mfpm-inline{box-sizing:border-box;width:100%;margin:12px 0 16px!important;padding:16px!important;border:1px solid rgba(91,190,232,.28)!important;border-radius:15px!important;background:linear-gradient(145deg,rgba(11,43,66,.96),rgba(10,26,43,.97))!important;box-shadow:inset 0 1px rgba(255,255,255,.035),0 8px 22px rgba(0,0,0,.12)!important}
+.mfpm-source-title{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 14px!important;color:#e5f5ff;font-weight:800;font-size:.9rem;line-height:1.35}
+.mfpm-source-title small{flex-basis:100%;margin-left:29px;color:#9ebdd0;font-size:.76rem;font-weight:500}
+.mfpm-source-icon{display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:7px;background:rgba(34,211,238,.13);color:#67e8f9;font-size:1rem}
+.mfpm-inline-grid,.mfpm-component-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:13px 16px!important;align-items:start!important;width:100%!important}
+.mfpm-inline-grid>div,.mfpm-component-grid>div{min-width:0!important;width:100%!important}
+.mfpm-inline-grid label,.mfpm-component-grid label{display:block!important;margin:0 0 6px!important;width:100%!important;color:#c6dceb!important;font-size:.78rem!important;line-height:1.4!important;font-weight:750!important;overflow-wrap:anywhere!important}
+.mfpm-inline-grid input,.mfpm-inline-grid select,.mfpm-component-grid input,.mfpm-component-grid select{display:block!important;box-sizing:border-box!important;width:100%!important;min-width:0!important;min-height:43px!important;margin:0!important;padding:10px 12px!important;border:1px solid rgba(134,178,208,.32)!important;border-radius:9px!important;background:#102a42!important;color:#f2f8fc!important;font-size:.86rem!important;line-height:1.35!important}
+.mfpm-inline-grid input:focus,.mfpm-inline-grid select:focus,.mfpm-component-grid input:focus,.mfpm-component-grid select:focus{outline:none!important;border-color:#38c8ef!important;box-shadow:0 0 0 3px rgba(56,200,239,.14)!important}
+.mfpm-source-help,.mfpm-mixed-hint{display:block!important;margin-top:12px!important;color:#9fb9cb!important;font-size:.75rem!important;line-height:1.55!important}
+.mfpm-mixed-box{margin-top:16px!important;padding:14px!important;border:1px solid rgba(80,174,222,.24)!important;border-radius:12px!important;background:rgba(7,23,39,.62)!important}
+.mfpm-mixed-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.mfpm-mixed-head b{display:block;color:#effaff;font-size:.88rem;margin-bottom:4px}
+.mfpm-mixed-head small{display:block;color:#9ebbd0;font-size:.75rem;line-height:1.45}
+.mfpm-mixed-row{padding:13px!important;margin:0 0 10px!important;border:1px solid rgba(121,174,207,.19)!important;border-radius:11px!important;background:rgba(28,56,78,.42)!important}
+.mfpm-component-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;color:#c9efff;font-size:.82rem}
+.mfpm-mixed-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 2px 0;border-top:1px solid rgba(134,178,208,.18);color:#b9d2e1;font-size:.82rem}
+.mfpm-mixed-summary strong{color:#6ee7b7;font-size:1.05rem;font-variant-numeric:tabular-nums}
+.mfpm-mini-btn{border:1px solid rgba(74,190,229,.32)!important;border-radius:8px!important;background:rgba(15,130,174,.18)!important;color:#dff8ff!important;padding:8px 11px!important;min-height:35px!important;font-size:.76rem!important;font-weight:750!important;cursor:pointer}
+.mfpm-remove-btn{border-color:rgba(248,113,113,.25)!important;background:rgba(127,29,29,.22)!important;color:#fecaca!important}
+@media(max-width:760px){.mfpm-inline-grid,.mfpm-component-grid{grid-template-columns:minmax(0,1fr)!important;gap:12px!important}.mfpm-inline{padding:13px!important}.mfpm-mixed-box{padding:11px!important}.mfpm-inline-grid input,.mfpm-inline-grid select,.mfpm-component-grid input,.mfpm-component-grid select{min-height:45px!important;font-size:16px!important}}
+</style>
+
 </head><body><h1>${esc(state.bizName||'MicroFinance')} — Phase C Portfolio Intelligence</h1><p>As of ${esc(pcToday())}</p><h2>Aging & PAR</h2><table><tr><th>Metric</th><th>Value</th></tr>${rows([['Loan Accounts',pf.rows.length],['Open/Risk Accounts',pf.open.length],['Gross Disbursed',pf.totalDisb],['Open Principal',pf.totalOut],['Overdue Accounts',pf.overdue.length],['PAR 30',pf.par30],['PAR 60',pf.par60],['PAR 90',pf.par90]])}</table><h2>Product Performance</h2><table><tr><th>Product</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR30</th><th>PAR60</th><th>PAR90</th></tr>${pr.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)}</td><td>${money(r.par60)}</td><td>${money(r.par90)}</td></tr>`).join('')}</table><h2>Vintage Analysis</h2><table><tr><th>Vintage</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR30</th><th>PAR60</th><th>PAR90</th></tr>${vr.map(r=>`<tr><td>${esc(r.key)}</td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)}</td><td>${money(r.par60)}</td><td>${money(r.par90)}</td></tr>`).join('')}</table><\/body></html>`;const w=window.open('','_blank');if(!w)return;w.document.write(html);w.document.close();w.onload=()=>{w.focus();w.print();};}
 window.exportPhaseCPortfolioExcel=exportPhaseCPortfolioExcel;window.printPhaseCPortfolio=printPhaseCPortfolio;
 
@@ -14435,24 +14460,32 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     if(v.includes('bank')||v.includes('transfer')||v.includes('neft')||v.includes('rtgs')||v.includes('imps'))return 'BANK';
     return 'CASH';
   }
-  const channelOptions=`<option value="">Select channel</option><option value="UPI">UPI</option><option value="NEFT">NEFT</option><option value="RTGS">RTGS</option><option value="IMPS">IMPS</option><option value="BANK_TRANSFER">Other Bank Transfer</option><option value="CHEQUE">Cheque</option><option value="DD">Demand Draft</option>`;
+  function channelOptionsFor(kind,selected=''){
+    const rows=kind==='BANK'
+      ? [['','Select transfer method'],['NEFT','NEFT'],['RTGS','RTGS'],['IMPS','IMPS']]
+      : kind==='CHEQUE'
+        ? [['','Select instrument'],['CHEQUE','Cheque'],['DD','Demand Draft']]
+        : [];
+    return rows.map(([v,label])=>`<option value="${esc(v)}" ${String(v)===String(selected)?'selected':''}>${esc(label)}</option>`).join('');
+  }
   function panelHTML(prefix){
     return `<div class="mfpm-inline" id="mfpm-inline-${prefix}" data-prefix="${prefix}">
-      <div style="font-size:.66rem;font-weight:850;color:#bfdbfe;margin-bottom:6px"><i class="fa-solid fa-link"></i> Payment Source Details</div>
+      <div class="mfpm-source-title"><span class="mfpm-source-icon">↗</span><span>Payment Source Details</span><small>Record where this payment came from or went to.</small></div>
       <div class="mfpm-inline-grid">
         <div class="mfpm-bank-field"><label>Bank Account</label><select id="mfpm-${prefix}-bank" onchange="mfPMRefreshInline('${prefix}')">${optsBanks()}</select></div>
-        <div class="mfpm-channel-field"><label>Payment Channel</label><select id="mfpm-${prefix}-channel" onchange="mfPMRefreshInline('${prefix}')">${channelOptions}</select></div>
+        <div class="mfpm-channel-field"><label id="mfpm-${prefix}-channel-label">Payment Channel</label><select id="mfpm-${prefix}-channel" onchange="mfPMRefreshInline('${prefix}')"></select></div>
         <div class="mfpm-upi-field"><label>Bank-linked UPI ID</label><select id="mfpm-${prefix}-upi">${optsUpi('')}</select></div>
-        <div><label>UTR / Transaction Reference</label><input id="mfpm-${prefix}-ref" placeholder="Reference if available"></div>
-        <div class="mfpm-cheque-field"><label>Cheque / DD Number</label><input id="mfpm-${prefix}-cheque" placeholder="Cheque / DD number"></div>
-        <div><label>Narration (optional)</label><input id="mfpm-${prefix}-note" placeholder="Short payment note"></div>
+        <div class="mfpm-ref-field"><label id="mfpm-${prefix}-ref-label">Transaction Reference</label><input id="mfpm-${prefix}-ref" placeholder="Enter reference, if available"></div>
+        <div class="mfpm-cheque-field"><label>Cheque / DD Number</label><input id="mfpm-${prefix}-cheque" placeholder="Enter cheque or DD number"></div>
+        <div class="mfpm-note-field"><label>Narration (optional)</label><input id="mfpm-${prefix}-note" placeholder="Add a short payment note"></div>
       </div>
-      <div id="mfpm-${prefix}-mixed" style="display:none;margin-top:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:.65rem;color:#fff">Mixed Payment Components</b><button type="button" class="mfpm-mini-btn" onclick="mfPMAddMixedRow('${prefix}')">+ Add Component</button></div>
+      <div id="mfpm-${prefix}-mixed" class="mfpm-mixed-box" style="display:none">
+        <div class="mfpm-mixed-head"><div><b>Split this payment</b><small>Add only the methods actually used. Each component has its own source details.</small></div><button type="button" class="mfpm-mini-btn" onclick="mfPMAddMixedRow('${prefix}')">+ Add component</button></div>
         <div id="mfpm-${prefix}-mixed-rows"></div>
-        <div id="mfpm-${prefix}-mixed-total" style="text-align:right;font-size:.67rem;color:#34d399;margin-top:5px"></div>
+        <div class="mfpm-mixed-summary"><span>Components total</span><strong id="mfpm-${prefix}-mixed-total">₹0.00</strong></div>
+        <div class="mfpm-mixed-hint">The component total must exactly match the transaction amount before saving. This split does not recalculate the loan or EMI.</div>
       </div>
-      <small>Choose the bank first; only UPI IDs linked to that bank are offered. Source metadata is recorded separately and does not alter the financial calculation.</small>
+      <small class="mfpm-source-help">Select the bank first. UPI IDs are limited to the selected bank. Source details are audit information and do not change financial calculations.</small>
     </div>`;
   }
   const mixedDraft={};
@@ -14498,7 +14531,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   };
   window.mfPMSetInlineMeta=function(prefix,meta){
     const mode=$(prefix);if(!mode)return;if(!meta){window.mfPMResetInline(prefix);return;}
-    if(Array.isArray(meta.components)&&meta.components.length){mixedDraft[prefix]=meta.components.map(c=>({mode:c.mode||'Cash',amount:String(c.amount??''),bankId:c.bankAccountId||c.paymentMeta?.bankAccountId||'',upiId:c.upiSourceId||c.paymentMeta?.upiSourceId||'',ref:c.reference||c.paymentMeta?.reference||''}));mode.value='Mixed';window.mfPMUpdateInline(prefix);renderMixedRows(prefix);return;}
+    if(Array.isArray(meta.components)&&meta.components.length){mixedDraft[prefix]=meta.components.map(c=>({mode:c.mode||'Cash',amount:String(c.amount??''),bankId:c.bankAccountId||c.paymentMeta?.bankAccountId||'',upiId:c.upiSourceId||c.paymentMeta?.upiSourceId||'',channel:c.channel||'',ref:c.reference||c.paymentMeta?.reference||'',chequeNo:c.chequeNo||'',note:c.narration||''}));mode.value='Mixed';window.mfPMUpdateInline(prefix);renderMixedRows(prefix);return;}
     const bank=$(`mfpm-${prefix}-bank`),channel=$(`mfpm-${prefix}-channel`),upi=$(`mfpm-${prefix}-upi`),ref=$(`mfpm-${prefix}-ref`),cheque=$(`mfpm-${prefix}-cheque`),note=$(`mfpm-${prefix}-note`);
     if(bank)bank.value=meta.bankAccountId||'';window.mfPMUpdateInline(prefix);if(channel)channel.value=meta.channel||'';if(upi)upi.value=meta.upiSourceId||'';if(ref)ref.value=meta.reference||'';if(cheque)cheque.value=meta.chequeNo||'';if(note)note.value=meta.narration||'';
   };
@@ -14509,44 +14542,60 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     panel.style.display=kind==='CASH'?'none':'block';
     const mixed=$(`mfpm-${prefix}-mixed`);
     if(mixed)mixed.style.display=kind==='MIXED'?'block':'none';
-    const bankField=panel.querySelector('.mfpm-bank-field'),channelField=panel.querySelector('.mfpm-channel-field'),upiField=panel.querySelector('.mfpm-upi-field'),chequeField=panel.querySelector('.mfpm-cheque-field');
-    if(bankField)bankField.style.display=kind==='MIXED'?'none':(kind==='CASH'?'none':'block');
-    if(channelField)channelField.style.display=kind==='MIXED'?'none':(kind==='CASH'?'none':'block');
+    const bankField=panel.querySelector('.mfpm-bank-field'),channelField=panel.querySelector('.mfpm-channel-field'),upiField=panel.querySelector('.mfpm-upi-field'),refField=panel.querySelector('.mfpm-ref-field'),chequeField=panel.querySelector('.mfpm-cheque-field');
+    const channel=$(`mfpm-${prefix}-channel`),channelLabel=$(`mfpm-${prefix}-channel-label`),refLabel=$(`mfpm-${prefix}-ref-label`),refInput=$(`mfpm-${prefix}-ref`);
+    if(bankField)bankField.style.display=['UPI','BANK','CHEQUE'].includes(kind)?'block':'none';
+    if(channelField)channelField.style.display=['BANK','CHEQUE'].includes(kind)?'block':'none';
     if(upiField)upiField.style.display=kind==='UPI'?'block':'none';
+    if(refField)refField.style.display=['UPI','BANK'].includes(kind)?'block':'none';
     if(chequeField)chequeField.style.display=kind==='CHEQUE'?'block':'none';
-    const channel=$(`mfpm-${prefix}-channel`);
-    if(channel&&kind!=='MIXED'){
-      if(kind==='UPI')channel.value='UPI';
-      else if(kind==='CHEQUE')channel.value=String(sel.value).toLowerCase().includes('dd')?'DD':'CHEQUE';
-      else if(kind==='BANK'&&channel.value==='UPI')channel.value='';
+    if(channel){
+      const previous=channel.value;
+      channel.innerHTML=channelOptionsFor(kind,previous);
+      if(kind==='BANK'&&!['NEFT','RTGS','IMPS'].includes(channel.value))channel.value='';
+      if(kind==='CHEQUE'&&!['CHEQUE','DD'].includes(channel.value))channel.value='';
     }
+    if(channelLabel)channelLabel.textContent=kind==='BANK'?'Transfer Method':'Instrument Type';
+    if(refLabel)refLabel.textContent=kind==='UPI'?'UTR Number':'Transaction Reference';
+    if(refInput)refInput.placeholder=kind==='UPI'?'Enter UTR, if available':'Enter transaction reference, if available';
     window.mfPMRefreshInline(prefix);
-    if(kind==='MIXED'&&!mixedDraft[prefix])mixedDraft[prefix]=[{mode:'Cash',amount:'',bankId:'',upiId:'',ref:''}];
+    if(kind==='MIXED'&&!mixedDraft[prefix])mixedDraft[prefix]=[{mode:'Cash',amount:'',bankId:'',upiId:'',channel:'',ref:'',chequeNo:'',note:''}];
     if(kind==='MIXED')renderMixedRows(prefix);
   };
   function renderMixedRows(prefix){
     const host=$(`mfpm-${prefix}-mixed-rows`);if(!host)return;
     const rows=mixedDraft[prefix]||[];
-    host.innerHTML=rows.map((r,i)=>`<div class="mfpm-mixed-row" data-mixed-index="${i}">
-      <div><label>Component Mode</label><select data-k="mode" onchange="mfPMMixedChange('${prefix}',${i},'mode',this.value)"><option value="Cash" ${r.mode==='Cash'?'selected':''}>Cash</option><option value="UPI" ${r.mode==='UPI'?'selected':''}>UPI</option><option value="Bank Transfer" ${r.mode==='Bank Transfer'?'selected':''}>Bank Transfer</option><option value="Cheque / DD" ${r.mode==='Cheque / DD'?'selected':''}>Cheque / DD</option></select></div>
-      <div><label>Amount (₹)</label><input data-k="amount" type="number" min="0.01" step="0.01" value="${esc(r.amount)}" onchange="mfPMMixedChange('${prefix}',${i},'amount',this.value)"></div>
-      <div style="${r.mode==='Cash'?'display:none':''}"><label>Bank Account</label><select data-k="bankId" onchange="mfPMMixedChange('${prefix}',${i},'bankId',this.value)">${optsBanks(r.bankId)}</select></div>
-      <div style="${r.mode==='UPI'?'':'display:none'}"><label>UPI ID</label><select data-k="upiId" onchange="mfPMMixedChange('${prefix}',${i},'upiId',this.value)">${optsUpi(r.bankId,r.upiId)}</select></div>
-      <div><label>Reference / Cheque No.</label><input data-k="ref" value="${esc(r.ref||'')}" onchange="mfPMMixedChange('${prefix}',${i},'ref',this.value)"></div>
-      ${rows.length>1?`<button type="button" class="mfpm-mini-btn" onclick="mfPMRemoveMixedRow('${prefix}',${i})">Remove</button>`:''}
-    </div>`).join('');
+    host.innerHTML=rows.map((r,i)=>{
+      const k=modeKind(r.mode);
+      const showBank=['UPI','BANK','CHEQUE'].includes(k),showChannel=['BANK','CHEQUE'].includes(k),showUpi=k==='UPI',showRef=['UPI','BANK'].includes(k),showCheque=k==='CHEQUE';
+      const label=k==='UPI'?'UTR Number':'Transaction Reference';
+      return `<div class="mfpm-mixed-row" data-mixed-index="${i}">
+        <div class="mfpm-component-heading"><b>Component ${i+1}</b>${rows.length>1?`<button type="button" class="mfpm-mini-btn mfpm-remove-btn" onclick="mfPMRemoveMixedRow('${prefix}',${i})">Remove</button>`:''}</div>
+        <div class="mfpm-component-grid">
+          <div><label>Payment Method</label><select data-k="mode" onchange="mfPMMixedChange('${prefix}',${i},'mode',this.value)"><option value="Cash" ${r.mode==='Cash'?'selected':''}>Cash</option><option value="UPI" ${r.mode==='UPI'?'selected':''}>UPI</option><option value="Bank Transfer" ${r.mode==='Bank Transfer'?'selected':''}>Bank Transfer (NEFT / RTGS / IMPS)</option><option value="Cheque / DD" ${r.mode==='Cheque / DD'?'selected':''}>Cheque / Demand Draft</option></select></div>
+          <div><label>Amount (₹)</label><input data-k="amount" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(r.amount)}" oninput="mfPMMixedChange('${prefix}',${i},'amount',this.value)"></div>
+          <div style="${showBank?'':'display:none'}"><label>Bank Account</label><select data-k="bankId" onchange="mfPMMixedChange('${prefix}',${i},'bankId',this.value)">${optsBanks(r.bankId)}</select></div>
+          <div style="${showChannel?'':'display:none'}"><label>${k==='BANK'?'Transfer Method':'Instrument Type'}</label><select data-k="channel" onchange="mfPMMixedChange('${prefix}',${i},'channel',this.value)">${channelOptionsFor(k,r.channel||'')}</select></div>
+          <div style="${showUpi?'':'display:none'}"><label>Bank-linked UPI ID</label><select data-k="upiId" onchange="mfPMMixedChange('${prefix}',${i},'upiId',this.value)">${optsUpi(r.bankId,r.upiId)}</select></div>
+          <div style="${showRef?'':'display:none'}"><label>${label}</label><input data-k="ref" value="${esc(r.ref||'')}" placeholder="${k==='UPI'?'Enter UTR, if available':'Enter reference, if available'}" oninput="mfPMMixedChange('${prefix}',${i},'ref',this.value)"></div>
+          <div style="${showCheque?'':'display:none'}"><label>Cheque / DD Number</label><input data-k="chequeNo" value="${esc(r.chequeNo||'')}" placeholder="Enter cheque or DD number" oninput="mfPMMixedChange('${prefix}',${i},'chequeNo',this.value)"></div>
+          <div><label>Narration (optional)</label><input data-k="note" value="${esc(r.note||'')}" placeholder="Short payment note" oninput="mfPMMixedChange('${prefix}',${i},'note',this.value)"></div>
+        </div>
+      </div>`;
+    }).join('');
     const total=rows.reduce((n,r)=>n+(Number(r.amount)||0),0);
-    const out=$(`mfpm-${prefix}-mixed-total`);if(out)out.textContent='Component Total: '+money(total);
+    const out=$(`mfpm-${prefix}-mixed-total`);if(out)out.textContent=money(total);
   }
   window.mfPMMixedChange=function(prefix,index,key,value){
     if(!mixedDraft[prefix])mixedDraft[prefix]=[];
     const row=mixedDraft[prefix][index];if(!row)return;
     row[key]=value;
-    if(key==='mode'){row.bankId='';row.upiId='';}
+    if(key==='mode'){row.bankId='';row.upiId='';row.channel='';row.ref='';row.chequeNo='';}
     if(key==='bankId')row.upiId='';
+    if(key==='amount'){const out=$(`mfpm-${prefix}-mixed-total`);if(out)out.textContent=money((mixedDraft[prefix]||[]).reduce((n,r)=>n+(Number(r.amount)||0),0));return;}
     renderMixedRows(prefix);
   };
-  window.mfPMAddMixedRow=function(prefix){mixedDraft[prefix]=mixedDraft[prefix]||[];mixedDraft[prefix].push({mode:'Cash',amount:'',bankId:'',upiId:'',ref:''});renderMixedRows(prefix);};
+  window.mfPMAddMixedRow=function(prefix){mixedDraft[prefix]=mixedDraft[prefix]||[];mixedDraft[prefix].push({mode:'Cash',amount:'',bankId:'',upiId:'',channel:'',ref:'',chequeNo:'',note:''});renderMixedRows(prefix);};
   window.mfPMRemoveMixedRow=function(prefix,index){mixedDraft[prefix]=(mixedDraft[prefix]||[]).filter((_,i)=>i!==index);renderMixedRows(prefix);};
   function mfPMAudit(action,entityType,entityId,before=null,after=null){
     ensure();
@@ -14568,19 +14617,22 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
       const sum=rows.reduce((n,r)=>n+r.amount,0);
       if(Number(amount)>0&&Math.abs(sum-Number(amount))>0.009){alert(`Mixed Payment total ${money(sum)} does not match the transaction amount ${money(amount)}.`);return {ok:false};}
       for(const r of rows){
-        if(r.mode!=='Cash'&&!r.bankId){alert('Select the bank account for every non-cash Mixed Payment component.');return {ok:false};}
-        if(r.mode==='UPI'&&!r.upiId){alert('Select the bank-linked UPI ID for every UPI component.');return {ok:false};}
+        const k=modeKind(r.mode);
+        if(k!=='CASH'&&!r.bankId){alert('Select a bank account for each non-cash component.');return {ok:false};}
+        if(k==='UPI'&&!r.upiId){alert('Select a bank-linked UPI ID for each UPI component.');return {ok:false};}
+        if(k==='BANK'&&!['NEFT','RTGS','IMPS'].includes(r.channel)){alert('For a Bank Transfer component, select NEFT, RTGS or IMPS.');return {ok:false};}
+        if(k==='CHEQUE'&&(!['CHEQUE','DD'].includes(r.channel)||!String(r.chequeNo||'').trim())){alert('For a Cheque / DD component, select Cheque or Demand Draft and enter its number.');return {ok:false};}
         if(r.bankId&&!accountById(r.bankId)){alert('A selected bank account no longer exists. Refresh the Payment Management source list.');return {ok:false};}
         if(r.upiId&&!upiById(r.bankId,r.upiId)){alert('A selected UPI ID is not linked to the chosen bank.');return {ok:false};}
       }
-      return {ok:true,meta:{transactionId:makeId('TXN'),recordedAt:new Date().toISOString(),deviceId:String(window.mfFirebaseDeviceId||'LOCAL'),mode:'Mixed',channel:'MIXED',direction,transactionAmount:Number(amount)||sum,components:rows.map(r=>{const a=accountById(r.bankId),u=upiById(r.bankId,r.upiId);return {componentId:makeId('COMP'),mode:r.mode,amount:r.amount,bankAccountId:r.bankId||'',bankNameSnapshot:a?.bankName||'',accountHolderSnapshot:a?.accountHolder||'',accountMaskedSnapshot:a?masked(a.accountNumber):'',branchSnapshot:a?.branch||'',ifscSnapshot:a?.ifsc||'',upiSourceId:r.upiId||'',upiAppSnapshot:u?.appName||'',upiIdSnapshot:u?.upiId||'',reference:r.ref||'',channel:r.mode==='UPI'?'UPI':r.mode==='Cheque / DD'?'CHEQUE/DD':r.mode==='Bank Transfer'?'BANK_TRANSFER':'CASH'};})}};
+      return {ok:true,meta:{transactionId:makeId('TXN'),recordedAt:new Date().toISOString(),deviceId:String(window.mfFirebaseDeviceId||'LOCAL'),mode:'Mixed',channel:'MIXED',direction,transactionAmount:Number(amount)||sum,components:rows.map(r=>{const a=accountById(r.bankId),u=upiById(r.bankId,r.upiId),k=modeKind(r.mode);return {componentId:makeId('COMP'),mode:r.mode,amount:r.amount,bankAccountId:r.bankId||'',bankNameSnapshot:a?.bankName||'',accountHolderSnapshot:a?.accountHolder||'',accountMaskedSnapshot:a?masked(a.accountNumber):'',branchSnapshot:a?.branch||'',ifscSnapshot:a?.ifsc||'',upiSourceId:r.upiId||'',upiAppSnapshot:u?.appName||'',upiIdSnapshot:u?.upiId||'',reference:r.ref||'',chequeNo:r.chequeNo||'',narration:r.note||'',channel:k==='UPI'?'UPI':k==='BANK'?r.channel:k==='CHEQUE'?r.channel:'CASH'};})}};
     }
     const bankId=$(`mfpm-${prefix}-bank`)?.value||'',channel=$(`mfpm-${prefix}-channel`)?.value||'',upiId=$(`mfpm-${prefix}-upi`)?.value||'',reference=$(`mfpm-${prefix}-ref`)?.value?.trim()||'',chequeNo=$(`mfpm-${prefix}-cheque`)?.value?.trim()||'',narration=$(`mfpm-${prefix}-note`)?.value?.trim()||'';
     if(!bankId){alert('Choose the bank account first in Payment Source Details. Add the bank under Payment Management if it is not listed.');return {ok:false};}
     if(!accountById(bankId)){alert('Selected bank account is no longer active. Refresh the form and choose an active account.');return {ok:false};}
     if(kind==='UPI'&&!upiId){alert('Choose a UPI ID linked to the selected bank. Add it from Payment Management → Manage UPI IDs.');return {ok:false};}
-    if(kind==='BANK'&&!channel){alert('Choose the actual bank transfer channel (NEFT, RTGS, IMPS or Other Bank Transfer).');return {ok:false};}
-    if(kind==='CHEQUE'&&(!channel||!chequeNo)){alert('Select Cheque/DD channel and enter its number.');return {ok:false};}
+    if(kind==='BANK'&&!['NEFT','RTGS','IMPS'].includes(channel)){alert('Choose NEFT, RTGS or IMPS as the bank transfer method.');return {ok:false};}
+    if(kind==='CHEQUE'&&(!['CHEQUE','DD'].includes(channel)||!chequeNo)){alert('Select Cheque or Demand Draft and enter its number.');return {ok:false};}
     const u=upiId?upiById(bankId,upiId):null;
     return {ok:true,meta:{transactionId:makeId('TXN'),recordedAt:new Date().toISOString(),deviceId:String(window.mfFirebaseDeviceId||'LOCAL'),mode:kind,channel:kind==='UPI'?'UPI':channel,bankAccountId:bankId,bankNameSnapshot:accountById(bankId)?.bankName||'',accountHolderSnapshot:accountById(bankId)?.accountHolder||'',accountMaskedSnapshot:masked(accountById(bankId)?.accountNumber||''),branchSnapshot:accountById(bankId)?.branch||'',ifscSnapshot:accountById(bankId)?.ifsc||'',upiSourceId:upiId,upiApp:u?.appName||'',upiId:u?.upiId||'',reference,chequeNo,narration,direction,transactionAmount:Number(amount)||0,components:[]}};
   };
