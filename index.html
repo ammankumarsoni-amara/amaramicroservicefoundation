@@ -4470,8 +4470,19 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
           const meta=root.data()||{}; if(meta.ownerUid&&meta.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
           const entities=await mfV2ReadEntities(mfFirebaseUser.uid);
           if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1' && !showConfirm) return false;
-          if(!entities.loans.length && mfV2HasBusinessData()) throw new Error('Cloud database is incomplete: zero loan records returned. Local data was protected.');
+          // A verified, explicit Clear All Data is different from a partial/failed cloud read.
+          // The cloud tombstone is written only by the confirmed clear workflow; it authorizes
+          // an empty cloud snapshot to replace stale records on the other device.
           const shell=meta.shell&&typeof meta.shell==='object'?meta.shell:{};
+          const verifiedCandidate={...shell,...entities};
+          const verifiedCloudClear=meta.businessDataCleared===true &&
+            Number(meta.counts?.loans||0)===0 && Number(meta.counts?.products||0)===0 &&
+            Number(meta.counts?.staff||0)===0 && Number(meta.counts?.expenses||0)===0 &&
+            Number(meta.counts?.borrowings||0)===0 && Number(meta.counts?.payments||0)===0 &&
+            entities.loans.length===0 && Object.keys(entities.products||{}).length===0 &&
+            entities.staff.length===0 && entities.expenses.length===0 && entities.borrowings.length===0 &&
+            mfStateFingerprintObject(verifiedCandidate)===String(meta.stateFingerprint||'');
+          if(!entities.loans.length && mfV2HasBusinessData() && !verifiedCloudClear) throw new Error('Cloud database is incomplete: zero loan records returned. Local data was protected.');
           state={...shell,...entities};
           mfScaleReinstallStateProxy(); normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
           await idbPutSnapshot();
@@ -4515,7 +4526,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
               for(let i=0;i<stale.length;i+=400){const b=mfFirestoreDb.batch();stale.slice(i,i+400).forEach(d=>b.delete(d.ref));await b.commit();}
             }));
           }
-          const meta={ownerUid:mfFirebaseUser.uid,version,schemaVersion:'AMARA-SYNC-V2',updatedByDevice:mfFirebaseDeviceId,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAtLabel:new Date().toLocaleString('en-IN'),stateFingerprint:localHash,counts:{loans:(state.loans||[]).length,products:Object.keys(state.products||{}).length,staff:(state.staff||[]).length,expenses:(state.expenses||[]).length,borrowings:(state.borrowings||[]).length,payments:(state.loans||[]).reduce((n,l)=>n+(Array.isArray(l.payments)?l.payments.length:0),0)},shell:mfV2Shell()};
+          const meta={ownerUid:mfFirebaseUser.uid,version,schemaVersion:'AMARA-SYNC-V2',updatedByDevice:mfFirebaseDeviceId,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAtLabel:new Date().toLocaleString('en-IN'),stateFingerprint:localHash,businessDataCleared:localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1',counts:{loans:(state.loans||[]).length,products:Object.keys(state.products||{}).length,staff:(state.staff||[]).length,expenses:(state.expenses||[]).length,borrowings:(state.borrowings||[]).length,payments:(state.loans||[]).reduce((n,l)=>n+(Array.isArray(l.payments)?l.payments.length:0),0)},shell:mfV2Shell()};
           await rootRef.set(meta,{merge:true});
           mfV2SetHash(localHash);mfSetKnownCloudVersion(version);mfV2ClearDirty();if(!syntheticFull)mfV2ClearPendingDirty(dirty);
           mfV2SetStatus('🟢 Secure cloud updated from this device — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
