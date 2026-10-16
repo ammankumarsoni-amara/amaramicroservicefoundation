@@ -536,7 +536,12 @@
         .mf-system-only-penalty{display:block;}
         @media(max-width:700px){.mf-loan-history-grid{grid-template-columns:1fr 1fr;}.mf-loan-actions .btn-header{flex:1 1 140px;justify-content:center;}#customer-history-summary .statement-box>div{grid-template-columns:1fr 1fr!important;}.mf-passbook-loan-row{align-items:flex-start;flex-direction:column;}.mf-passbook-loan-row .btn-edit-sm{width:100%;justify-content:center;}}
 
-</style>
+
+        .mf-source-detail{width:100%;table-layout:fixed;border-collapse:collapse}
+        .mf-source-detail th,.mf-source-detail td{padding:7px 8px;vertical-align:top;overflow-wrap:anywhere;word-break:normal}
+        .mf-source-components{margin-top:3px;font-size:.82em;color:#475569;line-height:1.4}
+        @media(max-width:700px){.mf-source-detail{table-layout:auto}.mf-source-detail th,.mf-source-detail td{padding:6px 5px;font-size:11px}}
+        </style>
 
 <style id="mf-upcoming-emi-css">
 .upcoming-emi-wrap{margin:0 0 14px;padding:12px;border:1px solid rgba(59,130,246,.28);border-radius:14px;background:linear-gradient(180deg,rgba(59,130,246,.07),rgba(15,23,42,.45))}
@@ -2528,9 +2533,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <div id="bulk-common-mode-wrap">
                     <select id="bulk-emi-payment-mode">
                         <option value="Cash">Cash</option>
-                        <option value="UPI">UPI (GPay / PhonePe / Other Payment Bank)</option>
-                        <option value="Bank Transfer">Bank Transfer / Cheque</option>
-                        <option value="Cash + UPI (Both)">Cash + UPI / Bank Transfer / Cheque (Mixed)</option>
+                        <option value="UPI">UPI</option>
+                        <option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option>
+                        <option value="Bank Cheque">Cheque / Demand Draft</option>
+                        <option value="Cash + UPI (Both)">Mixed Payment (multiple components)</option>
                     </select>
                     <div style="font-size:.63rem;color:#64748b;margin-top:4px;">For Manual Due-Date Collection, each selected EMI can use its own mode from its row.</div>
                 </div>
@@ -9115,9 +9121,10 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         function getCollectionPaymentModeOptions(selected='Cash') {
             const opts = [
                 ['Cash','Cash'],
-                ['UPI','UPI (GPay / PhonePe / Other Payment Bank)'],
-                ['Bank Transfer','Bank Transfer / Cheque'],
-                ['Cash + UPI (Both)','Cash + UPI / Bank Transfer / Cheque (Mixed)']
+                ['UPI','UPI'],
+                ['Bank Transfer','Bank Transfer (NEFT / RTGS / IMPS)'],
+                ['Bank Cheque','Cheque / Demand Draft'],
+                ['Cash + UPI (Both)','Mixed Payment (multiple components)']
             ];
             return opts.map(([v,t])=>`<option value="${v}" ${v===selected?'selected':''}>${t}</option>`).join('');
         }
@@ -9292,7 +9299,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 return;
             }
             const modeSummary=[...new Set(rows.map(r=>r.collectionMode))].map(m=>{
-                const label=m==='UPI'?'UPI (GPay / PhonePe / Other Payment Bank)':m==='Bank Transfer'?'Bank Transfer / Cheque':m==='Cash + UPI (Both)'?'Mixed (Cash + UPI / Bank Transfer / Cheque)':'Cash';
+                const label=m==='UPI'?'UPI':m==='Bank Transfer'?'Bank Transfer (NEFT / RTGS / IMPS)':m==='Bank Cheque'?'Cheque / Demand Draft':m==='Cash + UPI (Both)'?'Mixed Payment (multiple components)':'Cash';
                 return label;
             }).join(' · ');
             box.innerHTML=`<div><b>${rows.length}</b> EMI(s) selected${mode==='ALL'?' for one-click collection':''}.</div><div style="margin-top:4px;">Scheduled due dates · ${formatToIndianDate(dates[0])} → ${formatToIndianDate(dates[dates.length-1])} · Total ₹${total.toLocaleString('en-IN')}</div><div style="margin-top:4px;color:#94a3b8;">Each selected EMI has its own actual paid date · Mode(s): ${modeSummary}</div>`;
@@ -11772,43 +11779,44 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             return out;
         }
         function mfAnnualModeBreakdown(filters,d){
+            // Management summary is transaction-level: a mixed transaction is one row/category,
+            // not separate Cash/UPI rows. Component allocation belongs in the source-detail view.
             const map={};
-            const sourceLabel=(mode,meta,component=null)=>{
-                const m=component||meta||{};
-                const k=String(component?.mode||mode||'Mode Not Recorded');
-                const bank=String(m.bankNameSnapshot||m.bankName||'').trim();
-                const masked=String(m.accountMaskedSnapshot||'').trim();
-                const app=String(m.upiAppSnapshot||m.upiApp||'').trim();
-                const upi=String(m.upiIdSnapshot||m.upiId||'').trim();
-                const channel=String(m.channel||'').trim();
-                const parts=[k];
-                if(bank)parts.push(bank+(masked?' · '+masked:''));
-                if(app||upi)parts.push([app,upi].filter(Boolean).join(' · '));
-                else if(channel&&channel!=='CASH'&&channel!=='UPI'&&channel!=='MIXED')parts.push(channel);
-                return parts.join(' — ');
+            const canonicalMode=(mode,meta)=>{
+                const raw=String(mode||'Mode Not Recorded').trim();
+                const n=raw.toLowerCase();
+                if(n.includes('mixed')||n.includes('cash + upi'))return 'Mixed Payment';
+                if(n==='bank cheque'||n==='cheque / dd'||n.includes('demand draft')||n.includes('cheque'))return 'Cheque / Demand Draft';
+                if(n.includes('bank transfer')||n==='bank'||n==='neft'||n==='rtgs'||n==='imps'){
+                    const ch=String(meta?.channel||'').toUpperCase();
+                    return ['NEFT','RTGS','IMPS'].includes(ch)?`Bank Transfer (${ch})`:'Bank Transfer (NEFT / RTGS / IMPS)';
+                }
+                if(n==='upi'||n==='gpay'||n==='phonepe'||n.includes('upi'))return 'UPI';
+                if(n==='cash')return 'Cash';
+                return raw||'Mode Not Recorded';
             };
-            const ensure=(label)=>{const k=String(label||'Mode Not Recorded');if(!map[k])map[k]={collections:0,disbursed:0,lender:0,opex:0,collectionCount:0,disbursalCount:0};return map[k];};
+            const ensure=label=>{const k=String(label||'Mode Not Recorded');if(!map[k])map[k]={collections:0,disbursed:0,lender:0,opex:0,collectionCount:0,disbursalCount:0};return map[k];};
             const add=(category,mode,amount,meta)=>{
                 const value=Number(amount)||0;
-                if(meta?.components?.length){
-                    let attributed=0;
-                    meta.components.forEach(c=>{const v=Number(c.amount)||0;if(v<=0)return;const q=ensure(sourceLabel(c.mode||mode,meta,c));q[category]+=v;if(category==='collections')q.collectionCount++;if(category==='disbursed')q.disbursalCount++;attributed+=v;});
-                    // Preserve reconciliation when a legacy/malformed mixed record has a residual.
-                    const residual=value-attributed;
-                    if(Math.abs(residual)>0.005){const q=ensure(sourceLabel(mode,meta));q[category]+=residual;if(category==='collections')q.collectionCount++;if(category==='disbursed')q.disbursalCount++;}
-                }else{const q=ensure(sourceLabel(mode,meta));q[category]+=value;if(category==='collections')q.collectionCount++;if(category==='disbursed')q.disbursalCount++;}
+                const label=canonicalMode(mode,meta);
+                const q=ensure(label);q[category]+=value;
+                if(category==='collections')q.collectionCount++;
+                if(category==='disbursed')q.disbursalCount++;
             };
             d.disbursed.forEach(x=>{
-                x.filteredPayments.forEach(p=>add('collections',mfResolveTransactionMode(p.mode),p.amount,p.paymentMeta));
-                if(x.loan.foreclosed&&mfPeriodMatch(x.loan.foreclosureData?.settlementDate,filters))add('collections',mfResolveTransactionMode(x.loan.foreclosureData?.mode),x.loan.foreclosureData?.settlementAmount,x.loan.foreclosureData?.paymentMeta);
-                if(x.loan.postMaturitySettlement&&mfPeriodMatch(x.loan.postMaturitySettlement.settlementDate,filters))add('collections',mfResolveTransactionMode(x.loan.postMaturitySettlement.mode),x.loan.postMaturitySettlement.actualReceived,x.loan.postMaturitySettlement.paymentMeta);
+                x.filteredPayments.forEach(p=>add('collections',p.mode,p.amount,p.paymentMeta));
+                if(x.loan.foreclosed&&mfPeriodMatch(x.loan.foreclosureData?.settlementDate,filters))add('collections',x.loan.foreclosureData?.mode,x.loan.foreclosureData?.settlementAmount,x.loan.foreclosureData?.paymentMeta);
+                if(x.loan.postMaturitySettlement&&mfPeriodMatch(x.loan.postMaturitySettlement.settlementDate,filters))add('collections',x.loan.postMaturitySettlement.mode,x.loan.postMaturitySettlement.actualReceived,x.loan.postMaturitySettlement.paymentMeta);
+                // This summary is the gross loan/disbursal measure used by the financial report.
+                // Do not split it by net-payment components; those are detailed in section 14.
                 if(x.includeDisb)add('disbursed',mfResolveDisbursalMode(x.loan).label,x.p.amount,x.loan.disbursalPaymentMeta);
             });
-            d.lender.forEach(x=>x.filteredRepayments.forEach(r=>add('lender',mfResolveTransactionMode(r.mode),(Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0),r.paymentMeta)));
-            d.payroll.forEach(x=>add('opex',mfResolveTransactionMode(x.sp.mode),x.sp.amount,x.sp.paymentMeta));
-            d.expenses.forEach(x=>add('opex',mfResolveTransactionMode(x.mode),x.amount,x.paymentMeta));
+            d.lender.forEach(x=>x.filteredRepayments.forEach(r=>add('lender',r.mode,(Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0),r.paymentMeta)));
+            d.payroll.forEach(x=>add('opex',x.sp.mode,x.sp.amount,x.sp.paymentMeta));
+            d.expenses.forEach(x=>add('opex',x.mode,x.amount,x.paymentMeta));
             return Object.entries(map).sort((a,b)=>(b[1].collections+b[1].disbursed+b[1].lender+b[1].opex)-(a[1].collections+a[1].disbursed+a[1].lender+a[1].opex)).map(([mode,v])=>({mode,...v}));
         }
+
         function mfAnnualLoanTypeSummary(d){
             const loans=d.disbursed.filter(x=>x.includeDisb).map(x=>x.loan), typeOf=l=>String(l?.loanType||'NEW').toUpperCase();
             return [
@@ -11846,22 +11854,48 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             return rows;
         }
         function mfBuildAnnualPaymentSourceRows(r){
-            const rows=[], add=(date,type,who,mode,amount,meta)=>{
-                const esc=v=>financeEsc(v==null||v===''?'—':String(v));
-                const list=meta?.components?.length?meta.components:[{mode:mode||'Mode Not Recorded',amount:Number(amount)||0,...(meta||{})}];
-                let attributed=0;
-                list.forEach(c=>{
-                    const val=Number(c.amount)||0; if(val<=0)return; attributed+=val;
-                    const method=String(c.mode||mode||'Mode Not Recorded');
-                    const bank=String(c.bankNameSnapshot||'');
-                    const masked=String(c.accountMaskedSnapshot||'');
-                    const upi=[c.upiAppSnapshot||c.upiApp||'',c.upiIdSnapshot||c.upiId||''].filter(Boolean).join(' · ');
-                    const ref=String(c.reference||c.ref||c.chequeNo||'');
-                    const source=method==='Cash'?'Cash source':(bank?'Source recorded':'Source details missing');
-                    rows.push(`<tr><td>${esc(date)}</td><td>${esc(type)}</td><td>${esc(who)}</td><td>${esc(method)}</td><td class="num">${money(val)}</td><td>${esc(bank)}${masked?' · '+esc(masked):''}</td><td>${esc(upi)}</td><td>${esc(ref)}</td><td>${esc(source)}</td></tr>`);
-                });
-                const residual=(Number(amount)||0)-attributed;
-                if(Math.abs(residual)>0.005)rows.push(`<tr><td>${esc(date)}</td><td>${esc(type)}</td><td>${esc(who)}</td><td>${esc(mode||'Mode Not Recorded')} — Unallocated</td><td class="num">${money(residual)}</td><td>—</td><td>—</td><td>—</td><td>Check component allocation</td></tr>`);
+            // One row per recorded transaction. Component detail is compactly summarized inside
+            // the row so a mixed payment never looks like multiple separate loan disbursals.
+            const rows=[];
+            const esc=v=>financeEsc(v==null||v===''?'—':String(v));
+            const fmt=v=>money(Number(v)||0);
+            const methodLabel=mode=>{
+                const n=String(mode||'Mode Not Recorded').toLowerCase();
+                if(n.includes('mixed')||n.includes('cash + upi'))return 'Mixed Payment';
+                if(n==='bank cheque'||n.includes('cheque')||n.includes('demand draft'))return 'Cheque / Demand Draft';
+                if(n.includes('bank transfer')||n==='bank')return 'Bank Transfer';
+                if(n==='upi'||n.includes('upi'))return 'UPI';
+                if(n==='cash')return 'Cash';
+                return String(mode||'Mode Not Recorded');
+            };
+            const add=(date,type,who,mode,amount,meta)=>{
+                const comps=(Array.isArray(meta?.components)?meta.components:[]).filter(c=>(Number(c.amount)||0)>0);
+                const componentTotal=comps.reduce((sum,c)=>sum+(Number(c.amount)||0),0);
+                // For a mixed disbursal, show the actual amount allocated to payment channels.
+                // The gross loan amount remains in the main financial report; withheld file charge
+                // is not fabricated as an unallocated payment component.
+                const isDisbursal=String(type)==='Loan disbursal';
+                const displayAmount=(comps.length&&isDisbursal)?componentTotal:(Number(amount)||0);
+                const modeText=comps.length?'Mixed Payment':methodLabel(mode);
+                const banks=[],upis=[],refs=[],parts=[];
+                if(comps.length){
+                    comps.forEach(c=>{
+                        const cm=methodLabel(c.mode),v=Number(c.amount)||0;
+                        parts.push(`${cm} ${fmt(v)}`);
+                        const bn=String(c.bankNameSnapshot||c.bankName||'').trim(),masked=String(c.accountMaskedSnapshot||'').trim();
+                        if(bn)banks.push(bn+(masked?' · '+masked:''));
+                        const app=String(c.upiAppSnapshot||c.upiApp||'').trim(),uid=String(c.upiIdSnapshot||c.upiId||'').trim();
+                        if(app||uid)upis.push([app,uid].filter(Boolean).join(' · '));
+                        const ref=String(c.reference||c.ref||c.chequeNo||'').trim();if(ref)refs.push(ref);
+                    });
+                } else {
+                    const bn=String(meta?.bankNameSnapshot||meta?.bankName||'').trim(),masked=String(meta?.accountMaskedSnapshot||'').trim();
+                    if(bn)banks.push(bn+(masked?' · '+masked:''));
+                    const app=String(meta?.upiAppSnapshot||meta?.upiApp||'').trim(),uid=String(meta?.upiIdSnapshot||meta?.upiId||'').trim();if(app||uid)upis.push([app,uid].filter(Boolean).join(' · '));
+                    const ref=String(meta?.reference||meta?.ref||meta?.chequeNo||'').trim();if(ref)refs.push(ref);
+                }
+                const sourceStatus=modeText==='Cash'?'Cash source':(banks.length||upis.length?'Source recorded':(modeText==='Mixed Payment'?'Partial source details':'Source details missing'));
+                rows.push(`<tr><td>${esc(date)}</td><td>${esc(type)}</td><td>${esc(who)}</td><td>${esc(modeText)}${parts.length?`<div class="mf-source-components">${parts.map(esc).join(' · ')}</div>`:''}</td><td class="num">${fmt(displayAmount)}</td><td>${esc([...new Set(banks)].join(' / '))}</td><td>${esc([...new Set(upis)].join(' / '))}</td><td>${esc([...new Set(refs)].join(' / '))}</td><td>${esc(sourceStatus)}</td></tr>`);
             };
             (state.loans||[]).forEach(l=>{
                 const p=state.products?.[l.product]||{};
@@ -11995,7 +12029,7 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
                 <h2>11. Operating Expenses & Payroll</h2><table><thead><tr><th>Metric</th><th>Amount</th></tr></thead><tbody>${rows([['Staff Salaries',d.salaries],['General Business Expenses',d.generalExp],['TOTAL OPERATING EXPENSES',d.opex]])}</tbody></table>
                 <h2>12. Payment Mode — Reconciled</h2><table><thead><tr><th>Mode</th><th>Customer Collections</th><th>Capital Disbursed</th><th>Lender Payments</th><th>OPEX / Payroll</th></tr></thead><tbody>${modeRows||'<tr><td colspan="5">No payment activity in this year.</td></tr>'}</tbody></table>${r.modeDataQuality.length?`<div class="mf-exec-warning"><b>Legacy disbursal-mode data-quality notice:</b> ${r.modeDataQuality.length} disbursal record(s) inside the selected ${r.basis==='financial'?'Financial Year':'Calendar Year'} period have no explicit stored disbursal mode. This is not a mathematical or collection-calculation error. The report uses the application's existing Cash fallback for these legacy records without modifying them and without inferring a mode from any customer collection or other transaction. If the original mode was UPI, Bank Transfer, or Mixed, that record must be verified and explicitly saved before it is considered rectified.</div>`:''}
                 <h2>13. Monthly Trend — ${financeEsc(r.periodLabel)}</h2><table class="mf-trend"><thead><tr><th>Month</th><th>Accounts</th><th>Disbursed</th><th>Collections</th><th>Principal</th><th>Revenue</th><th>Lender Cost</th><th>OPEX</th><th>Net</th></tr></thead><tbody>${monthRows}</tbody></table>
-                <h2>14. Payment Source Detail</h2><p class="mf-exec-note">Mixed payments are shown by component for traceability. These rows are a source-detail view; they do not create additional disbursals or alter financial totals. Missing source metadata is shown explicitly instead of being inferred.</p><table class="mf-source-detail"><thead><tr><th>Date</th><th>Type</th><th>Customer / Record</th><th>Payment Method</th><th>Amount</th><th>Bank / Masked Account</th><th>UPI App / ID</th><th>Reference / Instrument</th><th>Source Status</th></tr></thead><tbody>${mfBuildAnnualPaymentSourceRows(r)}</tbody></table>
+                <h2>14. Payment Source Detail</h2><p class="mf-exec-note">One row per transaction. Mixed payments remain one transaction, with component amounts summarized inline. For loan disbursals, this source view shows the amount actually paid to the customer; the annual financial summary retains gross loan principal and reports file charges separately. Missing source details are shown as missing, never guessed.</p><table class="mf-source-detail"><thead><tr><th>Date</th><th>Type</th><th>Customer / Record</th><th>Payment Method</th><th>Amount</th><th>Bank / Masked Account</th><th>UPI App / ID</th><th>Reference / Instrument</th><th>Source Status</th></tr></thead><tbody>${mfBuildAnnualPaymentSourceRows(r)}</tbody></table>
                 <h2>15. Mathematical Reconciliation</h2><table><thead><tr><th>Check</th><th>Calculated</th><th>Reported</th><th>Result</th></tr></thead><tbody>${reconRows}</tbody></table>
                 <div class="mf-exec-note"><b>Core formulas:</b> Net Operating Surplus = Gross Business Revenue − Lender Financing Cost − Operating Expenses/Payroll. Closing Principal Portfolio = Opening Principal Portfolio + Capital Disbursed − Principal Recovered. Principal recovery is capital recovery, not revenue. Net Cash Movement = Customer Collections + New Borrowing − Customer Disbursement − Lender Payments − OPEX/Payroll.</div>
                 <div class="mf-exec-disclaimer">Management information report only. This report does not rewrite or alter operational loan calculations, EMI schedules, payments, settlements, foreclosures, security or cloud data.</div>
