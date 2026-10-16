@@ -13927,6 +13927,35 @@ function printPhaseCPortfolio(){const pf=buildPortfolio(),pr=productRows(pf),vr=
 @media(max-width:760px){.mfpm-inline-grid,.mfpm-component-grid{grid-template-columns:minmax(0,1fr)!important;gap:12px!important}.mfpm-inline{padding:13px!important}.mfpm-mixed-box{padding:11px!important}.mfpm-inline-grid input,.mfpm-inline-grid select,.mfpm-component-grid input,.mfpm-component-grid select{min-height:45px!important;font-size:16px!important}}
 </style>
 
+
+<style id="mfpm-sophisticated-source-ui-final">
+.mfpm-inline{display:none;box-sizing:border-box;width:100%;max-width:100%;min-width:0;margin:16px 0 18px!important;padding:18px!important;border:1px solid rgba(111,190,224,.23)!important;border-radius:16px!important;background:linear-gradient(145deg,rgba(10,37,58,.98),rgba(8,25,43,.98))!important;box-shadow:0 8px 24px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.035)!important}
+.mfpm-source-title{display:flex!important;align-items:center!important;gap:10px!important;flex-wrap:nowrap!important;width:100%!important;margin:0 0 16px!important;padding:0 0 12px!important;border-bottom:1px solid rgba(148,190,213,.15)!important;color:#eaf7ff!important;font-size:.94rem!important;line-height:1.35!important;font-weight:800!important}
+.mfpm-source-title>span:last-child{display:block!important;min-width:0!important;white-space:normal!important}
+.mfpm-source-title small{display:none!important}
+.mfpm-source-icon{flex:0 0 28px!important;width:28px!important;height:28px!important;border-radius:9px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;background:rgba(34,211,238,.12)!important;color:#67e8f9!important;font-size:1rem!important}
+.mfpm-inline-grid,.mfpm-component-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:15px 18px!important;align-items:start!important;width:100%!important;min-width:0!important}
+.mfpm-inline-grid>div,.mfpm-component-grid>div{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:0!important;min-width:0!important;width:100%!important}
+.mfpm-inline-grid label,.mfpm-component-grid label{display:block!important;position:static!important;float:none!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;margin:0 0 7px!important;padding:0!important;color:#c8dce9!important;font-size:.78rem!important;font-weight:750!important;line-height:1.4!important;white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important}
+.mfpm-inline-grid input,.mfpm-inline-grid select,.mfpm-component-grid input,.mfpm-component-grid select{display:block!important;position:static!important;float:none!important;box-sizing:border-box!important;width:100%!important;max-width:100%!important;min-width:0!important;min-height:46px!important;margin:0!important;padding:11px 13px!important;border:1px solid rgba(133,174,201,.32)!important;border-radius:10px!important;background:#10283e!important;color:#f2f8fc!important;font-family:inherit!important;font-size:.88rem!important;line-height:1.4!important;box-shadow:none!important}
+.mfpm-inline-grid input::placeholder,.mfpm-component-grid input::placeholder{color:#8da9bb!important;opacity:1!important}
+.mfpm-inline-grid input:focus,.mfpm-inline-grid select:focus,.mfpm-component-grid input:focus,.mfpm-component-grid select:focus{outline:none!important;border-color:#45c8ed!important;box-shadow:0 0 0 3px rgba(69,200,237,.13)!important}
+.mfpm-source-help{display:block!important;margin:13px 0 0!important;color:#91adbf!important;font-size:.75rem!important;line-height:1.5!important}
+.mfpm-mixed-box{display:block;box-sizing:border-box;width:100%;min-width:0;margin-top:18px!important;padding:16px!important;border:1px solid rgba(103,181,217,.22)!important;border-radius:13px!important;background:rgba(4,19,33,.5)!important}
+.mfpm-mixed-head{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:14px!important;flex-wrap:wrap!important;margin:0 0 14px!important;padding:0 0 13px!important;border-bottom:1px solid rgba(148,190,213,.13)!important}
+.mfpm-mixed-head>div{flex:1 1 180px!important;min-width:0!important}
+.mfpm-mixed-head b{display:block!important;margin:0 0 4px!important;color:#e9f7ff!important;font-size:.9rem!important;line-height:1.35!important}
+.mfpm-mixed-head small{display:block!important;color:#8faabd!important;font-size:.76rem!important;line-height:1.45!important}
+.mfpm-mini-btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:6px!important;min-height:40px!important;padding:9px 13px!important;border:1px solid rgba(65,195,231,.34)!important;border-radius:9px!important;background:rgba(14,130,171,.19)!important;color:#dff8ff!important;font-family:inherit!important;font-size:.78rem!important;font-weight:800!important;line-height:1.2!important;white-space:nowrap!important;cursor:pointer!important}
+.mfpm-mini-btn:hover{background:rgba(14,130,171,.3)!important;border-color:rgba(65,195,231,.55)!important}
+.mfpm-mixed-row{display:block!important;box-sizing:border-box!important;width:100%!important;min-width:0!important;margin:0 0 12px!important;padding:15px!important;border:1px solid rgba(128,177,204,.17)!important;border-radius:12px!important;background:rgba(24,49,68,.42)!important}
+.mfpm-component-heading{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;margin:0 0 13px!important;padding:0 0 10px!important;border-bottom:1px solid rgba(148,190,213,.12)!important;color:#dff4ff!important;font-size:.82rem!important;line-height:1.3!important}
+.mfpm-remove-btn{min-height:32px!important;padding:6px 10px!important;border-color:rgba(248,113,113,.24)!important;background:rgba(127,29,29,.18)!important;color:#fecaca!important}
+.mfpm-mixed-summary{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;margin-top:4px!important;padding:14px 2px 0!important;border-top:1px solid rgba(148,190,213,.16)!important;color:#bbd0dd!important;font-size:.82rem!important;font-weight:700!important}
+.mfpm-mixed-summary strong{color:#6ee7b7!important;font-size:1.08rem!important;font-weight:850!important;font-variant-numeric:tabular-nums!important}
+@media(max-width:760px){.mfpm-inline{padding:14px!important;margin:13px 0 15px!important;border-radius:13px!important}.mfpm-inline-grid,.mfpm-component-grid{grid-template-columns:minmax(0,1fr)!important;gap:13px!important}.mfpm-inline-grid input,.mfpm-inline-grid select,.mfpm-component-grid input,.mfpm-component-grid select{min-height:47px!important;font-size:16px!important}.mfpm-mixed-box{padding:12px!important;margin-top:14px!important}.mfpm-mixed-row{padding:12px!important}.mfpm-mixed-head{align-items:stretch!important}.mfpm-mixed-head .mfpm-mini-btn{width:100%!important}}
+</style>
+
 </head><body><h1>${esc(state.bizName||'MicroFinance')} — Phase C Portfolio Intelligence</h1><p>As of ${esc(pcToday())}</p><h2>Aging & PAR</h2><table><tr><th>Metric</th><th>Value</th></tr>${rows([['Loan Accounts',pf.rows.length],['Open/Risk Accounts',pf.open.length],['Gross Disbursed',pf.totalDisb],['Open Principal',pf.totalOut],['Overdue Accounts',pf.overdue.length],['PAR 30',pf.par30],['PAR 60',pf.par60],['PAR 90',pf.par90]])}</table><h2>Product Performance</h2><table><tr><th>Product</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR30</th><th>PAR60</th><th>PAR90</th></tr>${pr.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)}</td><td>${money(r.par60)}</td><td>${money(r.par90)}</td></tr>`).join('')}</table><h2>Vintage Analysis</h2><table><tr><th>Vintage</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR30</th><th>PAR60</th><th>PAR90</th></tr>${vr.map(r=>`<tr><td>${esc(r.key)}</td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)}</td><td>${money(r.par60)}</td><td>${money(r.par90)}</td></tr>`).join('')}</table><\/body></html>`;const w=window.open('','_blank');if(!w)return;w.document.write(html);w.document.close();w.onload=()=>{w.focus();w.print();};}
 window.exportPhaseCPortfolioExcel=exportPhaseCPortfolioExcel;window.printPhaseCPortfolio=printPhaseCPortfolio;
 
@@ -14470,7 +14499,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   }
   function panelHTML(prefix){
     return `<div class="mfpm-inline" id="mfpm-inline-${prefix}" data-prefix="${prefix}">
-      <div class="mfpm-source-title"><span class="mfpm-source-icon">↗</span><span>Payment Source Details</span><small>Record where this payment came from or went to.</small></div>
+      <div class="mfpm-source-title"><span class="mfpm-source-icon">↗</span><span>Payment details</span></div>
       <div class="mfpm-inline-grid">
         <div class="mfpm-bank-field"><label>Bank Account</label><select id="mfpm-${prefix}-bank" onchange="mfPMRefreshInline('${prefix}')">${optsBanks()}</select></div>
         <div class="mfpm-channel-field"><label id="mfpm-${prefix}-channel-label">Payment Channel</label><select id="mfpm-${prefix}-channel" onchange="mfPMRefreshInline('${prefix}')"></select></div>
@@ -14480,12 +14509,12 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         <div class="mfpm-note-field"><label>Narration (optional)</label><input id="mfpm-${prefix}-note" placeholder="Add a short payment note"></div>
       </div>
       <div id="mfpm-${prefix}-mixed" class="mfpm-mixed-box" style="display:none">
-        <div class="mfpm-mixed-head"><div><b>Split this payment</b><small>Add only the methods actually used. Each component has its own source details.</small></div><button type="button" class="mfpm-mini-btn" onclick="mfPMAddMixedRow('${prefix}')">+ Add component</button></div>
+        <div class="mfpm-mixed-head"><div><b>Mixed payment</b><small>Split the amount across payment methods.</small></div><button type="button" class="mfpm-mini-btn" onclick="mfPMAddMixedRow('${prefix}')">＋ Add payment</button></div>
         <div id="mfpm-${prefix}-mixed-rows"></div>
-        <div class="mfpm-mixed-summary"><span>Components total</span><strong id="mfpm-${prefix}-mixed-total">₹0.00</strong></div>
-        <div class="mfpm-mixed-hint">The component total must exactly match the transaction amount before saving. This split does not recalculate the loan or EMI.</div>
+        <div class="mfpm-mixed-summary"><span>Total allocated</span><strong id="mfpm-${prefix}-mixed-total">₹0.00</strong></div>
+        
       </div>
-      <small class="mfpm-source-help">Select the bank first. UPI IDs are limited to the selected bank. Source details are audit information and do not change financial calculations.</small>
+      <small class="mfpm-source-help">UPI IDs shown belong to the selected bank.</small>
     </div>`;
   }
   const mixedDraft={};
@@ -14570,7 +14599,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
       const showBank=['UPI','BANK','CHEQUE'].includes(k),showChannel=['BANK','CHEQUE'].includes(k),showUpi=k==='UPI',showRef=['UPI','BANK'].includes(k),showCheque=k==='CHEQUE';
       const label=k==='UPI'?'UTR Number':'Transaction Reference';
       return `<div class="mfpm-mixed-row" data-mixed-index="${i}">
-        <div class="mfpm-component-heading"><b>Component ${i+1}</b>${rows.length>1?`<button type="button" class="mfpm-mini-btn mfpm-remove-btn" onclick="mfPMRemoveMixedRow('${prefix}',${i})">Remove</button>`:''}</div>
+        <div class="mfpm-component-heading"><b>Payment ${String(i+1).padStart(2,'0')}</b>${rows.length>1?`<button type="button" class="mfpm-mini-btn mfpm-remove-btn" onclick="mfPMRemoveMixedRow('${prefix}',${i})">Remove</button>`:''}</div>
         <div class="mfpm-component-grid">
           <div><label>Payment Method</label><select data-k="mode" onchange="mfPMMixedChange('${prefix}',${i},'mode',this.value)"><option value="Cash" ${r.mode==='Cash'?'selected':''}>Cash</option><option value="UPI" ${r.mode==='UPI'?'selected':''}>UPI</option><option value="Bank Transfer" ${r.mode==='Bank Transfer'?'selected':''}>Bank Transfer (NEFT / RTGS / IMPS)</option><option value="Cheque / DD" ${r.mode==='Cheque / DD'?'selected':''}>Cheque / Demand Draft</option></select></div>
           <div><label>Amount (₹)</label><input data-k="amount" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(r.amount)}" oninput="mfPMMixedChange('${prefix}',${i},'amount',this.value)"></div>
