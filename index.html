@@ -6416,10 +6416,16 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
         }
         function setUpcomingToday(){ const t=mfIsoToday(); setUpcomingDate('from',t); setUpcomingDate('to',t); renderUpcomingEmiSchedule(); }
         function applyUpcomingQuickView(){
-            const v=document.getElementById('emi-schedule-quick')?.value||'7', t=mfIsoToday(), d=new Date();
-            if(v==='MONTH'){ const y=d.getFullYear(),m=d.getMonth(); setUpcomingDate('from',`${y}-${String(m+1).padStart(2,'0')}-01`); setUpcomingDate('to',`${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`); }
+            const v=document.getElementById('emi-schedule-quick')?.value||'NONE', t=mfIsoToday(), d=new Date();
+            if(v==='NONE'){
+                // Returning to Select Quick View must not silently turn into a zero-day/today range.
+                // Clear the quick-view dates only when the user has also cleared the required filters.
+                const status=document.getElementById('emi-schedule-status')?.value||'NONE';
+                const collector=document.getElementById('emi-collector-filter')?.value||'NONE';
+                if(status==='NONE' && collector==='NONE'){ setUpcomingDate('from',''); setUpcomingDate('to',''); }
+            } else if(v==='MONTH'){ const y=d.getFullYear(),m=d.getMonth(); setUpcomingDate('from',`${y}-${String(m+1).padStart(2,'0')}-01`); setUpcomingDate('to',`${y}-${String(m+1).padStart(2,'0')}-${String(new Date(y,m+1,0).getDate()).padStart(2,'0')}`); }
             else if(v==='YEAR'){ const y=d.getFullYear(); setUpcomingDate('from',`${y}-01-01`); setUpcomingDate('to',`${y}-12-31`); }
-            else { const n=Number(v); setUpcomingDate('from',t); setUpcomingDate('to',mfIsoAddDays(t,n-1)); }
+            else { const n=Number(v); if(Number.isFinite(n)&&n>0){setUpcomingDate('from',t);setUpcomingDate('to',mfIsoAddDays(t,n-1));} }
             renderUpcomingEmiSchedule();
         }
         function getCollectionAgents(){
@@ -6719,16 +6725,31 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             </article>`;
         }
         function renderUpcomingEmiSchedule(){
-            const from=getUpcomingDateIso('from')||mfIsoToday(), to=getUpcomingDateIso('to')||from;
+            const from=getUpcomingDateIso('from'), to=getUpcomingDateIso('to');
             const status=document.getElementById('emi-schedule-status')?.value||'UPCOMING',
                   q=(document.getElementById('emi-schedule-search')?.value||'').trim().toLowerCase(),
                   collector=document.getElementById('emi-collector-filter')?.value||'NONE',
                   today=mfIsoToday();
             populateUpcomingCollectorFilter();
             if(status==='NONE' || collector==='NONE'){
+                const quick=document.getElementById('emi-schedule-quick')?.value||'NONE';
+                if(status==='NONE' && collector==='NONE' && quick==='NONE'){setUpcomingDate('from','');setUpcomingDate('to','');}
                 const summary=document.getElementById('upcoming-emi-summary'), area=document.getElementById('upcoming-emi-results');
+                const collectorSummary=document.getElementById('upcoming-collector-summary');
+                const priority=document.getElementById('upcoming-collection-priority');
                 if(summary) summary.innerHTML='<div class="upcoming-emi-empty-state"><i class="fa-solid fa-filter"></i><b>Select Status and Collection Agent</b><span>Choose the required filters to load the collection book. No portfolio is loaded by default.</span></div>';
                 if(area) area.innerHTML='';
+                if(collectorSummary) collectorSummary.remove();
+                // Do not leave old priority names/counts visible after the required filters are cleared.
+                if(priority) priority.innerHTML='<div class="upcoming-empty compact-empty"><i class="fa-solid fa-filter"></i> Select Status and Collection Agent to view collection priority.</div>';
+                return;
+            }
+            if(!from || !to || from>to){
+                const summary=document.getElementById('upcoming-emi-summary'), area=document.getElementById('upcoming-emi-results');
+                const collectorSummary=document.getElementById('upcoming-collector-summary'), priority=document.getElementById('upcoming-collection-priority');
+                if(summary) summary.innerHTML='<div class="upcoming-emi-empty-state"><i class="fa-solid fa-calendar-days"></i><b>Select a valid date range</b><span>Choose a Quick View or enter From Date and To Date, then apply filters.</span></div>';
+                if(area) area.innerHTML=''; if(collectorSummary) collectorSummary.remove();
+                if(priority) priority.innerHTML='<div class="upcoming-empty compact-empty">No collection priority loaded for the current filters.</div>';
                 return;
             }
 
@@ -6915,13 +6936,13 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
 
         // Customer Feed Rendering
         function renderProductFilters() {
-            const bar = document.getElementById("product-filter-bar");
-            bar.innerHTML = `<div class="filter-chip ${state.activeFilter==='ALL'?'active':''}" onclick="setFilter('ALL')">All Loans (${state.loans.length})</div>`;
-            
+            const bar = document.getElementById("product-filter-bar"); if(!bar) return;
+            bar.innerHTML = `<button type="button" class="filter-chip ${state.activeFilter==='ALL'?'active':''}" onclick="setFilter('ALL')" title="Open all loan accounts">All Loans (${state.loans.length}) <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></button>`;
             Object.keys(state.products).forEach(code => {
                 const p = state.products[code];
                 const count = state.loans.filter(l => l.product === code).length;
-                bar.innerHTML += `<div class="filter-chip ${state.activeFilter===code?'active':''}" onclick="setFilter('${code}')">${p.name.split(" ")[0]} (${count})</div>`;
+                const safeCode=String(code).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+                bar.innerHTML += `<button type="button" class="filter-chip ${state.activeFilter===code?'active':''}" onclick="setFilter('${safeCode}')" title="Open ${financeEsc(p.name)} loan accounts">${financeEsc(p.name.split(" ")[0])} (${count}) <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></button>`;
             });
         }
 
@@ -6929,6 +6950,9 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             state.activeFilter = filterCode;
             renderProductFilters();
             renderFeed();
+            // The chip count is also a drill-down control; open the matching accounts even when
+            // the main recovery search is empty, instead of making the click appear to do nothing.
+            openLoanSummaryModal(filterCode==='ALL'?'ALL':'PRODUCT',filterCode==='ALL'?'':filterCode,'');
         }
 
         function getLoanMaturityDate(loan){
@@ -10286,41 +10310,74 @@ th,td{overflow-wrap:anywhere;word-break:break-word;}
             const active = state.loans.filter(l => !l.foreclosed && getLoanPending(l) > 0).length;
             const closed = state.loans.filter(l => !l.foreclosed && getLoanPending(l) <= 0).length;
             const foreclosed = state.loans.filter(l => l.foreclosed).length;
-
             let cards = `
-                <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-bottom:10px;">
-                    <div class="kpi-card" style="padding:8px 10px;"><div class="kpi-label" style="font-size:.6rem;">Total Loans</div><div class="kpi-val" style="font-size:1.05rem;color:#60a5fa;">${total}</div></div>
-                    <div class="kpi-card" style="padding:8px 10px;"><div class="kpi-label" style="font-size:.6rem;">Total Disbursed</div><div class="kpi-val" style="font-size:1.05rem;color:#34d399;">₹${totalDisb.toLocaleString('en-IN')}</div></div>
-                    <div class="kpi-card" style="padding:8px 10px;"><div class="kpi-label" style="font-size:.6rem;">Active / Closed</div><div class="kpi-val" style="font-size:1.05rem;color:#fbbf24;">${active} / ${closed}</div></div>
-                    <div class="kpi-card" style="padding:8px 10px;"><div class="kpi-label" style="font-size:.6rem;">Foreclosed</div><div class="kpi-val" style="font-size:1.05rem;color:#c084fc;">${foreclosed}</div></div>
+                <div class="mf-loan-summary-kpis">
+                    <button type="button" class="kpi-card mf-summary-kpi" onclick="openLoanSummaryModal('ALL','','')"><span class="kpi-label">Total Loans</span><strong class="kpi-val" style="color:#60a5fa;">${total}</strong><small>View all accounts <i class="fa-solid fa-arrow-up-right-from-square"></i></small></button>
+                    <div class="kpi-card mf-summary-kpi"><span class="kpi-label">Total Disbursed</span><strong class="kpi-val" style="color:#34d399;">₹${totalDisb.toLocaleString('en-IN')}</strong><small>Gross product principal</small></div>
+                    <div class="kpi-card mf-summary-kpi"><span class="kpi-label">Active / Closed</span><div class="mf-summary-split"><button type="button" onclick="openLoanSummaryModal('STATUS','','ACTIVE')"><b style="color:#fbbf24;">${active}</b><small>Active</small></button><button type="button" onclick="openLoanSummaryModal('STATUS','','CLOSED')"><b style="color:#cbd5e1;">${closed}</b><small>Closed</small></button></div></div>
+                    <button type="button" class="kpi-card mf-summary-kpi" onclick="openLoanSummaryModal('STATUS','','FORECLOSED')"><span class="kpi-label">Foreclosed</span><strong class="kpi-val" style="color:#c084fc;">${foreclosed}</strong><small>View foreclosed <i class="fa-solid fa-arrow-up-right-from-square"></i></small></button>
                 </div>
-                <div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:12px;padding:10px 11px;">
-                    <div style="font-size:.78rem;font-weight:800;color:#fff;margin-bottom:8px;"><i class="fa-solid fa-chart-column" style="color:#60a5fa;"></i> Loan Product-wise Summary</div>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:7px;">
+                <div class="mf-product-summary-shell">
+                    <div class="mf-product-summary-title"><i class="fa-solid fa-chart-column" style="color:#60a5fa;"></i> Loan Product-wise Summary <span>Tap any count to view matching accounts</span></div>
+                    <div class="mf-product-summary-grid">
             `;
-
             Object.keys(state.products).forEach(code => {
                 const p = state.products[code];
                 const loans = state.loans.filter(l => l.product === code);
                 const activeCount = loans.filter(l => !l.foreclosed && getLoanPending(l) > 0).length;
                 const closedCount = loans.filter(l => !l.foreclosed && getLoanPending(l) <= 0).length;
                 const fcCount = loans.filter(l => l.foreclosed).length;
-                const disb = loans.length * p.amount;
+                const disb = loans.reduce((sum,l)=>sum+(Number((state.products[l.product]||{}).amount)||0),0);
+                const safeCode=String(code).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
                 cards += `
-                    <div style="background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);border-radius:9px;padding:9px;">
-                        <b style="color:#60a5fa;font-size:.8rem;">${p.name}</b>
-                        <div style="font-size:.69rem;color:#94a3b8;margin-top:4px;">${code} · ₹${p.amount.toLocaleString('en-IN')} loan</div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:7px;font-size:.7rem;">
-                            <span>Total: <b style="color:#fff;">${loans.length}</b></span>
-                            <span>Disbursed: <b style="color:#34d399;">₹${disb.toLocaleString('en-IN')}</b></span>
-                            <button type="button" onclick="setTab('products'); setTimeout(()=>toggleProductClients('${code.replace(/[^a-zA-Z0-9_-]/g, '_')}'),50)" style="border:0;background:none;padding:0;color:#60a5fa;cursor:pointer;">Active: <b>${activeCount}</b></button>
-                            <span>Closed: <b style="color:#cbd5e1;">${closedCount}</b></span>
-                            <span>Foreclosed: <b style="color:#c084fc;">${fcCount}</b></span>
+                    <div class="mf-product-summary-card">
+                        <b class="mf-product-summary-name">${financeEsc(p.name)}</b>
+                        <div class="mf-product-summary-meta">${financeEsc(code)} · ₹${Number(p.amount||0).toLocaleString('en-IN')} loan</div>
+                        <div class="mf-product-summary-counts">
+                            <button type="button" onclick="openLoanSummaryModal('PRODUCT','${safeCode}','')"><span>Total</span><b>${loans.length}</b></button>
+                            <div><span>Disbursed</span><b class="mf-green">₹${disb.toLocaleString('en-IN')}</b></div>
+                            <button type="button" onclick="openLoanSummaryModal('PRODUCT_STATUS','${safeCode}','ACTIVE')"><span>Active</span><b class="mf-blue">${activeCount}</b></button>
+                            <button type="button" onclick="openLoanSummaryModal('PRODUCT_STATUS','${safeCode}','CLOSED')"><span>Closed</span><b>${closedCount}</b></button>
+                            <button type="button" onclick="openLoanSummaryModal('PRODUCT_STATUS','${safeCode}','FORECLOSED')"><span>Foreclosed</span><b class="mf-purple">${fcCount}</b></button>
                         </div>
                     </div>`;
             });
             cards += `</div></div>`;
             area.innerHTML = cards;
+        }
+
+        function openLoanSummaryModal(kind, productCode, statusCode) {
+            const all=Array.isArray(state.loans)?state.loans:[];
+            let loans=all.filter(l=>{
+                if(productCode && l.product!==productCode) return false;
+                if(statusCode==='ACTIVE') return !l.foreclosed && getLoanPending(l)>0;
+                if(statusCode==='CLOSED') return !l.foreclosed && getLoanPending(l)<=0;
+                if(statusCode==='FORECLOSED') return !!l.foreclosed;
+                return true;
+            });
+            const productName=productCode ? (state.products[productCode]?.name||productCode) : '';
+            const statusName=statusCode==='ACTIVE'?'Active':statusCode==='CLOSED'?'Closed':statusCode==='FORECLOSED'?'Foreclosed':'';
+            const title=[productName,statusName,kind==='ALL'?'All Loan Accounts':''].filter(Boolean).join(' · ')||'Loan Accounts';
+            let overlay=document.getElementById('mf-loan-summary-modal'); if(overlay) overlay.remove();
+            overlay=document.createElement('div'); overlay.id='mf-loan-summary-modal'; overlay.className='mf-loan-modal-overlay';
+            const esc=financeEsc;
+            overlay.innerHTML=`<section class="mf-loan-modal" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+                <header class="mf-loan-modal-head"><div><b>${esc(title)}</b><small>${loans.length.toLocaleString('en-IN')} matching loan account${loans.length===1?'':'s'}</small></div><button type="button" class="mf-loan-modal-close" aria-label="Close" onclick="document.getElementById('mf-loan-summary-modal')?.remove()"><i class="fa-solid fa-xmark"></i></button></header>
+                <div class="mf-loan-modal-search"><i class="fa-solid fa-magnifying-glass"></i><input id="mf-loan-modal-search" placeholder="Search name, phone or Loan ID" oninput="filterLoanSummaryModalRows()" autocomplete="off"></div>
+                <div class="mf-loan-modal-table-wrap"><table class="mf-loan-modal-table"><thead><tr><th>Loan ID</th><th>Customer</th><th>Phone</th><th>Product</th><th>Status</th><th>Loan Amount</th><th></th></tr></thead><tbody id="mf-loan-modal-tbody">${loans.map(l=>{const p=state.products[l.product]||{};const st=l.foreclosed?'FORECLOSED':(getLoanPending(l)>0?'ACTIVE':'CLOSED');return `<tr data-search="${esc([l.id,l.name,l.phone,l.phone2,p.name,st].filter(Boolean).join(' ').toLowerCase())}"><td>${esc(l.id||'—')}</td><td>${esc(l.name||'—')}</td><td>${esc([l.phone,l.phone2].filter(Boolean).join(' / ')||'—')}</td><td>${esc(p.name||l.product||'—')}</td><td><span class="mf-loan-status-pill ${st.toLowerCase()}">${st==='FORECLOSED'?'Foreclosed':st==='ACTIVE'?'Active':'Closed'}</span></td><td>₹${Number(p.amount||0).toLocaleString('en-IN')}</td><td><button type="button" class="mf-loan-open-btn" onclick="openLoanSummaryAccount('${String(l.id||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">Open</button></td></tr>`;}).join('')}</tbody></table>${loans.length?'':'<div class="mf-loan-modal-empty">No loan accounts match this selection.</div>'}</div>
+                <footer class="mf-loan-modal-foot"><span>Read-only list · financial records are not changed</span><button type="button" class="mf-loan-open-btn secondary" onclick="document.getElementById('mf-loan-summary-modal')?.remove()">Close</button></footer>
+            </section>`;
+            overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+            document.body.appendChild(overlay);
+            const onKey=e=>{if(e.key==='Escape'){overlay.remove();document.removeEventListener('keydown',onKey);}}; document.addEventListener('keydown',onKey);
+        }
+        function filterLoanSummaryModalRows(){
+            const q=(document.getElementById('mf-loan-modal-search')?.value||'').trim().toLowerCase();
+            document.querySelectorAll('#mf-loan-modal-tbody tr').forEach(row=>{row.style.display=!q||(row.getAttribute('data-search')||'').includes(q)?'':'none';});
+        }
+        function openLoanSummaryAccount(id){
+            const loan=(state.loans||[]).find(l=>String(l.id)===String(id)); if(!loan)return;
+            document.getElementById('mf-loan-summary-modal')?.remove(); openLoanMasterLoan(id);
         }
 
         function refreshLoanMasterProductFilter() {
@@ -14120,6 +14177,56 @@ function printPhaseCPortfolio(){const pf=buildPortfolio(),pr=productRows(pf),vr=
 }
 </style>
 
+
+<style id="mf-advanced-summary-drilldown-responsive">
+#product-filter-bar.filter-strip{display:flex;flex-wrap:wrap;align-items:center;gap:7px;overflow:visible;padding:2px 0 9px;}
+#product-filter-bar .filter-chip{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:34px;max-width:100%;white-space:nowrap;transition:background .15s,border-color .15s,transform .15s;}
+#product-filter-bar .filter-chip:hover{border-color:rgba(56,189,248,.65);transform:translateY(-1px);}
+#product-filter-bar .filter-chip i{font-size:.62rem;opacity:.75;}
+.mf-loan-summary-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px;}
+.mf-summary-kpi{box-sizing:border-box;min-width:0;width:100%;padding:10px 12px;text-align:left;display:flex;flex-direction:column;gap:4px;border:1px solid var(--border-subtle);border-radius:12px;background:var(--bg-card);color:var(--text-main,#e2e8f0);}
+button.mf-summary-kpi{cursor:pointer;transition:border-color .15s,transform .15s;}
+button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translateY(-1px);}
+.mf-summary-kpi .kpi-label{font-size:.66rem;color:var(--text-muted,#94a3b8);font-weight:800;}
+.mf-summary-kpi .kpi-val{font-size:1.08rem;line-height:1.2;overflow-wrap:anywhere;}
+.mf-summary-kpi>small{font-size:.58rem;color:var(--text-muted,#94a3b8);}
+.mf-summary-split{display:flex;gap:8px;flex-wrap:wrap;}
+.mf-summary-split button{display:flex;align-items:baseline;gap:4px;border:0;background:transparent;padding:0;cursor:pointer;color:inherit;}
+.mf-summary-split button small{font-size:.6rem;color:var(--text-muted,#94a3b8);}
+.mf-product-summary-shell{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:12px;padding:11px;}
+.mf-product-summary-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.78rem;font-weight:850;color:var(--text-main,#fff);margin-bottom:9px;}
+.mf-product-summary-title span{font-size:.6rem;font-weight:600;color:var(--text-muted,#94a3b8);}
+.mf-product-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:8px;}
+.mf-product-summary-card{min-width:0;border:1px solid rgba(148,163,184,.14);background:rgba(255,255,255,.025);border-radius:10px;padding:10px;}
+.mf-product-summary-name{display:block;font-size:.78rem;color:#60a5fa;overflow-wrap:anywhere;}
+.mf-product-summary-meta{font-size:.65rem;color:var(--text-muted,#94a3b8);margin-top:4px;overflow-wrap:anywhere;}
+.mf-product-summary-counts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:9px;}
+.mf-product-summary-counts>button,.mf-product-summary-counts>div{display:flex;align-items:center;justify-content:space-between;gap:5px;min-width:0;border:1px solid rgba(148,163,184,.13);border-radius:7px;background:rgba(255,255,255,.025);padding:6px 7px;color:var(--text-main,#e2e8f0);font-size:.65rem;text-align:left;}
+.mf-product-summary-counts>button{cursor:pointer;}
+.mf-product-summary-counts>button:hover{border-color:rgba(56,189,248,.55);background:rgba(56,189,248,.08);}
+.mf-product-summary-counts span{color:var(--text-muted,#94a3b8);}
+.mf-product-summary-counts b{font-variant-numeric:tabular-nums;}
+.mf-product-summary-counts .mf-green{color:#34d399;}.mf-product-summary-counts .mf-blue{color:#60a5fa;}.mf-product-summary-counts .mf-purple{color:#c084fc;}
+.mf-loan-modal-overlay{position:fixed;inset:0;z-index:100500;background:rgba(2,6,23,.76);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:14px;}
+.mf-loan-modal{width:min(1120px,100%);max-height:min(88dvh,850px);display:flex;flex-direction:column;overflow:hidden;background:var(--bg-main,#07152c);color:var(--text-main,#e2e8f0);border:1px solid rgba(96,165,250,.35);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.48);}
+.mf-loan-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid rgba(148,163,184,.16);}
+.mf-loan-modal-head>div{display:flex;flex-direction:column;gap:3px;min-width:0;}.mf-loan-modal-head b{font-size:.9rem;overflow-wrap:anywhere;}.mf-loan-modal-head small{font-size:.67rem;color:var(--text-muted,#94a3b8);}
+.mf-loan-modal-close{flex:0 0 36px;width:36px;height:36px;border:1px solid rgba(148,163,184,.2);border-radius:10px;background:rgba(255,255,255,.05);color:inherit;cursor:pointer;}
+.mf-loan-modal-search{display:flex;align-items:center;gap:8px;margin:10px 12px;padding:0 11px;height:40px;border:1px solid rgba(148,163,184,.22);border-radius:10px;background:rgba(255,255,255,.035);color:#60a5fa;}
+.mf-loan-modal-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:inherit;font-size:.76rem;}
+.mf-loan-modal-table-wrap{overflow:auto;min-height:70px;max-height:calc(88dvh - 180px);overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+.mf-loan-modal-table{width:100%;min-width:780px;border-collapse:separate;border-spacing:0;font-size:.7rem;}
+.mf-loan-modal-table th{position:sticky;top:0;z-index:1;background:#102441;color:#93c5fd;text-align:left;font-size:.62rem;text-transform:uppercase;letter-spacing:.025em;}
+.mf-loan-modal-table th,.mf-loan-modal-table td{padding:10px 11px;border-bottom:1px solid rgba(148,163,184,.1);white-space:nowrap;}
+.mf-loan-status-pill{display:inline-flex;padding:4px 7px;border-radius:99px;font-size:.6rem;font-weight:850;background:rgba(96,165,250,.13);color:#93c5fd;}.mf-loan-status-pill.closed{background:rgba(148,163,184,.13);color:#cbd5e1;}.mf-loan-status-pill.foreclosed{background:rgba(192,132,252,.14);color:#d8b4fe;}
+.mf-loan-open-btn{border:1px solid rgba(56,189,248,.35);border-radius:8px;background:rgba(14,165,233,.12);color:#7dd3fc;font-size:.66rem;font-weight:800;padding:6px 9px;cursor:pointer;white-space:nowrap;}.mf-loan-open-btn.secondary{color:inherit;border-color:rgba(148,163,184,.25);background:rgba(255,255,255,.04);}
+.mf-loan-modal-empty{padding:24px;text-align:center;color:var(--text-muted,#94a3b8);font-size:.75rem;}
+.mf-loan-modal-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-top:1px solid rgba(148,163,184,.14);font-size:.61rem;color:var(--text-muted,#94a3b8);}
+.upcoming-emi-control{min-width:0;}.upcoming-emi-control input,.upcoming-emi-control select{min-width:0;}
+@media(max-width:900px){.mf-loan-summary-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:600px){.mf-loan-summary-kpis{gap:6px;}.mf-summary-kpi{padding:9px;}.mf-summary-kpi .kpi-val{font-size:.95rem;}.mf-product-summary-shell{padding:8px;}.mf-product-summary-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));}.mf-loan-modal-overlay{padding:7px;align-items:center;}.mf-loan-modal{max-height:92dvh;border-radius:13px;}.mf-loan-modal-head{padding:11px;}.mf-loan-modal-table-wrap{max-height:calc(92dvh - 170px);}.mf-loan-modal-foot{align-items:flex-start;}.mf-loan-modal-foot span{max-width:70%;}.upcoming-emi-controls{grid-template-columns:repeat(2,minmax(0,1fr))!important;}.upcoming-emi-controls .date-control{min-width:0;}.upcoming-emi-summary{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:380px){.mf-loan-summary-kpis{grid-template-columns:1fr 1fr;}.mf-product-summary-grid{grid-template-columns:1fr;}.mf-loan-modal-table{min-width:740px;}}
+</style>
 </head><body><h1>${esc(state.bizName||'MicroFinance')} — Phase C Portfolio Intelligence</h1><p>As of ${esc(pcToday())}</p><h2>Aging & PAR</h2><table><tr><th>Metric</th><th>Value</th></tr>${rows([['Loan Accounts',pf.rows.length],['Open/Risk Accounts',pf.open.length],['Gross Disbursed',pf.totalDisb],['Open Principal',pf.totalOut],['Overdue Accounts',pf.overdue.length],['PAR 30',pf.par30],['PAR 60',pf.par60],['PAR 90',pf.par90]])}</table><h2>Product Performance</h2><table><tr><th>Product</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR30</th><th>PAR60</th><th>PAR90</th></tr>${pr.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)}</td><td>${money(r.par60)}</td><td>${money(r.par90)}</td></tr>`).join('')}</table><h2>Vintage Analysis</h2><table><tr><th>Vintage</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR30</th><th>PAR60</th><th>PAR90</th></tr>${vr.map(r=>`<tr><td>${esc(r.key)}</td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)}</td><td>${money(r.par60)}</td><td>${money(r.par90)}</td></tr>`).join('')}</table><\/body></html>`;const w=window.open('','_blank');if(!w)return;w.document.write(html);w.document.close();w.onload=()=>{w.focus();w.print();};}
 window.exportPhaseCPortfolioExcel=exportPhaseCPortfolioExcel;window.printPhaseCPortfolio=printPhaseCPortfolio;
 
