@@ -13877,6 +13877,31 @@ function printPhaseCPortfolio(){const pf=buildPortfolio(),pr=productRows(pf),vr=
 }
 </style>
 
+
+<style id="mfpm-source-controls-global-polish-v2">
+/* Shared payment-source fields appear inside several transaction modals, not inside Payment Management itself. */
+.mfpm-inline {
+  display:none; width:100%; max-width:100%; box-sizing:border-box;
+  margin:14px 0 16px!important; padding:16px!important;
+  border:1px solid rgba(74,190,231,.32)!important; border-radius:15px!important;
+  background:linear-gradient(135deg,rgba(9,47,73,.96),rgba(8,27,47,.98))!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 8px 24px rgba(0,0,0,.12)!important;
+}
+.mfpm-inline>div:first-child {font-size:.88rem!important;line-height:1.45!important;margin:0 0 14px!important;color:#e0f5ff!important;font-weight:800!important;}
+.mfpm-inline-grid {display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:13px 16px!important;align-items:start!important;width:100%!important;}
+.mfpm-inline-grid>div {display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:0!important;min-width:0!important;width:100%!important;}
+.mfpm-inline-grid label {display:block!important;position:static!important;width:100%!important;max-width:100%!important;margin:0 0 7px!important;padding:0!important;font-size:.78rem!important;line-height:1.4!important;font-weight:750!important;color:#c9deed!important;white-space:normal!important;overflow-wrap:anywhere!important;}
+.mfpm-inline-grid input,.mfpm-inline-grid select {display:block!important;position:static!important;float:none!important;width:100%!important;max-width:100%!important;min-width:0!important;min-height:44px!important;box-sizing:border-box!important;margin:0!important;padding:10px 12px!important;border:1px solid rgba(125,174,205,.42)!important;border-radius:10px!important;background:#102b43!important;color:#f3f8fc!important;font-size:.88rem!important;line-height:1.35!important;box-shadow:none!important;}
+.mfpm-inline-grid input::placeholder {color:#90aabd!important;opacity:1!important;}
+.mfpm-inline-grid input:focus,.mfpm-inline-grid select:focus {outline:none!important;border-color:#36c5ed!important;box-shadow:0 0 0 3px rgba(54,197,237,.15)!important;}
+.mfpm-inline>small {display:block!important;margin:12px 0 0!important;font-size:.76rem!important;line-height:1.55!important;color:#a9c3d5!important;}
+.mfpm-mixed-row {grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important;padding:12px!important;border:1px solid rgba(105,180,216,.2)!important;border-radius:11px!important;margin-top:10px!important;background:rgba(4,20,36,.38)!important;}
+.mfpm-mixed-row>div {min-width:0!important;display:flex!important;flex-direction:column!important;gap:6px!important;}
+.mfpm-mixed-row label {display:block!important;margin:0!important;font-size:.76rem!important;line-height:1.4!important;color:#c9deed!important;}
+.mfpm-mixed-row input,.mfpm-mixed-row select {width:100%!important;min-width:0!important;min-height:40px!important;box-sizing:border-box!important;border-radius:9px!important;padding:9px 10px!important;}
+@media(max-width:760px){.mfpm-inline{padding:13px!important;margin:12px 0!important}.mfpm-inline-grid{grid-template-columns:minmax(0,1fr)!important;gap:12px!important}.mfpm-inline-grid input,.mfpm-inline-grid select{min-height:46px!important;font-size:16px!important}.mfpm-mixed-row{grid-template-columns:minmax(0,1fr)!important}}
+</style>
+
 </head><body><h1>${esc(state.bizName||'MicroFinance')} — Phase C Portfolio Intelligence</h1><p>As of ${esc(pcToday())}</p><h2>Aging & PAR</h2><table><tr><th>Metric</th><th>Value</th></tr>${rows([['Loan Accounts',pf.rows.length],['Open/Risk Accounts',pf.open.length],['Gross Disbursed',pf.totalDisb],['Open Principal',pf.totalOut],['Overdue Accounts',pf.overdue.length],['PAR 30',pf.par30],['PAR 60',pf.par60],['PAR 90',pf.par90]])}</table><h2>Product Performance</h2><table><tr><th>Product</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR30</th><th>PAR60</th><th>PAR90</th></tr>${pr.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)}</td><td>${money(r.par60)}</td><td>${money(r.par90)}</td></tr>`).join('')}</table><h2>Vintage Analysis</h2><table><tr><th>Vintage</th><th>Accounts</th><th>Open</th><th>Disbursed</th><th>Outstanding</th><th>Recovered Principal</th><th>Overdue</th><th>PAR30</th><th>PAR60</th><th>PAR90</th></tr>${vr.map(r=>`<tr><td>${esc(r.key)}</td><td>${r.accounts}</td><td>${r.open}</td><td>${money(r.disb)}</td><td>${money(r.out)}</td><td>${money(r.rec)}</td><td>${r.overdue}</td><td>${money(r.par30)}</td><td>${money(r.par60)}</td><td>${money(r.par90)}</td></tr>`).join('')}</table><\/body></html>`;const w=window.open('','_blank');if(!w)return;w.document.write(html);w.document.close();w.onload=()=>{w.focus();w.print();};}
 window.exportPhaseCPortfolioExcel=exportPhaseCPortfolioExcel;window.printPhaseCPortfolio=printPhaseCPortfolio;
 
@@ -14440,12 +14465,31 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     holder.insertAdjacentHTML('afterend',panelHTML(prefix));
     sel.dataset.mfpmReady='1';
     sel.addEventListener('change',()=>window.mfPMUpdateInline(prefix));
+    const bank=$(`mfpm-${prefix}-bank`);
+    if(bank)bank.addEventListener('focus',()=>refreshInlineBankOptions(prefix));
     window.mfPMUpdateInline(prefix);
   }
+  function refreshInlineBankOptions(prefix){
+    const bank=$(`mfpm-${prefix}-bank`),upi=$(`mfpm-${prefix}-upi`);
+    if(bank){const selected=bank.value;bank.innerHTML=optsBanks(selected);if(selected&&!accountById(selected))bank.value='';}
+    if(bank&&upi){const selectedUpi=upi.value;upi.innerHTML=optsUpi(bank.value,selectedUpi);if(selectedUpi&&!upiById(bank.value,selectedUpi))upi.value='';}
+  }
+  function refreshAllInlineSources(){
+    // Rebuild bank options from the current canonical state. Panels are created once, but bank
+    // accounts may be added later or arrive through cloud sync; never rely on the initial options.
+    document.querySelectorAll('.mfpm-inline[data-prefix]').forEach(panel=>refreshInlineBankOptions(panel.dataset.prefix));
+    document.querySelectorAll('.mfpm-mixed-row').forEach(row=>{
+      const bank=row.querySelector('select[data-k="bankId"]'),upi=row.querySelector('select[data-k="upiId"]');
+      if(bank){const selected=bank.value;bank.innerHTML=optsBanks(selected);if(selected&&!accountById(selected))bank.value='';}
+      if(bank&&upi){const selectedUpi=upi.value;upi.innerHTML=optsUpi(bank.value,selectedUpi);if(selectedUpi&&!upiById(bank.value,selectedUpi))upi.value='';}
+    });
+  }
+  window.mfPMRefreshAllInlineSources=refreshAllInlineSources;
   window.mfPMInitPanels=function(){
     ['fc-disbursal-mode','ps-mode','ex-mode','lp-mode','pay-mode','rp-mode','fc-s-mode','pm-mode','b-received-mode','bulk-emi-payment-mode'].forEach(id=>addPanel($(id)));
     // Bulk rows are rendered on demand; attach source panels to each per-EMI mode selector too.
     document.querySelectorAll('select.bulk-emi-row-mode[id]').forEach(addPanel);
+    refreshAllInlineSources();
   };
   window.mfPMResetInline=function(prefix){
     if(mixedDraft[prefix])delete mixedDraft[prefix];
@@ -14458,10 +14502,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     const bank=$(`mfpm-${prefix}-bank`),channel=$(`mfpm-${prefix}-channel`),upi=$(`mfpm-${prefix}-upi`),ref=$(`mfpm-${prefix}-ref`),cheque=$(`mfpm-${prefix}-cheque`),note=$(`mfpm-${prefix}-note`);
     if(bank)bank.value=meta.bankAccountId||'';window.mfPMUpdateInline(prefix);if(channel)channel.value=meta.channel||'';if(upi)upi.value=meta.upiSourceId||'';if(ref)ref.value=meta.reference||'';if(cheque)cheque.value=meta.chequeNo||'';if(note)note.value=meta.narration||'';
   };
-  window.mfPMRefreshInline=function(prefix){
-    const bank=$(`mfpm-${prefix}-bank`),upi=$(`mfpm-${prefix}-upi`);
-    if(bank&&upi){const old=upi.value;upi.innerHTML=optsUpi(bank.value,old);}
-  };
+  window.mfPMRefreshInline=function(prefix){refreshInlineBankOptions(prefix);};
   window.mfPMUpdateInline=function(prefix){
     const sel=$(prefix),panel=$(`mfpm-inline-${prefix}`); if(!sel||!panel)return;
     const kind=modeKind(sel.value);
@@ -14544,7 +14585,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     return {ok:true,meta:{transactionId:makeId('TXN'),recordedAt:new Date().toISOString(),deviceId:String(window.mfFirebaseDeviceId||'LOCAL'),mode:kind,channel:kind==='UPI'?'UPI':channel,bankAccountId:bankId,bankNameSnapshot:accountById(bankId)?.bankName||'',accountHolderSnapshot:accountById(bankId)?.accountHolder||'',accountMaskedSnapshot:masked(accountById(bankId)?.accountNumber||''),branchSnapshot:accountById(bankId)?.branch||'',ifscSnapshot:accountById(bankId)?.ifsc||'',upiSourceId:upiId,upiApp:u?.appName||'',upiId:u?.upiId||'',reference,chequeNo,narration,direction,transactionAmount:Number(amount)||0,components:[]}};
   };
 
-  window.openPaymentManagement=function(){ensure();window.mfPMInitPanels();mfPMRender();$('modal-payment-management')?.classList.add('active');};
+  window.openPaymentManagement=function(){ensure();window.mfPMInitPanels();refreshAllInlineSources();mfPMRender();$('modal-payment-management')?.classList.add('active');};
   function populateStatementBank(){const el=$('mfpm-statement-bank');if(!el)return;const old=el.value;el.innerHTML=optsBanks(old);}
   function renderStatementLines(){
     const el=$('mfpm-statement-lines');if(!el)return;const rows=(state.paymentStatementLines||[]).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
@@ -14652,7 +14693,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     const rec={id:id||makeId('BANK'),bankName:name,accountHolder:holder,branch,ifsc,accountNumber:num,registeredMobile:mobile,accountType:$('mfpm-bank-type').value,openingBalance:Math.round(opening*100)/100,notes:$('mfpm-bank-notes').value.trim(),active:prev?prev.active!==false:true,upiSources:prev?.upiSources||[],createdAt:prev?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};
     if(prev){const i=state.paymentAccounts.findIndex(a=>a.id===id);state.paymentAccounts[i]=rec;}else state.paymentAccounts.push(rec);
     mfPMAudit(prev?'UPDATE':'CREATE','Bank Account',rec.id,prev,rec);
-    closeModal('modal-mfpm-bank-form');try{mfScaleMarkDirty('root');}catch(e){} persist();mfPMRender();
+    closeModal('modal-mfpm-bank-form');try{mfScaleMarkDirty('root');}catch(e){} persist();refreshAllInlineSources();mfPMRender();
   };
   window.mfPMToggleBank=function(id){const a=accountById(id);if(!a)return;if(a.active!==false&&((state.loans||[]).some(l=>l.disbursalPaymentMeta?.bankAccountId===id)||(state.loans||[]).some(l=>(l.payments||[]).some(p=>p.paymentMeta?.bankAccountId===id)))){if(!confirm('This account is referenced by transactions. Deactivate it? Historical records will remain linked.'))return;}const before={...a};a.active=a.active===false;a.updatedAt=new Date().toISOString();mfPMAudit(a.active?'ACTIVATE':'DEACTIVATE','Bank Account',id,before,a);try{mfScaleMarkDirty('root');}catch(e){} persist();mfPMRender();};
   window.mfPMOpenUpi=function(bankId){
@@ -14687,7 +14728,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     if(prev){const i=a.upiSources.findIndex(u=>u.id===id);a.upiSources[i]=rec;}else a.upiSources.push(rec);
     mfPMAudit(prev?'UPDATE':'CREATE','UPI Source',rec.id,prev,rec);
     $('mfpm-upi-id').value='';$('mfpm-upi-form').reset();$('mfpm-upi-bank-id').value=bankId;$('mfpm-upi-active').value='true';$('mfpm-upi-custom-wrap').style.display='none';
-    try{mfScaleMarkDirty('root');}catch(e){} persist();renderUpiList(a);mfPMRender();
+    try{mfScaleMarkDirty('root');}catch(e){} persist();refreshAllInlineSources();renderUpiList(a);mfPMRender();
   };
   window.mfPMToggleUpi=function(bankId,upiId){const u=upiById(bankId,upiId);if(!u)return;const before={...u};u.active=u.active===false;u.updatedAt=new Date().toISOString();mfPMAudit(u.active?'ACTIVATE':'DEACTIVATE','UPI Source',upiId,before,u);try{mfScaleMarkDirty('root');}catch(e){} persist();renderUpiList(accountById(bankId));mfPMRender();};
   $('mfpm-upi-app')?.addEventListener('change',()=>{$('mfpm-upi-custom-wrap').style.display=$('mfpm-upi-app').value==='Other'?'block':'none';});
