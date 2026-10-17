@@ -1356,6 +1356,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
 @media(prefers-reduced-motion:reduce){button.mf-summary-kpi,.filter-chip{transition:none!important;}}
 
 </style>
+
+<style id="mf-compact-payment-split-css">.mf-compact-payment-split{display:block;margin-top:4px;max-width:100%;font-size:.64rem;line-height:1.25;font-weight:700;padding:3px 7px;border-radius:7px;background:rgba(96,165,250,.09);border:1px solid rgba(96,165,250,.24);color:#cbd5e1;white-space:normal;overflow-wrap:anywhere}.mf-compact-payment-split::before{content:"Payment split: ";color:#93c5fd;font-weight:800}@media(max-width:640px){.mf-compact-payment-split{font-size:.6rem;padding:3px 5px}}</style>
 </head>
 <body>
 <div id="app-lock-overlay" aria-modal="true" role="dialog" aria-label="App Lock">
@@ -9136,6 +9138,39 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         // PhonePe", "Bank Transfer", or "Cash + UPI" etc. — never a generic Online/Offline label.
         // Looks across all parts for a partial-collected installment so a genuinely mixed-mode
         // history (e.g. some cash, some UPI) is shown as the combination of the real modes used.
+        function mfCompactPaymentSplitHtml(pay){
+            if(!pay)return '';
+            const esc=v=>financeEsc(String(v==null?'':v));
+            const moneyShort=v=>'₹'+(Number(v)||0).toLocaleString('en-IN',{maximumFractionDigits:2});
+            const sourceFor=(meta,mode)=>{
+                const m=meta||{},nested=m.paymentMeta||{};
+                const bid=m.bankAccountId||nested.bankAccountId||'', uid=m.upiSourceId||nested.upiSourceId||'';
+                const account=(state.paymentAccounts||[]).find(a=>String(a.id)===String(bid));
+                const upis=Array.isArray(state.paymentUpiSources)?state.paymentUpiSources:(Array.isArray(state.paymentUpis)?state.paymentUpis:[]);
+                const upi=(account?.upiSources||[]).find(u=>String(u.id)===String(uid))||upis.find(u=>String(u.id)===String(uid));
+                const bank=String(m.bankNameSnapshot||nested.bankNameSnapshot||m.bankName||nested.bankName||account?.bankName||'').trim();
+                const app=String(m.upiAppSnapshot||nested.upiAppSnapshot||m.upiApp||nested.upiApp||upi?.appName||'').trim();
+                const n=String(mode||m.mode||'').toLowerCase();
+                if(n==='cash')return 'Cash';
+                if(n.includes('upi')||n==='gpay'||n==='phonepe')return 'UPI'+(bank?' · '+bank:'')+(app?' · '+app:'');
+                if(n.includes('bank transfer')||n==='bank'||['neft','rtgs','imps'].includes(n))return 'Bank'+(bank?' · '+bank:'');
+                if(n.includes('cheque')||n.includes('demand draft'))return 'Cheque'+(bank?' · '+bank:'');
+                return String(mode||'Payment');
+            };
+            const parts=[];
+            const addPart=(mode,amount,meta)=>{
+                const n=Number(amount); if(!Number.isFinite(n)||n<0)return;
+                parts.push(`${sourceFor(meta,mode)} ${moneyShort(n)}`);
+            };
+            if(Array.isArray(pay.parts)&&pay.parts.length){pay.parts.forEach(pt=>addPart(pt.mode||pay.mode,pt.amount,pt.paymentMeta||null));}
+            else if(Array.isArray(pay.paymentMeta?.components)&&pay.paymentMeta.components.length){pay.paymentMeta.components.forEach(c=>addPart(c.mode||pay.mode,c.amount,{...c,...(c.paymentMeta||{})}));}
+            if(parts.length>1)return `<div class="mf-compact-payment-split" title="Recorded payment components">${parts.map(esc).join(' + ')}</div>`;
+            if(parts.length===1)return `<div class="mf-compact-payment-split">${esc(parts[0])}</div>`;
+            const label=getPaidViaLabel(pay);
+            if(label)return `<div class="mf-compact-payment-split">${esc(label)}${String(pay.mode||'').toLowerCase().includes('mixed')?' · component amounts not recorded':''}</div>`;
+            return '';
+        }
+
         function getPaidViaLabel(pay) {
             const displayMode = (m) => {
                 if (!m) return null;
@@ -9891,8 +9926,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     actionBtn = '';
                 } else if (pay) {
                     badge = `<span class="badge-paid">PAID</span>`;
-                    const paidVia = getPaidViaLabel(pay);
-                    if (paidVia) badge += `<div style="margin-top:4px;display:block;width:max-content;max-width:100%;font-size:.62rem;line-height:1.15;font-weight:700;padding:2px 7px;border-radius:999px;background:rgba(148,163,184,.15);border:1px solid rgba(148,163,184,.4);color:#cbd5e1;white-space:normal;">${financeEsc(paidVia)}</div>`;
+                    const paidVia = mfCompactPaymentSplitHtml(pay);
+                    if (paidVia) badge += paidVia;
                     paidStr = formatToIndianDate(pay.date);
                     if (pay.parts && pay.parts.length > 1) {
                         badge += ` <button type="button" class="no-print" onclick="showPaymentParts('${l.id}', ${i-1})" style="background:rgba(96,165,250,.15); border:1px solid rgba(96,165,250,.4); color:#93c5fd; font-size:.62rem; font-weight:700; padding:2px 6px; border-radius:999px; cursor:pointer;">${pay.parts.length} parts</button>`;
@@ -12122,11 +12157,89 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             return rows.sort((a,b)=>a.localeCompare(b)).join('');
         }
 
+
+        // Read-only, source-aware aggregation for the annual PDF. Component allocations are
+        // grouped by the recorded bank/channel; gross disbursal accounting remains untouched.
+        function mfBuildAnnualBankwiseBreakdown(r){
+            const map=new Map();
+            const accounts=Array.isArray(state.paymentAccounts)?state.paymentAccounts:[];
+            const upis=Array.isArray(state.paymentUpiSources)?state.paymentUpiSources:(Array.isArray(state.paymentUpis)?state.paymentUpis:[]);
+            const bankFor=(meta)=>{
+                const m=meta||{}, nested=m.paymentMeta||{};
+                const bid=m.bankAccountId||nested.bankAccountId||'';
+                const account=accounts.find(a=>String(a.id)===String(bid));
+                return String(m.bankNameSnapshot||nested.bankNameSnapshot||m.bankName||nested.bankName||account?.bankName||'').trim();
+            };
+            const upiFor=(meta)=>{
+                const m=meta||{}, nested=m.paymentMeta||{};
+                const uid=m.upiSourceId||nested.upiSourceId||'', bid=m.bankAccountId||nested.bankAccountId||'';
+                const account=accounts.find(a=>String(a.id)===String(bid));
+                const u=(account?.upiSources||[]).find(x=>String(x.id)===String(uid))||upis.find(x=>String(x.id)===String(uid));
+                return String(m.upiAppSnapshot||nested.upiAppSnapshot||m.upiApp||nested.upiApp||u?.appName||'').trim();
+            };
+            const sourceName=(mode,meta)=>{
+                const raw=String(mode||meta?.mode||'Mode Not Recorded').trim(), n=raw.toLowerCase();
+                const bank=bankFor(meta), app=upiFor(meta);
+                if(n==='cash')return 'Cash';
+                if(n.includes('upi')||n==='gpay'||n==='phonepe')return `UPI · ${bank||'Bank not recorded'}${app?' · '+app:''}`;
+                if(n.includes('bank transfer')||n==='bank'||['neft','rtgs','imps'].includes(n))return `Bank Transfer · ${bank||'Bank not recorded'}`;
+                if(n.includes('cheque')||n.includes('demand draft'))return `Cheque / DD · ${bank||'Bank not recorded'}`;
+                if(n.toLowerCase().includes('mixed'))return 'Mixed / component source not recorded';
+                return `${raw||'Mode not recorded'}${bank?' · '+bank:''}`;
+            };
+            const ensure=(label)=>{if(!map.has(label))map.set(label,{source:label,collections:0,disbursed:0,lender:0,opex:0,collectionCount:0,disbursalCount:0,lenderCount:0,opexCount:0});return map.get(label);};
+            const addOne=(category,mode,amount,meta)=>{
+                const value=Number(amount);
+                if(!Number.isFinite(value)||value<0)return;
+                const label=sourceName(mode,meta), row=ensure(label);
+                row[category]+=value;
+                const countKey=category+'Count'; if(countKey in row)row[countKey]++;
+            };
+            const add=(category,mode,amount,meta)=>{
+                const components=Array.isArray(meta?.components)?meta.components.filter(c=>Number.isFinite(Number(c.amount))&&Number(c.amount)>=0):[];
+                if(components.length){components.forEach(c=>addOne(category,c.mode||mode,c.amount,{...c,...(c.paymentMeta||{}),bankAccountId:c.bankAccountId||c.paymentMeta?.bankAccountId,upiSourceId:c.upiSourceId||c.paymentMeta?.upiSourceId}));return;}
+                addOne(category,mode,amount,meta);
+            };
+            const inPeriod=d=>mfPeriodMatch(String(d||'').slice(0,10),{year:r.year,basis:r.basis});
+            (state.loans||[]).forEach(l=>{
+                const prod=state.products?.[l.product]||{};
+                (l.payments||[]).forEach(pay=>{
+                    if(!inPeriod(pay.date))return;
+                    if(Array.isArray(pay.parts)&&pay.parts.length){pay.parts.forEach(part=>add('collections',part.mode||pay.mode,part.amount,part.paymentMeta||null));}
+                    else add('collections',pay.mode,pay.amount,pay.paymentMeta||null);
+                });
+                const fd=l.foreclosureData;if(fd&&inPeriod(fd.settlementDate))add('collections',fd.mode,fd.settlementAmount,fd.paymentMeta||null);
+                const pm=l.postMaturitySettlement;if(pm&&inPeriod(pm.settlementDate))add('collections',pm.mode,pm.actualReceived,pm.paymentMeta||null);
+                if(inPeriod(l.disbursalDate)){
+                    // Only actual source component allocations are shown here. Gross principal
+                    // remains in the original reconciled payment-mode table; no net payout is guessed.
+                    const meta=l.disbursalPaymentMeta;
+                    if(Array.isArray(meta?.components)&&meta.components.length)add('disbursed',mfResolveDisbursalMode(l).label,Number(prod.amount)||0,meta);
+                    else if(meta)addOne('disbursed',mfResolveDisbursalMode(l).label,0,{...meta,bankNameSnapshot:meta.bankNameSnapshot||'Source allocation not recorded'});
+                }
+            });
+            (state.borrowings||[]).forEach(b=>{
+                (b.repayments||[]).forEach(x=>{if(inPeriod(x.date))add('lender',x.mode,(Number(x.principal)||0)+(Number(x.interest)||0)+(Number(x.gst)||0),x.paymentMeta||null);});
+            });
+            (state.expenses||[]).forEach(x=>{if(inPeriod(x.date))add('opex',x.mode,x.amount,x.paymentMeta||null);});
+            (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(x=>{if(inPeriod(x.date))add('opex',x.mode,x.amount,x.paymentMeta||null);}));
+            const rows=[...map.values()].sort((a,b)=>(b.collections+b.disbursed+b.lender+b.opex)-(a.collections+a.disbursed+a.lender+a.opex));
+            const esc=v=>financeEsc(String(v==null?'':v));
+            if(!rows.length)return {rowsHtml:'<tr><td colspan="5">No source-tagged payment activity in the selected period.</td></tr>',chartHtml:'<div class="mf-bank-chart-empty">No recorded source allocations for this reporting period.</div>',rows:[],totals:{collections:0,disbursed:0,lender:0,opex:0}};
+            const totals=rows.reduce((a,x)=>{['collections','disbursed','lender','opex'].forEach(k=>a[k]+=Number(x[k])||0);return a;},{collections:0,disbursed:0,lender:0,opex:0});
+            const sourceCollectionRows=rows.filter(x=>x.collections>0).sort((a,b)=>b.collections-a.collections);
+            const grand=sourceCollectionRows.reduce((a,x)=>a+x.collections,0);
+            const colors=['#2489e8','#13a981','#f59e0b','#8b5cf6','#f97316','#0ea5e9','#64748b'];
+            const chartHtml=grand>0?`<div class="mf-bank-chart-bar">${sourceCollectionRows.map((x,i)=>`<span title="${esc(x.source)}: ${money(x.collections)}" style="width:${(x.collections/grand*100).toFixed(4)}%;background:${colors[i%colors.length]}"></span>`).join('')}</div><div class="mf-bank-chart-legend">${sourceCollectionRows.map((x,i)=>`<span><i style="background:${colors[i%colors.length]}"></i>${esc(x.source)} <b>${money(x.collections)}</b> <small>${(x.collections/grand*100).toFixed(1)}%</small></span>`).join('')}</div>`:'<div class="mf-bank-chart-empty">No customer collection amounts in this period.</div>';
+            const rowsHtml=rows.map(x=>`<tr><td>${esc(x.source)}</td><td class="num">${money(x.collections)}</td><td class="num">${x.disbursed>0?money(x.disbursed):'—'}</td><td class="num">${money(x.lender)}</td><td class="num">${money(x.opex)}</td></tr>`).join('');
+            return {rowsHtml,chartHtml,rows,totals};
+        }
+
         function mfExecutiveReportData(filters={}){
             const f=mfNormalizeReportFilters(filters), year=f.year, basis=f.basis;
             if(!year)throw new Error('A reporting year is required for the annual management report.');
             const period=mfReportPeriodFilter(f), prevYear=String(Number(year)-1), prevPeriod=mfReportPeriodFilter({year:prevYear,basis}),
-                d=getFinanceSnapshot(period), c=mfAnnualActualCollectionBreakdown(period,d), portfolio=mfAnnualPortfolio(year,basis), modeRows=mfAnnualModeBreakdown(period,d),
+                d=getFinanceSnapshot(period), c=mfAnnualActualCollectionBreakdown(period,d), portfolio=mfAnnualPortfolio(year,basis), modeRows=mfAnnualModeBreakdown(period,d), bankwiseBreakdown=mfBuildAnnualBankwiseBreakdown({year,basis}),
                 pd=getFinanceSnapshot(prevPeriod), pc=mfAnnualActualCollectionBreakdown(prevPeriod,pd), pp=mfAnnualPortfolio(prevYear,basis);
             const disbLoans=d.disbursed.filter(x=>x.includeDisb), viewLoans=d.disbursed.filter(x=>x.includeDisb||x.activityInPeriod);
             const statusCounts={ACTIVE:0,DUE:0,OVERDUE:0,CLOSED:0,SETTLED:0,FORECLOSED:0}; viewLoans.forEach(x=>{const st=mfLoanOperationalStatus(x.loan);statusCounts[st]=(statusCounts[st]||0)+1;});
@@ -12172,7 +12285,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 ['Net Operating Surplus',d.net,pd.net],
                 ['Closing Principal Portfolio',portfolio.closing,pp.closing]
             ].map(x=>{const delta=Number(x[1]||0)-Number(x[2]||0),pct=Math.abs(Number(x[2]||0))>0.005?(delta/Number(x[2]))*100:null;return [...x,delta,pct];});
-            return {year,basis,filters:f,period,periodLabel:mfReportPeriodLabel(f),d,previous:{year:prevYear,basis,d:pd,collections:pc,portfolio:pp},collections:c,portfolio,modeRows,modeDataQuality,disbLoans,viewLoans,totalLoans:viewLoans.length,loanTypeRows,statusRows,foreclosureRows,settlementRows,capitalBorrowed,lenderPayments,capitalDisbursed,netCashMovement,revenueComponents,reconciliation,monthly,monthlyRollup,monthlyReconciliation,productRows,compareMetrics,reportDate:formatToIndianDate(new Date().toISOString().slice(0,10))};
+            return {year,basis,filters:f,period,periodLabel:mfReportPeriodLabel(f),d,previous:{year:prevYear,basis,d:pd,collections:pc,portfolio:pp},collections:c,portfolio,modeRows,bankwiseBreakdown,modeDataQuality,disbLoans,viewLoans,totalLoans:viewLoans.length,loanTypeRows,statusRows,foreclosureRows,settlementRows,capitalBorrowed,lenderPayments,capitalDisbursed,netCashMovement,revenueComponents,reconciliation,monthly,monthlyRollup,monthlyReconciliation,productRows,compareMetrics,reportDate:formatToIndianDate(new Date().toISOString().slice(0,10))};
         }
         function mfStyleExecutiveSheet(ws,titleRows=1,headerRow=null){ if(!ws)return; ws['!cols']=ws['!cols']||[]; if(headerRow!==null)ws['!autofilter']={ref:`A${headerRow}:Z${headerRow}`}; ws['!freeze']={xSplit:0,ySplit:headerRow||0}; }
         function mfExecutiveReportTableRows(rows){ return rows.map(r=>r.map(v=>v===undefined||v===null?'':v)); }
@@ -12234,14 +12347,13 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 <h2>9. Foreclosure & Settlement</h2><table><thead><tr><th>Metric</th><th>Count / Amount</th></tr></thead><tbody>${rows([['Foreclosures in Year',r.foreclosureRows.count],['Foreclosure Cash Received',r.foreclosureRows.received],['Foreclosure Principal Recovered',r.foreclosureRows.principal],['Pre-Closure Interest',r.foreclosureRows.interest],['Foreclosure Fees',r.foreclosureRows.fee],['Foreclosure GST Collected',r.foreclosureRows.gst],['Post-Maturity Settlements',r.settlementRows.count],['Settlement Cash Received',r.settlementRows.received],['Settlement Principal Recovered',r.settlementRows.principal],['Settlement Interest Recognized',r.settlementRows.interest],['Settlement Waiver — Not Revenue',r.settlementRows.waiver]])}</tbody></table>
                 <h2>10. Lender / Financing Cost</h2><table><thead><tr><th>Metric</th><th>Amount</th></tr></thead><tbody>${rows([['New Borrowing Added',r.capitalBorrowed],['Lender Principal Repaid',d.lenderPrincipal],['Lender Interest',d.lenderInterest],['Lender Interest GST',d.lenderGst],['Upfront Borrowing Charges',d.lenderUpfront],['TOTAL LENDER FINANCING COST',d.lenderCost]])}</tbody></table>
                 <h2>11. Operating Expenses & Payroll</h2><table><thead><tr><th>Metric</th><th>Amount</th></tr></thead><tbody>${rows([['Staff Salaries',d.salaries],['General Business Expenses',d.generalExp],['TOTAL OPERATING EXPENSES',d.opex]])}</tbody></table>
-                <h2>12. Payment Mode — Reconciled</h2><p class="mf-exec-note">This section groups each transaction once by its recorded payment mode. Mixed Payment is identified as “Mixed Payment — Multiple Components” and, where recorded, lists the methods used (for example, Cash + UPI). Capital Disbursed here is gross loan principal; section 14 shows the actual amount paid out and its source allocation after deductions. Component amounts are not added again to the gross disbursal total.</p><table><thead><tr><th>Payment Mode / Component Summary</th><th>Customer Collections</th><th>Gross Loan Principal Disbursed</th><th>Lender Payments</th><th>OPEX / Payroll</th></tr></thead><tbody>${modeRows||'<tr><td colspan="5">No payment activity in this year.</td></tr>'}</tbody></table>${r.modeDataQuality.length?`<div class="mf-exec-warning"><b>Legacy disbursal-mode data-quality notice:</b> ${r.modeDataQuality.length} disbursal record(s) inside the selected ${r.basis==='financial'?'Financial Year':'Calendar Year'} period have no explicit stored disbursal mode. This is not a mathematical or collection-calculation error. The report uses the application's existing Cash fallback for these legacy records without modifying them and without inferring a mode from any customer collection or other transaction. If the original mode was UPI, Bank Transfer, or Mixed, that record must be verified and explicitly saved before it is considered rectified.</div>`:''}
+                <h2>12. Payment Mode — Bank-wise Reconciliation</h2><p class="mf-exec-note">Each transaction is counted once in the reconciled totals below. The graphical breakdown and bank-wise source table use recorded payment-source metadata only. UPI and bank-transfer rows identify the bank when it is recorded; missing bank details are explicitly labelled and never guessed. Gross loan principal remains the financial disbursal measure in the first table; the bank-wise disbursal column reflects only recorded source-component allocations and may differ where charges are withheld or source components were not recorded.</p><div class="mf-bankwise-block"><h3>Customer Collection Source Composition</h3>${r.bankwiseBreakdown.chartHtml}</div><table class="mf-bankwise-table"><thead><tr><th>Payment Source / Bank</th><th>Customer Collections</th><th>Disbursal Source Allocation*</th><th>Lender Payments</th><th>OPEX / Payroll</th></tr></thead><tbody>${r.bankwiseBreakdown.rowsHtml}</tbody><tfoot><tr><th>Recorded source totals</th><th class="num">${money(r.bankwiseBreakdown.totals.collections)}</th><th class="num">${money(r.bankwiseBreakdown.totals.disbursed)}</th><th class="num">${money(r.bankwiseBreakdown.totals.lender)}</th><th class="num">${money(r.bankwiseBreakdown.totals.opex)}</th></tr></tfoot></table><p class="mf-exec-note">*Disbursal Source Allocation shows recorded payment components only; it is not added to or substituted for gross loan principal in financial totals. Component amounts are not double-counted. If bank details were not saved with a transaction, the report shows “Bank not recorded”.</p><table class="mf-mode-summary-table"><thead><tr><th>Recorded Payment Mode / Component Summary</th><th>Customer Collections</th><th>Gross Loan Principal Disbursed</th><th>Lender Payments</th><th>OPEX / Payroll</th></tr></thead><tbody>${modeRows||'<tr><td colspan="5">No payment activity in this year.</td></tr>'}</tbody></table>${r.modeDataQuality.length?`<div class="mf-exec-warning"><b>Legacy disbursal-mode data-quality notice:</b> ${r.modeDataQuality.length} disbursal record(s) inside the selected ${r.basis==='financial'?'Financial Year':'Calendar Year'} period have no explicit stored disbursal mode. This is not a mathematical or collection-calculation error. The report uses the application's existing Cash fallback for these legacy records without modifying them and without inferring a mode from any customer collection or other transaction. If the original mode was UPI, Bank Transfer, or Mixed, that record must be verified and explicitly saved before it is considered rectified.</div>`:''}
                 <h2>13. Monthly Trend — ${financeEsc(r.periodLabel)}</h2><table class="mf-trend"><thead><tr><th>Month</th><th>Accounts</th><th>Disbursed</th><th>Collections</th><th>Principal</th><th>Revenue</th><th>Lender Cost</th><th>OPEX</th><th>Net</th></tr></thead><tbody>${monthRows}</tbody></table>
-                <h2>14. Payment Source Detail</h2><p class="mf-exec-note">One row per transaction. Mixed payments remain one transaction, with component amounts summarized inline. For loan disbursals, this source view shows the amount actually paid to the customer; the annual financial summary retains gross loan principal and reports file charges separately. Missing source details are shown as missing, never guessed.</p><table class="mf-source-detail"><thead><tr><th>Date</th><th>Type</th><th>Customer / Record</th><th>Payment Method &amp; Components</th><th>Amount</th><th>Bank / Account (masked)</th><th>UPI App / ID</th><th>Reference / Instrument</th><th>Source Status</th></tr></thead><tbody>${mfBuildAnnualPaymentSourceRows(r)}</tbody></table>
-                <h2>15. Mathematical Reconciliation</h2><table><thead><tr><th>Check</th><th>Calculated</th><th>Reported</th><th>Result</th></tr></thead><tbody>${reconRows}</tbody></table>
+                <h2>14. Mathematical Reconciliation</h2><table><thead><tr><th>Check</th><th>Calculated</th><th>Reported</th><th>Result</th></tr></thead><tbody>${reconRows}</tbody></table>
                 <div class="mf-exec-note"><b>Core formulas:</b> Net Operating Surplus = Gross Business Revenue − Lender Financing Cost − Operating Expenses/Payroll. Closing Principal Portfolio = Opening Principal Portfolio + Capital Disbursed − Principal Recovered. Principal recovery is capital recovery, not revenue. Net Cash Movement = Customer Collections + New Borrowing − Customer Disbursement − Lender Payments − OPEX/Payroll.</div>
                 <div class="mf-exec-disclaimer">Management information report only. This report does not rewrite or alter operational loan calculations, EMI schedules, payments, settlements, foreclosures, security or cloud data.</div>
             </div>`;
-            const css=`<style id="mf-executive-pdf-css">.mf-exec-report{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:9.2pt;line-height:1.38}.mf-exec-cover{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;border-bottom:2px solid #111;padding:0 0 10px;margin-bottom:10px}.mf-exec-brand{font-size:10pt;font-weight:800;color:#444}.mf-exec-cover h1{font-size:18pt;margin:3px 0}.mf-exec-year{font-size:11pt;font-weight:800}.mf-exec-cover-meta{font-size:8pt;color:#555;text-align:right}.mf-exec-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px}.mf-exec-kpis>div{border:1px solid #bbb;border-radius:5px;padding:6px}.mf-exec-kpis small{display:block;color:#666;font-size:7pt}.mf-exec-kpis b{display:block;font-size:8.5pt;margin-top:2px}.mf-exec-report h2{font-size:10.5pt;margin:13px 0 5px;border-bottom:1px solid #aaa;padding-bottom:3px}.mf-exec-report table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:7px}.mf-exec-report th,.mf-exec-report td{border:1px solid #aaa;padding:4px 5px;vertical-align:top;overflow-wrap:anywhere}.mf-exec-report th{background:#f0f2f5;text-align:left;font-weight:800}.mf-exec-report td:not(:first-child){text-align:right}.mf-exec-note,.mf-exec-warning{margin-top:7px;border:1px solid #aaa;padding:6px 8px;background:#fafafa;font-size:7.7pt}.mf-exec-warning{background:#fff7ed;border-color:#f59e0b}.mf-exec-disclaimer{margin-top:8px;color:#555;font-size:7pt;border-top:1px solid #aaa;padding-top:5px}.mf-trend{font-size:7.2pt}@media print{.mf-exec-kpis{grid-template-columns:repeat(5,1fr)}h2{break-after:avoid}table{page-break-inside:auto}tr{page-break-inside:avoid;page-break-after:auto}}</style>`;
+            const css=`<style id="mf-executive-pdf-css">.mf-exec-report{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:9.2pt;line-height:1.38}.mf-exec-cover{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;border-bottom:2px solid #111;padding:0 0 10px;margin-bottom:10px}.mf-exec-brand{font-size:10pt;font-weight:800;color:#444}.mf-exec-cover h1{font-size:18pt;margin:3px 0}.mf-exec-year{font-size:11pt;font-weight:800}.mf-exec-cover-meta{font-size:8pt;color:#555;text-align:right}.mf-exec-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px}.mf-exec-kpis>div{border:1px solid #bbb;border-radius:5px;padding:6px}.mf-exec-kpis small{display:block;color:#666;font-size:7pt}.mf-exec-kpis b{display:block;font-size:8.5pt;margin-top:2px}.mf-exec-report h2{font-size:10.5pt;margin:13px 0 5px;border-bottom:1px solid #aaa;padding-bottom:3px}.mf-exec-report table{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:7px}.mf-exec-report th,.mf-exec-report td{border:1px solid #aaa;padding:4px 5px;vertical-align:top;overflow-wrap:anywhere}.mf-exec-report th{background:#f0f2f5;text-align:left;font-weight:800}.mf-exec-report td:not(:first-child){text-align:right}.mf-exec-note,.mf-exec-warning{margin-top:7px;border:1px solid #aaa;padding:6px 8px;background:#fafafa;font-size:7.7pt}.mf-exec-warning{background:#fff7ed;border-color:#f59e0b}.mf-exec-disclaimer{margin-top:8px;color:#555;font-size:7pt;border-top:1px solid #aaa;padding-top:5px}.mf-trend{font-size:7.2pt}.mf-bankwise-block{border:1px solid #b8c5d6;border-radius:5px;padding:8px 10px;margin:7px 0}.mf-bankwise-block h3{font-size:8.5pt;margin:0 0 7px}.mf-bank-chart-bar{display:flex;width:100%;height:16px;border-radius:4px;overflow:hidden;background:#edf2f7;border:1px solid #cbd5e1}.mf-bank-chart-bar span{display:block;height:100%;min-width:0}.mf-bank-chart-legend{display:flex;flex-wrap:wrap;gap:5px 12px;margin-top:7px;font-size:7pt}.mf-bank-chart-legend span{display:inline-flex;align-items:center;gap:4px}.mf-bank-chart-legend i{display:inline-block;width:8px;height:8px;border-radius:50%}.mf-bank-chart-legend small{color:#555}.mf-bank-chart-empty{padding:10px;border:1px dashed #cbd5e1;color:#555;font-size:8pt}.mf-bankwise-table{font-size:7.5pt}.mf-bankwise-table td:first-child{font-weight:600;text-align:left}.mf-bankwise-table tfoot th{background:#e5eaf0}.mf-mode-summary-table{font-size:7.5pt;margin-top:8px}.mf-mode-summary-table td:first-child{text-align:left}@media print{.mf-exec-kpis{grid-template-columns:repeat(5,1fr)}h2{break-after:avoid}table{page-break-inside:auto}tr{page-break-inside:avoid;page-break-after:auto}}</style>`;
             const w=mfPrintA4Shell(`${state.bizName||'MicroFinance'} — Annual Management Report — ${r.basis==='financial'?`FY ${r.year}-${String(Number(r.year)+1).slice(-2)}`:`CY ${r.year}`}`,mfCompanyPrintHeader('Annual Management & Microfinance Portfolio Report')+css+content);
             if(!w)return; w.onload=()=>{w.focus();setTimeout(()=>w.print(),100);};
         }
