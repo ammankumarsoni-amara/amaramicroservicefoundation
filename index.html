@@ -9329,7 +9329,12 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             document.getElementById('bulk-emi-name').innerText=loan.name||'-';
             document.getElementById('bulk-emi-id').innerText=loan.id||'-';
             document.getElementById('bulk-emi-mode').value=mode==='ALL'?'ALL':'MANUAL';
+            // A payment form is a fresh transaction context each time it opens.
+            // Never carry mixed component amounts/bank/UPI selections from a prior
+            // customer or a previous Bulk / Select-Range Collection session.
             document.getElementById('bulk-emi-payment-mode').value='Cash';
+            if(typeof mfPMResetInline==='function') mfPMResetInline('bulk-emi-payment-mode');
+            if(typeof mfPMResetInlineGroup==='function') mfPMResetInlineGroup('bulk-mode-');
             renderBulkEmiChecklist();
             setBulkEmiMode(mode);
             updateBulkMixedHelp();
@@ -15209,7 +15214,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
       <div id="mfpm-${prefix}-mixed" class="mfpm-mixed-box" style="display:none">
         <div class="mfpm-mixed-head"><div><b>Mixed payment</b><small>Add only the methods actually used.</small></div><button type="button" class="mfpm-mini-btn" onclick="mfPMAddMixedRow('${prefix}')">＋ Add payment method</button></div>
         <div id="mfpm-${prefix}-mixed-rows"></div>
-        <div class="mfpm-mixed-summary"><span>Total allocated</span><strong id="mfpm-${prefix}-mixed-total">₹0.00</strong></div>
+        <div class="mfpm-mixed-summary"><span>Total allocated · live</span><strong id="mfpm-${prefix}-mixed-total">₹0.00</strong></div><small id="mfpm-${prefix}-mixed-status" class="mfpm-source-help" style="display:block;margin-top:6px;">Enter each component amount; the total updates as you type.</small>
         
       </div>
       <small class="mfpm-source-help">Bank and UPI options update from saved Payment Management records.</small>
@@ -15256,6 +15261,20 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     ['bank','channel','upi','ref','cheque','note'].forEach(k=>{const el=$(`mfpm-${prefix}-${k}`);if(el)el.value='';});
     if($(prefix))window.mfPMUpdateInline(prefix);
   };
+  window.mfPMResetInlineGroup=function(prefixStart){
+    const start=String(prefixStart||'');
+    if(!start)return;
+    // Clear drafts even for old EMI rows whose DOM is no longer present because the next
+    // loan has a different number of installments. Saved transactions are not touched.
+    Object.keys(mixedDraft).forEach(key=>{if(key.startsWith(start))delete mixedDraft[key];});
+    document.querySelectorAll('.mfpm-inline[data-prefix]').forEach(panel=>{
+      const prefix=String(panel.dataset.prefix||'');
+      if(prefix.startsWith(start)){
+        ['bank','channel','upi','ref','cheque','note'].forEach(k=>{const el=$(`mfpm-${prefix}-${k}`);if(el)el.value='';});
+        const sel=$(prefix);if(sel)window.mfPMUpdateInline(prefix);
+      }
+    });
+  };
   window.mfPMSetInlineMeta=function(prefix,meta){
     const mode=$(prefix);if(!mode)return;if(!meta){window.mfPMResetInline(prefix);return;}
     if(Array.isArray(meta.components)&&meta.components.length){mixedDraft[prefix]=meta.components.map(c=>({mode:c.mode||'Cash',amount:String(c.amount??''),bankId:c.bankAccountId||c.paymentMeta?.bankAccountId||'',upiId:c.upiSourceId||c.paymentMeta?.upiSourceId||'',channel:c.channel||'',ref:c.reference||c.paymentMeta?.reference||'',chequeNo:c.chequeNo||'',note:c.narration||''}));mode.value='Mixed';window.mfPMUpdateInline(prefix);renderMixedRows(prefix);return;}
@@ -15290,6 +15309,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     window.mfPMRefreshInline(prefix);
     if(kind==='MIXED'&&!mixedDraft[prefix])mixedDraft[prefix]=[{mode:'Cash',amount:'',bankId:'',upiId:'',channel:'',ref:'',chequeNo:'',note:''}];
     if(kind==='MIXED')renderMixedRows(prefix);
+    else { const status=$(`mfpm-${prefix}-mixed-status`); if(status) status.textContent='Switch to Mixed Payment to enter multiple payment components.'; }
   };
   function renderMixedRows(prefix){
     const host=$(`mfpm-${prefix}-mixed-rows`);if(!host)return;
@@ -15312,8 +15332,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         </div>
       </div>`;
     }).join('');
-    const total=rows.reduce((n,r)=>n+(Number(r.amount)||0),0);
-    const out=$(`mfpm-${prefix}-mixed-total`);if(out)out.textContent=money(total);
+    updateMixedAllocationSummary(prefix);
   }
   window.mfPMMixedChange=function(prefix,index,key,value){
     if(!mixedDraft[prefix])mixedDraft[prefix]=[];
@@ -15321,9 +15340,37 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     row[key]=value;
     if(key==='mode'){row.bankId='';row.upiId='';row.channel='';row.ref='';row.chequeNo='';}
     if(key==='bankId')row.upiId='';
-    if(key==='amount'){const out=$(`mfpm-${prefix}-mixed-total`);if(out)out.textContent=money((mixedDraft[prefix]||[]).reduce((n,r)=>n+(Number(r.amount)||0),0));return;}
+    if(key==='amount'){
+      updateMixedAllocationSummary(prefix);
+      if(prefix==='bulk-emi-payment-mode' && typeof updateBulkEmiPreview==='function') updateBulkEmiPreview();
+      return;
+    }
     renderMixedRows(prefix);
   };
+  function updateMixedAllocationSummary(prefix){
+    const rows=mixedDraft[prefix]||[];
+    const total=rows.reduce((n,r)=>n+(Number(r.amount)||0),0);
+    const out=$(`mfpm-${prefix}-mixed-total`);if(out)out.textContent=money(total);
+    const status=$(`mfpm-${prefix}-mixed-status`);if(!status)return;
+    let expected=null;
+    if(prefix==='bulk-emi-payment-mode' && typeof getSelectedBulkEmis==='function'){
+      const selected=getSelectedBulkEmis();
+      expected=selected.reduce((n,r)=>n+(Number(r.totalDue??r.emi)||0),0);
+    }
+    if(expected===null){
+      status.textContent=`${rows.filter(r=>(Number(r.amount)||0)>0).length} positive component(s) · Enter the actual amount received for each method.`;
+      status.style.color='';
+      return;
+    }
+    const delta=Math.round((total-expected)*100)/100;
+    if(Math.abs(delta)<0.01){
+      status.textContent=`Allocation matches selected EMI total: ${money(total)}.`;
+      status.style.color='#34d399';
+    }else{
+      status.textContent=`Entered ${money(total)} · Selected EMI total ${money(expected)} · ${delta<0?'Short by '+money(-delta):'Over by '+money(delta)}.`;
+      status.style.color='#fbbf24';
+    }
+  }
   window.mfPMAddMixedRow=function(prefix){mixedDraft[prefix]=mixedDraft[prefix]||[];mixedDraft[prefix].push({mode:'Cash',amount:'',bankId:'',upiId:'',channel:'',ref:'',chequeNo:'',note:''});renderMixedRows(prefix);};
   window.mfPMRemoveMixedRow=function(prefix,index){mixedDraft[prefix]=(mixedDraft[prefix]||[]).filter((_,i)=>i!==index);renderMixedRows(prefix);};
   function mfPMAudit(action,entityType,entityId,before=null,after=null){
