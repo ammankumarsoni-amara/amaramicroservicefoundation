@@ -3891,6 +3891,11 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         const mfV2DirtyGeneration={loans:new Map(),products:new Map(),staff:new Map(),expenses:new Map(),borrowings:new Map(),shell:0,full:0};
         let mfScaleProxySuspend=false;
         let mfScaleStateProxyInstalled=false;
+        // Keep a global identity set for already-wrapped records. A fresh per-call WeakMap
+        // alone cannot detect that a loan object is already a Proxy. Without this guard,
+        // `state.loans = state.loans.filter(...)` recursively re-wraps every existing loan,
+        // every EMI/payment and every nested field, making deletion increasingly expensive.
+        const mfScaleWrappedProxies = new WeakSet();
         function mfScaleSetFullDirty(){
             mfScaleDirty.full=true; mfV2PendingDirty.full=true; mfV2DirtyGeneration.full++;
             try{ mfScalePaymentCounts.clear(); (state.loans||[]).forEach(l=>mfScalePaymentCounts.set(String(l?.id),Array.isArray(l?.payments)?l.payments.length:0)); }catch(e){}
@@ -3913,7 +3918,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         }
         function mfScaleResetDirty(){ mfScaleDirty.loans.clear(); mfScaleDirtyLoanRefs.clear(); mfScaleDirty.products.clear(); mfScaleDirty.staff.clear(); mfScaleDirty.expenses.clear(); mfScaleDirty.borrowings.clear(); mfScaleDirty.shell=false; mfScaleDirty.full=false; }
         function mfScaleWrapObject(value,kind='',id='',seen=new WeakMap()){
-            if(!value || typeof value!=='object' || seen.has(value)) return value;
+            if(!value || typeof value!=='object') return value;
+            if(mfScaleWrappedProxies.has(value)) return value;
+            if(seen.has(value)) return seen.get(value);
             const cached=seen.get(value); if(cached) return cached;
             const handler={
                 set(target,prop,val,receiver){
@@ -3936,7 +3943,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     return ok;
                 }
             };
-            const proxy=new Proxy(value,handler); seen.set(value,proxy);
+            const proxy=new Proxy(value,handler);
+            seen.set(value,proxy);
+            mfScaleWrappedProxies.add(proxy);
             if(Array.isArray(value)){
                 for(let i=0;i<value.length;i++) value[i]=mfScaleWrapObject(value[i],kind || '',kind?((value[i]?.id)||id):id,seen);
             }else{
@@ -5428,9 +5437,13 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 try{ mfV2MarkDirty(); scheduleFirebasePush(); }catch(e){ console.warn('Automatic Secure Firebase sync scheduling skipped:',e); }
                 try{
                     mfScaleScheduleMirror();
-                    // Once the targeted mirror refresh is complete, Customer Recovery can
-                    // repaint from the same authoritative state without rebuilding hidden tabs.
-                    try{ if(typeof renderFeed==='function') renderFeed(); }catch(e){}
+                    // For a targeted loan deletion, the scheduled scoped render owns the
+                    // visible feed refresh. Calling renderFeed here as well duplicates a
+                    // full portfolio rebuild immediately after deletion and can lock up
+                    // the main thread on large customer/payment histories.
+                    if(options.renderScope!=='loan-delete'){
+                        try{ if(typeof renderFeed==='function') renderFeed(); }catch(e){}
+                    }
                 }catch(e){}
                 /* Drive auto-sync disabled by production policy. */
             });
@@ -5795,8 +5808,12 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 mfPersistRenderRaf=0;
                 try{
                     if(scope==='loan-delete'){
-                        // Refresh financial KPIs and only the visible loan-related screen.
-                        renderKPIs();
+                        // Keep deletion responsive: financial reconciliation scans loan/payment
+                        // history, so defer KPI recalculation until the browser has had a chance
+                        // to paint the successful delete and update the visible list first.
+                        const recalcKpis=()=>{ try{ renderKPIs(); }catch(e){ console.warn('Deferred KPI refresh failed',e); } };
+                        if(typeof requestIdleCallback==='function') requestIdleCallback(recalcKpis,{timeout:1500});
+                        else setTimeout(recalcKpis,250);
                         const tab=mfActiveTab||'feed';
                         if(tab==='all'){
                             if(typeof renderAllLoansTable==='function') renderAllLoansTable();
