@@ -2618,7 +2618,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             <div class="form-group" id="bulk-common-mode-group" style="margin-top:10px;">
                 <label>Payment Mode</label>
                 <div id="bulk-common-mode-wrap">
-                    <select id="bulk-emi-payment-mode">
+                    <select id="bulk-emi-payment-mode" onchange="updateBulkEmiPreview();updateBulkMixedHelp();">
                         <option value="Cash">Cash</option>
                         <option value="UPI">UPI</option>
                         <option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option>
@@ -2626,6 +2626,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                         <option value="Cash + UPI (Both)">Mixed Payment (multiple components)</option>
                     </select>
                     <div style="font-size:.63rem;color:#64748b;margin-top:4px;">For Manual Due-Date Collection, each selected EMI can use its own mode from its row.</div>
+                    <div id="bulk-mixed-help" style="display:none;margin-top:7px;padding:8px 9px;border-radius:8px;border:1px solid rgba(45,212,191,.25);background:rgba(45,212,191,.06);color:#99f6e4;font-size:.68rem;line-height:1.45;">Mixed Payment: enter the Cash / UPI / bank / cheque components for the full selected total. The system will allocate the recorded components across each EMI in proportion to that EMI's amount; every EMI's source components will reconcile to its EMI amount. EMI principal, interest, penalty and schedule calculations are not changed.</div>
                 </div>
             </div>
 
@@ -9275,6 +9276,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             document.getElementById('bulk-emi-payment-mode').value='Cash';
             renderBulkEmiChecklist();
             setBulkEmiMode(mode);
+            updateBulkMixedHelp();
             document.getElementById('modal-bulk-emi').classList.add('active');
         }
 
@@ -9300,6 +9302,71 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 renderBulkEmiChecklist();
             }
             updateBulkEmiPreview();
+            updateBulkMixedHelp();
+        }
+
+        function updateBulkMixedHelp(){
+            const help=document.getElementById('bulk-mixed-help');
+            const mode=document.getElementById('bulk-emi-mode')?.value||'ALL';
+            const paymentMode=document.getElementById('bulk-emi-payment-mode')?.value||'Cash';
+            if(help)help.style.display=(mode==='ALL'&&(String(paymentMode).toLowerCase().includes('mixed')||String(paymentMode).toLowerCase().includes('both')))?'block':'none';
+        }
+
+        // Split one aggregate mixed-payment source allocation across the selected EMIs without
+        // duplicating its total. Integer paise are used for source components; row totals (each EMI)
+        // and column totals (each recorded payment component) must both reconcile exactly.
+        function mfBulkAllocateMixedMeta(rows, aggregateMeta){
+            const totalCents=rows.reduce((n,r)=>n+Math.round((Number(r.totalDue ?? r.emi)||0)*100),0);
+            const components=(aggregateMeta?.components||[]).map(c=>({...c,_cents:Math.round((Number(c.amount)||0)*100)})).filter(c=>c._cents>0);
+            if(!rows.length||!components.length||totalCents<=0) return {ok:false,reason:'Mixed Payment needs at least one positive component and at least one unpaid EMI.'};
+            if(Math.abs(components.reduce((n,c)=>n+c._cents,0)-totalCents)>0) return {ok:false,reason:'Mixed Payment component total must equal the total selected EMI amount exactly (to the nearest paise).'};
+            const rowCents=rows.map(r=>Math.round((Number(r.totalDue ?? r.emi)||0)*100));
+            if(rowCents.some(c=>c<0)||rowCents.reduce((n,c)=>n+c,0)!==totalCents) return {ok:false,reason:'The selected EMI total cannot be reconciled in paise. No collection was saved.'};
+            const R=rows.length,C=components.length;
+            const base=Array.from({length:R},()=>Array(C).fill(0));
+            const frac=Array.from({length:R},()=>Array(C).fill(0));
+            const rowNeed=Array(R).fill(0),colNeed=Array(C).fill(0);
+            for(let i=0;i<R;i++) for(let j=0;j<C;j++){
+                const ideal=rowCents[i]*components[j]._cents/totalCents;
+                base[i][j]=Math.floor(ideal+1e-10); frac[i][j]=ideal-base[i][j];
+            }
+            for(let i=0;i<R;i++) rowNeed[i]=rowCents[i]-base[i].reduce((a,b)=>a+b,0);
+            for(let j=0;j<C;j++) colNeed[j]=components[j]._cents-base.reduce((a,row)=>a+row[j],0);
+            // Small max-flow network rounds fractional paise while preserving every row/column total.
+            const N=2+R+C, source=N-2,sink=N-1,g=Array.from({length:N},()=>[]);
+            const addEdge=(u,v,cap)=>{const a={to:v,cap,rev:g[v].length},b={to:u,cap:0,rev:g[u].length};g[u].push(a);g[v].push(b);return a;};
+            for(let i=0;i<R;i++) addEdge(source,i,rowNeed[i]);
+            const refs=Array.from({length:R},()=>Array(C).fill(null));
+            for(let i=0;i<R;i++) for(let j=0;j<C;j++) if(frac[i][j]>1e-8) refs[i][j]=addEdge(i,R+j,1);
+            for(let j=0;j<C;j++) addEdge(R+j,sink,colNeed[j]);
+            let flow=0,required=rowNeed.reduce((a,b)=>a+b,0);
+            while(flow<required){
+                const prev=Array(N).fill(null),q=[source];prev[source]={node:-1,edge:-1};
+                for(let qi=0;qi<q.length&&prev[sink]===null;qi++){
+                    const u=q[qi];for(let ei=0;ei<g[u].length;ei++){const e=g[u][ei];if(e.cap>0&&prev[e.to]===null){prev[e.to]={node:u,edge:ei};q.push(e.to);if(e.to===sink)break;}}
+                }
+                if(prev[sink]===null) return {ok:false,reason:'Mixed Payment paise allocation could not be reconciled. No collection was saved.'};
+                let aug=Infinity;for(let v=sink;v!==source;){const x=prev[v],e=g[x.node][x.edge];aug=Math.min(aug,e.cap);v=x.node;}
+                for(let v=sink;v!==source;){const x=prev[v],e=g[x.node][x.edge];e.cap-=aug;g[v][e.rev].cap+=aug;v=x.node;}flow+=aug;
+            }
+            for(let i=0;i<R;i++) for(let j=0;j<C;j++) if(refs[i][j]&&refs[i][j].cap===0) base[i][j]++;
+            for(let i=0;i<R;i++) if(base[i].reduce((a,b)=>a+b,0)!==rowCents[i]) return {ok:false,reason:'An EMI component split did not reconcile to its EMI total. No collection was saved.'};
+            for(let j=0;j<C;j++) if(base.reduce((n,row)=>n+row[j],0)!==components[j]._cents) return {ok:false,reason:'A payment component total did not reconcile. No collection was saved.'};
+            const metas=rows.map((r,i)=>{
+                const amountCents=rowCents[i];
+                const cs=components.map((c,j)=>({...c,amount:base[i][j]/100,componentId:'COMP-BULK-'+Date.now().toString(36)+'-'+i+'-'+j})).filter(c=>c.amount>0).map(c=>{delete c._cents;return c;});
+                return {...aggregateMeta,transactionId:'TXN-BULK-'+Date.now().toString(36)+'-'+i+'-'+Math.random().toString(36).slice(2,6),recordedAt:new Date().toISOString(),mode:'Mixed',channel:'MIXED',direction:'IN',transactionAmount:amountCents/100,components:cs};
+            });
+            return {ok:true,metas};
+        }
+
+        function mfBulkCloneMetaForAmount(meta, amount, index){
+            if(!meta)return null;
+            const copy=JSON.parse(JSON.stringify(meta));
+            copy.transactionId='TXN-BULK-'+Date.now().toString(36)+'-'+index+'-'+Math.random().toString(36).slice(2,6);
+            copy.recordedAt=new Date().toISOString();copy.transactionAmount=Number(amount)||0;
+            if(Array.isArray(copy.components))copy.components=copy.components.map((c,j)=>({...c,componentId:'COMP-BULK-'+Date.now().toString(36)+'-'+index+'-'+j,amount:Number(c.amount)||0}));
+            return copy;
         }
 
         function getBulkEmiCandidates(){
@@ -9418,6 +9485,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         }
 
         function updateBulkEmiPreview(){
+            updateBulkMixedHelp();
             const box=document.getElementById('bulk-emi-preview'); if(!box) return;
             const rows=getSelectedBulkEmis();
             const mode=document.getElementById('bulk-emi-mode')?.value||'ALL';
@@ -9453,18 +9521,29 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const invalid=rows.find(r=>!r.collectionPaymentDate);
                 if(invalid){ alert(`Please select a valid Actual Paid Date for EMI #${invalid.no}.`); return; }
             }
-            // Source metadata is captured per EMI. Mixed Payment uses Manual mode so each EMI can carry its own component split.
+            // Source metadata is captured per EMI. In one-click Mixed Payment, the entered
+            // components represent the aggregate receipt and are split across the selected EMIs.
+            // No aggregate component is duplicated on every EMI; all source totals must reconcile.
             const bulkMode=String(document.getElementById('bulk-emi-mode')?.value||'ALL');
-            let sharedMeta=null;
+            let sharedMeta=null, mixedMetasByNo=null, sharedMode='Cash';
             if(bulkMode==='ALL'){
-                const sharedMode=document.getElementById('bulk-emi-payment-mode')?.value||'Cash';
-                if(String(sharedMode).toLowerCase().includes('mixed')||String(sharedMode).toLowerCase().includes('both')){alert('For Mixed Payment, switch to Manual selection so each EMI can have its own component split.');return;}
-                const sharedResult=mfPMReadInlineMeta('bulk-emi-payment-mode',null,sharedMode,'IN');if(!sharedResult.ok)return;sharedMeta=sharedResult.meta;
+                sharedMode=document.getElementById('bulk-emi-payment-mode')?.value||'Cash';
+                const total=rows.reduce((sum,r)=>sum+(Number(r.totalDue ?? r.emi)||0),0);
+                const sharedResult=mfPMReadInlineMeta('bulk-emi-payment-mode',total,sharedMode,'IN');if(!sharedResult.ok)return;sharedMeta=sharedResult.meta;
+                if(String(sharedMode).toLowerCase().includes('mixed')||String(sharedMode).toLowerCase().includes('both')){
+                    const allocation=mfBulkAllocateMixedMeta(rows,sharedMeta);
+                    if(!allocation.ok){alert(allocation.reason||'Mixed Payment source allocation could not be reconciled. No collection was saved.');return;}
+                    mixedMetasByNo=new Map(rows.map((r,i)=>[Number(r.no),allocation.metas[i]]));
+                }
             }
             const prepared=[];
             for(const r of rows.sort((a,b)=>a.no-b.no)){
-                const amt=Number(r.totalDue)||Number(r.emi)||0;let meta=sharedMeta;
-                if(bulkMode!=='ALL'){const sel=document.querySelector(`#bulk-emi-checklist .bulk-emi-row-mode[data-emi-no="${r.no}"]`);const m=sel?.value||r.collectionMode||'Cash';const result=mfPMReadInlineMeta(`bulk-mode-${r.no}`,amt,m,'IN');if(!result.ok)return;meta=result.meta;}
+                const amt=Number(r.totalDue)||Number(r.emi)||0;let meta=null;
+                if(bulkMode==='ALL'){
+                    meta=mixedMetasByNo?mixedMetasByNo.get(Number(r.no)):mfBulkCloneMetaForAmount(sharedMeta,amt,r.no);
+                }else{
+                    const sel=document.querySelector(`#bulk-emi-checklist .bulk-emi-row-mode[data-emi-no="${r.no}"]`);const m=sel?.value||r.collectionMode||'Cash';const result=mfPMReadInlineMeta(`bulk-mode-${r.no}`,amt,m,'IN');if(!result.ok)return;meta=result.meta;
+                }
                 prepared.push({...r,_sourceMeta:meta});
             }
             prepared.forEach(r=>{const paymentDate=r.collectionPaymentDate||r.dueDate;loan.payments.push({date:paymentDate,dueDate:r.dueDate,amount:Number(r.totalDue)||Number(r.emi)||0,penalty:0,mode:r.collectionMode||'Cash',paymentMeta:r._sourceMeta,principal:Number(r.principal)||0,interest:Number(r.interest)||0,preEmiInterest:Number(r.preEmiInterest)||0});});
