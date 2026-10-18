@@ -4437,7 +4437,16 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           const out=[];(state.loans||[]).forEach(l=>(Array.isArray(l.payments)?l.payments:[]).forEach((p,i)=>{const y=mfV2SafeClone(p);delete y._ownerUid;delete y.loanId;delete y.paymentIndex;out.push({id:String(l.id)+'-'+i,loanId:String(l.id),paymentIndex:i,row:y});}));return out;
         }
         function mfV2Shell(){
-          const x=mfV2SafeClone(state); delete x.loans; delete x.products; delete x.staff; delete x.expenses; delete x.borrowings;
+          // Build the lightweight shell directly. Cloning the entire state and deleting
+          // entity collections afterwards synchronously duplicates every loan/payment
+          // before every shell save and can freeze the browser on a large portfolio.
+          // Entity collections are journalled separately by ID and remain authoritative.
+          const x={};
+          const entityKeys=new Set(['loans','products','staff','expenses','borrowings']);
+          for(const k of Object.keys(state||{})){
+            if(entityKeys.has(k)) continue;
+            x[k]=mfV2SafeClone(state[k]);
+          }
           return x;
         }
         function mfV2Fingerprint(){return mfLocalStateFingerprint();}
@@ -5388,7 +5397,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             if (inp) inp.addEventListener('keyup', e => { if (e.key === 'Enter') attemptAppUnlock(); });
         });
 
-        function persist(){
+        function persist(options={}){
             const now=new Date();
             try{ mfV2MarkDirty(); }catch(e){}
             try{ mfFinancialReconciliationCache=null; mfGrowthCache=null; }catch(e){}
@@ -5401,7 +5410,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             mfPerfV2QueuePersist().then(async result=>{
                 const el=document.getElementById("last-sync-time");
                 if(el) el.innerHTML=`<i class="fa-solid fa-check text-success me-1"></i> Saved: ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
-                mfSchedulePersistRender();
+                mfSchedulePersistRender(options.renderScope||'all');
                 // Version history remains a full-state audit snapshot, but it is now queued
                 // behind the incremental journal instead of being part of every save burst.
                 queueAutomaticVersionedBackup();
@@ -5410,7 +5419,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 console.error("Incremental local save failed",err);
                 const el=document.getElementById("last-sync-time");
                 if(el) el.innerHTML=`<i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> Local save warning`;
-                mfSchedulePersistRender();
+                mfSchedulePersistRender(options.renderScope||'all');
             }).finally(()=>{
                 // PRIMARY OPERATIONAL CLOUD COPY: Firebase Secure Sync must not depend on
                 // IndexedDB success. A transient IndexedDB failure must never block the
@@ -5780,9 +5789,29 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         let mfActiveTab = 'feed';
         let mfRenderRaf = 0;
         let mfPersistRenderRaf = 0;
-        function mfSchedulePersistRender(){
+        function mfSchedulePersistRender(scope='all'){
             if(mfPersistRenderRaf) return;
-            const cb=()=>{ mfPersistRenderRaf=0; try{ renderAll(); }catch(e){ console.error('Deferred render failed',e); } };
+            const cb=()=>{
+                mfPersistRenderRaf=0;
+                try{
+                    if(scope==='loan-delete'){
+                        // Refresh financial KPIs and only the visible loan-related screen.
+                        renderKPIs();
+                        const tab=mfActiveTab||'feed';
+                        if(tab==='all'){
+                            if(typeof renderAllLoansTable==='function') renderAllLoansTable();
+                            if(typeof renderLoanMasterSummary==='function') renderLoanMasterSummary();
+                        }else if(tab==='feed'){
+                            if(typeof renderBusinessGrowthChart==='function') renderBusinessGrowthChart();
+                            if(typeof renderProductFilters==='function') renderProductFilters();
+                            if(typeof renderFeed==='function') renderFeed();
+                            if(typeof renderUpcomingEmiSchedule==='function') renderUpcomingEmiSchedule();
+                        }else if(tab==='phaseb' && typeof renderPhaseB==='function'){
+                            renderPhaseB();
+                        }
+                    }else renderAll();
+                }catch(e){ console.error('Deferred render failed',e); }
+            };
             if(typeof requestAnimationFrame==='function') mfPersistRenderRaf=requestAnimationFrame(cb); else mfPersistRenderRaf=setTimeout(cb,0);
         }
         function syncCompanyNameField(){
@@ -8298,12 +8327,22 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         }
 
         function deleteClientAction() {
-            const id = document.getElementById("fc-id").value;
-            if (confirm("Delete loan account " + id + "?")) {
-                state.loans = state.loans.filter(l => l.id !== id);
-                closeModal("modal-client");
-                persist();
-            }
+            const id = String(document.getElementById("fc-id")?.value || '').trim();
+            if (!id) { alert('No loan account is selected.'); return; }
+            const existing=(state.loans||[]).find(l=>String(l?.id)===id);
+            if (!existing) { alert('This loan account is no longer available in the loaded data. Refresh the list and try again.'); return; }
+            if (!confirm("Delete loan account " + id + "?")) return;
+
+            // Remove the authoritative record once, then explicitly journal the deleted
+            // loan as a tombstone. Replacing state.loans alone marks only the shell dirty,
+            // which could leave the removed loan in structured cloud/index mirrors.
+            state.loans = (state.loans||[]).filter(l => String(l?.id) !== id);
+            try { mfScaleMarkDirty('loans', id); } catch(e) { console.warn('Loan deletion journal mark skipped:',e); }
+            closeModal("modal-client");
+            // Avoid synchronously repainting every dashboard while the delete is saved.
+            // The persistence/cloud/security pipeline is unchanged; only the immediate
+            // post-delete render is scoped to the currently visible loan view.
+            persist({renderScope:'loan-delete'});
         }
 
         // PRE-CLOSURE / FORECLOSURE INTEREST
