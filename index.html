@@ -2147,37 +2147,28 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
 
                 <div class="form-group" style="background: rgba(16,185,129,0.08); padding: 10px; border-radius: 9px; border: 1px solid rgba(16,185,129,0.25);">
                     <div style="font-weight:800; color:#34d399; margin-bottom:8px;">Upfront Loan Charges (Paid When Capital Is Taken)</div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                        <div class="form-group" style="margin-bottom:0;">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 12px;align-items:end;"><div class="form-group" style="margin-bottom:0;">
                             <label>Processing Fee (%)</label>
                             <input type="number" id="b-processing-fee-pct" value="0" min="0" max="100" step="any" placeholder="e.g. 2" oninput="calcBorrowingUpfrontFields('fee-pct')">
-                            <div style="font-size:.68rem;color:#94a3b8;margin-top:3px;">Enter percentage or rupee amount; the other field updates automatically.</div>
-                        </div>
-                        <div class="form-group" style="margin-bottom:0;">
+                        </div><div class="form-group" style="margin-bottom:0;">
                             <label>Processing Fee (₹)</label>
                             <input type="number" id="b-processing-fee-amount" value="0" min="0" step="any" placeholder="e.g. 10000" oninput="calcBorrowingUpfrontFields('fee-amount')">
-                            <div id="b-processing-fee-calc" style="font-size:.68rem;color:#94a3b8;margin-top:3px;">Calculated: ₹0</div>
-                        </div>
-                        <div class="form-group" style="margin-bottom:0;">
+                        </div></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 12px;align-items:end;margin-top:8px;"><div class="form-group" style="margin-bottom:0;">
                             <label>Processing Fee GST (%)</label>
                             <input type="number" id="b-processing-gst-pct" value="18" min="0" max="100" step="any" placeholder="e.g. 18" oninput="calcBorrowingUpfrontFields('pct')">
-                            <div id="b-processing-gst-calc" style="font-size:.68rem;color:#94a3b8;margin-top:3px;">GST Amount: ₹0</div>
-                            <input type="number" id="b-processing-gst-amount" value="0" min="0" step="any" placeholder="GST amount" oninput="document.getElementById('b-processing-gst-amount').dataset.userEdited='1';calcBorrowingUpfrontFields('amount')" style="margin-top:5px;">
-                        </div>
-                        <div class="form-group" style="margin-bottom:0;">
+                        </div><div class="form-group" style="margin-bottom:0;">
+                            <label>Processing Fee GST (₹)</label>
+                            <input type="number" id="b-processing-gst-amount" value="0" min="0" step="any" placeholder="GST amount" oninput="calcBorrowingUpfrontFields('amount')">
+                        </div></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 12px;align-items:end;margin-top:8px;"><div class="form-group" style="margin-bottom:0;">
                             <label>Other Charges (₹)</label>
-                            <input type="number" id="b-other-charges" value="0" min="0" step="any" placeholder="0">
-                        </div>
-                        <div class="form-group" style="margin-bottom:0;">
+                            <input type="number" id="b-other-charges" value="0" min="0" step="any" placeholder="0" oninput="calcBorrowingOtherGst('base')">
+                        </div><div class="form-group" style="margin-bottom:0;">
                             <label>Other Charges GST (%)</label>
                             <input type="number" id="b-other-gst-pct" value="18" min="0" max="100" step="any" placeholder="e.g. 18" oninput="calcBorrowingOtherGst('pct')">
-                            <div id="b-other-gst-calc" style="font-size:.68rem;color:#94a3b8;margin-top:3px;">Calculated: ₹0</div>
-                        </div>
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label>Other Charges GST Amount (₹) [Editable]</label>
+                        </div><div class="form-group" style="margin-bottom:0;">
+                            <label>Other Charges GST (₹)</label>
                             <input type="number" id="b-other-gst" value="0" min="0" step="any" placeholder="0" oninput="calcBorrowingOtherGst('amount')">
-                        </div>
-                    </div>
+                        </div></div>
                     <div style="margin-top:8px; font-size:.72rem; color:#94a3b8;">
                         These are treated as actual financing outflows and are included in Lender Cost / True In-Hand.
                     </div>
@@ -2207,6 +2198,16 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                         <select id="b-month" required></select>
                         <select id="b-year" required></select>
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label>First EMI Due Date (Date / Month / Year) *</label>
+                    <div class="dmy-grid">
+                        <select id="b-first-day" required></select>
+                        <select id="b-first-month" required></select>
+                        <select id="b-first-year" required></select>
+                    </div>
+                    <small style="display:block;color:#94a3b8;font-size:.68rem;margin-top:5px;">Enter the lender's first scheduled EMI due date. Subsequent monthly due dates follow this date; actual paid date is recorded separately when you make a repayment.</small>
                 </div>
 
                 <div class="form-group"><label>Funds Received Through *</label><select id="b-received-mode" required><option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option><option value="UPI">UPI</option><option value="Cash">Cash</option><option value="Cheque / DD">Cheque / Demand Draft</option><option value="Mixed">Mixed Payment (multiple components)</option></select><small style="display:block;color:#64748b;font-size:.63rem;margin-top:4px;">Select the channel through which the borrowed funds were received. Detailed payment-source allocation is recorded on actual payment forms.</small></div>
@@ -2289,7 +2290,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                         <select id="lp-month" required></select>
                         <select id="lp-year" required></select>
                     </div>
-                    <div style="font-size:.68rem;color:#94a3b8;margin-top:5px;">You enter only the actual date you paid. The EMI due date is calculated automatically from the borrowing date.</div>
+                    <div style="font-size:.68rem;color:#94a3b8;margin-top:5px;">You enter only the actual date you paid. The EMI due date comes from the first EMI date saved in the borrowing record; this is the actual date you paid.</div>
                 </div>
                 <input type="hidden" id="lp-emi-month">
                 <input type="hidden" id="lp-emi-year">
@@ -3537,7 +3538,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     const ordered = b.repayments.slice().sort((a,z)=>String(a.date||"").localeCompare(String(z.date||"")));
                     ordered.forEach((r,i)=>{
                         if (!r.emiNo) r.emiNo = i + 1;
-                        if (!r.dueDate) r.dueDate = mfAddMonths(b.date, Number(r.emiNo));
+                        if (!r.dueDate) r.dueDate = mfAddMonths(mfBorrowingFirstEmiDate(b), Number(r.emiNo)-1);
                         if (!r.emiMonth) r.emiMonth = String(r.dueDate).slice(5,7);
                         if (!r.emiYear) r.emiYear = Number(String(r.dueDate).slice(0,4));
                     });
@@ -5682,6 +5683,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         initDmySelectors("fc-s");
         initDmySelectors("pm-s");
         initDmySelectors("b");
+        initDmySelectors("b-first");
         initDmySelectors("lp");
         initEmiPeriodSelectors();
         initDmySelectors("st");
@@ -7514,7 +7516,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             calcBorrowingUpfrontFields('reset');
             calcBorrowingOtherGst('reset');
             toggleGstCheckbox();
-            setDmyValues("b", new Date().toISOString().split('T')[0]);
+            const newBorrowDate = new Date().toISOString().split('T')[0];
+            setDmyValues("b", newBorrowDate);
+            setDmyValues("b-first", mfAddMonths(newBorrowDate,1));
             document.getElementById("btn-delete-borrowing").style.display = "none";
             document.getElementById("modal-borrowing").classList.add("active");
         }
@@ -7551,6 +7555,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             calcBorrowingOtherGst('load');
             toggleGstCheckbox();
             setDmyValues("b", b.date);
+            setDmyValues("b-first", mfBorrowingFirstEmiDate(b));
             document.getElementById("btn-delete-borrowing").style.display = "block";
             document.getElementById("modal-borrowing").classList.add("active");
         }
@@ -7676,7 +7681,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             let pct = mfSafeNumber(pctText);
             let amountText = mfExactText('b-other-gst','0');
             let amount = Math.max(0,mfSafeNumber(amountText));
-            if (source === 'pct' || source === 'reset') {
+            if (source === 'pct' || source === 'reset' || source === 'base') {
                 amountText = mfDecPercentOf(baseText,pctText); amount=mfSafeNumber(amountText);
                 if (amtEl) { amtEl.value = amountText; amtEl.dataset.userEdited = ''; }
             } else if (source === 'amount') {
@@ -7717,12 +7722,17 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const applyGst = document.getElementById("b-apply-gst").checked;
             const interestGstPct = Math.max(0, parseFloat(document.getElementById("b-interest-gst-pct")?.value) || 18);
             const date = getDmyIsoString("b");
+            const firstEmiDate = getDmyIsoString("b-first");
             const receivedMode=$('b-received-mode')?.value||'Bank Transfer';
             const netBorrowingReceived=Math.max(0,amount-processingFee-processingGst-otherCharges-otherGst);
             const receivedSourceResult={ok:true,meta:null}; // Capital borrowing records the receipt channel only; detailed payment-source allocation belongs to actual repayment/collection forms.
 
             if (!Number.isFinite(tenure) || tenure < 1) {
                 alert("Please enter a valid loan tenure in months.");
+                return;
+            }
+            if (!date || !firstEmiDate || firstEmiDate < date) {
+                alert("First EMI due date cannot be earlier than the borrowing date.");
                 return;
             }
 
@@ -7755,6 +7765,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     interestGstPct: interestGstPct,
                     applyGst: applyGst,
                     date: date,
+                    firstEmiDate: firstEmiDate,
                     repayments: []
                 });
             } else {
@@ -7780,6 +7791,11 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 b.interestGstPct = interestGstPct;
                 b.applyGst = applyGst;
                 b.date = date;
+                b.firstEmiDate = firstEmiDate;
+                b._rawProcessingGstPct = processingGstPctText;
+                b._rawProcessingGst = processingGstText;
+                b._rawOtherGstPct = otherGstPctText;
+                b._rawOtherGst = otherGstText;
             }
 
             closeModal("modal-borrowing");
@@ -7925,12 +7941,18 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
         }
 
+        function mfBorrowingFirstEmiDate(b){
+            const saved=String(b?.firstEmiDate||'').slice(0,10);
+            if(/^\\d{4}-\\d{2}-\\d{2}$/.test(saved)) return saved;
+            return mfAddMonths(String(b?.date||'').slice(0,10),1);
+        }
+
         const mfAmortisationCache=new WeakMap();
         function mfBuildAmortisation(b) {
             const principal = Math.max(0, Number(b.amount) || 0);
             const annualRate = Math.max(0, Number(b.rate) || 0);
             const tenure = Math.max(1, parseInt(b.tenure, 10) || 0);
-            const start = String(b.date || "").slice(0,10);
+            const start = mfBorrowingFirstEmiDate(b);
             if (!principal || !tenure || !start) return [];
             const cacheKey=[principal,annualRate,tenure,start,String(b.interestBasis||"Reducing Balance"),String(b.type||"")].join('|');
             const cached=mfAmortisationCache.get(b);
@@ -7948,7 +7970,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     : principal * mr * tenure;
                 const i = Math.round(interest);
                 const gst = 0; // GST is recorded separately at payment time; never part of amortisation.
-                rows.push({no:1,dueDate:mfAddMonths(start,tenure),emi:Math.round(principal+i),principal:Math.round(principal),interest:i,gst,closing:0});
+                rows.push({no:1,dueDate:mfAddMonths(start,tenure-1),emi:Math.round(principal+i),principal:Math.round(principal),interest:i,gst,closing:0});
                 return store(rows);
             }
 
@@ -7959,7 +7981,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     const i = Math.round(monthlyInterest);
                     const gst = 0; // GST is recorded separately at payment time; never part of amortisation.
                     balance = Math.max(0,balance-p);
-                    rows.push({no:n,dueDate:mfAddMonths(start,n),emi:Math.round(p+i),principal:Math.round(p),interest:i,gst,closing:Math.round(balance)});
+                    rows.push({no:n,dueDate:mfAddMonths(start,n-1),emi:Math.round(p+i),principal:Math.round(p),interest:i,gst,closing:Math.round(balance)});
                 }
                 return store(rows);
             }
@@ -7981,7 +8003,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     principalRemaining = Math.max(0, principalRemaining-p);
                     interestRemaining = Math.max(0, interestRemaining-i);
                     balance = Math.max(0, balance-p);
-                    rows.push({no:n,dueDate:mfAddMonths(start,n),emi:pr+ir,principal:pr,interest:ir,gst,closing:Math.round(balance)});
+                    rows.push({no:n,dueDate:mfAddMonths(start,n-1),emi:pr+ir,principal:pr,interest:ir,gst,closing:Math.round(balance)});
                 }
                 return store(rows);
             }
@@ -7998,7 +8020,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const pr = Math.round(p);
                 const gst = 0; // GST is recorded separately at payment time; never part of amortisation.
                 balance = Math.max(0,balance-p);
-                rows.push({no:n,dueDate:mfAddMonths(start,n),emi:pr+i,principal:pr,interest:i,gst,closing:Math.round(balance)});
+                rows.push({no:n,dueDate:mfAddMonths(start,n-1),emi:pr+i,principal:pr,interest:i,gst,closing:Math.round(balance)});
             }
             return store(rows);
         }
@@ -8026,7 +8048,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const modal=normalizeLenderModal('modal-borrowing-schedule');
             if(!modal) return;
             document.getElementById('borrowing-schedule-title').innerText = `${b.lenderName} — Installments`;
-            document.getElementById('borrowing-schedule-summary').innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;"><div style="padding:8px;border-radius:9px;background:rgba(59,130,246,.10);"><small>Loan Amount</small><br><b>${mfMoney(b.amount)}</b></div><div style="padding:8px;border-radius:9px;background:rgba(52,211,153,.10);"><small>Installments Paid</small><br><b>${repayments.length} of ${rows.length}</b></div><div style="padding:8px;border-radius:9px;background:rgba(251,191,36,.10);"><small>Tenure</small><br><b>${b.tenure||0} months</b></div></div><div style="font-size:.68rem;color:#94a3b8;margin-top:7px;">This is a simple installment list for the actual EMI due dates — it does not predict or suggest any EMI/Principal/Interest split. You enter those yourself, exactly as your lender charges them, when you click Pay.</div>`;
+            document.getElementById('borrowing-schedule-summary').innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;"><div style="padding:8px;border-radius:9px;background:rgba(59,130,246,.10);"><small>Loan Amount</small><br><b>${mfMoney(b.amount)}</b></div><div style="padding:8px;border-radius:9px;background:rgba(52,211,153,.10);"><small>Installments Paid</small><br><b>${repayments.length} of ${rows.length}</b></div><div style="padding:8px;border-radius:9px;background:rgba(251,191,36,.10);"><small>Tenure</small><br><b>${b.tenure||0} months</b></div></div><div style="font-size:.7rem;color:#94a3b8;margin-top:6px;">Borrowing date: ${formatToIndianDate(b.date)} · First EMI due: ${formatToIndianDate(mfBorrowingFirstEmiDate(b))}</div><div style="font-size:.68rem;color:#94a3b8;margin-top:7px;">This is a simple installment list for the actual EMI due dates — it does not predict or suggest any EMI/Principal/Interest split. You enter those yourself, exactly as your lender charges them, when you click Pay.</div>`;
             let t=`<div class="installment-list">`;
             const today=new Date().toISOString().slice(0,10);
             t += rows.map(r=>{
