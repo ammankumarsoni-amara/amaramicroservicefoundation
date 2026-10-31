@@ -2111,7 +2111,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     </div>
                     <div class="form-group">
                         <label>Loan Amount (₹) *</label>
-                        <input type="number" id="b-amount" placeholder="200000" step="any" required>
+                        <input type="number" id="b-amount" placeholder="200000" step="any" required oninput="calcBorrowingUpfrontFields('base')">
                     </div>
                 </div>
 
@@ -2150,7 +2150,12 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                         <div class="form-group" style="margin-bottom:0;">
                             <label>Processing Fee (%)</label>
-                            <input type="number" id="b-processing-fee-pct" value="0" min="0" max="100" step="any" placeholder="e.g. 2" oninput="calcBorrowingUpfrontFields()">
+                            <input type="number" id="b-processing-fee-pct" value="0" min="0" max="100" step="any" placeholder="e.g. 2" oninput="calcBorrowingUpfrontFields('fee-pct')">
+                            <div style="font-size:.68rem;color:#94a3b8;margin-top:3px;">Enter percentage or rupee amount; the other field updates automatically.</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label>Processing Fee (₹)</label>
+                            <input type="number" id="b-processing-fee-amount" value="0" min="0" step="any" placeholder="e.g. 10000" oninput="calcBorrowingUpfrontFields('fee-amount')">
                             <div id="b-processing-fee-calc" style="font-size:.68rem;color:#94a3b8;margin-top:3px;">Calculated: ₹0</div>
                         </div>
                         <div class="form-group" style="margin-bottom:0;">
@@ -2204,7 +2209,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     </div>
                 </div>
 
-                <div class="form-group"><label>Funds Received Through *</label><select id="b-received-mode" required><option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option><option value="UPI">UPI</option><option value="Cash">Cash</option><option value="Cheque / DD">Cheque / Demand Draft</option><option value="Mixed">Mixed Payment (multiple components)</option></select><small style="display:block;color:#64748b;font-size:.63rem;margin-top:4px;">Source metadata only; borrowing principal and lender-cost calculations are unchanged.</small></div>
+                <div class="form-group"><label>Funds Received Through *</label><select id="b-received-mode" required><option value="Bank Transfer">Bank Transfer (NEFT / RTGS / IMPS)</option><option value="UPI">UPI</option><option value="Cash">Cash</option><option value="Cheque / DD">Cheque / Demand Draft</option><option value="Mixed">Mixed Payment (multiple components)</option></select><small style="display:block;color:#64748b;font-size:.63rem;margin-top:4px;">Select the channel through which the borrowed funds were received. Detailed payment-source allocation is recorded on actual payment forms.</small></div>
                 <button type="submit" class="btn-submit" id="btn-save-borrowing">Save Borrowing Loan</button>
                 <button type="button" class="btn-delete" id="btn-delete-borrowing" style="display: none;" onclick="deleteBorrowingAction()">Delete Loan</button>
             </form>
@@ -7488,13 +7493,14 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function openAddBorrowingModal() {
             document.getElementById("b-mode").value = "ADD";
             document.getElementById("modal-borrowing-heading").innerText = "Add Borrowed Capital Loan";
-            const receiveMode=document.getElementById('b-received-mode');if(receiveMode)receiveMode.value='Bank Transfer';if(window.mfPMResetInline)mfPMResetInline('b-received-mode');
+            const receiveMode=document.getElementById('b-received-mode');if(receiveMode)receiveMode.value='Bank Transfer';
             document.getElementById("b-lender-name").value = "";
             document.getElementById("b-amount").value = "";
             document.getElementById("b-rate").value = "12";
             document.getElementById("b-tenure").value = "12";
             document.getElementById("b-interest-basis").value = "Reducing Balance";
             document.getElementById("b-processing-fee-pct").value = 0;
+            document.getElementById("b-processing-fee-amount").value = 0;
             document.getElementById("b-processing-gst-pct").value = 18;
             document.getElementById("b-processing-gst-amount").value = 0;
             document.getElementById("b-other-charges").value = 0;
@@ -7518,7 +7524,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             document.getElementById("b-mode").value = "EDIT";
             document.getElementById("b-id").value = b.id;
             document.getElementById("modal-borrowing-heading").innerText = `Edit Borrowing (${b.id})`;
-            const receiveMode=document.getElementById('b-received-mode');if(receiveMode)receiveMode.value=b.receivedMode||'Bank Transfer';if(window.mfPMSetInlineMeta)mfPMSetInlineMeta('b-received-mode',b.receivedPaymentMeta||null);
+            const receiveMode=document.getElementById('b-received-mode');if(receiveMode)receiveMode.value=b.receivedMode||'Bank Transfer';
             document.getElementById("b-lender-name").value = b.lenderName;
             document.getElementById("b-category").value = b.category;
             document.getElementById("b-amount").value = b.amount;
@@ -7527,7 +7533,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             document.getElementById("b-interest-basis").value = b.interestBasis || "Reducing Balance";
             document.getElementById("b-type").value = b.type;
             const legacyProcessingPct = Number(b.processingFeePct || 0) || ((Number(b.amount)||0) > 0 ? ((Number(b.processingFee)||0) / (Number(b.amount)||0) * 100) : 0);
-            document.getElementById("b-processing-fee-pct").value = legacyProcessingPct ? Number(legacyProcessingPct) : 0;
+            document.getElementById("b-processing-fee-pct").value = String(b._rawProcessingFeePct ?? (legacyProcessingPct ? Number(legacyProcessingPct) : 0));
+            document.getElementById("b-processing-fee-amount").value = String(b._rawProcessingFee ?? Number(b.processingFee || 0));
             const legacyProcessingGstPct = Number(b.processingGstPct || 0) || ((Number(b.processingFee)||0) > 0 ? ((Number(b.processingGst)||0) / (Number(b.processingFee)||0) * 100) : 0);
             document.getElementById("b-processing-gst-pct").value = legacyProcessingGstPct ? Number(legacyProcessingGstPct) : 0;
             document.getElementById("b-processing-gst-amount").value = Number(b.processingGst || 0);
@@ -7549,12 +7556,10 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         }
 
         function toggleGstCheckbox() {
-            const cat = document.getElementById("b-category")?.value;
             const checkbox = document.getElementById("b-apply-gst");
             const wrap = document.getElementById("b-interest-gst-settings");
-            if (cat === "Credit Card Loan" || cat === "Bank Personal Loan") {
-                if (checkbox) checkbox.checked = true;
-            }
+            // Interest GST is an explicit lender/product setting. Upfront processing-fee GST
+            // must never force this independent checkbox on or prevent the user switching it off.
             if (wrap) wrap.style.display = checkbox?.checked ? '' : 'none';
             const pct = document.getElementById("b-interest-gst-pct");
             if (pct && (!pct.value || Number(pct.value) < 0)) pct.value = 18;
@@ -7612,20 +7617,41 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
 
         function calcBorrowingUpfrontFields(source='') {
             const amountText = mfExactText('b-amount','0');
-            const amount = mfSafeNumber(amountText);
-            const pctText = mfExactText('b-processing-fee-pct','0');
-            const pct = mfSafeNumber(pctText);
-            const feeText = mfDecPercentOf(amountText,pctText);
-            const fee = Math.max(0, mfSafeNumber(feeText));
+            const pctEl = document.getElementById('b-processing-fee-pct');
+            const feeEl = document.getElementById('b-processing-fee-amount');
+            let pctText = mfExactText('b-processing-fee-pct','0');
+            let feeText = mfExactText('b-processing-fee-amount','0');
+            let fee = Math.max(0,mfSafeNumber(feeText));
+            let pct = Math.max(0,mfSafeNumber(pctText));
+
+            if (source === 'fee-pct' || source === 'reset' || source === 'base') {
+                feeText = mfDecPercentOf(amountText,pctText);
+                fee = Math.max(0,mfSafeNumber(feeText));
+                if (feeEl) feeEl.value = feeText;
+            } else if (source === 'fee-amount') {
+                pctText = mfSafeNumber(amountText)>0 ? mfDecPercentFromAmount(amountText,feeText) : '0';
+                pct = Math.max(0,mfSafeNumber(pctText));
+                if (pctEl) pctEl.value = pctText;
+            } else if (source === 'load') {
+                // Stored fee amount is authoritative for legacy records; derive the paired rate.
+                pctText = mfSafeNumber(amountText)>0 ? mfDecPercentFromAmount(amountText,feeText) : '0';
+                pct = Math.max(0,mfSafeNumber(pctText));
+                if (pctEl) pctEl.value = pctText;
+            } else if (source === 'legacy-load') {
+                feeText = mfDecPercentOf(amountText,pctText);
+                fee = Math.max(0,mfSafeNumber(feeText));
+                if (feeEl) feeEl.value = feeText;
+            }
+
             const gstPctEl = document.getElementById("b-processing-gst-pct");
             const gstAmtEl = document.getElementById("b-processing-gst-amount");
             let gstPctText = mfExactText('b-processing-gst-pct','0');
             let gstPct = mfSafeNumber(gstPctText);
             let gstText = mfExactText('b-processing-gst-amount','0');
             let gst = Math.max(0, mfSafeNumber(gstText));
-            if (source === 'pct' || source === 'reset') {
+            if (source === 'pct' || source === 'reset' || source === 'fee-pct' || source === 'fee-amount' || source === 'base' || source === 'legacy-load') {
                 gstText = mfDecPercentOf(feeText,gstPctText);
-                gst = mfSafeNumber(gstText);
+                gst = Math.max(0,mfSafeNumber(gstText));
                 if (gstAmtEl) { gstAmtEl.value = gstText; gstAmtEl.dataset.userEdited = ''; }
             } else if (source === 'amount') {
                 gstPctText = fee>0 ? mfDecPercentFromAmount(feeText,gstText) : '0';
@@ -7636,9 +7662,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             }
             const out = document.getElementById("b-processing-fee-calc");
             const gstOut = document.getElementById("b-processing-gst-calc");
-            if (out) out.innerText = "Calculated: ₹" + fee.toLocaleString("en-IN", {maximumFractionDigits:2});
+            if (out) out.innerText = "Processing fee: ₹" + fee.toLocaleString("en-IN", {maximumFractionDigits:2});
             if (gstOut) gstOut.innerText = "GST Amount: ₹" + gst.toLocaleString("en-IN", {maximumFractionDigits:2});
-            return { fee, gst, gstPct };
+            return { fee, feeText, pct, pctText, gst, gstPct };
         }
 
         function calcBorrowingOtherGst(source='') {
@@ -7676,7 +7702,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const type = document.getElementById("b-type").value;
             const processingFeePctText = mfExactText('b-processing-fee-pct','0');
             const processingFeePct = mfSafeNumber(processingFeePctText);
-            const processingFeeText = mfDecPercentOf(mfExactText('b-amount',String(amount)),processingFeePctText);
+            const processingFeeText = mfExactText('b-processing-fee-amount',mfDecPercentOf(mfExactText('b-amount',String(amount)),processingFeePctText));
             const processingFee = Math.max(0,mfSafeNumber(processingFeeText));
             const processingGstPctText = mfExactText('b-processing-gst-pct','0');
             const processingGstPct = mfSafeNumber(processingGstPctText);
@@ -7693,8 +7719,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const date = getDmyIsoString("b");
             const receivedMode=$('b-received-mode')?.value||'Bank Transfer';
             const netBorrowingReceived=Math.max(0,amount-processingFee-processingGst-otherCharges-otherGst);
-            const receivedSourceResult=mode==='ADD'?mfPMReadInlineMeta('b-received-mode',netBorrowingReceived,receivedMode,'IN'):{ok:true,meta:null};
-            if(!receivedSourceResult.ok)return;
+            const receivedSourceResult={ok:true,meta:null}; // Capital borrowing records the receipt channel only; detailed payment-source allocation belongs to actual repayment/collection forms.
 
             if (!Number.isFinite(tenure) || tenure < 1) {
                 alert("Please enter a valid loan tenure in months.");
@@ -7738,12 +7763,15 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 b.lenderName = lenderName;
                 b.category = category;
                 b.amount = amount;
+                b.receivedMode = receivedMode;
                 b.rate = rate;
                 b.tenure = tenure;
                 b.interestBasis = interestBasis;
                 b.type = type;
                 b.processingFeePct = processingFeePct;
                 b.processingFee = processingFee;
+                b._rawProcessingFeePct = mfExactText('b-processing-fee-pct',String(processingFeePct));
+                b._rawProcessingFee = processingFeeText;
                 b.processingGstPct = processingGstPct;
                 b.processingGst = processingGst;
                 b.otherCharges = otherCharges;
@@ -15411,7 +15439,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   }
   window.mfPMRefreshAllInlineSources=refreshAllInlineSources;
   window.mfPMInitPanels=function(){
-    ['fc-disbursal-mode','ps-mode','ex-mode','lp-mode','pay-mode','rp-mode','fc-s-mode','pm-mode','b-received-mode','bulk-emi-payment-mode'].forEach(id=>addPanel($(id)));
+    ['fc-disbursal-mode','ps-mode','ex-mode','lp-mode','pay-mode','rp-mode','fc-s-mode','pm-mode','bulk-emi-payment-mode'].forEach(id=>addPanel($(id)));
     // Bulk rows are rendered on demand; attach source panels to each per-EMI mode selector too.
     document.querySelectorAll('select.bulk-emi-row-mode[id]').forEach(addPanel);
     refreshAllInlineSources();
