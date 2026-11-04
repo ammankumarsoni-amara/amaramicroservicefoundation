@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Loan Management</title>
-    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-10-23-V42-BANK-OPENING-UNKNOWN-SOURCE-EXCEPTIONS-PARITY-CONTROLS">
+    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-11-04-V55-CUSTOMER-PRINT-DISBURSAL-TEMPLATE">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -2791,6 +2791,42 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             if(loan.postMaturitySettlement) return 'SETTLED';
             return getLoanPending(loan)<=0 ? 'CLOSED' : 'ACTIVE';
         }
+        // Persist only the last-used disbursal METHOD TEMPLATE. Previous monetary amounts,
+        // transaction IDs, UTRs, cheque numbers and narrations must never prefill another loan.
+        function mfBuildDisbursalPaymentTemplate(mode, meta){
+            const selectedMode=String(mode||'Cash').trim()||'Cash';
+            const kind=typeof modeKind==='function'?modeKind(selectedMode):'CASH';
+            if(kind==='MIXED'){
+                const components=Array.isArray(meta?.components)?meta.components:[];
+                return {mode:'Mixed',meta:{components:components.map(c=>({
+                    mode:String(c?.mode||'Cash'),
+                    amount:'',
+                    bankAccountId:String(c?.bankAccountId||''),
+                    upiSourceId:String(c?.upiSourceId||''),
+                    channel:String(c?.channel||'')
+                }))}};
+            }
+            if(kind==='CASH')return {mode:'Cash',meta:null};
+            return {mode:selectedMode,meta:{
+                bankAccountId:String(meta?.bankAccountId||''),
+                upiSourceId:String(meta?.upiSourceId||''),
+                channel:String(meta?.channel||'')
+            }};
+        }
+        function mfApplyDisbursalPaymentTemplate(template, fallbackMode='Cash', fallbackMeta=null){
+            const select=document.getElementById('fc-disbursal-mode');
+            if(!select)return;
+            const source=template||mfBuildDisbursalPaymentTemplate(fallbackMode,fallbackMeta);
+            const safe=mfBuildDisbursalPaymentTemplate(source.mode||fallbackMode,source.meta||null);
+            if(typeof window.mfPMResetInline==='function')window.mfPMResetInline('fc-disbursal-mode');
+            select.value=safe.mode;
+            if(typeof window.mfPMUpdateInline==='function')window.mfPMUpdateInline('fc-disbursal-mode');
+            if(safe.meta&&typeof window.mfPMSetInlineMeta==='function'){
+                window.mfPMSetInlineMeta('fc-disbursal-mode',safe.meta);
+            }else if(typeof window.mfPMResetInline==='function'){
+                window.mfPMResetInline('fc-disbursal-mode');
+            }
+        }
         function mfCustomerLoans(customerKey, fallbackLoan){
             const key=String(customerKey||fallbackLoan?.customerKey||'');
             let rows=key ? (state.loans||[]).filter(x=>String(x.customerKey||'')===key) : [];
@@ -2845,7 +2881,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             document.getElementById('fc-guarantor-phone2').value=source.guarantorPhone2||source.guarantorSecondaryPhone||'';
             document.getElementById('fc-address').value=source.address||'';
             document.getElementById('fc-product').value=source.product||'';
-            document.getElementById('fc-disbursal-mode').value=source.disbursalMode||'Cash';
+            mfApplyDisbursalPaymentTemplate(state.lastDisbursalPaymentTemplate||null,source.disbursalMode||'Cash',source.disbursalPaymentMeta||null);
             document.getElementById('fc-collector').value=source.collectorId||'';
             const today=new Date().toISOString().split('T')[0];
             setDmyValues('fc',today);
@@ -8246,7 +8282,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             document.getElementById("fc-guarantor-name").value = "";
             document.getElementById("fc-guarantor-phone").value = "";
             document.getElementById("fc-guarantor-phone2").value = "";
-            document.getElementById("fc-disbursal-mode").value = "Cash"; if(window.mfPMResetInline)mfPMResetInline('fc-disbursal-mode');
+            mfApplyDisbursalPaymentTemplate(state.lastDisbursalPaymentTemplate||null,'Cash',null);
             document.getElementById("fc-collector").value = "";
             document.getElementById("fc-address").value = "";
             const today=new Date().toISOString().split('T')[0];
@@ -8417,6 +8453,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const loanType=mode==='TOP_UP'?'TOP_UP':mode==='RENEWAL'?'RENEWAL':'NEW';
                 if(loanType==='RENEWAL' && sourceLoan && mfLoanStatusLabel(sourceLoan)==='ACTIVE'){ alert('Renewal requires the source loan to be completely closed, settled, or foreclosed.'); return; }
                 const newId = mfNextLoanId();
+                state.lastDisbursalPaymentTemplate=mfBuildDisbursalPaymentTemplate(disbursalMode,disbursalSourceResult.meta);
                 const customerKey=sourceLoan?.customerKey || mfFindCustomerKey(name,phone);
                 const mainLoanId=sourceLoan ? mfResolveMainLoanId(sourceLoan) : '';
                 const historyCount=(state.loans||[]).filter(x=>String(x.customerKey||'')===String(customerKey)).length;
@@ -9282,6 +9319,33 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         // PhonePe", "Bank Transfer", or "Cash + UPI" etc. — never a generic Online/Offline label.
         // Looks across all parts for a partial-collected installment so a genuinely mixed-mode
         // history (e.g. some cash, some UPI) is shown as the combination of the real modes used.
+        // Customer documents intentionally show only the payment method names.
+        // Full source/account/app/UPI ID and component amounts remain available in the internal UI and reports.
+        function mfCustomerFacingPaymentModeLabel(pay){
+            if(!pay)return '';
+            const modes=[];
+            const add=(mode)=>{
+                const raw=String(mode||'').trim();
+                if(!raw)return;
+                const kind=typeof modeKind==='function'?modeKind(raw):raw.toUpperCase();
+                const label=kind==='CASH'?'Cash':kind==='UPI'?'UPI':kind==='BANK'?'Bank Transfer':kind==='CHEQUE'?'Cheque / DD':'';
+                const finalLabel=label||((raw.toLowerCase()==='mixed'||raw.toLowerCase().includes('both'))?'':raw);
+                if(finalLabel&&!modes.includes(finalLabel))modes.push(finalLabel);
+            };
+            if(Array.isArray(pay.parts)&&pay.parts.length){
+                pay.parts.forEach(pt=>add(pt?.mode||pay.mode));
+            }else if(Array.isArray(pay.paymentMeta?.components)&&pay.paymentMeta.components.length){
+                pay.paymentMeta.components.forEach(c=>add(c?.mode||pay.mode));
+            }else{
+                const raw=String(pay.mode||'').trim();
+                if(raw.toLowerCase()==='mixed'||raw.toLowerCase().includes('both')){
+                    // Without recorded components, do not guess or expose detailed source metadata.
+                    modes.push('Mixed Payment');
+                }else add(raw);
+            }
+            return modes.join(' + ');
+        }
+
         function mfCompactPaymentSplitHtml(pay){
             if(!pay)return '';
             const esc=v=>financeEsc(String(v==null?'':v));
@@ -9301,6 +9365,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 if(n.includes('cheque')||n.includes('demand draft'))return 'Cheque'+(bank?' · '+bank:'');
                 return String(mode||'Payment');
             };
+            const customerMode=mfCustomerFacingPaymentModeLabel(pay);
+            const customerModeAttr=customerMode?` data-customer-mode="${esc(customerMode)}"`:'';
             const parts=[];
             const addPart=(mode,amount,meta)=>{
                 const n=Number(amount); if(!Number.isFinite(n)||n<0)return;
@@ -9308,10 +9374,10 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             };
             if(Array.isArray(pay.parts)&&pay.parts.length){pay.parts.forEach(pt=>addPart(pt.mode||pay.mode,pt.amount,pt.paymentMeta||null));}
             else if(Array.isArray(pay.paymentMeta?.components)&&pay.paymentMeta.components.length){pay.paymentMeta.components.forEach(c=>addPart(c.mode||pay.mode,c.amount,{...c,...(c.paymentMeta||{})}));}
-            if(parts.length>1)return `<div class="mf-compact-payment-split" title="Recorded payment components">${parts.map(esc).join(' + ')}</div>`;
-            if(parts.length===1)return `<div class="mf-compact-payment-split">${esc(parts[0])}</div>`;
+            if(parts.length>1)return `<div class="mf-compact-payment-split"${customerModeAttr} title="Recorded payment components">${parts.map(esc).join(' + ')}</div>`;
+            if(parts.length===1)return `<div class="mf-compact-payment-split"${customerModeAttr}>${esc(parts[0])}</div>`;
             const label=getPaidViaLabel(pay);
-            if(label)return `<div class="mf-compact-payment-split">${esc(label)}${String(pay.mode||'').toLowerCase().includes('mixed')?' · component amounts not recorded':''}</div>`;
+            if(label)return `<div class="mf-compact-payment-split"${customerModeAttr}>${esc(label)}${String(pay.mode||'').toLowerCase().includes('mixed')?' · component amounts not recorded':''}</div>`;
             return '';
         }
 
@@ -10058,7 +10124,18 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             if(!area)return;
             const mode=document.getElementById('passbook-doc-mode')?.value||'STATEMENT';
             const title=mode==='SCHEDULE'?'EMI Repayment Schedule':'Loan Statement & Paid EMI Schedule';
-            const printRoot=document.createElement('div'); printRoot.innerHTML=area.innerHTML; printRoot.querySelectorAll('.statement-internal-company-header,.loan-card-internal-company-header,.mf-system-only-penalty').forEach(el=>el.remove()); const content=mfCompanyPrintHeader(title)+printRoot.innerHTML;
+            const printRoot=document.createElement('div'); printRoot.innerHTML=area.innerHTML;
+            printRoot.querySelectorAll('.statement-internal-company-header,.loan-card-internal-company-header,.mf-system-only-penalty').forEach(el=>el.remove());
+            // Customer-facing copy: retain the PAID status and a short method label only.
+            // Never expose bank name, UPI app/ID, UTR/reference, or component amounts on customer printouts.
+            printRoot.querySelectorAll('.mf-compact-payment-split').forEach(el=>{
+                const shortLabel=String(el.getAttribute('data-customer-mode')||'').trim();
+                if(shortLabel){el.className='';el.removeAttribute('title');el.removeAttribute('style');el.textContent=shortLabel;}
+                else el.remove();
+            });
+            // Partial-payment date/amount breakdown is internal detail, not part of the customer copy.
+            printRoot.querySelectorAll('.mf-payment-parts-detail').forEach(el=>el.remove());
+            const content=mfCompanyPrintHeader(title)+printRoot.innerHTML;
             const w=mfPrintA4Shell(`${state.bizName} — ${title}`,content);
             if(!w)return;
             w.onload=()=>{w.focus();w.print();};
@@ -10159,7 +10236,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     if (pay.parts && pay.parts.length > 1) {
                         badge += ` <button type="button" class="no-print" onclick="showPaymentParts('${l.id}', ${i-1})" style="background:rgba(96,165,250,.15); border:1px solid rgba(96,165,250,.4); color:#93c5fd; font-size:.62rem; font-weight:700; padding:2px 6px; border-radius:999px; cursor:pointer;">${pay.parts.length} parts</button>`;
                         const partsList = pay.parts.map(pt => `${formatToIndianDate(pt.date)}: ₹${Number(pt.amount).toLocaleString('en-IN')}`).join(' + ');
-                        paidStr += `<div style="font-size:.66rem; color:#94a3b8; margin-top:3px; font-weight:400;">(${partsList})</div>`;
+                        paidStr += `<div class="mf-payment-parts-detail" style="font-size:.66rem; color:#94a3b8; margin-top:3px; font-weight:400;">(${partsList})</div>`;
                     }
                     const pDt = new Date(pay.date);
                     const dDt = new Date(defaultDueIso);
