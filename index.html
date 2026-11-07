@@ -7616,9 +7616,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         async function renderFeed(){
             const input=document.getElementById('search-input'),rawQuery=input?.value||'',query=normalizeRecoverySearchText(rawQuery),listDiv=document.getElementById('feed-list');
             if(!listDiv)return; listDiv.innerHTML='';
-            if(!query){
-                const countEl=document.getElementById('recovery-filter-count'); if(countEl)countEl.textContent=`${state.loans.length} loan accounts · Search to load matching customers`;
-                listDiv.innerHTML=`<div class="recovery-search-empty"><i class="fa-solid fa-magnifying-glass big"></i><b>Search a customer to open recovery actions</b></div>`; return;
+            if(!query && recoveryStatusFilter==='ALL'){
+                const countEl=document.getElementById('recovery-filter-count'); if(countEl)countEl.textContent=`${state.loans.length} loan accounts · Search or select a status to load matching customers`;
+                listDiv.innerHTML=`<div class="recovery-search-empty"><i class="fa-solid fa-magnifying-glass big"></i><b>Search a customer or select a status to load recovery accounts</b></div>`; return;
             }
 
             // Recovery is now customer-grouped, just like Statement & PDF. Search first finds
@@ -7632,7 +7632,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const customerKeys=[];
             const matchedCustomerKeys=new Set();
             for(const loan of allLoans){
-                if(!recoverySearchMatches(loan,rawQuery)) continue;
+                if(query && !recoverySearchMatches(loan,rawQuery)) continue;
                 if(recoveryStatusFilter!=='ALL'){
                     const st=getRecoveryStatus(loan);
                     if(recoveryStatusFilter==='DUE'?st!=='DUE':st!==recoveryStatusFilter) continue;
@@ -7684,7 +7684,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const newCount=rows.filter(x=>String(x.loanType||'NEW').toUpperCase()==='NEW').length;
                 const topCount=rows.filter(x=>String(x.loanType||'').toUpperCase()==='TOP_UP').length;
                 const renCount=rows.filter(x=>String(x.loanType||'').toUpperCase()==='RENEWAL').length;
-                const activeCount=rows.filter(x=>mfLoanStatusLabel(x)==='ACTIVE').length;
+                const activeCount=rows.filter(x=>mfLoanOperationalStatus(x)==='ACTIVE').length;
                 const mainLoan=mfMainLoanFor(first);
                 const groupId=`mf-recovery-customer-${mfRecoverySafeGroupKey(group.key)}-${mfScaleRecoveryPage}-${index}`;
                 const bodyId=`${groupId}-loans`,arrowId=`${groupId}-arrow`;
