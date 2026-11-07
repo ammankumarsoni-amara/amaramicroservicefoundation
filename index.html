@@ -3971,18 +3971,24 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         const mfV2DirtyGeneration={loans:new Map(),products:new Map(),staff:new Map(),expenses:new Map(),borrowings:new Map(),shell:0,full:0};
         let mfScaleProxySuspend=false;
         let mfScaleStateProxyInstalled=false;
+        // Monotonic mutation epoch: every proxied state write invalidates derived
+        // fingerprints, including nested shell fields that are not entity collections.
+        let mfStateMutationEpoch=0;
+        let mfLocalFingerprintCache={epoch:-1,value:''};
         // Keep a global identity set for already-wrapped records. A fresh per-call WeakMap
         // alone cannot detect that a loan object is already a Proxy. Without this guard,
         // `state.loans = state.loans.filter(...)` recursively re-wraps every existing loan,
         // every EMI/payment and every nested field, making deletion increasingly expensive.
         const mfScaleWrappedProxies = new WeakSet();
         function mfScaleSetFullDirty(){
+            mfStateMutationEpoch++; mfLocalFingerprintCache.epoch=-1;
             mfScaleDirty.full=true; mfV2PendingDirty.full=true; mfV2DirtyGeneration.full++;
             try{ mfScalePaymentCounts.clear(); (state.loans||[]).forEach(l=>mfScalePaymentCounts.set(String(l?.id),Array.isArray(l?.payments)?l.payments.length:0)); }catch(e){}
         }
         function mfScaleMarkDirty(kind,id){
             try{ mfFinancialReconciliationCache=null; mfGrowthCache=null; mfResetBorrowingAggregateCache(); }catch(e){}
             if(mfScaleProxySuspend) return;
+            mfStateMutationEpoch++; mfLocalFingerprintCache.epoch=-1;
             if(kind==='root'){
                 mfScaleDirty.shell=true; mfV2PendingDirty.shell=true; mfV2DirtyGeneration.shell++;
                 return;
@@ -4067,8 +4073,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 }
                 return JSON.parse(JSON.stringify(v));
             }catch(e){
-                console.warn('Scalable data clone failed:',e);
-                return null;
+                console.error('Scalable data clone failed; operation aborted to protect data integrity:',e);
+                throw new Error('Scalable data clone failed: '+(e?.message||e));
             }
         }
         function mfScaleFirestoreSafe(value){
@@ -4764,6 +4770,39 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           // never clone the full state and then delete loans/payments afterwards.
           return JSON.parse(JSON.stringify(x??null));
         }
+        const MF_FIRESTORE_MAX_DOCUMENT_BYTES=1048576;
+        const MF_FIRESTORE_DOCUMENT_WARN_BYTES=900*1024;
+        function mfV2Utf8Bytes(value){
+          const raw=typeof value==='string'?value:JSON.stringify(value);
+          if(typeof TextEncoder!=='undefined') return new TextEncoder().encode(raw).length;
+          return unescape(encodeURIComponent(raw)).length;
+        }
+        function mfV2AssertDocumentSize(kind,id,payload){
+          // Firestore FieldValue sentinels are not ordinary JSON objects; replace only
+          // the server timestamp metadata with a conservative fixed-size placeholder.
+          const measurePayload=payload&&Object.prototype.hasOwnProperty.call(payload,'_updatedAt')?{...payload,_updatedAt:'SERVER_TIMESTAMP_PLACEHOLDER'}:payload;
+          const bytes=mfV2Utf8Bytes(measurePayload);
+          if(bytes>=MF_FIRESTORE_MAX_DOCUMENT_BYTES) throw new Error('Firebase document size limit reached for '+kind+'/'+id+' ('+bytes+' bytes). Sync stopped for safety; local data was not deleted.');
+          return {kind,id:String(id),bytes,warning:bytes>=MF_FIRESTORE_DOCUMENT_WARN_BYTES};
+        }
+        // Manual, read-only preflight over local entity payloads. Reports IDs and byte
+        // counts only; it never sends data to Firestore or mutates local records.
+        function mfRunFirestoreEntitySizeDiagnostics(){
+          const rows=[]; const add=(kind,id,row)=>{
+            if(!row) return;
+            const clean=mfV2SafeClone(row); delete clean.id; delete clean._ownerUid; delete clean._syncMeta;
+            const payload={...clean,_ownerUid:'OWNER_UID_PLACEHOLDER',_syncVersion:999999,_updatedAt:{seconds:9999999999,nanoseconds:999999999},...(kind==='payments'?{loanId:String(id).split('-').slice(0,-1).join('-'),paymentIndex:Number(String(id).split('-').pop())||0}:{})};
+            rows.push(mfV2AssertDocumentSize(kind,id,payload));
+          };
+          (state.loans||[]).forEach(l=>{add('loans',l?.id,l);(l?.payments||[]).forEach((pay,i)=>add('payments',String(l.id)+'-'+i,pay));});
+          Object.entries(state.products||{}).forEach(([id,row])=>add('products',id,row));
+          for(const kind of ['staff','expenses','borrowings']) (state[kind]||[]).forEach(row=>add(kind,row?.id,row));
+          rows.sort((a,b)=>b.bytes-a.bytes);
+          const result={at:new Date().toISOString(),documentLimitBytes:MF_FIRESTORE_MAX_DOCUMENT_BYTES,warnAtBytes:MF_FIRESTORE_DOCUMENT_WARN_BYTES,totalDocuments:rows.length,oversizeCount:rows.filter(x=>x.bytes>=MF_FIRESTORE_MAX_DOCUMENT_BYTES).length,warningCount:rows.filter(x=>x.warning).length,largestDocuments:rows.slice(0,20)};
+          window.__mfFirestoreEntitySizeDiagnostics=result; return result;
+        }
+        window.mfRunFirestoreEntitySizeDiagnostics=mfRunFirestoreEntitySizeDiagnostics;
+
         function mfV2EntityRows(kind){
           if(kind==='loans') return (state.loans||[]).map(x=>{const y=mfV2SafeClone(x); delete y.id; delete y._ownerUid; delete y._syncMeta; return {id:String(x.id),row:y};});
           if(kind==='products') return Object.entries(state.products||{}).map(([id,x])=>{const y=mfV2SafeClone(x);delete y.id;delete y._ownerUid;delete y._syncMeta;return {id:String(id),row:y};});
@@ -4804,6 +4843,14 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           return result;
         }
         window.mfRunPerformanceDiagnostics=mfRunPerformanceDiagnostics;
+        // Read-only capability snapshot for report/export regression review.
+        window.mfRunExportCompatibilityDiagnostics=function(){
+          const xlsxAvailable=typeof XLSX!=='undefined'&&!!XLSX?.utils?.book_new&&typeof XLSX?.writeFile==='function';
+          const printAvailable=typeof window.print==='function';
+          const scripts=[...document.scripts].map(x=>x.src).filter(Boolean);
+          const reportTables=[...document.querySelectorAll('table')].filter(t=>t.offsetParent!==null).length;
+          return {at:new Date().toISOString(),xlsxAvailable,printAvailable,visibleTableCount:reportTables,scriptDependencies:scripts.filter(u=>/xlsx|jspdf|html2canvas/i.test(u)),pdfMode:'Browser print dialog / Save as PDF',jsPdfAvailable:typeof window.jspdf!=='undefined'||typeof window.jsPDF!=='undefined',html2canvasAvailable:typeof window.html2canvas==='function'};
+        };
         function mfV2Fingerprint(){return mfLocalStateFingerprint();}
         function mfV2DirtyAt(){return Date.parse(localStorage.getItem('MF_LOCAL_DIRTY_AT_V2')||'')||0;}
         function mfV2MarkDirty(){try{localStorage.setItem('MF_LOCAL_DIRTY_AT_V2',new Date().toISOString());}catch(e){}}
@@ -4872,12 +4919,16 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         }
         async function mfV2WriteEntities(ownerUid,version,dirty){
           if(dirty.full){
+            // Preflight every local entity before the first full-sync batch is committed.
+            // This prevents a known oversized document from causing a partial full upload.
+            const sizeAudit=mfRunFirestoreEntitySizeDiagnostics();
+            if(sizeAudit.oversizeCount) throw new Error('Full Firebase sync stopped: '+sizeAudit.oversizeCount+' entity document(s) exceed the Firestore 1 MiB limit. Run mfRunFirestoreEntitySizeDiagnostics() for the largest records.');
             const kinds={loans:mfV2EntityRows('loans'),products:mfV2EntityRows('products'),staff:mfV2EntityRows('staff'),expenses:mfV2EntityRows('expenses'),borrowings:mfV2EntityRows('borrowings'),payments:mfV2PaymentRows()};
             await Promise.all(MF_SYNC_V2_KINDS.map(async kind=>{
               const col=mfV2Col(kind), rows=kinds[kind];
               for(let i=0;i<rows.length;i+=400){
                 const batch=mfFirestoreDb.batch();
-                rows.slice(i,i+400).forEach(e=>{const ref=col.doc(e.id);batch.set(ref,{...e.row,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp(),...(kind==='payments'?{loanId:e.loanId,paymentIndex:e.paymentIndex}:{})},{merge:true});});
+                rows.slice(i,i+400).forEach(e=>{const ref=col.doc(e.id);const payload={...e.row,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp(),...(kind==='payments'?{loanId:e.loanId,paymentIndex:e.paymentIndex}:{})};mfV2AssertDocumentSize(kind,e.id,payload);batch.set(ref,payload,{merge:true});});
                 await batch.commit();
               }
             }));
@@ -4894,7 +4945,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
               for(const id of list.slice(start,start+400)){
                 const row=kind==='products'?(state.products?.[id]||null):((state[kind]||[]).find(x=>String(x?.id)===String(id))||null);
                 const ref=col.doc(String(id));
-                if(row){const y=mfV2SafeClone(row);delete y.id;delete y._ownerUid;delete y._syncMeta;batch.set(ref,{...y,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});}
+                if(row){const y=mfV2SafeClone(row);delete y.id;delete y._ownerUid;delete y._syncMeta;const payload={...y,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp()};mfV2AssertDocumentSize(kind,id,payload);batch.set(ref,payload,{merge:true});}
                 else batch.delete(ref);
               }
               await batch.commit();
@@ -4909,7 +4960,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           for(const loanId of dirty.loans){
             const loan=(state.loans||[]).find(x=>String(x?.id)===String(loanId));
             const loanCol=mfV2Col('loans'), loanRef=loanCol.doc(String(loanId));
-            if(loan){const y=mfV2SafeClone(loan);delete y.id;delete y._ownerUid;delete y._syncMeta;await loanRef.set({...y,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});}
+            if(loan){const y=mfV2SafeClone(loan);delete y.id;delete y._ownerUid;delete y._syncMeta;const payload={...y,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp()};mfV2AssertDocumentSize('loans',loanId,payload);await loanRef.set(payload,{merge:true});}
             else await loanRef.delete();
             const pcol=mfV2Col('payments');
             const previousCount=Number(mfScalePaymentCounts.get(String(loanId))||0);
@@ -4919,7 +4970,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const batch=mfFirestoreDb.batch();
                 for(let j=i;j<Math.min(i+400,loan.payments.length);j++){
                   const p=loan.payments[j], id=String(loanId)+'-'+j; const y=mfV2SafeClone(p);delete y.id;delete y._ownerUid;delete y._syncMeta;
-                  batch.set(pcol.doc(id),{...y,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp(),loanId:String(loanId),paymentIndex:j},{merge:true});
+                  const payload={...y,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp(),loanId:String(loanId),paymentIndex:j};mfV2AssertDocumentSize('payments',id,payload);batch.set(pcol.doc(id),payload,{merge:true});
                 }
                 await batch.commit();
               }
@@ -5453,7 +5504,12 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             try{const raw=mfStableStringify(mfCanonicalStateForFingerprint(obj));let h=2166136261;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(16);}catch(e){return '';}
         }
         function mfLocalStateFingerprint(){
-            return mfStateFingerprintObject(state);
+            // Cache only the live proxied state fingerprint, keyed by the mutation epoch.
+            // Arbitrary snapshots/cloud candidates continue through the uncached function.
+            if(mfLocalFingerprintCache.epoch===mfStateMutationEpoch && mfLocalFingerprintCache.value) return mfLocalFingerprintCache.value;
+            const value=mfStateFingerprintObject(state);
+            if(value){mfLocalFingerprintCache={epoch:mfStateMutationEpoch,value};}
+            return value;
         }
         function mfCloudPayloadFingerprint(data){
             try{return data?.payload?mfStateFingerprintObject(JSON.parse(data.payload)):'';}catch(e){return '';}
