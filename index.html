@@ -4228,7 +4228,12 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 // Any mismatch between the authoritative loan collection and its scalable
                 // projection is a rebuild condition, even when the proxy dirty flags are clear.
                 const sourceLoanFingerprint = fullRebuild || !meta?.searchReady || meta?.schema!==MF_SCALE.schema ? mfScaleHash(loans) : String(meta?.sourceLoanFingerprint||'INCREMENTAL');
-                const rebuildRequested=fullRebuild || !meta?.searchReady || meta?.schema!==MF_SCALE.schema;
+                // A stale local mirror must be rebuilt after a cloud restore or startup
+                // when the local dirty marker no longer matches the mirror metadata. Do not
+                // force a full rebuild during an ordinary save that already has tracked dirty
+                // entities; those are applied incrementally below.
+                const mirrorMarkerMismatch=!!meta && (meta.localDirtyAt!==dirtyAt || Number(meta.loanCount||0)!==loans.length);
+                const rebuildRequested=fullRebuild || !meta?.searchReady || meta?.schema!==MF_SCALE.schema || (mirrorMarkerMismatch && !hasPendingDirty && !mfScaleDirty.full);
                 const searchIndexRebuild=meta?.loanMasterSearchVersion!==MF_LM_SEARCH_INDEX_VERSION;
                 if(searchIndexRebuild||rebuildRequested) mfScaleLoanMasterSearchIndexReady=false;
                 if(rebuildRequested){
@@ -4489,6 +4494,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 currentSearchVersion:MF_LM_SEARCH_INDEX_VERSION,
                 metaLocalDirtyAt:meta?.localDirtyAt||null,
                 currentLocalDirtyAt:localStorage.getItem('MF_LOCAL_DIRTY_AT')||'',
+                mirrorMarkerMismatch:!!meta && (meta.localDirtyAt!==(localStorage.getItem('MF_LOCAL_DIRTY_AT')||'') || Number(meta.loanCount||0)!==(Array.isArray(state?.loans)?state.loans.length:0)),
                 lastPerformance:mfLoanMasterPerfLast?{...mfLoanMasterPerfLast}:null,
                 measuredAt:new Date().toISOString()
             };
@@ -4699,6 +4705,16 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     // Offline/local-only reopen: verified IndexedDB data remains usable.
                     markStorageReady();
                     renderAll();
+                }
+
+                // Build/refresh the local scalable mirror only after the authoritative
+                // local snapshot or verified Firebase baseline has been selected. Earlier
+                // builds could remain permanently uninitialized after cloud-only startup,
+                // leaving Loan Master on its in-memory fallback path.
+                const hasAuthoritativeState=validLocalSnapshot || window.mfFirebaseInitialSyncReady;
+                if(hasAuthoritativeState && localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')!=='1'){
+                    const mirrored=await mfScaleBuildLocalEntities(false);
+                    if(mirrored) mfScaleResetDirty();
                 }
             }catch(err){
                 console.error('Clean authoritative storage initialization failed',err);
