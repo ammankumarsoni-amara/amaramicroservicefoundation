@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Loan Management</title>
-    <meta name="mf-build" content="PRODUCTION-FINAL-SECURE-RECOVERY-2026-11-04-V55-CUSTOMER-PRINT-DISBURSAL-TEMPLATE">
+    <meta name="mf-build" content="V55-SECURITY-HARDENING-REALIZED-PROFIT-PRECEDENCE-2026-11-07">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -803,7 +803,6 @@
 .mf-qa-result{margin-top:8px;font-size:.68rem;line-height:1.45;color:#cbd5e1;}
 .mf-qa-result .ok{color:#34d399;font-weight:800;}.mf-qa-result .bad{color:#f87171;font-weight:800;}.mf-qa-result .warn{color:#fbbf24;font-weight:800;}
 html.mf-qa-preview .top-header,html.mf-qa-preview .main-wrap{pointer-events:none;}
-html.mf-qa-preview #app-lock-overlay{display:none!important;}
 #app-lock-overlay{position:fixed;inset:0;z-index:2147483000;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(2,8,18,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
 #app-lock-overlay .app-lock-card{width:min(420px,94vw);padding:22px;border:1px solid rgba(96,165,250,.28);border-radius:18px;background:linear-gradient(180deg,#101d2f,#091525);box-shadow:0 24px 70px rgba(0,0,0,.45);color:#f4f7fb;text-align:center;}
 #app-lock-overlay .app-lock-input{width:100%;box-sizing:border-box;padding:12px 13px;border-radius:10px;background:rgba(8,20,34,.9);border:1px solid rgba(148,163,184,.22);color:#fff;font-size:1rem;letter-spacing:.18em;text-align:center;-webkit-text-security:disc;text-security:disc;}
@@ -3906,7 +3905,20 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             return mfCloneStateForPersistence();
         }
         function mfStateFingerprint(obj){
-            try{return JSON.stringify(obj);}catch(e){return String(Date.now());}
+            // A fingerprint is an equality token, not a serialized state payload.
+            // Keep the serialized bytes transient instead of retaining a second full
+            // portfolio-sized string in mfLastVersionFingerprint. Two independent
+            // 32-bit accumulators reduce accidental collision risk versus a single hash.
+            try{
+                const raw=JSON.stringify(obj); if(typeof raw!=='string') return '';
+                let h1=2166136261,h2=2246822519;
+                for(let i=0;i<raw.length;i++){
+                    const c=raw.charCodeAt(i);
+                    h1^=c; h1=Math.imul(h1,16777619);
+                    h2^=c; h2=Math.imul(h2,3266489917);
+                }
+                return (h1>>>0).toString(16).padStart(8,'0')+(h2>>>0).toString(16).padStart(8,'0');
+            }catch(e){return '';}
         }
         async function idbPutVersionedBackup(reason='AUTO',force=false){
             const db=await openMfDb();
@@ -3952,8 +3964,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         // logic and legacy snapshot remain authoritative during the compatibility phase.
         // Entity-level IndexedDB stores and bounded structured Firebase mirrors are maintained
         // without replacing the proven V15 business engine until a verified migration is ready.
-        const MF_SCALE = Object.freeze({schema:'AMARA-SCALABLE-1',pageSize:15,recoveryPageSize:50,maxRecoveryRender:100});
-        let mfScaleReady=false, mfScaleSearchReady=false, mfScaleBuildBusy=false;
+        const MF_SCALE = Object.freeze({schema:'AMARA-SCALABLE-2',pageSize:15,recoveryPageSize:50,maxRecoveryRender:100});
+        let mfScaleReady=false, mfScaleSearchReady=false, mfScaleLoanMasterSearchIndexReady=false, mfScaleBuildBusy=false;
         let mfScaleRecoveryPage=0, mfScaleLoanMasterPage=0;
         let mfScaleRecoveryTimer=0, mfScaleMirrorTimer=0, mfScaleLastMirrorAt=0;
         const mfScaleLoanFingerprints=new Map();
@@ -4082,6 +4094,30 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const n=normalizeRecoverySearchText(value||'');
             return [...new Set(n.split(/\s+/).map(x=>x.trim()).filter(x=>x.length>=2))];
         }
+        // Loan Master uses a separate prefixed trigram namespace in the existing
+        // scalable_search store. Existing exact-token consumers remain unchanged.
+        const MF_LM_SEARCH_GRAM_PREFIX='__MF_LM3__';
+        const MF_LM_SEARCH_INDEX_VERSION=1;
+        function mfScaleLoanMasterGrams(value){
+            const words=normalizeRecoverySearchText(value||'').split(/\s+/).map(x=>x.trim()).filter(x=>x.length>=3);
+            const grams=new Set();
+            for(const word of words) for(let i=0;i<=word.length-3;i++) grams.add(word.slice(i,i+3));
+            return [...grams];
+        }
+        function mfScaleLoanSearchIndexValues(loan){
+            const text=mfScaleLoanSearchText(loan);
+            return [
+                ...mfScaleTokens(text),
+                ...mfScaleLoanMasterGrams(text).map(g=>MF_LM_SEARCH_GRAM_PREFIX+g)
+            ];
+        }
+        function mfScaleLoanMasterQueryGrams(rawQuery){
+            const words=normalizeRecoverySearchText(rawQuery||'').split(/\s+/).map(x=>x.trim()).filter(Boolean);
+            if(!words.length || words.some(x=>x.length<3)) return [];
+            const grams=new Set();
+            for(const word of words) for(let i=0;i<=word.length-3;i++) grams.add(word.slice(i,i+3));
+            return [...grams];
+        }
         function mfScaleLoanSearchText(loan){
             const p=state.products?.[loan?.product]||{};
             return [loan?.id,loan?.name,loan?.phone,loan?.phone2,loan?.guarantorName,loan?.guarantorPhone,loan?.guarantorPhone2,loan?.guarantorSecondaryPhone,loan?.husbandName,loan?.husbandPhone,loan?.secondaryName,loan?.address,loan?.collectorName,loan?.product,p?.name,loan?.loanType,mfLoanTypeLabel(loan)].filter(v=>v!==undefined&&v!==null).join(' ');
@@ -4106,7 +4142,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 pending=Math.max(0,Number(getLoanPending(loan))||0);
                 scaleMaturity=String(getLoanMaturityDate(loan)||'');
                 paidPrincipal=(loan.payments||[]).reduce((sum,p)=>sum+(Number(p.principal)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.principalPaid||0)+Number(loan.foreclosureData?.partialAmountAlreadyCollected||0):0);
-                realizedProfit=Number(product.fileCharge)||0+(loan.payments||[]).reduce((sum,p)=>sum+(Number(p.interest)||0)+(Number(p.penalty)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.feeAmount||0):0);
+                realizedProfit=(Number(product.fileCharge)||0)+(loan.payments||[]).reduce((sum,p)=>sum+(Number(p.interest)||0)+(Number(p.penalty)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.feeAmount||0):0);
                 scaleStatus=mfLoanOperationalStatus(loan);
             }catch(e){}
             const statusInfo=(()=>{try{return mfLoanOperationalStatusInfo(loan);}catch(e){return {overdueCount:0,dueTodayCount:0,overdueDays:0,oldestOverdueDueDate:'',firstUnpaidDueDate:''};}})();
@@ -4117,9 +4153,32 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             if(!loan?.id) return;
             const db=await openMfDb();
             const oldIds=await new Promise((resolve,reject)=>{const tx=db.transaction('scalable_search','readonly');const idx=tx.objectStore('scalable_search').index('loanId');const r=idx.getAllKeys(String(loan.id));r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error);});
-            const tokens=mfScaleTokens(mfScaleLoanSearchText(loan));
-            await new Promise((resolve,reject)=>{const tx=db.transaction('scalable_search','readwrite');const st=tx.objectStore('scalable_search');oldIds.forEach(id=>st.delete(id));tokens.forEach(token=>st.put({id:token+'|'+String(loan.id),token,loanId:String(loan.id)}));tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Search index update failed'));});
+            const values=mfScaleLoanSearchIndexValues(loan);
+            await new Promise((resolve,reject)=>{const tx=db.transaction('scalable_search','readwrite');const st=tx.objectStore('scalable_search');oldIds.forEach(id=>st.delete(id));values.forEach(token=>st.put({id:token+'|'+String(loan.id),token,loanId:String(loan.id)}));tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Search index update failed'));tx.onabort=()=>reject(tx.error||new Error('Search index update aborted'));});
         }
+        async function mfScaleReplaceSearchForLoans(loansToUpdate){
+            const clean=(loansToUpdate||[]).filter(loan=>loan?.id);
+            if(!clean.length) return;
+            const db=await openMfDb();
+            await new Promise((resolve,reject)=>{
+                const tx=db.transaction('scalable_search','readwrite');
+                const st=tx.objectStore('scalable_search');
+                const byLoan=st.index('loanId');
+                clean.forEach(loan=>{
+                    const loanId=String(loan.id);
+                    const req=byLoan.getAllKeys(loanId);
+                    req.onsuccess=()=>{
+                        (req.result||[]).forEach(key=>st.delete(key));
+                        for(const token of mfScaleLoanSearchIndexValues(loan)) st.put({id:token+'|'+loanId,token,loanId});
+                    };
+                    req.onerror=()=>{try{tx.abort();}catch(e){};};
+                });
+                tx.oncomplete=resolve;
+                tx.onerror=()=>reject(tx.error||new Error('Bulk search index update failed'));
+                tx.onabort=()=>reject(tx.error||new Error('Bulk search index update aborted'));
+            });
+        }
+
         async function mfScaleUpsertPayments(loan){
             if(!loan?.id) return;
             mfScalePaymentCounts.set(String(loan.id),Array.isArray(loan.payments)?loan.payments.length:0);
@@ -4170,13 +4229,15 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 // treated as current. This is what prevents Statement/PDF and Recovery from
                 // silently reading two different versions of the same loan.
                 const hasPendingDirty = mfScaleDirty.loans.size || mfScaleDirty.products.size || mfScaleDirty.staff.size || mfScaleDirty.expenses.size || mfScaleDirty.borrowings.size || mfScaleDirty.shell;
-                if(!fullRebuild && !hasPendingDirty && !mfScaleDirty.full && meta?.localDirtyAt===dirtyAt && Number(meta.loanCount||0)===loans.length && meta.searchReady){
-                    mfScaleReady=true; mfScaleSearchReady=true; return true;
+                if(!fullRebuild && !hasPendingDirty && !mfScaleDirty.full && meta?.schema===MF_SCALE.schema && meta?.localDirtyAt===dirtyAt && Number(meta.loanCount||0)===loans.length && meta.searchReady && meta?.loanMasterSearchVersion===MF_LM_SEARCH_INDEX_VERSION){
+                    mfScaleReady=true; mfScaleSearchReady=true; mfScaleLoanMasterSearchIndexReady=true; return true;
                 }
                 // Any mismatch between the authoritative loan collection and its scalable
                 // projection is a rebuild condition, even when the proxy dirty flags are clear.
-                const sourceLoanFingerprint = fullRebuild || !meta?.searchReady ? mfScaleHash(loans) : String(meta?.sourceLoanFingerprint||'INCREMENTAL');
-                const rebuildRequested=fullRebuild || !meta?.searchReady;
+                const sourceLoanFingerprint = fullRebuild || !meta?.searchReady || meta?.schema!==MF_SCALE.schema ? mfScaleHash(loans) : String(meta?.sourceLoanFingerprint||'INCREMENTAL');
+                const rebuildRequested=fullRebuild || !meta?.searchReady || meta?.schema!==MF_SCALE.schema;
+                const searchIndexRebuild=meta?.loanMasterSearchVersion!==MF_LM_SEARCH_INDEX_VERSION;
+                if(searchIndexRebuild||rebuildRequested) mfScaleLoanMasterSearchIndexReady=false;
                 if(rebuildRequested){
                     // Full rebuilds (first install / restore) must remove stale scalable records
                     // before rebuilding. Otherwise a deleted old loan could remain searchable.
@@ -4204,13 +4265,13 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                                     scaleMaturity=String(getLoanMaturityDate(loan)||'');
                                     pending=Math.max(0,Number(getLoanPending(loan))||0);
                                     paidPrincipal=(loan.payments||[]).reduce((sum,x)=>sum+(Number(x?.principal)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.principalPaid||0)+Number(loan.foreclosureData?.partialAmountAlreadyCollected||0):0);
-                                    realizedProfit=Number(product.fileCharge)||0+(loan.payments||[]).reduce((sum,x)=>sum+(Number(x?.interest)||0)+(Number(x?.penalty)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.feeAmount||0):0);
+                                    realizedProfit=(Number(product.fileCharge)||0)+(loan.payments||[]).reduce((sum,x)=>sum+(Number(x?.interest)||0)+(Number(x?.penalty)||0),0)+(loan.foreclosed?Number(loan.foreclosureData?.feeAmount||0):0);
                                     scaleStatus=mfLoanOperationalStatus(loan);
                                 }catch(e){}
                                 let statusInfo={overdueCount:0,dueTodayCount:0,overdueDays:0,oldestOverdueDueDate:'',firstUnpaidDueDate:''}; try{statusInfo=mfLoanOperationalStatusInfo(loan);}catch(e){}
                                 const loanCopy=mfScaleClone(loan); if(!loanCopy) throw new Error('Loan mirror clone failed'); delete loanCopy.payments;
                                 loanSt.put({...loanCopy,id:String(loan.id),_scaleFingerprint:fp,_scaleUpdatedAt:new Date().toISOString(),_scaleStatus:scaleStatus,_scaleRecoveryStatus:(scaleStatus==='OVERDUE'||scaleStatus==='DUE')?'DUE':scaleStatus,_scaleOverdueCount:statusInfo.overdueCount,_scaleDueTodayCount:statusInfo.dueTodayCount,_scaleOverdueDays:statusInfo.overdueDays,_scaleOldestOverdueDueDate:statusInfo.oldestOverdueDueDate,_scaleFirstUnpaidDueDate:statusInfo.firstUnpaidDueDate,_scaleMaturityIso:scaleMaturity,_scalePending:pending,_scalePaidPrincipal:paidPrincipal,_scaleRealizedProfit:realizedProfit});
-                                for(const token of mfScaleTokens(mfScaleLoanSearchText(loan))) searchSt.put({id:token+'|'+String(loan.id),token,loanId:String(loan.id)});
+                                for(const token of mfScaleLoanSearchIndexValues(loan)) searchSt.put({id:token+'|'+String(loan.id),token,loanId:String(loan.id)});
                                 (loan.payments||[]).forEach((pay,i)=>{const id=String(loan.id)+'|'+String(i)+'|'+String(pay?.date||'')+'|'+String(pay?.amount||0);paySt.put({...mfScaleClone(pay),id,loanId:String(loan.id),paymentIndex:i});});
                             }
                         });
@@ -4243,6 +4304,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     for(const id of [...mfScaleDirty.products]){
                         const v=state.products?.[id];
                         await mfScaleTx(['scalable_products'],'readwrite',stores=>v?stores.scalable_products.put({...mfScaleClone(v),id:String(id)}):stores.scalable_products.delete(String(id)));
+                        // Product names are part of Loan Master search text; refresh only loans using this product.
+                        await mfScaleReplaceSearchForLoans(loans.filter(loan=>String(loan?.product)===String(id)));
                     }
                     for(const [kind,arr] of [['staff',state.staff||[]],['expenses',state.expenses||[]],['borrowings',state.borrowings||[]]]){
                         for(const id of [...mfScaleDirty[kind]]){
@@ -4251,9 +4314,27 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                         }
                     }
                 }
-                mfScaleReady=true; mfScaleSearchReady=true;
+                    // Upgrade legacy exact-token-only search records once, without rebuilding
+                // unrelated loan/payment mirrors. This preserves existing data and adds the
+                // trigram postings required for fast, substring-equivalent Loan Master search.
+                if(searchIndexRebuild && !rebuildRequested){
+                    await mfScaleTx(['scalable_search'],'readwrite',stores=>stores.scalable_search.clear());
+                    const totalSearchLoans=loans.length;
+                    for(let start=0;start<totalSearchLoans;start+=250){
+                        const batch=loans.slice(start,start+250);
+                        await mfScaleTx(['scalable_search'],'readwrite',stores=>{
+                            const st=stores.scalable_search;
+                            for(const loan of batch){
+                                if(!loan?.id) continue;
+                                for(const token of mfScaleLoanSearchIndexValues(loan)) st.put({id:token+'|'+String(loan.id),token,loanId:String(loan.id)});
+                            }
+                        });
+                        await new Promise(r=>('requestIdleCallback' in window)?requestIdleCallback(()=>r(),{timeout:50}):setTimeout(r,0));
+                    }
+                }
+                mfScaleReady=true; mfScaleSearchReady=true; mfScaleLoanMasterSearchIndexReady=true;
                 const scaleEl=document.getElementById('mf-scalable-status'); if(scaleEl) scaleEl.textContent='🟢 Local data setup is ready.';
-                await mfScalePutMeta({id:'entity_mirror',schema:MF_SCALE.schema,localDirtyAt:dirtyAt,loanCount:loans.length,searchReady:true,sourceLoanFingerprint:sourceLoanFingerprint,updatedAt:new Date().toISOString()});
+                await mfScalePutMeta({id:'entity_mirror',schema:MF_SCALE.schema,localDirtyAt:dirtyAt,loanCount:loans.length,searchReady:true,loanMasterSearchVersion:MF_LM_SEARCH_INDEX_VERSION,sourceLoanFingerprint:sourceLoanFingerprint,updatedAt:new Date().toISOString()});
             }catch(e){console.warn('Scalable local entity update skipped:',e); return false;}
             finally{mfScaleBuildBusy=false;}
             return true;
@@ -4312,13 +4393,26 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const ids=[...(candidateIds||[])];
             const matched=[];
             const skip=Math.max(0,Number(page)||0)*pageSize;
-            for(const id of ids){
-                const loan=await new Promise(resolve=>{
-                    const tx=db.transaction('scalable_loans','readonly');
-                    const r=tx.objectStore('scalable_loans').get(String(id));
-                    r.onsuccess=()=>resolve(r.result||null); r.onerror=()=>resolve(null);
+            // Read all candidate loan rows in ONE IndexedDB transaction. The previous
+            // implementation opened and awaited a separate transaction for every ID,
+            // creating hundreds/thousands of serial storage round-trips on large portfolios.
+            const candidateLoans=await new Promise((resolve,reject)=>{
+                if(!ids.length){resolve([]);return;}
+                let tx;
+                try{tx=db.transaction('scalable_loans','readonly');}
+                catch(e){reject(e);return;}
+                const store=tx.objectStore('scalable_loans');
+                const rows=[];
+                ids.forEach(id=>{
+                    const req=store.get(String(id));
+                    req.onsuccess=()=>{if(req.result)rows.push(req.result);};
+                    req.onerror=()=>{try{req.preventDefault();}catch(e){}};
                 });
-                if(!loan) continue;
+                tx.oncomplete=()=>resolve(rows);
+                tx.onerror=()=>reject(tx.error||new Error('Recovery loan page read failed'));
+                tx.onabort=()=>reject(tx.error||new Error('Recovery loan page read aborted'));
+            });
+            for(const loan of candidateLoans){
                 if(product!=='ALL' && product!=='NONE' && String(loan.product)!==String(product)) continue;
                 const storedStatus=String(loan._scaleStatus||'ACTIVE');
                 const dynamicStatus=storedStatus;
@@ -4350,35 +4444,121 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function mfLoanMasterTypeMatches(loan, loanType){
             return loanType==='NONE' || loanType==='ALL' || String(loan?.loanType||'NEW').toUpperCase()===String(loanType).toUpperCase();
         }
+        async function mfScaleLoanMasterCandidateIds(rawQuery){
+            if(!mfScaleLoanMasterSearchIndexReady) return null;
+            const grams=mfScaleLoanMasterQueryGrams(rawQuery);
+            if(!grams.length) return null; // Preserve one/two-character substring search via the safe cursor path.
+            const db=await openMfDb();
+            return new Promise((resolve,reject)=>{
+                let tx,idx,remaining=grams.length,best={count:Infinity,token:''},resultIds=[];
+                let settled=false;
+                const fail=e=>{if(!settled){settled=true;reject(e||new Error('Loan Master search index read failed'));}};
+                try{tx=db.transaction('scalable_search','readonly');idx=tx.objectStore('scalable_search').index('token');}
+                catch(e){fail(e);return;}
+                for(const gram of grams){
+                    const token=MF_LM_SEARCH_GRAM_PREFIX+gram;
+                    const req=idx.count(token);
+                    req.onsuccess=()=>{
+                        if(req.result<best.count) best={count:req.result,token};
+                        remaining--;
+                        if(remaining===0){
+                            if(!best.count) return;
+                            const rows=idx.getAll(best.token);
+                            rows.onsuccess=()=>{resultIds=(rows.result||[]).map(x=>String(x.loanId));};
+                            rows.onerror=()=>fail(rows.error||new Error('Loan Master search candidate read failed'));
+                        }
+                    };
+                    req.onerror=()=>fail(req.error||new Error('Loan Master search index count failed'));
+                }
+                tx.oncomplete=()=>{if(!settled){settled=true;resolve(best.count?resultIds:[]);}};
+                tx.onerror=()=>fail(tx.error);
+                tx.onabort=()=>fail(tx.error||new Error('Loan Master search index transaction aborted'));
+            });
+        }
         async function mfScaleLoanMasterPageData({query='',product='ALL',loanType='ALL',status='ALL',period='ALL',page=0,pageSize=15}={}){
             const db=await openMfDb();
-            const skip=Math.max(0,Number(page)||0)*pageSize;
+            const safePage=Math.max(0,Number(page)||0);
+            const safePageSize=Math.max(0,Number(pageSize)||0);
+            const skip=safePage*safePageSize;
+            const keepCount=skip+safePageSize+1;
             const needle=normalizeRecoverySearchText(query||'');
-            const allRecords=await new Promise((resolve,reject)=>{
-                const tx=db.transaction('scalable_loans','readonly');
-                const req=tx.objectStore('scalable_loans').getAll();
-                req.onsuccess=()=>resolve(req.result||[]);
-                req.onerror=()=>reject(req.error||new Error('Loan Master index read failed'));
+            const compareLoanOrder=(a,b)=>{
+                const da=String(a?.disbursalDate||''), dbd=String(b?.disbursalDate||'');
+                return dbd.localeCompare(da)||String(b?.id||'').localeCompare(String(a?.id||''));
+            };
+            const compareEntry=(a,b)=>compareLoanOrder(a.record,b.record)||a.ordinal-b.ordinal;
+            const heap=[];
+            let total=0, ordinal=0;
+            const isWorse=(a,b)=>compareEntry(a,b)>0;
+            const swap=(i,j)=>{const t=heap[i];heap[i]=heap[j];heap[j]=t;};
+            const siftUp=i=>{
+                while(i>0){const parent=Math.floor((i-1)/2);if(!isWorse(heap[i],heap[parent]))break;swap(i,parent);i=parent;}
+            };
+            const siftDown=i=>{
+                for(;;){const left=i*2+1,right=left+1;let worst=i;if(left<heap.length&&isWorse(heap[left],heap[worst]))worst=left;if(right<heap.length&&isWorse(heap[right],heap[worst]))worst=right;if(worst===i)break;swap(i,worst);i=worst;}
+            };
+            const candidateIds=needle.length>=3?await mfScaleLoanMasterCandidateIds(needle):null;
+            const processRecord=(rec,currentOrdinal)=>{
+                if(!rec) return;
+                let matches=true;
+                if(needle&&!normalizeRecoverySearchText(mfScaleLoanSearchText(rec)).includes(needle)) matches=false;
+                if(matches&&product!=='ALL'&&product!=='NONE'&&String(rec.product)!==String(product)) matches=false;
+                if(matches&&!mfLoanMasterTypeMatches(rec,loanType)) matches=false;
+                const recStatus=String(rec._scaleStatus||'ACTIVE');
+                if(matches&&status!=='ALL'&&status!=='NONE'&&recStatus!==String(status)) matches=false;
+                if(matches&&!mfLoanMasterDateMatches(rec,period)) matches=false;
+                if(!matches) return;
+                total++;
+                const entry={record:rec,ordinal:currentOrdinal};
+                if(heap.length<keepCount){heap.push(entry);siftUp(heap.length-1);}
+                else if(keepCount>0&&compareEntry(entry,heap[0])<0){heap[0]=entry;siftDown(0);}
+            };
+            await new Promise((resolve,reject)=>{
+                let settled=false;
+                const fail=e=>{if(!settled){settled=true;reject(e||new Error('Loan Master index read failed'));}};
+                let tx,store;
+                try{tx=db.transaction('scalable_loans','readonly');store=tx.objectStore('scalable_loans');}
+                catch(e){fail(e);return;}
+                if(candidateIds!==null){
+                    if(!candidateIds.length){tx.oncomplete=()=>{if(!settled){settled=true;resolve();}};tx.onerror=()=>fail(tx.error);return;}
+                    candidateIds.forEach((id,index)=>{
+                        const req=store.get(String(id));
+                        req.onsuccess=()=>processRecord(req.result,index);
+                        req.onerror=()=>fail(req.error||new Error('Loan Master candidate loan read failed'));
+                    });
+                }else{
+                    const openSelectedCursor=(source,key)=>{
+                        const req=source.openCursor(key===undefined?undefined:IDBKeyRange.only(key));
+                        req.onsuccess=()=>{
+                            const cursor=req.result;if(!cursor)return;
+                            processRecord(cursor.value,ordinal++);
+                            cursor.continue();
+                        };
+                        req.onerror=()=>fail(req.error||new Error('Loan Master indexed cursor failed'));
+                    };
+                    const hasProduct=product!=='ALL'&&product!=='NONE';
+                    const hasStatus=status!=='ALL'&&status!=='NONE';
+                    if(hasProduct&&hasStatus){
+                        let pc,sc,remaining=2,chosen=null;
+                        const choose=()=>{remaining--;if(!remaining)openSelectedCursor(pc<=sc?store.index('product'):store.index('scaleStatus'),pc<=sc?String(product):String(status));};
+                        const pr=store.index('product').count(String(product));pr.onsuccess=()=>{pc=pr.result;choose();};pr.onerror=()=>fail(pr.error);
+                        const sr=store.index('scaleStatus').count(String(status));sr.onsuccess=()=>{sc=sr.result;choose();};sr.onerror=()=>fail(sr.error);
+                    }else if(hasProduct) openSelectedCursor(store.index('product'),String(product));
+                    else if(hasStatus) openSelectedCursor(store.index('scaleStatus'),String(status));
+                    else openSelectedCursor(store);
+                }
+                tx.oncomplete=()=>{if(!settled){settled=true;resolve();}};
+                tx.onerror=()=>fail(tx.error);
+                tx.onabort=()=>fail(tx.error||new Error('Loan Master index transaction aborted'));
             });
-            const matched=allRecords.filter(rec=>{
-                if(needle && !normalizeRecoverySearchText(mfScaleLoanSearchText(rec)).includes(needle)) return false;
-                if(product!=='ALL'&&product!=='NONE'&&String(rec.product)!==String(product)) return false;
-                if(!mfLoanMasterTypeMatches(rec,loanType)) return false;
-                const recStatus=String(rec._scaleStatus||'ACTIVE'); if(status!=='ALL'&&status!=='NONE'&&recStatus!==String(status)) return false;
-                return mfLoanMasterDateMatches(rec,period);
-            });
-            matched.sort((a,b)=>{
-                const da=String(a.disbursalDate||''), dbd=String(b.disbursalDate||'');
-                return dbd.localeCompare(da)||String(b.id||'').localeCompare(String(a.id||''));
-            });
-            const total=matched.length;
-            const pageRows=matched.slice(skip,skip+pageSize);
-            const hasNext=skip+pageSize<total;
-            const pageIds=pageRows.map(r=>String(r.id));
-            const hydrated=await mfScaleGetLoansByIds(pageIds,{hydratePayments:true});
+            heap.sort(compareEntry);
+            const pageEntries=heap.slice(skip,skip+safePageSize);
+            const pageIds=pageEntries.map(entry=>String(entry.record.id));
+            const hasNext=total>skip+safePageSize;
+            const rows=await mfScaleGetLoansByIds(pageIds,{hydratePayments:true});
             const order=new Map(pageIds.map((id,i)=>[id,i]));
-            hydrated.sort((a,b)=>(order.get(String(a.id))??0)-(order.get(String(b.id))??0));
-            return {rows:hydrated,total,hasNext};
+            rows.sort((a,b)=>(order.get(String(a.id))??0)-(order.get(String(b.id))??0));
+            return {rows,total,hasNext};
         }
 
         // ================= CLEAN SYNC BOUNDARY =================
@@ -4511,7 +4691,13 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function mfV2DocId(code){return MF_SYNC_V2_PREFIX+String(code||'').trim();}
         function mfV2Root(){return mfFirestoreDb.collection('secure_microfinance_business').doc(mfV2DocId(mfFirebaseSyncCode));}
         function mfV2Col(kind){return mfV2Root().collection('structured_v1_'+kind);}
-        function mfV2SafeClone(x){return JSON.parse(JSON.stringify(x??null));}
+        function mfV2SafeClone(x){
+          // Keep JSON clone semantics here: Firestore payloads must continue to drop
+          // undefined properties and normalize Date values exactly as before.
+          // The larger win is already in mfV2Shell(): clone only non-entity fields,
+          // never clone the full state and then delete loans/payments afterwards.
+          return JSON.parse(JSON.stringify(x??null));
+        }
         function mfV2EntityRows(kind){
           if(kind==='loans') return (state.loans||[]).map(x=>{const y=mfV2SafeClone(x); delete y.id; delete y._ownerUid; delete y._syncMeta; return {id:String(x.id),row:y};});
           if(kind==='products') return Object.entries(state.products||{}).map(([id,x])=>{const y=mfV2SafeClone(x);delete y.id;delete y._ownerUid;delete y._syncMeta;return {id:String(id),row:y};});
@@ -4533,6 +4719,25 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           }
           return x;
         }
+        // Opt-in diagnostics for the expensive full-state/cloud-shell paths.
+        // This does not write data, change sync state, or run automatically.
+        function mfRunPerformanceDiagnostics(){
+          const now=()=>((typeof performance!=='undefined'&&performance.now)?performance.now():Date.now());
+          const result={at:new Date().toISOString(),loanCount:Array.isArray(state?.loans)?state.loans.length:0,paymentCount:0};
+          (state?.loans||[]).forEach(l=>{result.paymentCount+=Array.isArray(l?.payments)?l.payments.length:0;});
+          let t=now(); result.fingerprint=mfLocalStateFingerprint(); result.fingerprintMs=Number((now()-t).toFixed(2));
+          t=now(); const shell=mfV2Shell(); result.shellBuildMs=Number((now()-t).toFixed(2));
+          t=now(); const shellJson=JSON.stringify(shell); result.shellSerializeMs=Number((now()-t).toFixed(2));
+          result.shellBytes=(typeof TextEncoder!=='undefined')?new TextEncoder().encode(shellJson).length:unescape(encodeURIComponent(shellJson)).length;
+          result.shellKiB=Number((result.shellBytes/1024).toFixed(1));
+          result.firestoreDocumentLimitBytes=1048576;
+          result.shellUnderFirestoreLimit=result.shellBytes<result.firestoreDocumentLimitBytes;
+          result.shellTopLevelKeys=Object.keys(shell).length;
+          result.shellLargestFields=Object.keys(shell).map(key=>{let bytes=0;try{const raw=JSON.stringify(shell[key]);bytes=(typeof TextEncoder!=='undefined')?new TextEncoder().encode(raw).length:unescape(encodeURIComponent(raw)).length;}catch(e){}return {key,bytes};}).sort((a,b)=>b.bytes-a.bytes).slice(0,8);
+          window.__mfPerformanceDiagnostics=result;
+          return result;
+        }
+        window.mfRunPerformanceDiagnostics=mfRunPerformanceDiagnostics;
         function mfV2Fingerprint(){return mfLocalStateFingerprint();}
         function mfV2DirtyAt(){return Date.parse(localStorage.getItem('MF_LOCAL_DIRTY_AT_V2')||'')||0;}
         function mfV2MarkDirty(){try{localStorage.setItem('MF_LOCAL_DIRTY_AT_V2',new Date().toISOString());}catch(e){}}
@@ -5466,7 +5671,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
 
         // Show the PIN screen immediately if a lock is set for this device, before anything else is usable.
         document.addEventListener('DOMContentLoaded', async () => {
-            if(document.documentElement.classList.contains('mf-qa-preview')){ const ov=document.getElementById('app-lock-overlay'); if(ov)ov.style.display='none'; } else maybeShowAppLockScreen();
+            maybeShowAppLockScreen();
             // Restore the encrypted Drive PIN on every fresh page load/reopen when the device
             // is already unlocked (or App Lock is not configured), then let the normal automatic
             // backup scheduler use it. With App Lock enabled, the PIN is restored after unlock.
@@ -7431,23 +7636,38 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             // Recovery is now customer-grouped, just like Statement & PDF. Search first finds
             // matching loan accounts; then all loan accounts belonging to those customers are
             // shown together so a customer with 10 loans never becomes 10 separate "customers".
-            let matchedLoans=state.loans.filter(l=>recoverySearchMatches(l,rawQuery));
-            // Recovery Intelligence deliberately uses Status + Search; product-chip filtering was removed from this view.
-            if(recoveryStatusFilter!=='ALL') matchedLoans=matchedLoans.filter(l=>recoveryStatusFilter==='DUE'?getRecoveryStatus(l)==='DUE':getRecoveryStatus(l)===recoveryStatusFilter);
-
+            // One-pass recovery grouping: the previous implementation filtered the full
+            // loan array once for the search and then once again for every matched customer.
+            // That made large portfolios approach O(customers × loans). Keep the exact
+            // search/status/grouping semantics, but build customer groups in linear passes.
+            const allLoans=Array.isArray(state.loans)?state.loans:[];
             const customerKeys=[];
-            const seenCustomers=new Set();
-            matchedLoans.forEach(l=>{
-                const key=String(l.customerKey||mfMakeCustomerKey(l.name||'',l.phone||''));
-                if(!seenCustomers.has(key)){seenCustomers.add(key);customerKeys.push(key);}
-            });
-            const groups=customerKeys.map(key=>{
-                const allLoans=state.loans.filter(l=>String(l.customerKey||mfMakeCustomerKey(l.name||'',l.phone||''))===key);
-                const displayLoans=(recoveryStatusFilter==='ALL')
-                    ? allLoans
-                    : allLoans.filter(l=>recoveryStatusFilter==='DUE'?getRecoveryStatus(l)==='DUE':getRecoveryStatus(l)===recoveryStatusFilter);
-                return {key,loans:displayLoans.slice().sort((a,b)=>String(a.disbursalDate||'').localeCompare(String(b.disbursalDate||''))||String(a.id).localeCompare(String(b.id)))};
-            }).filter(g=>g.loans.length);
+            const matchedCustomerKeys=new Set();
+            for(const loan of allLoans){
+                if(!recoverySearchMatches(loan,rawQuery)) continue;
+                if(recoveryStatusFilter!=='ALL'){
+                    const st=getRecoveryStatus(loan);
+                    if(recoveryStatusFilter==='DUE'?st!=='DUE':st!==recoveryStatusFilter) continue;
+                }
+                const key=String(loan.customerKey||mfMakeCustomerKey(loan.name||'',loan.phone||''));
+                if(!matchedCustomerKeys.has(key)){matchedCustomerKeys.add(key);customerKeys.push(key);}
+            }
+            const groupsByCustomer=new Map();
+            for(const loan of allLoans){
+                const key=String(loan.customerKey||mfMakeCustomerKey(loan.name||'',loan.phone||''));
+                if(!matchedCustomerKeys.has(key)) continue;
+                if(recoveryStatusFilter!=='ALL'){
+                    const st=getRecoveryStatus(loan);
+                    if(recoveryStatusFilter==='DUE'?st!=='DUE':st!==recoveryStatusFilter) continue;
+                }
+                let group=groupsByCustomer.get(key);
+                if(!group){group={key,loans:[]};groupsByCustomer.set(key,group);}
+                group.loans.push(loan);
+            }
+            const groups=customerKeys.map(key=>groupsByCustomer.get(key)).filter(g=>g&&g.loans.length);
+            for(const group of groups){
+                group.loans.sort((a,b)=>String(a.disbursalDate||'').localeCompare(String(b.disbursalDate||''))||String(a.id).localeCompare(String(b.id)));
+            }
 
             const pageSize=Math.max(1,Number(MF_SCALE.recoveryPageSize)||20);
             const totalCustomers=groups.length;
@@ -7468,6 +7688,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             head.innerHTML=`<span><i class="fa-solid fa-bolt" style="color:#60a5fa;margin-right:4px;"></i><b>${totalCustomers}</b> customer result${totalCustomers===1?'':'s'} · <b>${totalLoanAccounts}</b> loan account${totalLoanAccounts===1?'':'s'}</span><span>Page ${mfScaleRecoveryPage+1} / ${totalPages}</span>`;
             listDiv.appendChild(head);
 
+            const customerFragment=document.createDocumentFragment();
             pageGroups.forEach((group,index)=>{
                 const rows=group.loans;
                 const first=rows[0]||{};
@@ -7509,8 +7730,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     <span style="min-width:0;flex:1;"><b style="font-size:.82rem;color:#fff;">${financeEsc(first.name||'Customer')}</b><div class="mf-passbook-customer-meta">${financeEsc(contact)} · ${rows.length} loan account${rows.length===1?'':'s'} · ${activeCount} active</div></span>
                     <span style="font-size:.62rem;color:#94a3b8;white-space:nowrap;">NEW ${newCount} · TOP-UP ${topCount} · RENEWAL ${renCount}</span>
                 </button><div class="mf-passbook-loans" id="${bodyId}">${loanRows}</div>`;
-                listDiv.appendChild(wrap);
+                customerFragment.appendChild(wrap);
             });
+            listDiv.appendChild(customerFragment);
 
             if(totalPages>1){
                 const nav=document.createElement('div'); nav.style.cssText='display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0;';
@@ -10925,7 +11147,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 (result?result.rows:filtered).forEach(loan=>{
                     const prod=state.products[loan.product]||{name:'Custom',amount:0,fileCharge:0,emi:0,tenure:0};
                     const paidPrincipal=Number(loan._scalePaidPrincipal)||((loan.payments||[]).reduce((s,p)=>s+(Number(p.principal)||0),0)+(loan.foreclosed?(loan.foreclosureData?.principalPaid||0)+Number(loan.foreclosureData?.partialAmountAlreadyCollected||0):0));
-                    const realizedProfit=Number(loan._scaleRealizedProfit)|| (Number(prod.fileCharge)||0+(loan.payments||[]).reduce((s,p)=>s+(Number(p.interest)||0)+(Number(p.penalty)||0),0)+(loan.foreclosed?(loan.foreclosureData?.feeAmount||0):0));
+                    const realizedProfit=Number(loan._scaleRealizedProfit)|| ((Number(prod.fileCharge)||0)+(loan.payments||[]).reduce((s,p)=>s+(Number(p.interest)||0)+(Number(p.penalty)||0),0)+(loan.foreclosed?(loan.foreclosureData?.feeAmount||0):0));
                     const pending=Number.isFinite(Number(loan._scalePending))?Number(loan._scalePending):getLoanPending(loan);
                     const st=mfLoanOperationalStatus(loan); const badge=st==='FORECLOSED'?'<span class="badge-foreclosed">FORECLOSED</span>':st==='SETTLED'?'<span class="badge-paid">SETTLED</span>':st==='CLOSED'?'<span class="badge-paid">CLOSED</span>':st==='OVERDUE'?'<span class="badge-overdue">OVERDUE</span>':st==='DUE'?'<span class="badge-pending">DUE TODAY</span>':'<span class="badge-pending">ACTIVE</span>';
                     tbody.innerHTML+=`<tr onclick="openLoanMasterLoan('${recoverySafeId(loan.id)}')" style="cursor:pointer;" title="Open loan statement"><td><b style="color:#60a5fa;">${financeEsc(loan.id)}</b></td><td><b style="color:#fff;">${financeEsc(loan.name)}</b></td><td>${financeEsc(loan.phone||'-')}${loan.phone2?`<br><span style="font-size:.62rem;color:#60a5fa;">${financeEsc(loan.phone2)}</span>`:''}</td><td><span class="mf-loan-type-badge">${mfLoanTypeLabel(loan)}</span></td><td>${financeEsc(prod.name)}</td><td>${formatToIndianDate(loan.disbursalDate)}</td><td>₹${Number(prod.amount||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${Number(prod.emi||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${paidPrincipal.toLocaleString('en-IN')}</td><td style="color:#fbbf24;font-weight:700;">₹${realizedProfit.toLocaleString('en-IN')}</td><td style="color:${pending<=0?'#34d399':'#f87171'};font-weight:700;">₹${pending.toLocaleString('en-IN')}</td><td>${badge}</td></tr>`;
@@ -10951,7 +11173,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     tbody.innerHTML=pageRows.map(loan=>{
                         const prod=state.products[loan.product]||{name:'Custom',amount:0,fileCharge:0,emi:0,tenure:0};
                         const paidPrincipal=(loan.payments||[]).reduce((s,p)=>s+(Number(p.principal)||0),0)+(loan.foreclosed?(loan.foreclosureData?.principalPaid||0)+Number(loan.foreclosureData?.partialAmountAlreadyCollected||0):0);
-                        const realizedProfit=Number(prod.fileCharge)||0+(loan.payments||[]).reduce((s,p)=>s+(Number(p.interest)||0)+(Number(p.penalty)||0),0)+(loan.foreclosed?(loan.foreclosureData?.feeAmount||0):0);
+                        const realizedProfit=(Number(prod.fileCharge)||0)+(loan.payments||[]).reduce((s,p)=>s+(Number(p.interest)||0)+(Number(p.penalty)||0),0)+(loan.foreclosed?(loan.foreclosureData?.feeAmount||0):0);
                         const pending=Math.max(0,Number(getLoanPending(loan))||0); const st=mfLoanOperationalStatus(loan);
                         const badge=st==='FORECLOSED'?'<span class="badge-foreclosed">FORECLOSED</span>':st==='SETTLED'?'<span class="badge-paid">SETTLED</span>':st==='CLOSED'?'<span class="badge-paid">CLOSED</span>':st==='OVERDUE'?'<span class="badge-overdue">OVERDUE</span>':st==='DUE'?'<span class="badge-pending">DUE TODAY</span>':'<span class="badge-pending">ACTIVE</span>';
                         return `<tr onclick="openLoanMasterLoan('${recoverySafeId(loan.id)}')" style="cursor:pointer;" title="Open loan statement"><td><b style="color:#60a5fa;">${financeEsc(loan.id)}</b></td><td><b style="color:#fff;">${financeEsc(loan.name)}</b></td><td>${financeEsc(loan.phone||'-')}${loan.phone2?`<br><span style="font-size:.62rem;color:#60a5fa;">${financeEsc(loan.phone2)}</span>`:''}</td><td><span class="mf-loan-type-badge">${mfLoanTypeLabel(loan)}</span></td><td>${financeEsc(prod.name)}</td><td>${formatToIndianDate(loan.disbursalDate)}</td><td>₹${Number(prod.amount||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${Number(prod.emi||0).toLocaleString('en-IN')}</td><td style="color:#34d399;font-weight:700;">₹${paidPrincipal.toLocaleString('en-IN')}</td><td style="color:#fbbf24;font-weight:700;">₹${realizedProfit.toLocaleString('en-IN')}</td><td style="color:${pending<=0?'#34d399':'#f87171'};font-weight:700;">₹${pending.toLocaleString('en-IN')}</td><td>${badge}</td></tr>`;
