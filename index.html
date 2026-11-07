@@ -2983,7 +2983,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
 
             <div class="secure-cloud-grid">
                 <div class="secure-cloud-card"><b>⚡ IndexedDB Local Database</b><span>Fast, asynchronous browser storage. Existing localStorage data is migrated automatically.</span></div>
-                <div class="secure-cloud-card"><b>☁️ Google Drive Backup</b><span>Manual encrypted backup/recovery. Firebase handles automatic operational cloud sync; Drive is used only when you explicitly press Sync Now or Restore.</span></div>
+                <div class="secure-cloud-card"><b>☁️ Google Drive Backup</b><span>Encrypted secondary backup/recovery. After a one-time manual connection, Drive backup runs quietly while this page is open, using only a still-valid saved authorization. Firebase remains the automatic operational sync path.</span></div>
                 <div class="secure-cloud-card"><b>🧩 Versioned Recovery</b><span>Local recovery versions are kept separately so you can restore an earlier safe point if needed.</span></div>
                 <div class="secure-cloud-card"><b>📊 Excel & JSON Export</b><span>Your existing reports/export and one-click JSON backup remain available.</span></div>
             </div>
@@ -3054,7 +3054,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             </div>
 
             <div style="margin-top:12px;border-top:1px solid var(--border-subtle);padding-top:12px;">
-                <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Manual Google Drive Backup & Recovery</div>
+                <div style="font-size:.82rem;font-weight:800;color:#fff;margin-bottom:7px;">Google Drive Backup & Recovery</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
                     <button type="button" class="btn-header btn-blue" style="justify-content:center;" onclick="syncNowToGoogleDrive()"><i class="fa-solid fa-cloud-arrow-up"></i> Backup to Google Drive</button>
                     <button type="button" class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" onclick="restoreLatestFromGoogleDrive()"><i class="fa-solid fa-cloud-arrow-down"></i> Restore Latest</button>
@@ -4788,13 +4788,22 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         // Manual, read-only preflight over local entity payloads. Reports IDs and byte
         // counts only; it never sends data to Firestore or mutates local records.
         function mfRunFirestoreEntitySizeDiagnostics(){
-          const rows=[]; const add=(kind,id,row)=>{
+          const rows=[];
+          const add=(kind,id,row,options={})=>{
             if(!row) return;
-            const clean=mfV2SafeClone(row); delete clean.id; delete clean._ownerUid; delete clean._syncMeta;
-            const payload={...clean,_ownerUid:'OWNER_UID_PLACEHOLDER',_syncVersion:999999,_updatedAt:{seconds:9999999999,nanoseconds:999999999},...(kind==='payments'?{loanId:String(id).split('-').slice(0,-1).join('-'),paymentIndex:Number(String(id).split('-').pop())||0}:{})};
+            const clean=mfV2SafeClone(row);
+            // Mirror the exact field-removal rules used by the corresponding full-sync
+            // serializer. Payment documents intentionally retain their payment id and
+            // _syncMeta fields in the existing V2 format.
+            if(options.payment){delete clean._ownerUid;delete clean.loanId;delete clean.paymentIndex;}
+            else {delete clean.id;delete clean._ownerUid;delete clean._syncMeta;}
+            const payload={...clean,_ownerUid:'OWNER_UID_PLACEHOLDER',_syncVersion:999999,_updatedAt:{seconds:9999999999,nanoseconds:999999999},...(options.payment?{loanId:String(options.loanId),paymentIndex:options.paymentIndex}:{})};
             rows.push(mfV2AssertDocumentSize(kind,id,payload));
           };
-          (state.loans||[]).forEach(l=>{add('loans',l?.id,l);(l?.payments||[]).forEach((pay,i)=>add('payments',String(l.id)+'-'+i,pay));});
+          (state.loans||[]).forEach(l=>{
+            add('loans',l?.id,l);
+            (l?.payments||[]).forEach((pay,i)=>add('payments',String(l.id)+'-'+i,pay,{payment:true,loanId:l.id,paymentIndex:i}));
+          });
           Object.entries(state.products||{}).forEach(([id,row])=>add('products',id,row));
           for(const kind of ['staff','expenses','borrowings']) (state[kind]||[]).forEach(row=>add(kind,row?.id,row));
           rows.sort((a,b)=>b.bytes-a.bytes);
@@ -5196,8 +5205,13 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function startFirebaseListener(){
           if(!mfV2LocalStateReady || !mfDbReady)return;
           if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return;
+          const key=String(mfFirebaseUser.uid)+'|'+mfFirebaseSyncCode;
+          // Keep an already-active listener for the same Firebase account/sync target.
+          // The previous order unsubscribed first and then returned for the same key,
+          // silently leaving realtime sync detached after a repeated initialization.
+          if(mfFirebaseListenerUnsub && mfFirebaseListenerKey===key)return;
           if(mfFirebaseListenerUnsub){try{mfFirebaseListenerUnsub();}catch(e){}mfFirebaseListenerUnsub=null;}
-          const key=String(mfFirebaseUser.uid)+'|'+mfFirebaseSyncCode;if(mfFirebaseListenerKey===key)return;mfFirebaseListenerKey=key;
+          mfFirebaseListenerKey=key;
           mfFirebaseListenerUnsub=mfV2Root().onSnapshot(snap=>{
             if(window.mfFirebaseInitialSyncReady!==true||!snap.exists)return;
             const cloud=snap.data()||{};if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid)return;
@@ -5693,7 +5707,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                             initFirebaseSync(JSON.parse(cfgRaw), syncCode, false);
                         }
                     } catch(e) { console.warn('Firebase resume after App Unlock skipped:', e); }
-                    try { /* Google Drive is manual-only; no background Drive scheduler. */ } catch(e) {}
+                    try { scheduleAutomaticCloudSync(); } catch(e) {}
                 });
             } else {
                 if (err) err.innerText = 'Incorrect PIN. Please try again.';
@@ -5847,17 +5861,35 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                         try{ if(typeof renderFeed==='function') renderFeed(); }catch(e){}
                     }
                 }catch(e){}
-                /* Drive auto-sync disabled by production policy. */
+                // Google Drive is a secondary encrypted backup. Schedule a debounced upload
+                // only when the operator previously connected Drive; the worker never opens OAuth.
+                try{ scheduleAutomaticCloudSync(); }catch(e){ console.warn('Drive backup scheduling skipped:',e); }
             });
         }
 
+        const MF_DRIVE_AUTO_BACKUP_DEBOUNCE_MS=120000;
+        const MF_DRIVE_AUTO_BACKUP_MIN_INTERVAL_MS=6*60*60*1000;
+        function mfDriveAutoBackupPending(reason){
+            try{ localStorage.setItem('MF_DRIVE_AUTO_BACKUP_PENDING',JSON.stringify({reason:String(reason||'Backup pending'),at:new Date().toISOString()})); }catch(e){}
+            const ds=document.getElementById('drive-last-sync');
+            if(ds) ds.textContent='🟡 Automatic Drive backup pending: '+String(reason||'Reconnect Google Drive manually to resume.');
+            updateSecureCloudStatus('🟡 Google Drive backup pending: '+String(reason||'A manual reconnect may be required.')+'. Local IndexedDB and Firebase sync remain active.',true);
+        }
         function scheduleAutomaticCloudSync(){
-            // Production safety policy: Google Drive is a MANUAL encrypted backup/recovery
-            // target. Never start Drive OAuth, Drive reconciliation, or Drive uploads from a
-            // save, reload, online event, or timer. Firebase remains the automatic operational
-            // cloud path; IndexedDB remains the local working copy.
             clearTimeout(cloudSyncTimer);
             cloudSyncTimer=null;
+            // Only previously configured devices are eligible. No OAuth request, popup,
+            // restore, reconciliation, or token refresh is ever started by this scheduler.
+            if(!mfGoogleDriveIsConfigured()) return;
+            if(isAppLockSet() && !mfAppUnlockedThisSession) return;
+            const last=Date.parse(localStorage.getItem(MF_LAST_DRIVE_BACKUP_AT_KEY)||'')||0;
+            const remaining=last ? Math.max(0,MF_DRIVE_AUTO_BACKUP_MIN_INTERVAL_MS-(Date.now()-last)) : 0;
+            const delay=Math.max(MF_DRIVE_AUTO_BACKUP_DEBOUNCE_MS,remaining);
+            cloudSyncTimer=setTimeout(async()=>{
+                cloudSyncTimer=null;
+                try{ await syncNowToGoogleDrive(true); }
+                catch(e){ mfDriveAutoBackupPending(e?.message||'Backup could not run.'); }
+            },delay);
         }
 
         function markCloudSynced(){
@@ -5915,7 +5947,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             try{
                 if(mfGoogleDriveIsConfigured()){
                     el.innerHTML='<i class="fa-solid fa-circle-check text-success me-1"></i> Google Drive Connected';
-                    el.title='Google Drive is connected on this device. Open Cloud & Local Safe settings.';
+                    el.title='Google Drive is connected on this device. Encrypted background backup is eligible while this page is open and the saved authorization remains valid.';
                 }else{
                     el.innerHTML='<i class="fa-solid fa-gear me-1"></i> Connect Gmail Drive';
                     el.title='Open Cloud & Local Safe settings to connect Google Drive.';
@@ -5925,9 +5957,18 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function mfRefreshDriveBackupUi(){
             const ds=document.getElementById('drive-last-sync'); if(!ds) return;
             try{
+                const partial=localStorage.getItem('MF_DRIVE_BACKUP_PARTIAL_STATUS');
+                if(partial){
+                    let info=null; try{info=JSON.parse(partial);}catch(e){}
+                    const when=info?.currentDatabaseAt?new Date(info.currentDatabaseAt).toLocaleString('en-IN'):'just now';
+                    ds.textContent='⚠ Partial backup: Current Database uploaded '+when+', but the timestamped recovery point failed. Retry Backup to Google Drive to complete a verified backup.';
+                    return;
+                }
+                const pending=localStorage.getItem('MF_DRIVE_AUTO_BACKUP_PENDING');
+                if(pending){ let info=null; try{info=JSON.parse(pending);}catch(e){} ds.textContent='🟡 Automatic Drive backup pending: '+(info?.reason||'Reconnect Google Drive manually if needed.'); return; }
                 const last=localStorage.getItem(MF_LAST_DRIVE_BACKUP_AT_KEY);
-                if(last){ ds.textContent='Last encrypted backup: '+new Date(last).toLocaleString('en-IN')+' · Each successful backup also creates a timestamped restore point.'; }
-                else ds.textContent='Drive backup is manual. Each successful backup creates an encrypted timestamped restore point; Current Database remains the latest manual copy.';
+                if(last){ ds.textContent='Last complete encrypted backup: '+new Date(last).toLocaleString('en-IN')+' · Current Database and timestamped recovery point both uploaded.'; }
+                else ds.textContent='Automatic encrypted Drive backup is enabled after one-time connection. It runs after a quiet period, at most once every 6 hours while this page is open. Use Backup to Google Drive for an immediate manual backup.';
             }catch(e){}
         }
         function updateSecureCloudStatus(message,warning=false){
@@ -5943,7 +5984,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 el.style.color='#fde68a'; return;
             }
             if(googleAccessToken) el.textContent="🟢 Google Drive connected for this session — manual encrypted backup is ready.";
-            else if(mfGoogleDriveIsConfigured()) el.textContent="🟢 Google Drive is configured on this device — manual encrypted backup is ready. Authorization is reused from secure device storage when valid; Google is contacted again only when that authorization expires or is revoked.";
+            else if(mfGoogleDriveIsConfigured()) el.textContent="🟢 Google Drive is configured on this device. Background backup uses only a still-valid saved authorization; if it expires, a manual reconnect is required.";
             else if(localStorage.getItem('MF_GOOGLE_CLIENT_ID')) el.textContent="🟡 Cloud Encryption PIN is active. Connect Google Drive once on this device to enable manual backup.";
             else el.textContent="🟢 IndexedDB local database active. Use Backup to Google Drive for a manual encrypted off-device backup.";
         }
@@ -11692,57 +11733,73 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const list=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=10',{},interactive);
             return {folder,files:(await list.json()).files||[]};
         }
-        async function syncNowToGoogleDrive(background=false){
-            if(background){
-                updateSecureCloudStatus('🟢 Local + Firebase data remain active. Google Drive backup is manual; press Backup to Google Drive when you want an encrypted backup.',false);
-                return false;
+        async function mfDriveUploadRequest(url,options,background){
+            const response=await fetch(url,options);
+            if(response.status===401){
+                clearPersistedGoogleAccessToken();
+                if(background) throw new Error('Saved Google authorization expired or was revoked. Press Connect Google Drive manually; no popup was opened.');
+                throw new Error('Google Drive authorization expired. Please reconnect and retry.');
             }
-            if(cloudSyncBusy) return; cloudSyncBusy=true;
+            return response;
+        }
+        async function syncNowToGoogleDrive(background=false){
+            if(cloudSyncBusy) return false; cloudSyncBusy=true;
+            let currentDatabaseUploaded=false;
+            let recoveryPointUploaded=false;
+            let currentDatabaseAt=null;
+            let backupStage='preparing';
             try{
                 const pin=getCloudPin();
                 if(!mfFirebaseUser){
+                    if(background){ mfDriveAutoBackupPending('Firebase sign-in is required.'); return false; }
                     updateSecureCloudStatus('🟡 Google Drive backup is locked — Firebase sign-in is required.',true);
                     alert('Sign in to Firebase before creating a Google Drive backup.');
                     return false;
                 }
                 if(!pin){
+                    if(background){ mfDriveAutoBackupPending('Cloud Encryption PIN is not available after unlock.'); return false; }
                     updateSecureCloudStatus('🟡 Google Drive backup is locked — Cloud Encryption PIN is required.',true);
                     alert('Activate your Cloud Encryption PIN before creating a Google Drive backup.');
                     return false;
                 }
                 if(!mfGoogleDriveIsConfigured()){
+                    if(background){ mfDriveAutoBackupPending('Connect Google Drive manually once on this device.'); return false; }
                     updateSecureCloudStatus('🟡 Google Drive backup is locked — connect Google Drive once on this device.',true);
                     alert('Connect Google Drive once before creating a backup. No backup was created.');
                     return false;
                 }
-                if(!googleAccessToken){
-                    if(background){
-                        updateSecureCloudStatus('🟡 Local save is safe — Google Drive remains manual and no authorization popup was opened automatically.',true);
-                        return false;
-                    }else{
-                        await mfEnsureGoogleAccessForUser();
+                if(background){
+                    if(!(googleAccessToken && googleTokenExpiresAt && Date.now()<googleTokenExpiresAt-60000)){
+                        const restored=await restoreGoogleAccessTokenWrapped();
+                        if(!restored || !(googleAccessToken && googleTokenExpiresAt && Date.now()<googleTokenExpiresAt-60000)){
+                            mfDriveAutoBackupPending('Saved Google authorization is missing or expired. Press Connect Google Drive manually; no popup was opened.');
+                            return false;
+                        }
                     }
-                }
+                }else if(!googleAccessToken) await mfEnsureGoogleAccessForUser();
                 if(!googleAccessToken) throw new Error('Google Drive authorization is not available.');
-                const {folder,files}=await driveListCurrent(true);
+                backupStage='preparing encrypted database';
+                const {folder,files}=await driveListCurrent(!background);
                 const blob=await makeCloudBackupBlob();
                 const metadata={name:'Current Database.mfbackup.json',mimeType:'application/json',parents:[folder]};
                 let resp;
+                backupStage='uploading Current Database';
                 if(files.length){
                     googleDriveFileId=files[0].id;
                     const form=new FormData(); form.append('metadata',new Blob([JSON.stringify({name:metadata.name,mimeType:metadata.mimeType})],{type:'application/json'})); form.append('file',blob);
-                    resp=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+googleDriveFileId+'?uploadType=multipart&fields=id,modifiedTime',{method:'PATCH',headers:{Authorization:'Bearer '+googleAccessToken},body:form});
+                    resp=await mfDriveUploadRequest('https://www.googleapis.com/upload/drive/v3/files/'+googleDriveFileId+'?uploadType=multipart&fields=id,modifiedTime',{method:'PATCH',headers:{Authorization:'Bearer '+googleAccessToken},body:form},background);
                 }else{
                     const form=new FormData(); form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'})); form.append('file',blob);
-                    resp=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime',{method:'POST',headers:{Authorization:'Bearer '+googleAccessToken},body:form});
+                    resp=await mfDriveUploadRequest('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime',{method:'POST',headers:{Authorization:'Bearer '+googleAccessToken},body:form},background);
                 }
-                if(!resp.ok) throw new Error('Drive upload '+resp.status);
+                if(!resp.ok) throw new Error('Current Database upload '+resp.status);
                 const result=await resp.json(); googleDriveFileId=result.id||googleDriveFileId;
-                localStorage.setItem(cloudLastSyncEncryptedKey(),'1');
+                currentDatabaseUploaded=true;
+                currentDatabaseAt=result.modifiedTime||new Date().toISOString();
+                backupStage='uploading timestamped recovery point';
 
-                // Timestamped immutable restore point: every successful Drive backup gets its own
-                // encrypted, immutable file. The exact blob uploaded to Current Database is reused,
-                // so the restore point is guaranteed to match the same PIN/KDF/backup format.
+                // The immutable recovery point is uploaded from the exact same encrypted blob.
+                // A backup is not marked complete until BOTH Drive files are confirmed.
                 const stamp=new Date();
                 const stampDay=stamp.toISOString().slice(0,10);
                 const stampName=`Backup_${stampDay}_${stamp.getTime()}.mfbackup.json`;
@@ -11750,21 +11807,43 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const sf=new FormData();
                 sf.append('metadata',new Blob([JSON.stringify(stampMeta)],{type:'application/json'}));
                 sf.append('file',blob);
-                const sr=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime',{method:'POST',headers:{Authorization:'Bearer '+googleAccessToken},body:sf});
+                const sr=await mfDriveUploadRequest('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,modifiedTime',{method:'POST',headers:{Authorization:'Bearer '+googleAccessToken},body:sf},background);
                 if(!sr.ok) throw new Error('Timestamped recovery point upload '+sr.status);
                 const stampResult=await sr.json();
+                recoveryPointUploaded=true;
+
+                // Commit success metadata only after both uploads have succeeded.
+                localStorage.setItem(cloudLastSyncEncryptedKey(),'1');
                 localStorage.setItem('MF_LAST_DRIVE_RESTORE_POINT', JSON.stringify({id:stampResult.id,name:stampName,modifiedTime:stampResult.modifiedTime||stamp.toISOString()}));
                 localStorage.setItem(MF_LAST_DRIVE_BACKUP_AT_KEY,stamp.toISOString());
-
-                markCloudSynced();
-                document.getElementById('sync-target-text').innerText='Google Drive Backup Secured';
+                localStorage.removeItem('MF_DRIVE_BACKUP_PARTIAL_STATUS');
+                if(!background) markCloudSynced();
+                try{localStorage.removeItem('MF_DRIVE_AUTO_BACKUP_PENDING');}catch(e){}
+                const target=document.getElementById('sync-target-text'); if(target) target.innerText='Google Drive Backup Secured';
                 mfRefreshDriveBackupUi();
-                updateSecureCloudStatus('🟢 Google Drive encrypted backup is up to date.');
-                if(!background) alert('Encrypted Google Drive backup completed successfully.');
+                updateSecureCloudStatus('🟢 Google Drive encrypted backup completed: Current Database and timestamped recovery point are both uploaded.');
+                if(!background) alert('Encrypted Google Drive backup completed successfully. Current Database and timestamped recovery point are both secured.');
                 return true;
             }catch(err){
-                console.error(err); if(!background) alert('Google Drive backup could not complete: '+err.message);
-                updateSecureCloudStatus('🟡 Local save is safe, but Google Drive backup is pending: '+err.message,true);
+                console.error(err);
+                if(currentDatabaseUploaded && !recoveryPointUploaded){
+                    try{localStorage.setItem('MF_DRIVE_BACKUP_PARTIAL_STATUS',JSON.stringify({stage:backupStage,currentDatabaseAt:currentDatabaseAt,error:String(err?.message||err),recordedAt:new Date().toISOString()}));}catch(e){}
+                    mfRefreshDriveBackupUi();
+                    updateSecureCloudStatus('⚠ Partial Google Drive backup: Current Database was uploaded, but the timestamped recovery point failed. Local IndexedDB and Firebase remain active. Press Backup to Google Drive to retry.',true);
+                    if(!background) alert('Partial backup — Current Database uploaded successfully, but the timestamped recovery point failed. Your local data and Firebase sync remain active. Please retry Backup to Google Drive to complete the recovery point.');
+                    else mfDriveAutoBackupPending('Partial backup: Current Database uploaded, but the timestamped recovery point failed.');
+                }else if(currentDatabaseUploaded && recoveryPointUploaded){
+                    // Both remote files exist; only the local success-marker write failed.
+                    // Do not misreport this as an upload failure or attempt an automatic restore.
+                    mfRefreshDriveBackupUi();
+                    updateSecureCloudStatus('🟡 Both Google Drive backup files were uploaded, but local completion metadata could not be saved. Verify the Drive restore-point list before retrying.',true);
+                    if(!background) alert('Both Google Drive files were uploaded, but this device could not save the completion status. Check the timestamped restore-point list before retrying.');
+                    else mfDriveAutoBackupPending('Both Drive files uploaded, but this device could not save completion metadata.');
+                }else{
+                    updateSecureCloudStatus('🟡 Google Drive backup failed during '+backupStage+': '+(err?.message||err)+'. Local save and Firebase sync remain active.',true);
+                    if(!background) alert('Google Drive backup could not complete during '+backupStage+': '+(err?.message||err));
+                    else mfDriveAutoBackupPending('Backup failed during '+backupStage+': '+(err?.message||err));
+                }
                 return false;
             }finally{cloudSyncBusy=false;}
         }
