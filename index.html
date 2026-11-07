@@ -4418,7 +4418,26 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const rows=await mfScaleGetLoansByIds(pageIds,{hydratePayments:true});
             const order=new Map(pageIds.map((id,i)=>[String(id),i]));
             rows.sort((a,b)=>(order.get(String(a.id))??0)-(order.get(String(b.id))??0));
+            const finishedAt=performance.now();
+            mfLoanMasterPerfLast={
+                measuredAt:new Date().toISOString(),
+                totalMs:Number((finishedAt-perfStart).toFixed(2)),
+                candidateLookupMs:Number((candidateReadyAt-perfStart).toFixed(2)),
+                indexedReadAndFilterMs:Number((scanFinishedAt-candidateReadyAt).toFixed(2)),
+                pageHydrationMs:Number((finishedAt-scanFinishedAt).toFixed(2)),
+                scannedCandidates:candidateIds===null?'cursor-scan':candidateIds.length,
+                matchedLoans:total,
+                returnedLoans:rows.length,
+                page:safePage,
+                pageSize:safePageSize,
+                queryLength:needle.length,
+                productFilter:String(product),
+                statusFilter:String(status),
+                loanTypeFilter:String(loanType),
+                periodFilter:String(period)
+            };
             return {rows,total,hasNext};
+
         }
 
         function mfLoanMasterDateMatches(loan, period){
@@ -4467,7 +4486,10 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 tx.onabort=()=>fail(tx.error||new Error('Loan Master search index transaction aborted'));
             });
         }
+        let mfLoanMasterPerfLast=null;
+        function mfGetLoanMasterPerformance(){return mfLoanMasterPerfLast?{...mfLoanMasterPerfLast}:null;}
         async function mfScaleLoanMasterPageData({query='',product='ALL',loanType='ALL',status='ALL',period='ALL',page=0,pageSize=15}={}){
+            const perfStart=performance.now();
             const db=await openMfDb();
             const safePage=Math.max(0,Number(page)||0);
             const safePageSize=Math.max(0,Number(pageSize)||0);
@@ -4490,13 +4512,24 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 for(;;){const left=i*2+1,right=left+1;let worst=i;if(left<heap.length&&isWorse(heap[left],heap[worst]))worst=left;if(right<heap.length&&isWorse(heap[right],heap[worst]))worst=right;if(worst===i)break;swap(i,worst);i=worst;}
             };
             const candidateIds=needle.length>=3?await mfScaleLoanMasterCandidateIds(needle):null;
+            const candidateReadyAt=performance.now();
             const processRecord=(rec,currentOrdinal)=>{
                 if(!rec) return;
                 let matches=true;
                 if(needle&&!normalizeRecoverySearchText(mfScaleLoanSearchText(rec)).includes(needle)) matches=false;
                 if(matches&&product!=='ALL'&&product!=='NONE'&&String(rec.product)!==String(product)) matches=false;
                 if(matches&&!mfLoanMasterTypeMatches(rec,loanType)) matches=false;
-                const recStatus=String(rec._scaleStatus||'ACTIVE');
+                let recStatus=String(rec._scaleStatus||'ACTIVE');
+                // Operational status changes as calendar days pass even when a loan record
+                // is not edited. Re-evaluate the indexed earliest unpaid due date at read time
+                // so the status filter does not rely on a stale status snapshot.
+                if(!['FORECLOSED','SETTLED','CLOSED'].includes(recStatus)){
+                    const firstDue=String(rec._scaleFirstUnpaidDueDate||'');
+                    const todayIso=mfIsoToday();
+                    if(firstDue && firstDue<todayIso) recStatus='OVERDUE';
+                    else if(firstDue && firstDue===todayIso) recStatus='DUE';
+                    else if(firstDue && firstDue>todayIso) recStatus='ACTIVE';
+                }
                 if(matches&&status!=='ALL'&&status!=='NONE'&&recStatus!==String(status)) matches=false;
                 if(matches&&!mfLoanMasterDateMatches(rec,period)) matches=false;
                 if(!matches) return;
@@ -4530,19 +4563,21 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     };
                     const hasProduct=product!=='ALL'&&product!=='NONE';
                     const hasStatus=status!=='ALL'&&status!=='NONE';
-                    if(hasProduct&&hasStatus){
-                        let pc,sc,remaining=2,chosen=null;
+                    const dateDynamicStatus=hasStatus&&['ACTIVE','DUE','OVERDUE'].includes(String(status));
+                    if(hasProduct&&hasStatus&&!dateDynamicStatus){
+                        let pc,sc,remaining=2;
                         const choose=()=>{remaining--;if(!remaining)openSelectedCursor(pc<=sc?store.index('product'):store.index('scaleStatus'),pc<=sc?String(product):String(status));};
                         const pr=store.index('product').count(String(product));pr.onsuccess=()=>{pc=pr.result;choose();};pr.onerror=()=>fail(pr.error);
                         const sr=store.index('scaleStatus').count(String(status));sr.onsuccess=()=>{sc=sr.result;choose();};sr.onerror=()=>fail(sr.error);
                     }else if(hasProduct) openSelectedCursor(store.index('product'),String(product));
-                    else if(hasStatus) openSelectedCursor(store.index('scaleStatus'),String(status));
+                    else if(hasStatus&&!dateDynamicStatus) openSelectedCursor(store.index('scaleStatus'),String(status));
                     else openSelectedCursor(store);
                 }
                 tx.oncomplete=()=>{if(!settled){settled=true;resolve();}};
                 tx.onerror=()=>fail(tx.error);
                 tx.onabort=()=>fail(tx.error||new Error('Loan Master index transaction aborted'));
             });
+            const scanFinishedAt=performance.now();
             heap.sort(compareEntry);
             const pageEntries=heap.slice(skip,skip+safePageSize);
             const pageIds=pageEntries.map(entry=>String(entry.record.id));
@@ -7613,7 +7648,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 <button class="btn-edit-sm" onclick="openEditClientModal('${id}')"><i class="fa-solid fa-pen"></i> Edit</button>
             </div>`;
         }
-        async function renderFeed(){
+        async function mfRenderFeedCore(){
             const input=document.getElementById('search-input'),rawQuery=input?.value||'',query=normalizeRecoverySearchText(rawQuery),listDiv=document.getElementById('feed-list');
             if(!listDiv)return; listDiv.innerHTML='';
             if(!query && recoveryStatusFilter==='ALL'){
@@ -7728,6 +7763,28 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 listDiv.appendChild(nav);
             }
         }
+
+
+        // Lightweight, read-only timing for real browser Recovery Search runs.
+        let mfRecoveryPerfLast=null;
+        async function renderFeed(){
+            const started=performance.now();
+            let queryLength=0, loanCount=Array.isArray(state.loans)?state.loans.length:0;
+            try{
+                const input=document.getElementById('search-input');
+                queryLength=String(input?.value||'').trim().length;
+                return await mfRenderFeedCore();
+            }finally{
+                mfRecoveryPerfLast={
+                    measuredAt:new Date().toISOString(),
+                    durationMs:Number((performance.now()-started).toFixed(2)),
+                    loanCount,
+                    queryLength,
+                    statusFilter:String(recoveryStatusFilter||'ALL')
+                };
+            }
+        }
+        function mfGetRecoveryPerformance(){return mfRecoveryPerfLast?{...mfRecoveryPerfLast}:null;}
 
         function mfRecoverySafeGroupKey(value){
             return String(value||'group').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,70);
