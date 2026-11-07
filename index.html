@@ -4418,24 +4418,6 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const rows=await mfScaleGetLoansByIds(pageIds,{hydratePayments:true});
             const order=new Map(pageIds.map((id,i)=>[String(id),i]));
             rows.sort((a,b)=>(order.get(String(a.id))??0)-(order.get(String(b.id))??0));
-            const finishedAt=performance.now();
-            mfLoanMasterPerfLast={
-                measuredAt:new Date().toISOString(),
-                totalMs:Number((finishedAt-perfStart).toFixed(2)),
-                candidateLookupMs:Number((candidateReadyAt-perfStart).toFixed(2)),
-                indexedReadAndFilterMs:Number((scanFinishedAt-candidateReadyAt).toFixed(2)),
-                pageHydrationMs:Number((finishedAt-scanFinishedAt).toFixed(2)),
-                scannedCandidates:candidateIds===null?'cursor-scan':candidateIds.length,
-                matchedLoans:total,
-                returnedLoans:rows.length,
-                page:safePage,
-                pageSize:safePageSize,
-                queryLength:needle.length,
-                productFilter:String(product),
-                statusFilter:String(status),
-                loanTypeFilter:String(loanType),
-                periodFilter:String(period)
-            };
             return {rows,total,hasNext};
 
         }
@@ -4585,6 +4567,24 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const rows=await mfScaleGetLoansByIds(pageIds,{hydratePayments:true});
             const order=new Map(pageIds.map((id,i)=>[id,i]));
             rows.sort((a,b)=>(order.get(String(a.id))??0)-(order.get(String(b.id))??0));
+            const finishedAt=performance.now();
+            mfLoanMasterPerfLast={
+                measuredAt:new Date().toISOString(),
+                totalMs:Number((finishedAt-perfStart).toFixed(2)),
+                candidateLookupMs:Number((candidateReadyAt-perfStart).toFixed(2)),
+                indexedReadAndFilterMs:Number((scanFinishedAt-candidateReadyAt).toFixed(2)),
+                pageHydrationMs:Number((finishedAt-scanFinishedAt).toFixed(2)),
+                scannedCandidates:candidateIds===null?'cursor-scan':candidateIds.length,
+                matchedLoans:total,
+                returnedLoans:rows.length,
+                page:safePage,
+                pageSize:safePageSize,
+                queryLength:needle.length,
+                productFilter:String(product),
+                statusFilter:String(status),
+                loanTypeFilter:String(loanType),
+                periodFilter:String(period)
+            };
             return {rows,total,hasNext};
         }
 
