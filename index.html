@@ -3958,6 +3958,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         // without replacing the proven V15 business engine until a verified migration is ready.
         const MF_SCALE = Object.freeze({schema:'AMARA-SCALABLE-2',pageSize:15,recoveryPageSize:50,maxRecoveryRender:100});
         let mfScaleReady=false, mfScaleSearchReady=false, mfScaleLoanMasterSearchIndexReady=false, mfScaleBuildBusy=false;
+        let mfScaleBuildLastError=null;
         let mfScaleRecoveryPage=0, mfScaleLoanMasterPage=0;
         let mfScaleRecoveryTimer=0, mfScaleMirrorTimer=0, mfScaleLastMirrorAt=0;
         const mfScaleLoanFingerprints=new Map();
@@ -4327,7 +4328,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 mfScaleReady=true; mfScaleSearchReady=true; mfScaleLoanMasterSearchIndexReady=true;
                 const scaleEl=document.getElementById('mf-scalable-status'); if(scaleEl) scaleEl.textContent='🟢 Local data setup is ready.';
                 await mfScalePutMeta({id:'entity_mirror',schema:MF_SCALE.schema,localDirtyAt:dirtyAt,loanCount:loans.length,searchReady:true,loanMasterSearchVersion:MF_LM_SEARCH_INDEX_VERSION,sourceLoanFingerprint:sourceLoanFingerprint,updatedAt:new Date().toISOString()});
-            }catch(e){console.warn('Scalable local entity update skipped:',e); return false;}
+            }catch(e){mfScaleBuildLastError={message:String(e?.message||e),name:String(e?.name||'Error'),at:new Date().toISOString()};console.warn('Scalable local entity update skipped:',e); return false;}
             finally{mfScaleBuildBusy=false;}
             return true;
         }
@@ -4470,6 +4471,28 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         }
         let mfLoanMasterPerfLast=null;
         function mfGetLoanMasterPerformance(){return mfLoanMasterPerfLast?{...mfLoanMasterPerfLast}:null;}
+        async function mfGetLoanMasterDiagnostics(){
+            let meta=null,metaError=null;
+            try{meta=await mfScaleGetMeta('entity_mirror');}catch(e){metaError=String(e?.message||e);}
+            return {
+                scalableReady:mfScaleReady,
+                scalableBuildBusy:mfScaleBuildBusy,
+                searchReady:mfScaleSearchReady,
+                loanMasterSearchIndexReady:mfScaleLoanMasterSearchIndexReady,
+                lastBuildError:mfScaleBuildLastError,
+                metaReadError:metaError,
+                stateLoanCount:Array.isArray(state?.loans)?state.loans.length:null,
+                metaSchema:meta?.schema||null,
+                metaLoanCount:Number(meta?.loanCount||0),
+                metaSearchReady:!!meta?.searchReady,
+                metaSearchVersion:meta?.loanMasterSearchVersion??null,
+                currentSearchVersion:MF_LM_SEARCH_INDEX_VERSION,
+                metaLocalDirtyAt:meta?.localDirtyAt||null,
+                currentLocalDirtyAt:localStorage.getItem('MF_LOCAL_DIRTY_AT')||'',
+                lastPerformance:mfLoanMasterPerfLast?{...mfLoanMasterPerfLast}:null,
+                measuredAt:new Date().toISOString()
+            };
+        }
         async function mfScaleLoanMasterPageData({query='',product='ALL',loanType='ALL',status='ALL',period='ALL',page=0,pageSize=15}={}){
             const perfStart=performance.now();
             const db=await openMfDb();
