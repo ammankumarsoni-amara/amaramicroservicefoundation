@@ -16804,5 +16804,55 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         };
 </script>
 
+<script id="mf-global-escape-close-v1">
+/* Keyboard usability: Escape closes only the top-most visible application dialog.
+   It never bypasses App Lock and never triggers form submission or data actions. */
+(function(){
+  if (window.__mfGlobalEscapeCloseInstalled) return;
+  window.__mfGlobalEscapeCloseInstalled = true;
+  function visible(el){
+    if(!el || !el.isConnected) return false;
+    const cs=window.getComputedStyle(el);
+    return cs.display!=='none' && cs.visibility!=='hidden' && Number(cs.opacity||1)!==0;
+  }
+  function closeTopDialog(){
+    const candidates=Array.from(document.querySelectorAll(
+      '.modal-overlay.active, .mf-loan-modal-overlay, #mf-phase-e-modal, #mf-phase-e-detail-modal, #mf-funding-source-dashboard'
+    )).filter(visible);
+    if(!candidates.length) return false;
+    // App Lock is intentionally not included in the candidate selector.
+    const top=candidates.map((el,index)=>({el,index,z:(parseInt(getComputedStyle(el).zIndex,10)||0)}))
+      .sort((a,b)=>a.z-b.z || a.index-b.index).pop().el;
+    if(top.id==='mf-loan-summary-modal' && typeof window.closeLoanSummaryModal==='function'){
+      window.closeLoanSummaryModal(); return true;
+    }
+    if(top.id==='mf-phase-e-modal'){
+      const close=top.querySelector('#mf-phase-e-close');
+      if(close){close.click();return true;}
+      top.remove();return true;
+    }
+    if(top.id==='mf-phase-e-detail-modal'){
+      top.remove();return true;
+    }
+    if(top.id==='mf-funding-source-dashboard'){
+      top.remove();return true;
+    }
+    if(top.classList.contains('modal-overlay')){
+      top.classList.remove('active'); return true;
+    }
+    // Generic fallback for any future custom overlay using the standard class.
+    top.remove(); return true;
+  }
+  document.addEventListener('keydown',function(event){
+    if(event.key!=='Escape' || event.defaultPrevented || event.isComposing) return;
+    // Let native select/listbox widgets consume Escape to dismiss their own menu first.
+    const target=event.target;
+    if(target && target.tagName==='SELECT') return;
+    if(closeTopDialog()){
+      event.preventDefault();
+    }
+  },false);
+})();
+</script>
 </body>
 </html>
