@@ -7753,6 +7753,17 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const st=mfLoanOperationalStatus(loan);
             return (st==='OVERDUE'||st==='DUE') ? 'DUE' : st;
         }
+        // "Active" in Customer Recovery means every loan account that is still
+        // financially running, including accounts with today's due or overdue EMIs.
+        // Due/Overdue remains a separate, narrower collection filter.
+        function recoveryLoanMatchesStatus(loan,status){
+            if(status==='ACTIVE'){
+                return !loan?.foreclosed && !loan?.postMaturitySettlement
+                    && Math.max(0,Number(getLoanPending(loan))||0)>0;
+            }
+            const st=getRecoveryStatus(loan);
+            return status==='DUE' ? st==='DUE' : st===status;
+        }
 
         function normalizeRecoverySearchText(value){
             return String(value??'').toLocaleLowerCase('en-IN').normalize('NFKC').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
@@ -7804,10 +7815,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const matchedCustomerKeys=new Set();
             for(const loan of allLoans){
                 if(query && !recoverySearchMatches(loan,rawQuery)) continue;
-                if(recoveryStatusFilter!=='ALL'){
-                    const st=getRecoveryStatus(loan);
-                    if(recoveryStatusFilter==='DUE'?st!=='DUE':st!==recoveryStatusFilter) continue;
-                }
+                if(recoveryStatusFilter!=='ALL' && !recoveryLoanMatchesStatus(loan,recoveryStatusFilter)) continue;
                 const key=String(loan.customerKey||mfMakeCustomerKey(loan.name||'',loan.phone||''));
                 if(!matchedCustomerKeys.has(key)){matchedCustomerKeys.add(key);customerKeys.push(key);}
             }
@@ -7815,10 +7823,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             for(const loan of allLoans){
                 const key=String(loan.customerKey||mfMakeCustomerKey(loan.name||'',loan.phone||''));
                 if(!matchedCustomerKeys.has(key)) continue;
-                if(recoveryStatusFilter!=='ALL'){
-                    const st=getRecoveryStatus(loan);
-                    if(recoveryStatusFilter==='DUE'?st!=='DUE':st!==recoveryStatusFilter) continue;
-                }
+                if(recoveryStatusFilter!=='ALL' && !recoveryLoanMatchesStatus(loan,recoveryStatusFilter)) continue;
                 let group=groupsByCustomer.get(key);
                 if(!group){group={key,loans:[]};groupsByCustomer.set(key,group);}
                 group.loans.push(loan);
