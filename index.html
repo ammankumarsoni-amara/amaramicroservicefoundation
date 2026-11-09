@@ -6,9 +6,53 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Loan Management</title>
-    <meta name="mf-build" content="V55-SECURITY-HARDENING-REALIZED-PROFIT-PRECEDENCE-2026-11-07">
+    <meta name="mf-build" content="V55-DEEP-AUDIT-REV4-DATED-LEDGER-RECONCILIATION-XLSX-WAIT-2026-11-09">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+/* XLSX resilience bootstrap: try the primary CDN first, then independent mirrors.
+   This runs before the application scripts and does not touch business data. */
+(function(){
+  const sources=[
+    'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+    'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js'
+  ];
+  window.mfXlsxLibraryStatus={state:'loading',source:'jsdelivr',attempts:['https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js']};
+  function valid(){return typeof window.XLSX!=='undefined'&&!!window.XLSX.utils&&typeof window.XLSX.utils.book_new==='function'&&typeof window.XLSX.utils.aoa_to_sheet==='function'&&typeof window.XLSX.writeFile==='function';}
+  window.mfValidateXlsxLibrary=function(){
+    if(valid()){window.mfXlsxLibraryStatus={state:'ready',source:window.mfXlsxLibraryStatus.source||'primary-or-fallback',attempts:window.mfXlsxLibraryStatus.attempts||[]};return true;}
+    window.mfLoadXlsxFallback(0);return false;
+  };
+  window.mfLoadXlsxFallback=function(index){
+    if(valid()){window.mfXlsxLibraryStatus.state='ready';return;}
+    if(index>=sources.length){window.mfXlsxLibraryStatus.state='unavailable';return;}
+    const url=sources[index];window.mfXlsxLibraryStatus.state='loading';window.mfXlsxLibraryStatus.source=url;
+    if(!window.mfXlsxLibraryStatus.attempts.includes(url))window.mfXlsxLibraryStatus.attempts.push(url);
+    const script=document.createElement('script');script.src=url;script.async=true;
+    script.onload=function(){if(valid()){window.mfXlsxLibraryStatus.state='ready';}else{window.mfLoadXlsxFallback(index+1);}};
+    script.onerror=function(){window.mfLoadXlsxFallback(index+1);};document.head.appendChild(script);
+  };
+  // Export actions wait for the primary CDN / fallback chain instead of failing during
+  // the short window in which the backup library is still downloading.
+  window.mfEnsureXlsxLibrary=function(timeoutMs=25000){
+    if(valid())return Promise.resolve(window.XLSX);
+    return new Promise((resolve,reject)=>{
+      const started=Date.now();
+      const check=()=>{
+        if(valid()){window.mfXlsxLibraryStatus.state='ready';resolve(window.XLSX);return;}
+        if(window.mfXlsxLibraryStatus?.state==='unavailable'||Date.now()-started>=timeoutMs){
+          window.mfXlsxLibraryStatus.state='unavailable';
+          reject(new Error('Excel library could not be loaded from the available CDN sources. Check your internet connection / site network access and try again.'));
+          return;
+        }
+        setTimeout(check,150);
+      };
+      check();
+    });
+  };
+  window.addEventListener('load',function(){if(!valid()&&window.mfXlsxLibraryStatus.state!=='unavailable')window.mfLoadXlsxFallback(0);else if(valid())window.mfXlsxLibraryStatus.state='ready';});
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" onload="window.mfValidateXlsxLibrary&&window.mfValidateXlsxLibrary()" onerror="window.mfLoadXlsxFallback&&window.mfLoadXlsxFallback(0)"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- Firebase Real-Time Sync (fast, no re-login needed, works across mobile + laptop) -->
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
@@ -4955,6 +4999,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         // Read-only capability snapshot for report/export regression review.
         window.mfRunExportCompatibilityDiagnostics=function(){
           const xlsxAvailable=typeof XLSX!=='undefined'&&!!XLSX?.utils?.book_new&&typeof XLSX?.writeFile==='function';
+          const xlsxLibraryStatus=window.mfXlsxLibraryStatus||{state:xlsxAvailable?'ready':'not-loaded',source:'unknown',attempts:[]};
           const printAvailable=typeof window.print==='function';
           const scripts=[...document.scripts].map(x=>x.src).filter(Boolean);
           const reportTables=[...document.querySelectorAll('table')].filter(t=>t.offsetParent!==null).length;
@@ -6282,7 +6327,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function mfFinancialReconciliation(){
             if(mfFinancialReconciliationCache) return mfFinancialReconciliationCache;
             const loans=Array.isArray(state.loans)?state.loans:[], products=state.products||{};
-            const out={loans:loans.length,disbursed:0,file:0,interest:0,penalty:0,foreclosureFee:0,preClosureInterest:0,postMaturityInterest:0,preEmiInterest:0,settlementReceived:0,settlementPrincipal:0,settlementContractualInterest:0,settlementRecoveryInterest:0,settlementWaiver:0,outstanding:0,collections:0,negativeRecords:0,missingProducts:0,statusCounts:{ACTIVE:0,DUE:0,OVERDUE:0,CLOSED:0,SETTLED:0,FORECLOSED:0},issues:[]};
+            const out={loans:loans.length,disbursed:0,file:0,interest:0,penalty:0,foreclosureFee:0,preClosureInterest:0,postMaturityInterest:0,preEmiInterest:0,foreclosureReceived:0,settlementReceived:0,settlementPrincipal:0,settlementContractualInterest:0,settlementRecoveryInterest:0,settlementWaiver:0,outstanding:0,collections:0,negativeRecords:0,missingProducts:0,statusCounts:{ACTIVE:0,DUE:0,OVERDUE:0,CLOSED:0,SETTLED:0,FORECLOSED:0},issues:[]};
             const issue=(code,msg)=>out.issues.push({code,msg});
             loans.forEach(l=>{
                 const p=products[l.product];
@@ -6293,11 +6338,19 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 (l.payments||[]).forEach(pay=>{
                     const amt=Number(pay.amount)||0, intr=Number(pay.interest)||0, pen=Number(pay.penalty)||0, pre=Number(pay.preEmiInterest)||0;
                     if(amt<0||intr<0||pen<0||pre<0)out.negativeRecords++;
-                    out.collections+=Math.max(0,amt); out.interest+=intr; out.penalty+=pen; out.preEmiInterest+=pre;
+                    out.collections+=Math.max(0,amt)+Math.max(0,pen); out.interest+=intr; out.penalty+=pen; out.preEmiInterest+=pre;
                 });
-                if(l.foreclosed&&l.foreclosureData){out.foreclosureFee+=Math.max(0,Number(l.foreclosureData.feeAmount)||0);out.preClosureInterest+=Math.max(0,Number(l.foreclosureData.preClosureInterest)||0);}
+                (l.pendingParts||[]).forEach(part=>{out.collections+=Math.max(0,Number(part.amount)||0);});
+                if(l.foreclosed&&l.foreclosureData){
+                    const fd=l.foreclosureData,parts=Array.isArray(fd.partialPaymentParts)?fd.partialPaymentParts:[];
+                    out.collections+=parts.length?parts.reduce((n,x)=>n+Math.max(0,Number(x.amount)||0),0):Math.max(0,Number(fd.partialAmountAlreadyCollected)||0);
+                    out.foreclosureReceived+=Math.max(0,Number(fd.settlementAmount)||0);
+                    out.foreclosureFee+=Math.max(0,Number(fd.feeAmount)||0);out.preClosureInterest+=Math.max(0,Number(fd.preClosureInterest)||0);
+                }
                 if(l.postMaturitySettlement){
                     const pm=l.postMaturitySettlement, c=getPostMaturitySettlementCalc(l,pm.settlementDate), a=mfSettlementAllocation(l,Number(pm.actualReceived)||0,c);
+                    const partials=Array.isArray(pm.partialPaymentParts)?pm.partialPaymentParts:[];
+                    out.collections+=partials.length?partials.reduce((n,x)=>n+Math.max(0,Number(x.amount)||0),0):Math.max(0,Number(pm.partialAmountAlreadyCollected)||0);
                     out.settlementReceived+=Math.max(0,Number(pm.actualReceived)||0);
                     out.settlementPrincipal+=Math.max(0,Number(a.principalReceived)||0);
                     out.settlementContractualInterest+=Math.max(0,Number(a.contractualInterestReceived)||0);
@@ -6310,7 +6363,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 out.outstanding += l.foreclosed ? 0 : Math.max(0,Number(getLoanPending(l))||0);
                 out.statusCounts[mfLoanOperationalStatus(l)] = (out.statusCounts[mfLoanOperationalStatus(l)]||0)+1;
             });
-            out.collections += out.settlementReceived;
+            out.collections += out.settlementReceived + out.foreclosureReceived;
             let lenderInterest=0,lenderGst=0,lenderUpfront=0,principalRepaid=0,capitalBorrowed=0;
             (state.borrowings||[]).forEach(b=>{
                 capitalBorrowed+=Math.max(0,Number(b.amount)||0); lenderUpfront+=Math.max(0,Number(borrowingUpfrontCharges(b))||0);
@@ -7509,7 +7562,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             rows.forEach(r=>{const key=r.customerBookKey||String(r.loan.customerKey||mfMakeCustomerKey(r.loan.name,r.loan.phone));if(!map.has(key))map.set(key,[]);map.get(key).push(r);});
             return Array.from(map.values());
         }
-        function exportUpcomingEmiExcel(){
+        async function exportUpcomingEmiExcel(){
+            try{await mfEnsureXlsxLibrary();}catch(e){alert(e.message||String(e));return;}
             if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}
             const rows=getUpcomingExportRows();
             const data=[[
@@ -7754,7 +7808,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const tenure=Number(p.tenure)||0;
             const emi=Number(p.emi)||0;
             const pendingEmis=Math.max(0,tenure-payments.length);
-            const partialCollected=getLoanPartialSum(loan);
+            const partialCollected=loan.postMaturitySettlement
+                ? Math.max(0,Number(loan.postMaturitySettlement.partialAmountAlreadyCollected)||0)
+                : getLoanPartialSum(loan);
             const contractualPending=getLoanContractualOutstanding(loan);
             const scheduledPending=Math.max(0,Array.from({length:Math.max(0,tenure-payments.length)},(_,k)=>mfLoanInstallmentAmount(loan,payments.length+k+1)).reduce((a,v)=>a+(Number(v)||0),0));
             const totalPrincipal=Math.max(0,(Number(p.principal)||0)*tenure);
@@ -7807,7 +7863,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 : getLoanPartialSum(loan);
             const totalContractualInterest=Math.max(0,(Number(state.products[loan.product]?.interest)||0)*(Number(state.products[loan.product]?.tenure)||0))+mfLoanPreEmiDue(loan);
             const alloc=mfSettlementAllocation(loan,actual,c);
-            loan.postMaturitySettlement={settlementDate:settleDate,maturityDate:c.maturityIso,_rawActualReceived:String(document.getElementById('pm-actual-amount').value||actual),overdueDays:c.overdueDays,recoveryMonths:c.recoveryMonths,recoveryRate:c.rate,contractualPending:c.contractualPending,recoveryInterest:c.recoveryInterest,recoveryInterestReceived:alloc.recoveryInterestReceived,contractualInterestReceived:alloc.contractualInterestReceived,principalReceived:alloc.principalReceived,preEmiInterestReceived:alloc.preEmiReceived,calculatedSettlement:c.calculatedSettlement,actualReceived:actual,waiverAmount:waiver,mode,paymentMeta:sourceResult.meta,partialAmountAlreadyCollected,recordedAt:new Date().toISOString(),workingNote:{pendingEmis:c.pendingEmis,emi:c.emi,pendingPrincipal:c.pendingPrincipal,pendingInterest:c.pendingInterest,totalContractualInterest,totalScheduledPending:c.scheduledPending}};
+            loan.postMaturitySettlement={settlementDate:settleDate,maturityDate:c.maturityIso,_rawActualReceived:String(document.getElementById('pm-actual-amount').value||actual),overdueDays:c.overdueDays,recoveryMonths:c.recoveryMonths,recoveryRate:c.rate,contractualPending:c.contractualPending,recoveryInterest:c.recoveryInterest,recoveryInterestReceived:alloc.recoveryInterestReceived,contractualInterestReceived:alloc.contractualInterestReceived,principalReceived:alloc.principalReceived,preEmiInterestReceived:alloc.preEmiReceived,calculatedSettlement:c.calculatedSettlement,actualReceived:actual,waiverAmount:waiver,mode,paymentMeta:sourceResult.meta,partialAmountAlreadyCollected,partialPaymentParts:loan.postMaturitySettlement&&Array.isArray(loan.postMaturitySettlement.partialPaymentParts)?loan.postMaturitySettlement.partialPaymentParts.map(part=>({...part})):(Array.isArray(loan.pendingParts)?loan.pendingParts.map(part=>({...part})):[]),recordedAt:new Date().toISOString(),workingNote:{pendingEmis:c.pendingEmis,emi:c.emi,pendingPrincipal:c.pendingPrincipal,pendingInterest:c.pendingInterest,totalContractualInterest,totalScheduledPending:c.scheduledPending}};
             loan.pendingParts=[]; loan.status='SETTLED'; loan.closedBy='POST_MATURITY_SETTLEMENT';
             closeModal('modal-post-maturity-settlement'); persist(); alert(`Loan ${loan.id} (${loan.name}) settled after maturity. Received ₹${actual.toLocaleString('en-IN')}; waiver ₹${waiver.toLocaleString('en-IN')}.`);
         }
@@ -7839,7 +7895,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             box.innerHTML=summary+(body?`<div style="display:grid;gap:6px;max-height:55vh;overflow:auto;">${body}</div>`:'<div class="npa-empty">No customer matches these filters.</div>');
         }
         function getNpaExportRows(){return getNpaRows().map(x=>{const v=x._v;return [x.id,x.name,mfLoanTypeLabel(x),x.phone||'',x.phone2||'',x.guarantorPhone||'',(x.guarantorPhone2||x.guarantorSecondaryPhone||''),v.p.name||'',formatToIndianDate(x.disbursalDate),v.maturity?formatToIndianDate(v.maturity.toISOString().split('T')[0]):'',v.overdueDays,v.recoveryMonths,v.pending,v.settled?'SETTLED':x.foreclosed?'FORECLOSED':v.pending<=0?'CLOSED':v.npaWatch?'90+ DPD':'OVERDUE',x.collectorName||'',formatToIndianDate(x.postMaturitySettlement?.settlementDate),x.postMaturitySettlement?.calculatedSettlement||0,x.postMaturitySettlement?.actualReceived||0,x.postMaturitySettlement?.waiverAmount||0,x.postMaturitySettlement?.partialAmountAlreadyCollected||0,x.postMaturitySettlement?.mode||''];});}
-        function exportNpaReportExcel(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}const wb=XLSX.utils.book_new();const headers=['Loan ID','Customer','Loan Type','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal Date','Maturity Date','DPD','Recovery Months','Contractual Pending','Status','Collector','Settlement Date','Calculated Settlement','Actual Received','Waiver','Partial Already Collected','Settlement Mode'];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['NPA & Recovery Report'],['Generated',new Date().toLocaleString('en-IN')],[],headers,...getNpaExportRows()]),'NPA_Recovery');XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_NPA_Recovery_Report.xlsx`);}
+        async function exportNpaReportExcel(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}try{await mfEnsureXlsxLibrary();}catch(e){alert(e.message||String(e));return;}const wb=XLSX.utils.book_new();const headers=['Loan ID','Customer','Loan Type','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal Date','Maturity Date','DPD','Recovery Months','Contractual Pending','Status','Collector','Settlement Date','Calculated Settlement','Actual Received','Waiver','Partial Already Collected','Settlement Mode'];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['NPA & Recovery Report'],['Generated',new Date().toLocaleString('en-IN')],[],headers,...getNpaExportRows()]),'NPA_Recovery');XLSX.writeFile(wb,`${state.bizName.replace(/\s+/g,'_')}_NPA_Recovery_Report.xlsx`);}
         function printNpaReport(){if(!npaFiltersApplied){alert('Apply the NPA & Recovery filters first.');return;}const rows=getNpaExportRows();const w=window.open('','_blank');if(!w){alert('Please allow pop-ups to print the report.');return;}w.document.write(`<html><head><title>NPA & Recovery Report - ${financeEsc(state.bizName)}</title><style>body{font-family:Arial,sans-serif;color:#111;padding:18px;font-size:10px}h1{font-size:18px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:5px;text-align:left}th{background:#eee}</style></head><body><h1>${financeEsc(state.bizName)} — NPA & Recovery Report</h1><div>Generated: ${new Date().toLocaleString('en-IN')}</div><table><thead><tr>${['Loan ID','Customer','Loan Type','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Disbursal','Maturity','DPD','Recovery Months','Pending','Status','Collector','Settlement Date','Calculated','Received','Waiver','Partial Collected','Mode'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(v=>`<td>${financeEsc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>
 </body></html>`);w.document.close();w.onload=()=>{w.focus();w.print();};}
 
@@ -9147,7 +9203,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const settleDate = getDmyIsoString("fc-s");
             const mode = document.getElementById("fc-s-mode").value;
             const loan = state.loans.find(l => l.id === loanId);
-            const partialAmountAlreadyCollected = Math.max(0, getLoanPartialSum(loan));
+            const editMode=document.getElementById("fc-settle-edit-mode")?.value==='EDIT';
+            const partialAmountAlreadyCollected = editMode ? Math.max(0,Number(loan.foreclosureData?.partialAmountAlreadyCollected)||0) : Math.max(0, getLoanPartialSum(loan));
+            const partialPaymentParts = editMode && Array.isArray(loan.foreclosureData?.partialPaymentParts) ? loan.foreclosureData.partialPaymentParts.map(part=>({...part})) : (Array.isArray(loan.pendingParts)?loan.pendingParts.map(part=>({...part})):[]);
             const pc = mfPreClosureDetails(loan, settleDate);
             const netSettleAmt = mfSafeNumber(mfDecAdd(mfDecAdd(mfDecAdd(String(remPrin),String(pc.interest)),String(feeAmt)),String(gstAmt)));
             const sourceResult=mfPMReadInlineMeta('fc-s-mode',netSettleAmt,mode,'IN'); if(!sourceResult.ok)return;
@@ -9158,6 +9216,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 settlementDate: settleDate,
                 principalPaid: remPrin,
                 partialAmountAlreadyCollected,
+                partialPaymentParts,
                 preClosureDays: pc.days,
                 preClosureFromDate: pc.fromDate,
                 preClosureMonthlyInterest: pc.monthlyInterest,
@@ -9177,7 +9236,6 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             // account cannot double-count or lose that historical collection.
             loan.pendingParts=[];
 
-            const editMode=document.getElementById("fc-settle-edit-mode")?.value==='EDIT';
             closeModal("modal-foreclose");
             persist();
             renderFeed();
@@ -12366,7 +12424,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             // monthly roll-up, mode breakdown and reconciliation checks. This verifies impact
             // propagation after add/edit/delete/payment-mode changes without mutating anything.
             const years=new Set();
-            loans.forEach(l=>{if(l.disbursalDate)years.add(String(l.disbursalDate).slice(0,4));(l.payments||[]).forEach(p=>{if(p.date)years.add(String(p.date).slice(0,4));});if(l.foreclosureData?.settlementDate)years.add(String(l.foreclosureData.settlementDate).slice(0,4));if(l.postMaturitySettlement?.settlementDate)years.add(String(l.postMaturitySettlement.settlementDate).slice(0,4));});
+            loans.forEach(l=>{if(l.disbursalDate)years.add(String(l.disbursalDate).slice(0,4));(l.payments||[]).forEach(p=>mfPaymentReportingParts(p).forEach(part=>{if(part.date)years.add(String(part.date).slice(0,4));}));(l.pendingParts||[]).forEach(part=>{if(part.date)years.add(String(part.date).slice(0,4));});[...(Array.isArray(l.foreclosureData?.partialPaymentParts)?l.foreclosureData.partialPaymentParts:[]),...(Array.isArray(l.postMaturitySettlement?.partialPaymentParts)?l.postMaturitySettlement.partialPaymentParts:[])].forEach(part=>{if(part.date)years.add(String(part.date).slice(0,4));});(l.penaltyReceipts||[]).forEach(part=>{if(part.receivedDate)years.add(String(part.receivedDate).slice(0,4));});if(l.foreclosureData?.settlementDate)years.add(String(l.foreclosureData.settlementDate).slice(0,4));if(l.postMaturitySettlement?.settlementDate)years.add(String(l.postMaturitySettlement.settlementDate).slice(0,4));});
             const periods=[...years].filter(Boolean).flatMap(y=>[{year:y,basis:'calendar'},{year:y,basis:'financial'}]);
             periods.forEach(f=>{try{checkedReports++;const r=mfExecutiveReportData(f);r.reconciliation.forEach(x=>{if(x[3]!=='PASS')add('critical',`${r.periodLabel}: ${x[0]} failed.`,`Calculated ₹${Number(x[1]||0)} · Reported ₹${Number(x[2]||0)}`);});r.monthlyReconciliation.forEach(x=>{if(x[3]!=='PASS')add('critical',`${r.periodLabel}: monthly trend ${x[0]} does not roll up.`,`Monthly ₹${Number(x[1]||0)} · Annual ₹${Number(x[2]||0)}`);});}catch(e){add('critical',`Reporting audit failed for ${f.basis} ${f.year}.`,e?.message||String(e));}});
             const critical=issues.filter(x=>x.severity==='critical').length,warning=issues.filter(x=>x.severity==='warning').length;
@@ -12381,7 +12439,10 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const years=new Set();
             loans.forEach(l=>{
                 if(l.disbursalDate) years.add(String(l.disbursalDate).slice(0,4));
-                (l.payments||[]).forEach(p=>{if(p.date) years.add(String(p.date).slice(0,4));});
+                (l.payments||[]).forEach(p=>mfPaymentReportingParts(p).forEach(part=>{if(part.date)years.add(String(part.date).slice(0,4));}));
+                (l.pendingParts||[]).forEach(part=>{if(part.date)years.add(String(part.date).slice(0,4));});
+                [...(Array.isArray(l.foreclosureData?.partialPaymentParts)?l.foreclosureData.partialPaymentParts:[]),...(Array.isArray(l.postMaturitySettlement?.partialPaymentParts)?l.postMaturitySettlement.partialPaymentParts:[])].forEach(part=>{if(part.date)years.add(String(part.date).slice(0,4));});
+                (l.penaltyReceipts||[]).forEach(part=>{if(part.receivedDate)years.add(String(part.receivedDate).slice(0,4));});
                 if(l.foreclosureData?.settlementDate) years.add(String(l.foreclosureData.settlementDate).slice(0,4));
                 if(l.postMaturitySettlement?.settlementDate) years.add(String(l.postMaturitySettlement.settlementDate).slice(0,4));
             });
@@ -12405,7 +12466,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const f=mfReportPeriodFilter({year,basis}), d=getFinanceSnapshot(f), label=mfReportPeriodLabel({year,basis});
                 const activityRows=d.disbursed.filter(x=>x.includeDisb||x.activityInPeriod), activityLoanIds=new Set();
                 loans.forEach(l=>{
-                    const has=(l.payments||[]).some(p=>mfPeriodMatch(p.date,f))||mfPeriodMatch(l.foreclosureData?.settlementDate,f)||mfPeriodMatch(l.postMaturitySettlement?.settlementDate,f);
+                    const has=(l.payments||[]).some(p=>mfPaymentReportingParts(p).some(part=>mfPeriodMatch(part.date,f)))||(l.pendingParts||[]).some(part=>mfPeriodMatch(part.date,f))||[...(Array.isArray(l.foreclosureData?.partialPaymentParts)?l.foreclosureData.partialPaymentParts:[]),...(Array.isArray(l.postMaturitySettlement?.partialPaymentParts)?l.postMaturitySettlement.partialPaymentParts:[])].some(part=>mfPeriodMatch(part.date,f))||(l.penaltyReceipts||[]).some(part=>mfPeriodMatch(part.receivedDate,f))||mfPeriodMatch(l.foreclosureData?.settlementDate,f)||mfPeriodMatch(l.postMaturitySettlement?.settlementDate,f);
                     if(has)activityLoanIds.add(l.id);
                 });
                 activityRows.forEach(x=>{if(!x.includeDisb&&!x.activityInPeriod)add('critical',`${label}: a report row has neither disbursal nor actual activity basis.`,x.loan?.id||'-');});
@@ -12413,7 +12474,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 if(missing.length)add('critical',`${label}: actual-activity loan(s) are missing from Market Disbursement reporting.`,missing.slice(0,10).join(', '));
                 const principal=d.disbursed.reduce((sum,x)=>sum+(Number(x.paymentPrincipal)||0)+(x.loan.foreclosed&&mfPeriodMatch(x.loan.foreclosureData?.settlementDate,f)?Number(x.loan.foreclosureData?.principalPaid)||0:0)+(Number(x.settlementPrincipal)||0),0);
                 const direct=loans.reduce((sum,l)=>{
-                    let v=(l.payments||[]).filter(p=>mfPeriodMatch(p.date,f)).reduce((a,p)=>a+(Number(p.principal)||0),0);
+                    let v=(l.payments||[]).reduce((sum,p)=>sum+mfPaymentReportingParts(p).filter(part=>mfPeriodMatch(part.date,f)).reduce((a,part)=>a+(Number(part.principal)||0),0),0);
+                    v+=(l.pendingParts||[]).filter(part=>mfPeriodMatch(part.date,f)).reduce((a,part)=>a+(Number(part.amount)||0),0);
+                    v+=[...(Array.isArray(l.foreclosureData?.partialPaymentParts)?l.foreclosureData.partialPaymentParts:[]),...(Array.isArray(l.postMaturitySettlement?.partialPaymentParts)?l.postMaturitySettlement.partialPaymentParts:[])].filter(part=>mfPeriodMatch(part.date,f)).reduce((a,part)=>a+(Number(part.amount)||0),0);
                     if(l.foreclosed&&mfPeriodMatch(l.foreclosureData?.settlementDate,f))v+=Number(l.foreclosureData?.principalPaid)||0;
                     if(l.postMaturitySettlement&&mfPeriodMatch(l.postMaturitySettlement.settlementDate,f)){const c=getPostMaturitySettlementCalc(l,l.postMaturitySettlement.settlementDate),a=mfSettlementAllocation(l,Number(l.postMaturitySettlement.actualReceived)||0,c);v+=Number(a.principalReceived)||0;}
                     return sum+v;
@@ -12661,14 +12724,16 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         // ================= END PHASE A FOUNDATION / INTEGRITY CONTROL MAP =================
 
         function openReportingAuditModal(){closeModal('modal-cloud');document.getElementById('modal-reporting-audit')?.classList.add('active');runReportingAudit(false);}
-        function exportReportingAudit(){
+        async function exportReportingAudit(){
+            try{await mfEnsureXlsxLibrary();}catch(e){alert(e.message||String(e));return;}
             const report=window.__mfLastReportingAudit||runReportingAudit(false), rows=report.issues||[];
             const data=[['Reporting & Reconciliation Audit'],['Generated',new Date().toLocaleString('en-IN')],['Loan Accounts',report.counts.loans],['Periods Checked',report.counts.periods],['Critical',report.counts.critical],['Warnings',report.counts.warning],['Info',report.counts.info],[],['Severity','Issue','Detail'],...rows.map(x=>[x.severity,x.message,x.detail])];
             if(typeof XLSX!=='undefined'){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(data),'Reporting_Audit');XLSX.writeFile(wb,`${(state.bizName||'MicroFinance').replace(/\s+/g,'_')}_Reporting_Audit.xlsx`);}
         }
 
         function openLoanAuditModal(){closeModal('modal-cloud');document.getElementById('modal-loan-audit')?.classList.add('active');runLoanIntegrityAudit(false);}
-        function exportLoanAuditReport(){
+        async function exportLoanAuditReport(){
+            try{await mfEnsureXlsxLibrary();}catch(e){alert(e.message||String(e));return;}
             const report=window.__mfLastAudit||runLoanIntegrityAudit(false), rows=report.issues||[];
             const data=[['Loan Audit & Integrity Report'],['Generated',new Date().toLocaleString('en-IN')],['Loan Accounts',report.counts.loans],['Critical',report.counts.critical],['Warnings',report.counts.warning],[],['Severity','Loan ID','Customer','Issue','Detail'],...rows.map(x=>[x.severity,x.loanId,x.customer,x.message,x.detail])];
             if(typeof XLSX!=='undefined'){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(data),'Loan_Audit');XLSX.writeFile(wb,`${(state.bizName||'MicroFinance').replace(/\s+/g,'_')}_Loan_Audit.xlsx`);}else{const blob=new Blob([data.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Loan_Audit.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
@@ -12776,7 +12841,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         // Calendar Year: Jan 1–Dec 31. Financial Year: Apr 1–Mar 31.
         function mfReportingDates(){
             const dates=[]; const add=d=>{const v=String(d||'').slice(0,10);if(/^\d{4}-\d{2}-\d{2}$/.test(v))dates.push(v);};
-            (state.loans||[]).forEach(l=>{add(l.disbursalDate);(l.payments||[]).forEach(p=>add(p.date));add(l.foreclosureData?.settlementDate);add(l.postMaturitySettlement?.settlementDate);});
+            (state.loans||[]).forEach(l=>{add(l.disbursalDate);(l.payments||[]).forEach(p=>{add(p.date);(p.parts||[]).forEach(part=>add(part.date));});(l.pendingParts||[]).forEach(part=>add(part.date));(l.foreclosureData?.partialPaymentParts||[]).forEach(part=>add(part.date));(l.postMaturitySettlement?.partialPaymentParts||[]).forEach(part=>add(part.date));add(l.foreclosureData?.settlementDate);add(l.postMaturitySettlement?.settlementDate);});
             (state.borrowings||[]).forEach(b=>{add(b.date);(b.repayments||[]).forEach(r=>add(r.date));});
             (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(p=>add(p.date)));
             (state.expenses||[]).forEach(e=>add(e.date));
@@ -12825,16 +12890,62 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const v=String(mode??'').trim();
             return v||'Mode Not Recorded';
         }
+        // Expand a completed EMI into its real dated contributions for period reporting.
+        // Principal/interest/pre-EMI are allocated proportionally to each contribution; the
+        // final part receives any rounding remainder. Penalty is a separate receipt and stays
+        // on its recorded penaltyReceivedDate (falling back to the final contribution date).
+        // This is a reporting view only: stored customer transactions are never rewritten.
+        function mfPaymentReportingParts(pay){
+            if(!pay)return [];
+            const baseAmount=Math.max(0,Number(pay.amount)||0), parts=Array.isArray(pay.parts)?pay.parts.filter(x=>(Number(x?.amount)||0)>0):[];
+            if(!parts.length)return [{...pay,date:String(pay.date||'').slice(0,10),partIndex:1,partCount:1}];
+            const rawTotal=parts.reduce((n,x)=>n+(Number(x.amount)||0),0);
+            if(!(rawTotal>0))return [{...pay,date:String(pay.date||'').slice(0,10),partIndex:1,partCount:1}];
+            const fields=['principal','interest','preEmiInterest'];
+            const remaining={}; fields.forEach(k=>remaining[k]=Number(pay[k])||0);
+            const rows=parts.map((part,i)=>{
+                const amount=i===parts.length-1?Math.max(0,baseAmount-parts.slice(0,-1).reduce((n,x)=>n+baseAmount*(Number(x.amount)||0)/rawTotal,0)):baseAmount*(Number(part.amount)||0)/rawTotal;
+                const row={...pay,date:String(part.date||pay.date||'').slice(0,10),amount,mode:part.mode||pay.mode,paymentMeta:part.paymentMeta||pay.paymentMeta||null,partIndex:i+1,partCount:parts.length,parts:undefined};
+                fields.forEach(k=>{const v=i===parts.length-1?remaining[k]:(Number(pay[k])||0)*(Number(part.amount)||0)/rawTotal;row[k]=v;remaining[k]-=v;});
+                row.penalty=i===parts.length-1?(Number(pay.penalty)||0):0;
+                if(i===parts.length-1)row.penaltyReceivedDate=pay.penaltyReceivedDate||row.date;
+                else row.penaltyReceivedDate=null;
+                return row;
+            });
+            return rows;
+        }
+        function mfPrincipalFromDatedParts(parts,cutoff,cap=Infinity){
+            let total=0; (Array.isArray(parts)?parts:[]).forEach(x=>{if(String(x?.date||'').slice(0,10)<=cutoff)total+=Math.max(0,Number(x?.amount)||0);});
+            return Math.min(Math.max(0,Number(cap)||0),total);
+        }
         function mfPrincipalRecoveredThrough(loan,cutoff){
             if(!loan||!cutoff)return 0;
+            const product=state.products?.[loan.product]||{},principalLimit=Math.max(0,Number(product.amount)||0);
             let total=0;
-            (loan.payments||[]).forEach(p=>{if(String(p.date||'').slice(0,10)<=cutoff) total+=Number(p.principal)||0;});
-            if(loan.foreclosed && String(loan.foreclosureData?.settlementDate||'').slice(0,10)<=cutoff) total+=Number(loan.foreclosureData?.principalPaid)||0;
-            if(loan.postMaturitySettlement && String(loan.postMaturitySettlement.settlementDate||'').slice(0,10)<=cutoff){
-                const pm=loan.postMaturitySettlement, c=getPostMaturitySettlementCalc(loan,pm.settlementDate), a=mfSettlementAllocation(loan,Number(pm.actualReceived)||0,c);
-                total+=Number(a.principalReceived)||0;
+            (loan.payments||[]).forEach(pay=>{
+                const rows=mfPaymentReportingParts(pay);
+                rows.forEach(row=>{if(row.date&&row.date<=cutoff)total+=Math.max(0,Number(row.principal)||0);});
+            });
+            // Uncompleted partial contributions are actual cash received. Existing settlement
+            // logic treats these as principal-first, so portfolio reporting follows that same rule.
+            const pending=Array.isArray(loan.pendingParts)?loan.pendingParts:[];
+            total+=mfPrincipalFromDatedParts(pending,cutoff,Math.max(0,principalLimit-total));
+            if(loan.foreclosed){
+                const fd=loan.foreclosureData||{},partial=Array.isArray(fd.partialPaymentParts)?fd.partialPaymentParts:null;
+                if(partial)total+=mfPrincipalFromDatedParts(partial,cutoff,Math.max(0,principalLimit-total));
+                else if(String(fd.settlementDate||'').slice(0,10)<=cutoff)total+=Math.min(Math.max(0,Number(fd.partialAmountAlreadyCollected)||0),Math.max(0,principalLimit-total));
+                if(String(fd.settlementDate||'').slice(0,10)<=cutoff)total+=Math.min(Math.max(0,Number(fd.principalPaid)||0),Math.max(0,principalLimit-total));
             }
-            return total;
+            if(loan.postMaturitySettlement){
+                const pm=loan.postMaturitySettlement,partial=Array.isArray(pm.partialPaymentParts)?pm.partialPaymentParts:null;
+                if(partial)total+=mfPrincipalFromDatedParts(partial,cutoff,Math.max(0,principalLimit-total));
+                else if(String(pm.settlementDate||'').slice(0,10)<=cutoff)total+=Math.min(Math.max(0,Number(pm.partialAmountAlreadyCollected)||0),Math.max(0,principalLimit-total));
+                if(String(pm.settlementDate||'').slice(0,10)<=cutoff){
+                    const c=getPostMaturitySettlementCalc(loan,pm.settlementDate),a=mfSettlementAllocation(loan,Number(pm.actualReceived)||0,c);
+                    total+=Math.min(Math.max(0,Number(a.principalReceived)||0),Math.max(0,principalLimit-total));
+                }
+            }
+            return Math.min(principalLimit,Math.max(0,total));
         }
         function mfAnnualPortfolio(year,basis='calendar'){
             const b=mfAnnualBounds(year,basis); let opening=0,closing=0,disbursed=0,principalRecovered=0,openingAccounts=0,closingAccounts=0;
@@ -12856,7 +12967,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const out={principal:0,interest:0,preEmi:0,penalty:0,foreclosureFee:0,foreclosureGst:0,settlementOther:0,total:0,accounts:new Set()};
             d.disbursed.forEach(x=>{
                 x.filteredPayments.forEach(p=>{
-                    out.total+=Number(p.amount)||0; out.principal+=Number(p.principal)||0; out.interest+=Number(p.interest)||0; out.preEmi+=Number(p.preEmiInterest)||0; out.penalty+=Number(p.penalty)||0; out.accounts.add(x.loan.id);
+                    out.total+=(Number(p.amount)||0)+(Number(p.penalty)||0); out.principal+=Number(p.principal)||0; out.interest+=Number(p.interest)||0; out.preEmi+=Number(p.preEmiInterest)||0; out.penalty+=Number(p.penalty)||0; out.accounts.add(x.loan.id);
                 });
                 if(x.loan.foreclosed&&mfPeriodMatch(x.loan.foreclosureData?.settlementDate,filters)){
                     const fd=x.loan.foreclosureData||{}, total=Number(fd.settlementAmount)||0, principal=Number(fd.principalPaid)||0, interest=Number(fd.preClosureInterest)||0, fee=Number(fd.feeAmount)||0, gst=Number(fd.gstAmount)||0;
@@ -12896,7 +13007,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 if(category==='disbursed')q.disbursalCount++;
             };
             d.disbursed.forEach(x=>{
-                x.filteredPayments.forEach(p=>add('collections',p.mode,p.amount,p.paymentMeta));
+                x.filteredPayments.forEach(p=>add('collections',p.mode,(Number(p.amount)||0)+(Number(p.penalty)||0),p.paymentMeta));
                 if(x.loan.foreclosed&&mfPeriodMatch(x.loan.foreclosureData?.settlementDate,filters))add('collections',x.loan.foreclosureData?.mode,x.loan.foreclosureData?.settlementAmount,x.loan.foreclosureData?.paymentMeta);
                 if(x.loan.postMaturitySettlement&&mfPeriodMatch(x.loan.postMaturitySettlement.settlementDate,filters))add('collections',x.loan.postMaturitySettlement.mode,x.loan.postMaturitySettlement.actualReceived,x.loan.postMaturitySettlement.paymentMeta);
                 // This summary is the gross loan/disbursal measure used by the financial report.
@@ -12919,17 +13030,27 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             ];
         }
         function mfAnnualProductRows(year,d,portfolio){
-            const map={};
+            const map={},end=mfAnnualBounds(year,portfolio.basis||'calendar').end;
+            // Closing portfolio is a point-in-time balance, not an activity list. Include every
+            // loan originated on/before period end, even if it had no transaction in this year.
+            (state.loans||[]).forEach(loan=>{
+                const key=loan.product||'Unknown',p=state.products?.[loan.product];
+                if(!p||!loan.disbursalDate||String(loan.disbursalDate).slice(0,10)>end)return;
+                if(!map[key])map[key]={name:p.name||key,accounts:0,viewAccounts:0,disbursed:0,principal:0,revenue:0,closing:0};
+                const q=map[key];q.viewAccounts++;q.closing+=mfAnnualProductClosingPrincipal(loan,year,portfolio.basis||'calendar');
+            });
             d.disbursed.forEach(x=>{
                 const key=x.loan.product||x.p.name||'Unknown';
                 if(!map[key])map[key]={name:x.p.name||key,accounts:0,viewAccounts:0,disbursed:0,principal:0,revenue:0,closing:0};
-                const q=map[key]; q.viewAccounts++; if(x.includeDisb){q.accounts++;q.disbursed+=Number(x.p.amount)||0;} q.principal+=Number(x.paymentPrincipal)||0; q.revenue+=Number(x.totalProfit)||0;
-                const cp=mfAnnualProductClosingPrincipal(x.loan,year,portfolio.basis||'calendar'); q.closing+=cp;
+                const q=map[key];if(x.includeDisb){q.accounts++;q.disbursed+=Number(x.p.amount)||0;} q.principal+=(Number(x.paymentPrincipal)||0)+(Number(x.foreclosurePrincipal)||0)+(Number(x.settlementPrincipal)||0); q.revenue+=Number(x.totalProfit)||0;
             });
             return Object.values(map).map(q=>[q.name,q.accounts,q.viewAccounts,q.disbursed,q.principal,q.revenue,q.closing]);
         }
-        function mfAnnualProductClosingPrincipal(loan,year){
-            const p=state.products?.[loan?.product],b=mfAnnualBounds(year); if(!p||!loan?.disbursalDate||String(loan.disbursalDate).slice(0,10)>b.end)return 0;
+        function mfAnnualProductClosingPrincipal(loan,year,basis='calendar'){
+            // Product-wise closing principal must use the same reporting basis as the parent
+            // annual report. Previously this helper silently defaulted to Calendar Year even
+            // when the report was filtered to Financial Year (Apr–Mar).
+            const p=state.products?.[loan?.product],b=mfAnnualBounds(year,basis); if(!p||!loan?.disbursalDate||String(loan.disbursalDate).slice(0,10)>b.end)return 0;
             return Math.max(0,(Number(p.amount)||0)-mfPrincipalRecoveredThrough(loan,b.end));
         }
         function mfAnnualBorrowingAdded(year,basis='calendar'){ const b=mfAnnualBounds(year,basis); return (state.borrowings||[]).reduce((s,x)=>{const d=String(x.date||'').slice(0,10);return d>=b.start&&d<=b.end?s+Math.max(0,Number(x.amount)||0):s;},0); }
@@ -12993,9 +13114,18 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const p=state.products?.[l.product]||{};
                 const disbDate=String(l.disbursalDate||'').slice(0,10);
                 if(disbDate&&mfPeriodMatch(disbDate,{year:r.year,basis:r.basis}))add(disbDate,'Loan disbursal',`${l.name||'Customer'} · ${l.id||''}`,mfResolveDisbursalMode(l).label,Number(p.amount)||0,l.disbursalPaymentMeta);
-                (l.payments||[]).forEach(pay=>{const date=String(pay.date||'').slice(0,10);if(date&&mfPeriodMatch(date,{year:r.year,basis:r.basis}))add(date,'EMI / collection',`${l.name||'Customer'} · ${l.id||''}`,pay.mode,pay.amount,pay.paymentMeta);});
-                const fd=l.foreclosureData;if(fd&&mfPeriodMatch(fd.settlementDate,{year:r.year,basis:r.basis}))add(fd.settlementDate,'Foreclosure',`${l.name||'Customer'} · ${l.id||''}`,fd.mode,fd.settlementAmount,fd.paymentMeta);
-                const pm=l.postMaturitySettlement;if(pm&&mfPeriodMatch(pm.settlementDate,{year:r.year,basis:r.basis}))add(pm.settlementDate,'Post-maturity settlement',`${l.name||'Customer'} · ${l.id||''}`,pm.mode,pm.actualReceived,pm.paymentMeta);
+                (l.payments||[]).forEach(pay=>{
+                    const parts=Array.isArray(pay.parts)&&pay.parts.length?pay.parts:[{date:pay.date,amount:pay.amount,mode:pay.mode,paymentMeta:pay.paymentMeta}];
+                    parts.forEach(part=>{const date=String(part.date||pay.date||'').slice(0,10);if(date&&mfPeriodMatch(date,{year:r.year,basis:r.basis}))add(date,parts.length>1?'Partial EMI contribution':'EMI / collection',`${l.name||'Customer'} · ${l.id||''}`,part.mode||pay.mode,part.amount,part.paymentMeta||pay.paymentMeta);});
+                });
+                (l.pendingParts||[]).forEach(part=>{if(mfPeriodMatch(part.date,{year:r.year,basis:r.basis}))add(part.date,'Uncompleted partial EMI',`${l.name||'Customer'} · ${l.id||''}`,part.mode,part.amount,part.paymentMeta);});
+                if(Array.isArray(l.penaltyReceipts)&&l.penaltyReceipts.length){
+                    l.penaltyReceipts.forEach((penalty,i)=>{if(mfPeriodMatch(penalty.receivedDate,{year:r.year,basis:r.basis}))add(penalty.receivedDate,'Penalty receipt',`${l.name||'Customer'} · ${l.id||''}`,penalty.mode,penalty.amount,penalty.paymentMeta);});
+                }else{
+                    (l.payments||[]).forEach((pay,i)=>{const amount=Number(pay.penalty)||0,date=pay.penaltyReceivedDate||pay.date;if(amount>0&&mfPeriodMatch(date,{year:r.year,basis:r.basis}))add(date,'Penalty receipt (legacy)',`${l.name||'Customer'} · ${l.id||''}`,pay.penaltyReceivedMode||pay.mode,amount,pay.paymentMeta);});
+                }
+                const fd=l.foreclosureData;if(fd){const parts=Array.isArray(fd.partialPaymentParts)&&fd.partialPaymentParts.length?fd.partialPaymentParts:((Number(fd.partialAmountAlreadyCollected)||0)>0?[{date:fd.settlementDate,amount:fd.partialAmountAlreadyCollected,mode:'Mode Not Recorded',paymentMeta:null}]:[]);parts.forEach(part=>{if(mfPeriodMatch(part.date,{year:r.year,basis:r.basis}))add(part.date,'Partial EMI before foreclosure',`${l.name||'Customer'} · ${l.id||''}`,part.mode,part.amount,part.paymentMeta);});if(mfPeriodMatch(fd.settlementDate,{year:r.year,basis:r.basis}))add(fd.settlementDate,'Foreclosure',`${l.name||'Customer'} · ${l.id||''}`,fd.mode,fd.settlementAmount,fd.paymentMeta);}
+                const pm=l.postMaturitySettlement;if(pm){const parts=Array.isArray(pm.partialPaymentParts)&&pm.partialPaymentParts.length?pm.partialPaymentParts:((Number(pm.partialAmountAlreadyCollected)||0)>0?[{date:pm.settlementDate,amount:pm.partialAmountAlreadyCollected,mode:'Mode Not Recorded',paymentMeta:null}]:[]);parts.forEach(part=>{if(mfPeriodMatch(part.date,{year:r.year,basis:r.basis}))add(part.date,'Partial EMI before settlement',`${l.name||'Customer'} · ${l.id||''}`,part.mode,part.amount,part.paymentMeta);});if(mfPeriodMatch(pm.settlementDate,{year:r.year,basis:r.basis}))add(pm.settlementDate,'Post-maturity settlement',`${l.name||'Customer'} · ${l.id||''}`,pm.mode,pm.actualReceived,pm.paymentMeta);}
             });
             (state.borrowings||[]).forEach(b=>{
                 if(b.paymentMeta&&mfPeriodMatch(b.date,{year:r.year,basis:r.basis}))add(b.date,'Borrowing receipt',b.lenderName||b.name||b.id||'Lender',b.mode,b.netBorrowingReceived??b.amount,b.paymentMeta);
@@ -13097,11 +13227,22 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const loans=Array.isArray(state.loans)?state.loans:[];
             loans.forEach(l=>{
                 (l.payments||[]).forEach(pay=>{
-                    if(!inPeriod(pay.date))return;
-                    const receiptMeta=Array.isArray(pay.parts)&&pay.parts.length?{...metaOf(pay.paymentMeta),components:pay.parts.map(part=>({...part,paymentMeta:part.paymentMeta||part.meta||part}))}:pay.paymentMeta;
-                    splitReceipt(pay.date,Number(pay.amount)||0,pay.mode,receiptMeta,{principal:pay.principal,interest:pay.interest,preEmi:pay.preEmiInterest,other:0});
+                    // A completed EMI may contain contributions received on different dates.
+                    // Report each contribution on its own receipt date, not the final EMI date.
+                    mfPaymentReportingParts(pay).forEach(part=>{
+                        if(!inPeriod(part.date))return;
+                        splitReceipt(part.date,Number(part.amount)||0,part.mode||pay.mode,part.paymentMeta||pay.paymentMeta,{
+                            principal:Number(part.principal)||0,interest:Number(part.interest)||0,
+                            preEmi:Number(part.preEmiInterest)||0,other:0
+                        });
+                    });
                 });
-                (l.pendingParts||[]).forEach(x=>{if(inPeriod(x.date))splitReceipt(x.date,Number(x.amount)||0,x.mode,x.paymentMeta,{other:0});});
+                (l.pendingParts||[]).forEach(x=>{if(inPeriod(x.date))splitReceipt(x.date,Number(x.amount)||0,x.mode,x.paymentMeta,{principal:Number(x.amount)||0,other:0});});
+                const closedParts=[
+                    ...(Array.isArray(l.foreclosureData?.partialPaymentParts)?l.foreclosureData.partialPaymentParts:[]),
+                    ...(Array.isArray(l.postMaturitySettlement?.partialPaymentParts)?l.postMaturitySettlement.partialPaymentParts:[])
+                ];
+                closedParts.forEach(x=>{if(inPeriod(x.date))splitReceipt(x.date,Number(x.amount)||0,x.mode,x.paymentMeta,{principal:Number(x.amount)||0,other:0});});
                 (l.penaltyReceipts||[]).forEach(x=>{if(inPeriod(x.receivedDate))splitReceipt(x.receivedDate,Number(x.amount)||0,x.mode,x.paymentMeta,{other:Number(x.amount)||0});});
                 const fd=l.foreclosureData;
                 if(fd&&inPeriod(fd.settlementDate))splitReceipt(fd.settlementDate,Number(fd.settlementAmount)||0,fd.mode,fd.paymentMeta,{principal:Number(fd.principalPaid)||0,interest:Number(fd.preClosureInterest)||0,other:Math.max(0,(Number(fd.settlementAmount)||0)-(Number(fd.principalPaid)||0)-(Number(fd.preClosureInterest)||0))});
@@ -13233,16 +13374,16 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     }
                 }
                 (loan.payments||[]).forEach(pay=>{
-                    const date=String(pay.date||'').slice(0,10);if(!date||date<start||date>end)return;
-                    if(Array.isArray(pay.parts)&&pay.parts.length){
-                        const storedParts=pay.parts.map(part=>({...part,paymentMeta:part.paymentMeta||part.meta||part}));
-                        const componentMeta={...getMeta(pay.paymentMeta),components:storedParts};
-                        const partTotal=storedParts.reduce((n,x)=>n+(Number(x.amount)||0),0);
-                        if(Math.abs(partTotal-(Number(pay.amount)||partTotal))<=0.02)addRecovery(loan,Number(pay.amount)||partTotal,componentMeta,pay.mode,date,'EMI / Mixed Component Collection');
-                        else {storedParts.forEach(part=>addRecovery(loan,Number(part.amount)||0,part.paymentMeta,part.mode||pay.mode,String(part.date||date).slice(0,10),'EMI / Partial Component Collection'));addException(date,loan,'EMI Collection',Number(pay.amount)||partTotal,'Stored pay.parts total does not reconcile to the parent payment amount');}
-                    }else addRecovery(loan,Number(pay.amount)||0,pay.paymentMeta,pay.mode,date,'EMI Collection');
+                    // Use the same dated contribution rows as the annual collection ledger.
+                    // This also preserves channel components attached to each partial receipt.
+                    mfPaymentReportingParts(pay).forEach(part=>{
+                        const date=String(part.date||'').slice(0,10);
+                        if(!date||date<start||date>end)return;
+                        addRecovery(loan,Number(part.amount)||0,part.paymentMeta||pay.paymentMeta,part.mode||pay.mode,date,'EMI / Partial Collection');
+                    });
                 });
                 (loan.pendingParts||[]).forEach(part=>addRecovery(loan,Number(part.amount)||0,part.paymentMeta,part.mode,String(part.date||'').slice(0,10),'Partial Collection'));
+                [...(Array.isArray(loan.foreclosureData?.partialPaymentParts)?loan.foreclosureData.partialPaymentParts:[]),...(Array.isArray(loan.postMaturitySettlement?.partialPaymentParts)?loan.postMaturitySettlement.partialPaymentParts:[])].forEach(part=>addRecovery(loan,Number(part.amount)||0,part.paymentMeta,part.mode,String(part.date||'').slice(0,10),'Closed Loan Partial Collection'));
                 (loan.penaltyReceipts||[]).forEach(x=>addRecovery(loan,Number(x.amount)||0,x.paymentMeta,x.mode,String(x.receivedDate||'').slice(0,10),'Penalty Receipt'));
                 const fd=loan.foreclosureData;if(fd)addRecovery(loan,Number(fd.settlementAmount)||0,fd.paymentMeta,fd.mode,String(fd.settlementDate||'').slice(0,10),'Foreclosure');
                 const pm=loan.postMaturitySettlement;if(pm)addRecovery(loan,Number(pm.actualReceived)||0,pm.paymentMeta,pm.mode,String(pm.settlementDate||'').slice(0,10),'Post-Maturity Settlement');
@@ -13299,11 +13440,13 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const inPeriod=d=>mfPeriodMatch(String(d||'').slice(0,10),{year:r.year,basis:r.basis});
             (state.loans||[]).forEach(l=>{
                 const prod=state.products?.[l.product]||{};
-                (l.payments||[]).forEach(pay=>{
-                    if(!inPeriod(pay.date))return;
-                    if(Array.isArray(pay.parts)&&pay.parts.length){pay.parts.forEach(part=>add('collections',part.mode||pay.mode,part.amount,part.paymentMeta||null));}
-                    else add('collections',pay.mode,pay.amount,pay.paymentMeta||null);
-                });
+                (l.payments||[]).forEach(pay=>mfPaymentReportingParts(pay).forEach(part=>{
+                    if(inPeriod(part.date))add('collections',part.mode||pay.mode,part.amount,part.paymentMeta||pay.paymentMeta||null);
+                }));
+                (l.pendingParts||[]).forEach(part=>{if(inPeriod(part.date))add('collections',part.mode,part.amount,part.paymentMeta||null);});
+                [...(Array.isArray(l.foreclosureData?.partialPaymentParts)?l.foreclosureData.partialPaymentParts:[]),...(Array.isArray(l.postMaturitySettlement?.partialPaymentParts)?l.postMaturitySettlement.partialPaymentParts:[])].forEach(part=>{if(inPeriod(part.date))add('collections',part.mode,part.amount,part.paymentMeta||null);});
+                if(Array.isArray(l.penaltyReceipts)&&l.penaltyReceipts.length)l.penaltyReceipts.forEach(p=>{if(inPeriod(p.receivedDate))add('collections',p.mode,p.amount,p.paymentMeta||null);});
+                else (l.payments||[]).forEach(p=>{const date=p.penaltyReceivedDate||p.date;if((Number(p.penalty)||0)>0&&inPeriod(date))add('collections',p.penaltyReceivedMode||p.mode,p.penalty,p.paymentMeta||null);});
                 const fd=l.foreclosureData;if(fd&&inPeriod(fd.settlementDate))add('collections',fd.mode,fd.settlementAmount,fd.paymentMeta||null);
                 const pm=l.postMaturitySettlement;if(pm&&inPeriod(pm.settlementDate))add('collections',pm.mode,pm.actualReceived,pm.paymentMeta||null);
                 if(inPeriod(l.disbursalDate)){
@@ -13358,10 +13501,11 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const prod=state.products?.[l.product]||{};
                 if(l.disbursalDate)inspect(l.disbursalDate,`DISB-${l.id}`,'Loan Disbursal','OUT',Number(l.disbursalPaymentMeta?.transactionAmount??prod.netDisbursement??prod.amount)||0,l.name,l.disbursalMode||l.disbursalPaymentMeta?.mode,l.disbursalPaymentMeta);
                 (l.payments||[]).forEach((p,i)=>{
-                    if(Array.isArray(p.parts)&&p.parts.length)p.parts.forEach((part,j)=>inspect(p.date||part.date,`EMI-${l.id}-${i+1}-${j+1}`,'EMI Collection','IN',part.amount,l.name,part.mode||p.mode,part.paymentMeta||p.paymentMeta));
+                    if(Array.isArray(p.parts)&&p.parts.length)p.parts.forEach((part,j)=>inspect(part.date||p.date,`EMI-${l.id}-${i+1}-${j+1}`,'EMI Collection','IN',part.amount,l.name,part.mode||p.mode,part.paymentMeta||p.paymentMeta));
                     else inspect(p.date,`EMI-${l.id}-${i+1}`,'EMI Collection','IN',p.amount,l.name,p.mode,p.paymentMeta);
                 });
                 (l.pendingParts||[]).forEach((x,i)=>inspect(x.date,`PART-${l.id}-${i+1}`,'Partial Collection','IN',x.amount,l.name,x.mode,x.paymentMeta));
+                [...(Array.isArray(l.foreclosureData?.partialPaymentParts)?l.foreclosureData.partialPaymentParts:[]),...(Array.isArray(l.postMaturitySettlement?.partialPaymentParts)?l.postMaturitySettlement.partialPaymentParts:[])].forEach((x,i)=>inspect(x.date,`CLOSED-PART-${l.id}-${i+1}`,'Closed Loan Partial Collection','IN',x.amount,l.name,x.mode,x.paymentMeta));
                 if(l.foreclosureData)inspect(l.foreclosureData.settlementDate,`FORECLOSE-${l.id}`,'Foreclosure','IN',l.foreclosureData.settlementAmount,l.name,l.foreclosureData.mode,l.foreclosureData.paymentMeta);
                 if(l.postMaturitySettlement)inspect(l.postMaturitySettlement.settlementDate,`SETTLE-${l.id}`,'Post-Maturity Settlement','IN',l.postMaturitySettlement.actualReceived,l.name,l.postMaturitySettlement.mode,l.postMaturitySettlement.paymentMeta);
                 (l.penaltyReceipts||[]).forEach((x,i)=>inspect(x.receivedDate,`PENALTY-${l.id}-${i+1}`,'Penalty Receipt','IN',x.amount,l.name,x.mode,x.paymentMeta));
@@ -13413,7 +13557,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             };
             // Actual customer receipts: EMI/partial payments, foreclosure and post-maturity settlement.
             (state.loans||[]).forEach(l=>{
-                (l.payments||[]).forEach(pay=>{if(!inPeriod(pay.date))return;if(Array.isArray(pay.parts)&&pay.parts.length)pay.parts.forEach(pt=>add('in',pt.mode||pay.mode,pt.amount,pt.paymentMeta||null));else add('in',pay.mode,pay.amount,pay.paymentMeta||null);});
+                (l.payments||[]).forEach(pay=>mfPaymentReportingParts(pay).forEach(pt=>{if(inPeriod(pt.date))add('in',pt.mode||pay.mode,pt.amount,pt.paymentMeta||pay.paymentMeta||null);}));
+                (l.pendingParts||[]).forEach(pt=>{if(inPeriod(pt.date))add('in',pt.mode||'Mode Not Recorded',pt.amount,pt.paymentMeta||null);});
+                [...(Array.isArray(l.foreclosureData?.partialPaymentParts)?l.foreclosureData.partialPaymentParts:[]),...(Array.isArray(l.postMaturitySettlement?.partialPaymentParts)?l.postMaturitySettlement.partialPaymentParts:[])].forEach(pt=>{if(inPeriod(pt.date))add('in',pt.mode||'Mode Not Recorded',pt.amount,pt.paymentMeta||null);});
                 (l.penaltyReceipts||[]).forEach(p=>{if(inPeriod(p.receivedDate))add('in',p.mode||'Mode Not Recorded',p.amount,p.paymentMeta||null);});
                 const fd=l.foreclosureData;if(fd&&inPeriod(fd.settlementDate))add('in',fd.mode,fd.settlementAmount,fd.paymentMeta||null);
                 const pm=l.postMaturitySettlement;if(pm&&inPeriod(pm.settlementDate))add('in',pm.mode,pm.actualReceived,pm.paymentMeta||null);
@@ -13498,8 +13644,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function mfExcelAddSheet(wb,name,title,period,headers,rows,widths){ const data=[[title],['Reporting Period',period],[],headers,...mfExecutiveReportTableRows(rows)]; const ws=XLSX.utils.aoa_to_sheet(data); if(widths)ws['!cols']=widths.map(w=>({wch:w})); mfStyleExecutiveSheet(ws,1,4); XLSX.utils.book_append_sheet(wb,ws,name); return ws; }
         function mfExcelMoneyFormat(wb){ wb.SheetNames.forEach(name=>{const ws=wb.Sheets[name];Object.keys(ws).forEach(k=>{if(k[0]==='!'||!ws[k]||typeof ws[k].v!=='number')return;ws[k].z='#,##0.00';});}); }
 
-        function exportFullEnterpriseExcel(filters={}){
-            if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}
+        async function exportFullEnterpriseExcel(filters={}){
+            try{await mfEnsureXlsxLibrary();}catch(e){alert(e.message||String(e));return;}
             let r;try{r=mfExecutiveReportData(filters);}catch(e){alert(e.message);return;} const d=r.d, wb=XLSX.utils.book_new(), scope=r.periodLabel;
             mfExcelAddSheet(wb,'01_Executive_Summary','ANNUAL MANAGEMENT REPORT — EXECUTIVE SUMMARY',scope,['Metric','Current Year','Previous Year','Change','Change %'],r.compareMetrics.map(x=>[x[0],x[1],x[2],x[3],x[4]===null?'N/A':x[4]/100]),[42,20,20,20,16]);
             mfExcelAddSheet(wb,'02_PnL_Revenue','P&L / GROSS BUSINESS REVENUE — ACTUAL RECOGNITION',scope,['Revenue Component','Amount (₹)'],[...r.revenueComponents,['GROSS BUSINESS REVENUE',d.gross]],[46,22]);
@@ -13734,7 +13880,37 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 // real customer payment/settlement happened in 2026. The original capital
                 // and file charge are counted only in the disbursal period.
                 const includeDisb=!hasFilters || financeDateInRange(disbDate,filters);
-                const payments=(l.payments||[]).filter(x=>!hasFilters||financeDateInRange(x.date,filters));
+                const payments=(l.payments||[]).flatMap((pay,index)=>mfPaymentReportingParts(pay).map(row=>({...row,installmentNum:index+1}))).filter(x=>!hasFilters||financeDateInRange(x.date,filters));
+                // A partial contribution is reportable on its receipt date even before it
+                // completes an EMI. It is principal-first under the existing settlement rule.
+                const pendingPartRows=(l.pendingParts||[]).filter(x=>!hasFilters||financeDateInRange(x.date,filters)).map(x=>({date:String(x.date||'').slice(0,10),amount:Number(x.amount)||0,principal:Number(x.amount)||0,interest:0,preEmiInterest:0,penalty:0,mode:x.mode||'Mode Not Recorded',paymentMeta:x.paymentMeta||null,isUncompletedPartial:true}));
+                const closedPartialRows=[];
+                // Penalty receipts have their own actual receipt date. Keep them out of the
+                // completed EMI's historical date when the receipt happened later.
+                const penaltyReceiptRows=[];
+                const penaltyReceipts=Array.isArray(l.penaltyReceipts)?l.penaltyReceipts:[];
+                if(penaltyReceipts.length){
+                    const byInstallment=new Map();
+                    penaltyReceipts.forEach(r=>{
+                        const amount=Math.max(0,Number(r?.amount)||0);if(!amount)return;
+                        const inst=Number(r.installmentNum)||0;byInstallment.set(inst,(byInstallment.get(inst)||0)+amount);
+                        const date=String(r.receivedDate||'').slice(0,10);
+                        if(!hasFilters||financeDateInRange(date,filters))penaltyReceiptRows.push({date,amount:0,principal:0,interest:0,preEmiInterest:0,penalty:amount,mode:r.mode||'Mode Not Recorded',paymentMeta:r.paymentMeta||null,isPenaltyReceipt:true,installmentNum:inst});
+                    });
+                    (l.payments||[]).forEach((pay,index)=>{
+                        const recorded=Math.max(0,Number(pay.penalty)||0),receipted=byInstallment.get(index+1)||0,residual=Math.max(0,recorded-receipted);
+                        if(residual>0.005){const date=String(pay.penaltyReceivedDate||pay.date||'').slice(0,10);if(!hasFilters||financeDateInRange(date,filters))penaltyReceiptRows.push({date,amount:0,principal:0,interest:0,preEmiInterest:0,penalty:residual,mode:pay.penaltyReceivedMode||pay.mode||'Mode Not Recorded',paymentMeta:pay.paymentMeta||null,isPenaltyReceipt:true,installmentNum:index+1});}
+                    });
+                    payments.forEach(row=>{row.penalty=0;row.penaltyReceivedDate=null;});
+                }
+                const addClosedPartial=(snapshot,legacyAmount,settlementDate)=>{
+                    const saved=Array.isArray(snapshot)?snapshot.filter(x=>(Number(x?.amount)||0)>0):[];
+                    if(saved.length){saved.forEach(x=>{if(!hasFilters||financeDateInRange(x.date,filters))closedPartialRows.push({date:String(x.date||settlementDate||'').slice(0,10),amount:Number(x.amount)||0,principal:Number(x.amount)||0,interest:0,preEmiInterest:0,penalty:0,mode:x.mode||'Mode Not Recorded',paymentMeta:x.paymentMeta||null,isUncompletedPartial:true});});}
+                    else if((Number(legacyAmount)||0)>0&&(!hasFilters||financeDateInRange(settlementDate,filters)))closedPartialRows.push({date:String(settlementDate||'').slice(0,10),amount:Number(legacyAmount)||0,principal:Number(legacyAmount)||0,interest:0,preEmiInterest:0,penalty:0,mode:'Legacy partial receipt — source not separately recorded',paymentMeta:null,isUncompletedPartial:true});
+                };
+                if(l.foreclosed)addClosedPartial(l.foreclosureData?.partialPaymentParts,l.foreclosureData?.partialAmountAlreadyCollected,l.foreclosureData?.settlementDate);
+                if(l.postMaturitySettlement)addClosedPartial(l.postMaturitySettlement?.partialPaymentParts,l.postMaturitySettlement?.partialAmountAlreadyCollected,l.postMaturitySettlement?.settlementDate);
+                payments.push(...pendingPartRows,...closedPartialRows,...penaltyReceiptRows);
                 const li=payments.reduce((a,x)=>a+(Number(x.interest)||0),0);
                 const lp=payments.reduce((a,x)=>a+(Number(x.penalty)||0),0);
                 const paymentAmount=payments.reduce((a,x)=>a+(Number(x.amount)||0),0);
@@ -13756,7 +13932,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const activityInPeriod=payments.length>0 || ff>0 || fci>0 || pm>0 || settlementContractualInterest>0 || settlementPreEmiInterest>0 || settlementPrincipal>0 || sa>0 || waiver>0;
                 const fc=includeDisb?(Number(p.fileCharge)||0):0;
                 file+=fc; interest+=li+settlementContractualInterest; penalty+=lp; foreclosureFee+=ff; preClosureInterest+=fci; postMaturityInterest+=pm; preEmiInterest+=pe+settlementPreEmiInterest; settlementAmount+=sa; settlementWaiver+=waiver;
-                if(includeDisb || activityInPeriod) disbursed.push({loan:l,p,interest:li+settlementContractualInterest,penalty:lp,foreclosureFee:ff,preClosureInterest:fci,postMaturityInterest:pm,preEmiInterest:pe+settlementPreEmiInterest,settlementContractualInterest,settlementPreEmiInterest,settlementPrincipal,settlementAmount:sa,settlementWaiver:waiver,totalProfit:fc+li+settlementContractualInterest+lp+ff+fci+pm+pe+settlementPreEmiInterest,filteredPayments:payments,paymentAmount,paymentPrincipal,includeDisb,activityInPeriod,reportBasis:includeDisb?'Disbursal + period activity': 'Period activity only'});
+                const foreclosurePrincipal=l.foreclosed && (!hasFilters || financeDateInRange(l.foreclosureData?.settlementDate,filters)) ? (Number(l.foreclosureData?.principalPaid)||0) : 0;
+                if(includeDisb || activityInPeriod || payments.length) disbursed.push({loan:l,p,interest:li+settlementContractualInterest,penalty:lp,foreclosureFee:ff,preClosureInterest:fci,postMaturityInterest:pm,preEmiInterest:pe+settlementPreEmiInterest,settlementContractualInterest,settlementPreEmiInterest,settlementPrincipal,foreclosurePrincipal,settlementAmount:sa,settlementWaiver:waiver,totalProfit:fc+li+settlementContractualInterest+lp+ff+fci+pm+pe+settlementPreEmiInterest,filteredPayments:payments,paymentAmount,paymentPrincipal,includeDisb,activityInPeriod:activityInPeriod||payments.length>0,reportBasis:includeDisb?'Disbursal + period activity': 'Period activity only'});
             });
             let lender=[]; let lenderInterest=0,lenderGst=0,lenderPrincipal=0,lenderUpfront=0;
             state.borrowings.forEach(b=>{
@@ -13944,7 +14121,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             if(type==='disbursed') return d.disbursed.filter(x=>x.includeDisb||x.activityInPeriod).map(x=>[x.loan.id,x.loan.name,mfLoanTypeLabel(x.loan),x.loan.phone||'',x.loan.phone2||'',x.loan.guarantorPhone||'',(x.loan.guarantorPhone2||x.loan.guarantorSecondaryPhone||''),x.p.name,x.loan.disbursalDate,mfDisbursalModeLabel(x.loan.disbursalMode,x.loan.disbursalPaymentMeta),x.includeDisb?x.p.amount:0,x.paymentPrincipal||0,x.activityInPeriod?'Actual period activity':'Disbursed in period',(()=>{const fs=mfLoanOperationalStatus(x.loan);return (fs==='OVERDUE'||fs==='DUE')?'DUE':fs;})()]);
             return [['Gross Revenue',d.gross],['Lender Cost',d.lenderCost],['Staff Salaries',d.salaries],['General Expenses',d.generalExp],['TRUE IN-HAND NET SURPLUS',d.net]];
         }
-        function exportFinanceDetailReport(){
+        async function exportFinanceDetailReport(){
+            try{await mfEnsureXlsxLibrary();}catch(e){alert(e.message||String(e));return;}
             const d=getFinanceSnapshot(), wb=XLSX.utils.book_new(), type=financeCurrentType, rows=financeRowsForExport(type,d), headers=type==='gross'?['Loan ID','Customer','Loan Type','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','File Charge','Contractual Interest','Pre-EMI Interest','Penalty','Foreclosure Fee','Pre-Closure Interest','Post-Maturity Recovery Interest','Settlement Waiver (Not Revenue)','Revenue','Reporting Basis']:type==='lender'?['Date','Lender','Principal','Interest','GST','Total','Mode']:type==='opex'?['Date','Payee / Category','Type / Description','Amount','Mode']:type==='disbursed'?['Loan ID','Customer','Loan Type','Customer Mobile 1','Customer Mobile 2','Guarantor Mobile 1','Guarantor Mobile 2','Product','Original Disbursal Date','Disbursal Mode','Capital Disbursed in Period','Actual Principal Recovered in Period','Reporting Basis','Status']:['Metric','Amount'];
             XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['MicroFinance Financial Detail Report'],['Report Period',financePeriodLabel()],['Reporting Basis','Actual transaction/collection basis. Future unpaid EMIs are not counted as collected. Original disbursal capital and file charge belong only to the disbursal period.'],[],headers,...rows]),'Detail_Report');
             const definitions=[['REPORTING DEFINITIONS'],['Term','Meaning'],['Actual Collection','Money recorded as actually received in a customer payment/settlement transaction during the selected period.'],['Market Disbursed','Original loan capital disbursed during the selected period. A prior-year loan can still appear when it has actual activity in the selected period.'],['Gross Revenue','Revenue components actually recognized by this software from recorded transactions; principal is not revenue.'],['Current Outstanding','Current contractual pending amount for the loan; it is not a period collection figure.'],['Reporting Basis','Period filters use event dates. No future unpaid EMI is treated as received revenue.']];
@@ -14323,7 +14501,7 @@ window.mfPhaseBRunAudit=function(showAlert=false){mfPhaseBEnsureState();const is
 function renderLinkedKPIs(){const open=state.ptps.filter(p=>['OPEN','DUE','OVERDUE'].includes(phaseBStatus(p))).length,due=state.ptps.filter(p=>phaseBStatus(p)==='DUE').length,broken=state.ptps.filter(p=>phaseBStatus(p)==='BROKEN').length,fu=followRows().filter(f=>String(f.dueDate||'')<=mfPhaseBToday()).length,customers=mfPhaseBCustomerKeys().length;[['mf-phaseb-kpi-open',open],['mf-phaseb-kpi-due',due],['mf-phaseb-kpi-broken',broken],['mf-phaseb-kpi-follow',fu],['mf-phaseb-kpi-customers',customers]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=String(v);});}
 window.renderPhaseB=function(){ensure();if(reconcilePayments())persist();renderLinkedKPIs();renderPhaseBPTPList();renderPhaseBFollowUps();renderPhaseBCustomerDirectory();};
 window.renderPhaseBCustomerDirectory=window.renderPhaseBCustomerDirectory;
-window.mfPhaseBExportFollowUpsExcel=function(){const rows=followRows();if(!rows.length){alert('Search the Follow-up Queue first. There are no matching open tasks to export.');return;}if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}const data=[['FOLLOW-UP QUEUE REPORT'],['Generated',new Date().toLocaleString('en-IN')],[],['Customer','Loan ID','Original PTP Date','PTP Amount','Follow-up Due','PTP Status','Last Outcome','Outcome Notes','Channel']];rows.forEach(f=>{const l=mfPhaseBLoan(f.loanId),p=state.ptps.find(x=>String(x.id)===String(f.ptpId));data.push([l?.name||'',l?.id||'',p?.promisedDate||'',mfPhaseBAmountText(p),f.dueDate||'',phaseBStatus(p),f.outcome||'Not yet taken',f.outcomeNotes||'',f.channel||'Phone']);});const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(data);XLSX.utils.book_append_sheet(wb,ws,'Follow_Up_Queue');XLSX.writeFile(wb,`Follow_Up_Queue_${new Date().toISOString().slice(0,10)}.xlsx`);};
+window.mfPhaseBExportFollowUpsExcel=async function(){try{await mfEnsureXlsxLibrary();}catch(e){alert(e.message||String(e));return;}const rows=followRows();if(!rows.length){alert('Search the Follow-up Queue first. There are no matching open tasks to export.');return;}if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}const data=[['FOLLOW-UP QUEUE REPORT'],['Generated',new Date().toLocaleString('en-IN')],[],['Customer','Loan ID','Original PTP Date','PTP Amount','Follow-up Due','PTP Status','Last Outcome','Outcome Notes','Channel']];rows.forEach(f=>{const l=mfPhaseBLoan(f.loanId),p=state.ptps.find(x=>String(x.id)===String(f.ptpId));data.push([l?.name||'',l?.id||'',p?.promisedDate||'',mfPhaseBAmountText(p),f.dueDate||'',phaseBStatus(p),f.outcome||'Not yet taken',f.outcomeNotes||'',f.channel||'Phone']);});const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(data);XLSX.utils.book_append_sheet(wb,ws,'Follow_Up_Queue');XLSX.writeFile(wb,`Follow_Up_Queue_${new Date().toISOString().slice(0,10)}.xlsx`);};
 window.mfPhaseBExportFollowUpsPDF=function(customerOnly){
 const openRows=followRows();if(!openRows.length&&!customerOnly){alert('Search the Follow-up Queue first. There are no matching open tasks to print.');return;}
 let rows=openRows,title='FOLLOW-UP QUEUE — ACTIONABLE RECOVERY SHEET';
@@ -14419,7 +14597,7 @@ try{renderPhaseB();}catch(e){console.warn('Phase B linked workflow initial rende
   function allFollowHistory(){const q=String(document.getElementById('mf-phaseb-follow-search')?.value||'').trim();if(!q)return [];const ts=N(q).split(' ').filter(Boolean);return (state.recoveryFollowUps||[]).filter(f=>{const l=loan(f.loanId),p=ptpFor(f);if(!l||!p)return false;const h=searchHay2(l)+' '+N([p.promisedDate,p.nextFollowUpDate,p.amount,p.notes,f.dueDate,f.outcome,f.outcomeNotes].join(' '));return ts.every(t=>h.includes(t));}).sort((a,b)=>String(a.createdAt||'').localeCompare(String(b.createdAt||'')));
   }
   function reportRows(){return allFollowHistory();}
-  window.mfPhaseBExportFollowUpsExcel=function(){const rows=reportRows();if(!rows.length){alert('Search the Follow-up Queue first. There is no matching follow-up history to export.');return;}if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}const data=[['FOLLOW-UP HISTORY REPORT'],['Generated',new Date().toLocaleString('en-IN')],['Search',String(document.getElementById('mf-phaseb-follow-search')?.value||'')],[],['Customer','Loan ID','Original PTP Date','PTP Amount','Follow-up Date','PTP Status','Follow-up Status','Outcome','Outcome Notes']];rows.forEach(f=>{const l=loan(f.loanId),p=ptpFor(f);data.push([l?.name||'',l?.id||'',p?.promisedDate||'',mfPhaseBAmountText(p),f.dueDate||'',String(p?.status||'OPEN'),f.status||'OPEN',f.outcome||'Not yet taken',f.outcomeNotes||f.notes||'']);});const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(data);XLSX.utils.book_append_sheet(wb,ws,'Follow_Up_History');XLSX.writeFile(wb,`Follow_Up_History_${new Date().toISOString().slice(0,10)}.xlsx`);};
+  window.mfPhaseBExportFollowUpsExcel=async function(){try{await mfEnsureXlsxLibrary();}catch(e){alert(e.message||String(e));return;}const rows=reportRows();if(!rows.length){alert('Search the Follow-up Queue first. There is no matching follow-up history to export.');return;}if(typeof XLSX==='undefined'){alert('Excel library is not available.');return;}const data=[['FOLLOW-UP HISTORY REPORT'],['Generated',new Date().toLocaleString('en-IN')],['Search',String(document.getElementById('mf-phaseb-follow-search')?.value||'')],[],['Customer','Loan ID','Original PTP Date','PTP Amount','Follow-up Date','PTP Status','Follow-up Status','Outcome','Outcome Notes']];rows.forEach(f=>{const l=loan(f.loanId),p=ptpFor(f);data.push([l?.name||'',l?.id||'',p?.promisedDate||'',mfPhaseBAmountText(p),f.dueDate||'',String(p?.status||'OPEN'),f.status||'OPEN',f.outcome||'Not yet taken',f.outcomeNotes||f.notes||'']);});const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(data);XLSX.utils.book_append_sheet(wb,ws,'Follow_Up_History');XLSX.writeFile(wb,`Follow_Up_History_${new Date().toISOString().slice(0,10)}.xlsx`);};
   window.mfPhaseBExportFollowUpsPDF=function(){const rows=reportRows();if(!rows.length){alert('Search the Follow-up Queue first. There is no matching follow-up history to print.');return;}const title='FOLLOW-UP QUEUE — COMPLETE RECOVERY HISTORY',q=String(document.getElementById('mf-phaseb-follow-search')?.value||'');let body=`<h1>${E(title)}</h1><div>Search: ${E(q)} · Generated ${E(new Date().toLocaleString('en-IN'))} · ${rows.length} history record(s)</div>`;const groups={};rows.forEach(f=>{const l=loan(f.loanId),key=`${l?.name||'-'}|${l?.id||'-'}`;(groups[key]||(groups[key]=[])).push(f);});Object.values(groups).forEach(gs=>{const l=loan(gs[0].loanId);body+=`<h2>${E(l?.name||'-')} · ${E(l?.id||'-')}</h2><table><tr><th>PTP Date</th><th>PTP Amount</th><th>Follow-up Date</th><th>PTP Status</th><th>Follow-up Status</th><th>Outcome / What happened</th><th>Notes</th></tr>`;gs.forEach(f=>{const p=ptpFor(f);body+=`<tr><td>${E(mfPhaseBDateLabel(p?.promisedDate))}</td><td>${E(mfPhaseBAmountText(p))}</td><td>${E(mfPhaseBDateLabel(f.dueDate))}</td><td>${E(p?.status||'OPEN')}</td><td>${E(f.status||'OPEN')}</td><td>${E(f.outcome||'Not yet taken')}</td><td>${E(f.outcomeNotes||f.notes||'')}</td></tr>`;});body+='</table>';});const w=window.open('','_blank');if(!w){alert('Please allow the print window.');return;}w.document.write(`<!doctype html><html><head><title>${E(title)}</title><style>body{font-family:Arial,sans-serif;padding:18px;font-size:11px;color:#111}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #777;padding:5px;vertical-align:top;word-break:break-word}th{background:#eee}h1{font-size:18px}h2{font-size:14px;margin-top:18px;page-break-after:avoid}tr{page-break-inside:avoid}</style></head><body>${body}</body></html>`);w.document.close();setTimeout(()=>{try{w.focus();w.print();}catch(e){}},250);};
   // Customer 360: no automatic directory; results only after search.
   window.renderPhaseBCustomerDirectory=function(){const box=document.getElementById('mf-phaseb-customer-directory');if(!box)return;const q=String(document.getElementById('mf-phaseb-customer-search')?.value||'').trim();const detail=document.getElementById('mf-phaseb-customer-detail');if(!q){box.innerHTML='<div class="mf-phaseb-empty"><b style="color:#cbd5e1;">Customer 360 is ready.</b><br>Search customer, mobile, guarantor or Loan ID. No customer list is loaded by default.</div>';if(detail){detail.innerHTML='';delete detail.dataset.selected;}return;}const ts=N(q).split(' ').filter(Boolean),rows=mfPhaseBCustomerKeys().filter(c=>{const h=N([c.name,c.phone,...c.loans.flatMap(l=>[l.id,l.phone,l.phone2,l.guarantorName,l.guarantorPhone,l.guarantorPhone2,l.address,state.products?.[l.product]?.name,state.products?.[l.product]?.code])].filter(Boolean).join(' '));return ts.every(t=>h.includes(t));}).sort((a,b)=>String(a.name).localeCompare(String(b.name)));if(!rows.length){box.innerHTML='<div class="mf-phaseb-empty">No customer matches found.</div>';return;}box.innerHTML=rows.map(c=>`<div class="mf-phaseb-customer-item" onclick="openPhaseBCustomer360('${E(c.key)}')"><div class="mf-phaseb-name">${E(c.name)}</div><div class="mf-phaseb-meta">${E(c.phone||'No phone')} · ${c.loans.length} loan account${c.loans.length===1?'':'s'}</div></div>`).join('');if(detail&&!detail.dataset.selected&&rows.length===1)openPhaseBCustomer360(rows[0].key);};
@@ -15506,7 +15684,7 @@ function open(){buildModal();$('modal-phasec-portfolio').classList.add('active')
 function refreshPhaseCPortfolio(){refresh();}
 window.openPhaseCPortfolioModal=open;window.refreshPhaseCPortfolio=refreshPhaseCPortfolio;
 
-function exportPhaseCPortfolioExcel(){try{const pf=buildPortfolio(),pr=productRows(pf),vr=vintageRows(pf,'ALL');if(typeof XLSX==='undefined')throw new Error('Excel engine is not available.');const wb=XLSX.utils.book_new();const ov=[['PHASE C — PORTFOLIO INTELLIGENCE'],['As of',pcToday()],[],['Metric','Value'],['Total Loan Accounts',pf.rows.length],['Open/Risk Accounts',pf.open.length],['Gross Portfolio Disbursed',pf.totalDisb],['Open Principal Outstanding',pf.totalOut],['Overdue Accounts',pf.overdue.length],['PAR 30',pf.par30],['PAR 60',pf.par60],['PAR 90',pf.par90]];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ov),'01_Aging_PAR');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Product','Accounts','Open','Disbursed','Outstanding','Principal Recovered','Overdue','PAR30','PAR60','PAR90'],...pr.map(r=>[r.name,r.accounts,r.open,r.disb,r.out,r.rec,r.overdue,r.par30,r.par60,r.par90])]),'02_Product');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Vintage','Accounts','Open','Disbursed','Outstanding','Principal Recovered','Overdue','PAR30','PAR60','PAR90'],...vr.map(r=>[r.key,r.accounts,r.open,r.disb,r.out,r.rec,r.overdue,r.par30,r.par60,r.par90])]),'03_Vintage');const audit=window.__mfPhaseCAudit||{critical:0,warning:0,issues:[]};XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Severity','Finding','Detail'],...audit.issues.map(x=>[x.sev,x.msg,x.detail])]),'04_Audit');XLSX.writeFile(wb,`${String(state.bizName||'MicroFinance').replace(/\s+/g,'_')}_Phase_C_Portfolio_Intelligence.xlsx`);}catch(e){alert(e.message||String(e));}}
+async function exportPhaseCPortfolioExcel(){try{await mfEnsureXlsxLibrary();const pf=buildPortfolio(),pr=productRows(pf),vr=vintageRows(pf,'ALL');if(typeof XLSX==='undefined')throw new Error('Excel engine is not available.');const wb=XLSX.utils.book_new();const ov=[['PHASE C — PORTFOLIO INTELLIGENCE'],['As of',pcToday()],[],['Metric','Value'],['Total Loan Accounts',pf.rows.length],['Open/Risk Accounts',pf.open.length],['Gross Portfolio Disbursed',pf.totalDisb],['Open Principal Outstanding',pf.totalOut],['Overdue Accounts',pf.overdue.length],['PAR 30',pf.par30],['PAR 60',pf.par60],['PAR 90',pf.par90]];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ov),'01_Aging_PAR');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Product','Accounts','Open','Disbursed','Outstanding','Principal Recovered','Overdue','PAR30','PAR60','PAR90'],...pr.map(r=>[r.name,r.accounts,r.open,r.disb,r.out,r.rec,r.overdue,r.par30,r.par60,r.par90])]),'02_Product');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Vintage','Accounts','Open','Disbursed','Outstanding','Principal Recovered','Overdue','PAR30','PAR60','PAR90'],...vr.map(r=>[r.key,r.accounts,r.open,r.disb,r.out,r.rec,r.overdue,r.par30,r.par60,r.par90])]),'03_Vintage');const audit=window.__mfPhaseCAudit||{critical:0,warning:0,issues:[]};XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Severity','Finding','Detail'],...audit.issues.map(x=>[x.sev,x.msg,x.detail])]),'04_Audit');XLSX.writeFile(wb,`${String(state.bizName||'MicroFinance').replace(/\s+/g,'_')}_Phase_C_Portfolio_Intelligence.xlsx`);}catch(e){alert(e.message||String(e));}}
 function printPhaseCPortfolio(){const pf=buildPortfolio(),pr=productRows(pf),vr=vintageRows(pf,'ALL');const rows=(a)=>a.map(r=>`<tr>${r.map(x=>`<td>${esc(typeof x==='number'?Number(x).toLocaleString('en-IN',{maximumFractionDigits:2}):x)}</td>`).join('')}</tr>`).join('');const html=`<html><head><title>Phase C Portfolio Intelligence</title><style>body{font-family:Arial,sans-serif;color:#111;padding:24px;font-size:11px}h1{font-size:20px}h2{font-size:15px;margin-top:24px}table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #bbb;padding:5px;text-align:left}th{background:#eee}small{display:block;color:#555}
 /* Payment Management: shared bank masters and responsive source details */
 .mfpm-modal{width:min(1180px,97vw);max-width:1180px}
@@ -16667,7 +16845,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   window.mfPMCalculatePeriodRecon=function(){try{const r=mfPMBuildPeriodRecon();window.__mfPMCurrentPeriodRecon=r;const el=$('mfpm-period-recon-result');if(el)el.innerHTML=`<div class="mfpm-kpis"><div class="mfpm-kpi"><small>Ledger Opening</small><b>${money(r.ledgerOpening)}</b></div><div class="mfpm-kpi"><small>Ledger Movement (Net)</small><b>${money(r.ledgerMovement)}</b></div><div class="mfpm-kpi"><small>Calculated Ledger Closing</small><b>${money(r.ledgerClosing)}</b></div><div class="mfpm-kpi"><small>Statement Closing</small><b>${money(r.statementClosing)}</b></div><div class="mfpm-kpi"><small>Opening Difference</small><b>${money(r.openingDifference)}</b></div><div class="mfpm-kpi"><small>Closing Difference</small><b>${money(r.closingDifference)}</b></div></div><p><b>Statement roll-forward:</b> ${money(r.statementOpening)} + ${money(r.statementMoneyIn)} − ${money(r.statementMoneyOut)} = ${money(r.statementCalculatedClosing)} · Statement closing entered: ${money(r.statementClosing)} · Difference: ${money(r.statementRollForwardDifference)}</p><p><b>Imported statement rows:</b> ${r.statementLineCount} · Matched ${r.matched} · Amount differences ${r.differences} · Unmatched ${r.unmatched}</p><p><b>Status:</b> ${esc(r.status)}${r.issues.length?'<br>'+r.issues.map(esc).join(' · '):'<br>All tested arithmetic comparisons are within ₹0.01; reviewer approval is still required.'}</p>`;mfPMRenderPeriodReconHistory();return r;}catch(e){alert(e.message||String(e));return null;}};
   window.mfPMApprovePeriodRecon=function(){const r=window.mfPMCalculatePeriodRecon();if(!r)return;const approver=String($('mfpm-recon-approver')?.value||'').trim(),reason=String($('mfpm-recon-reason')?.value||'').trim(),accept=!!$('mfpm-recon-accept-exceptions')?.checked;if(!approver){alert('Enter the reviewer / approver name.');return;}if(!reason){alert('Enter a review note / reason.');return;}if(r.issues.length&&!accept){alert('Exceptions remain. Review them and tick “I reviewed and accept the listed exceptions” only if you intentionally record approval with exceptions.');return;}if(!confirm(r.issues.length?'Record this review with acknowledged exceptions? This does not lock the period.':'Record this reconciliation review? This does not lock the period.'))return;const rec={id:makeId('REVIEW'),recordedAt:new Date().toISOString(),bankId:r.bankId,bankName:r.bankName,start:r.start,end:r.end,approver,reason,status:r.issues.length?'APPROVED WITH EXCEPTIONS':'APPROVED — RECONCILED',statementOpening:r.statementOpening,statementClosing:r.statementClosing,ledgerOpening:r.ledgerOpening,ledgerMovement:r.ledgerMovement,ledgerClosing:r.ledgerClosing,statementMoneyIn:r.statementMoneyIn,statementMoneyOut:r.statementMoneyOut,statementCalculatedClosing:r.statementCalculatedClosing,openingDifference:r.openingDifference,statementRollForwardDifference:r.statementRollForwardDifference,closingDifference:r.closingDifference,statementLineCount:r.statementLineCount,matched:r.matched,differences:r.differences,unmatched:r.unmatched,issues:r.issues.slice(),signature:r.signature,deviceId:String(window.mfFirebaseDeviceId||'LOCAL')};state.paymentReconciliationReviews.push(rec);if(state.paymentReconciliationReviews.length>1000)state.paymentReconciliationReviews.splice(0,state.paymentReconciliationReviews.length-1000);mfPMAudit('PERIOD_RECON_REVIEW','Bank Statement Reconciliation',r.bankId,null,rec);try{mfScaleMarkDirty('root');}catch(e){}persist();mfPMRenderPeriodReconHistory();alert('Review recorded. This is an application audit record, not a cryptographic signature or period lock.');};
   window.mfPMExportPeriodRecon=function(wb){ensure();const rows=[['Recorded At','Bank','Bank ID','Period Start','Period End','Reviewer','Reason','Status','Statement Opening','Ledger Opening','Opening Difference','Statement Money In','Statement Money Out','Statement Calculated Closing','Entered Statement Closing','Ledger Movement','Calculated Ledger Closing','Closing Difference','Statement Roll-forward Difference','Statement Rows','Matched','Differences','Unmatched','Signature Snapshot','Device']];(state.paymentReconciliationReviews||[]).forEach(x=>rows.push([x.recordedAt,x.bankName,x.bankId,x.start,x.end,x.approver,x.reason,x.status,x.statementOpening,x.ledgerOpening,x.openingDifference,x.statementMoneyIn,x.statementMoneyOut,x.statementCalculatedClosing,x.statementClosing,x.ledgerMovement,x.ledgerClosing,x.closingDifference,x.statementRollForwardDifference,x.statementLineCount,x.matched,x.differences,x.unmatched,x.signature===mfPMReconFingerprint(x.bankId,x.start,x.end)?'CURRENT':'STALE — RE-REVIEW',x.deviceId]));if(wb&&typeof XLSX!=='undefined')XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Recon_Review_Audit');return rows;};
-  window.mfPMExportReconReviewAudit=function(){if(typeof XLSX==='undefined'){alert('Excel export library is not available.');return;}const wb=XLSX.utils.book_new();window.mfPMExportPeriodRecon(wb);XLSX.writeFile(wb,`Bank_Reconciliation_Review_Audit_${today()}.xlsx`);};
+  window.mfPMExportReconReviewAudit=async function(){try{await mfEnsureXlsxLibrary();}catch(e){alert(e.message||String(e));return;}const wb=XLSX.utils.book_new();window.mfPMExportPeriodRecon(wb);XLSX.writeFile(wb,`Bank_Reconciliation_Review_Audit_${today()}.xlsx`);};
   window.mfPMRender=function(){ensure();renderKpis();renderBanks();renderMovements();populateLedgerBankFilter();populateStatementBank();renderStatementLines();renderLedger();renderAudit();mfPMRenderPeriodReconHistory();document.querySelectorAll('.mfpm-inline[data-prefix]').forEach(p=>{const prefix=p.dataset.prefix,bank=$(`mfpm-${prefix}-bank`),old=bank?.value||'';if(bank)bank.innerHTML=optsBanks(old);window.mfPMRefreshInline(prefix);if(mixedDraft[prefix])renderMixedRows(prefix);});};
   function renderKpis(){
     const ac=activeBanks(),upis=ac.reduce((n,a)=>n+(a.upiSources||[]).filter(u=>u.active!==false).length,0);
@@ -16780,6 +16958,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
           p.parts.forEach((part,j)=>{if(part.paymentMeta)push({id:part.paymentMeta?.transactionId||`EMI-${l.id}-${i+1}-${j+1}`,date:part.date||p.date,type:'EMI Collection (Partial Part)',direction:'IN',amount:part.amount,loanId:l.id,customer:l.name,mode:part.mode,meta:part.paymentMeta,reference:part.paymentMeta?.reference||''});});
         }else if(p.paymentMeta)push({id:p.paymentMeta?.transactionId||`EMI-${l.id}-${i+1}`,date:p.date,type:'EMI Collection',direction:'IN',amount:p.amount,loanId:l.id,customer:l.name,mode:p.mode,meta:p.paymentMeta,reference:p.paymentMeta?.reference||''});
       });
+      (l.foreclosureData?.partialPaymentParts||[]).forEach((part,i)=>{if(part.paymentMeta)push({id:part.paymentMeta?.transactionId||`FORECLOSURE-PARTIAL-${l.id}-${i+1}`,date:part.date,type:'Partial Collection before Foreclosure',direction:'IN',amount:part.amount,loanId:l.id,customer:l.name,mode:part.mode,meta:part.paymentMeta,reference:part.paymentMeta?.reference||''});});
+      (l.postMaturitySettlement?.partialPaymentParts||[]).forEach((part,i)=>{if(part.paymentMeta)push({id:part.paymentMeta?.transactionId||`SETTLEMENT-PARTIAL-${l.id}-${i+1}`,date:part.date,type:'Partial Collection before Settlement',direction:'IN',amount:part.amount,loanId:l.id,customer:l.name,mode:part.mode,meta:part.paymentMeta,reference:part.paymentMeta?.reference||''});});
       if(l.foreclosureData?.paymentMeta)push({id:l.foreclosureData.paymentMeta?.transactionId||'FORECLOSURE-'+l.id,date:l.foreclosureData.settlementDate,type:'Foreclosure',direction:'IN',amount:l.foreclosureData.settlementAmount,loanId:l.id,customer:l.name,mode:l.foreclosureData.mode,meta:l.foreclosureData.paymentMeta});
       if(l.postMaturitySettlement?.paymentMeta)push({id:l.postMaturitySettlement.paymentMeta?.transactionId||'SETTLEMENT-'+l.id,date:l.postMaturitySettlement.settlementDate,type:'Post-Maturity Settlement',direction:'IN',amount:l.postMaturitySettlement.actualReceived,loanId:l.id,customer:l.name,mode:l.postMaturitySettlement.mode,meta:l.postMaturitySettlement.paymentMeta});
       (l.penaltyReceipts||[]).forEach((p,i)=>{if(p.paymentMeta)push({id:`PENALTY-${l.id}-${i+1}`,date:p.receivedDate,type:'Penalty Receipt',direction:'IN',amount:p.amount,loanId:l.id,customer:l.name,mode:p.mode,meta:p.paymentMeta,reference:p.paymentMeta?.reference||''});});
@@ -16855,8 +17035,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
       else if(String(r.meta?.bankAccountId||'')===String(accountId)){const n=Number(r.amount)||0;if(r.direction==='IN')bal+=n;else if(r.direction==='OUT')bal-=n;else if(r.direction==='INTERNAL')bal+=String(r.type).includes('Deposit')?n:-n;else if(r.direction==='TRANSFER')bal+=String(r.type).includes('In')?n:-n;}
     });return Math.round(bal*100)/100;
   }
-  window.mfPMExportExcel=function(){
-    if(typeof XLSX==='undefined'){alert('Excel export library is not available.');return;}
+  window.mfPMExportExcel=async function(){
+    try{await mfEnsureXlsxLibrary();}catch(e){alert(e.message||String(e));return;}
     const wb=XLSX.utils.book_new(),banks=[['Bank','Account Holder','Branch','IFSC','Masked Account','Type','Opening Balance','Opening Balance Effective Date','Calculated Source Balance','UPI IDs','Status']];
     (state.paymentAccounts||[]).forEach(a=>banks.push([a.bankName,a.accountHolder,a.branch,a.ifsc,masked(a.accountNumber),a.accountType,a.openingBalanceEffectiveDate?(Number(a.openingBalance)||0):'NOT SET',a.openingBalanceEffectiveDate||'NOT SET',accountBalance(a.id)===null?'NOT CALCULATED — SET OPENING DATE':accountBalance(a.id),(a.upiSources||[]).filter(u=>u.active!==false).length,a.active===false?'Inactive':'Active']));
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(banks),'Bank_Sources');
