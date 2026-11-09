@@ -5998,13 +5998,12 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 try{ mfV2MarkDirty(); scheduleFirebasePush(); }catch(e){ console.warn('Automatic Secure Firebase sync scheduling skipped:',e); }
                 try{
                     mfScaleScheduleMirror();
-                    // For a targeted loan deletion, the scheduled scoped render owns the
-                    // visible feed refresh. Calling renderFeed here as well duplicates a
-                    // full portfolio rebuild immediately after deletion and can lock up
-                    // the main thread on large customer/payment histories.
-                    if(options.renderScope!=='loan-delete'){
-                        try{ if(typeof renderFeed==='function') renderFeed(); }catch(e){}
-                    }
+                    // The scheduled render above is the single owner of UI refresh for
+                    // every save (including the active dashboard/feed). Rendering the feed
+                    // again here caused a duplicate full portfolio rebuild after ordinary
+                    // saves, even when another tab was active. On larger loan/payment sets
+                    // this occupied the main thread and could make the next click feel
+                    // ignored until the browser caught up. Keep one scoped render only.
                 }catch(e){}
                 // Google Drive is a secondary encrypted backup. Schedule a debounced upload
                 // only when the operator previously connected Drive; the worker never opens OAuth.
