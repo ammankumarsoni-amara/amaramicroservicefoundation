@@ -1550,6 +1550,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 <span class="cloud-dot"></span>
                 <span><b>Cloud & Local Safe:</b> <span id="sync-target-text">Device Storage</span></span>
             </div>
+            <div id="mf-local-save-status" role="status" style="font-size:.72rem"></div>
             <div style="font-size: 0.72rem; color: #38bdf8; cursor: pointer;" onclick="openCloudModal()" id="last-sync-time"><i class="fa-solid fa-gear me-1"></i> Connect Gmail Drive</div>
         </div>
 
@@ -3923,31 +3924,47 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             }
         }
 
-        async function idbPutSnapshot(options={}){
-            const db=await openMfDb();
+        // All current-state writes share one queue and one atomic snapshot/journal transaction.
+        let mfLocalRevision = '';
+        function mfSnapshotRevision(row){
+            return row?.revision || row?.updatedAt || '';
+        }
+        async function idbPutSnapshot(){
+            if(!mfDbReady) throw new Error('Local database is still opening. Keep this tab open.');
             const savedState=mfCloneStateForPersistence();
-            const hasBusinessData=!!(savedState && savedState.products && (
-                (Array.isArray(savedState.loans)?savedState.loans.length:0)+
-                (Array.isArray(savedState.borrowings)?savedState.borrowings.length:0)+
-                (Array.isArray(savedState.staff)?savedState.staff.length:0)+
-                (Array.isArray(savedState.expenses)?savedState.expenses.length:0)
-            ));
-            const previous=await new Promise((resolve,reject)=>{
-                const tx=db.transaction(MF_IDB_STORE,'readonly');
-                const r=tx.objectStore(MF_IDB_STORE).get('current');
-                r.onsuccess=()=>resolve(r.result||null); r.onerror=()=>reject(r.error||new Error('Snapshot metadata read failed'));
-            });
-            const journalSeq=Number(options.journalSeq!==undefined?options.journalSeq:(mfPerfV2Seq||previous?.journalSeq||0))||0;
-            const payload={id:"current",version:1,updatedAt:new Date().toISOString(),state:savedState,journalSeq};
-            payload.stateFingerprint=mfStateFingerprintObject(payload.state);
-            await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,"readwrite");tx.objectStore(MF_IDB_STORE).put(payload);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
-            if(options.clearJournal!==false){
-                try{ await mfPerfV2DeleteJournalThrough(journalSeq); }catch(e){ console.warn('Performance journal cleanup deferred:',e); }
-            }
-            if(hasBusinessData){
-                try{ localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_READY','1'); localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_HASH',String(payload.stateFingerprint||'')); }catch(e){}
-            }
-            return payload;
+            const commit=async()=>{
+                const db=await openMfDb();
+                const updatedAt=new Date().toISOString();
+                const revision=updatedAt+'-'+Math.random().toString(36).slice(2);
+                const payload={id:'current',version:1,updatedAt,revision,state:savedState,
+                    journalSeq:0,stateFingerprint:mfStateFingerprintObject(savedState)};
+                await new Promise((resolve,reject)=>{
+                    const stores=[MF_IDB_STORE,MF_IDB_JOURNAL_STORE];
+                    const tx=db.transaction(stores,'readwrite',{durability:'strict'});
+                    const store=tx.objectStore(MF_IDB_STORE);
+                    let conflict=false;
+                    const request=store.get('current');
+                    request.onsuccess=()=>{
+                        if(mfSnapshotRevision(request.result)!==mfLocalRevision){
+                            conflict=true; tx.abort(); return;
+                        }
+                        store.put(payload);
+                        tx.objectStore(MF_IDB_JOURNAL_STORE).clear();
+                    };
+                    tx.oncomplete=resolve;
+                    tx.onabort=()=>reject(conflict ? new Error('Another tab changed the database. Keep this tab open and export your unsaved work before reloading.') : tx.error || new Error('Local save aborted.'));
+                });
+                mfLocalRevision=revision;
+                mfPerfV2JournalCount=0;
+                try{
+                    localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_READY','1');
+                    localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_HASH',payload.stateFingerprint);
+                }catch(e){}
+                return payload;
+            };
+            const result=mfPerfV2WriteChain.catch(()=>{}).then(commit);
+            mfPerfV2WriteChain=result;
+            return result;
         }
 
         async function idbGetSnapshot(){
@@ -3956,40 +3973,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         }
 
         // ================= PERFORMANCE ARCHITECTURE V2 =================
-        // Golden rule: zero business-data migration, zero manual re-entry, zero change to
-        // existing financial calculations. V15 state remains the business authority.
-        // Normal saves write only changed entities to a durable local journal. A complete
-        // snapshot is compacted periodically, so page reload/recovery still has one canonical
-        // snapshot while routine collections/edits do not serialize the entire database.
-        const MF_PERF_V2={schema:'AMARA-PERFORMANCE-ARCH-V2',compactEvery:25,compactAfterMs:120000,maxJournal:80};
+        // Replay journals created by previous versions before the first new snapshot.
         let mfPerfV2WriteChain=Promise.resolve();
-        let mfPerfV2Seq=0;
         let mfPerfV2JournalCount=0;
-        let mfPerfV2LastCompactAt=0;
-        let mfPerfV2Compacting=false;
-
-        function mfPerfV2Clone(v){
-            try{return mfScaleClone(v);}catch(e){return JSON.parse(JSON.stringify(v??null));}
-        }
-        function mfPerfV2EntityCurrent(kind,id){
-            const key=String(id);
-            if(kind==='products') return state.products&&Object.prototype.hasOwnProperty.call(state.products,key)?state.products[key]:null;
-            const arr=Array.isArray(state[kind])?state[kind]:[];
-            return arr.find(x=>String(x?.id)===key)||null;
-        }
-        function mfPerfV2BuildPatch(){
-            const patch={schema:MF_PERF_V2.schema,createdAt:new Date().toISOString(),full:false,shell:null,changes:{loans:[],products:[],staff:[],expenses:[],borrowings:[]}};
-            if(mfV2PendingDirty.full){ patch.full=true; return patch; }
-            if(mfV2PendingDirty.shell) patch.shell=mfPerfV2Clone(mfV2Shell());
-            for(const kind of Object.keys(patch.changes)){
-                for(const id of mfV2PendingDirty[kind]){
-                    const row=mfPerfV2EntityCurrent(kind,id);
-                    patch.changes[kind].push({id:String(id),row:row?mfPerfV2Clone(row):null});
-                }
-            }
-            const meaningful=patch.full||patch.shell!==null||Object.values(patch.changes).some(a=>a.length);
-            return meaningful?patch:null;
-        }
         function mfPerfV2ApplyPatch(target,patch){
             if(!patch||patch.full) return target;
             if(patch.shell&&typeof patch.shell==='object') target={...target,...patch.shell};
@@ -4030,62 +4016,11 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 if(rec.patch?.full) continue; // a full patch is compacted as a snapshot, never replayed here
                 working=mfPerfV2ApplyPatch(working,rec.patch); next=Math.max(next,Number(rec.seq||0));
             }
-            mfPerfV2Seq=next; mfPerfV2JournalCount=rows.length;
+            mfPerfV2JournalCount=rows.length;
             return {state:working,seq:next,replayed:rows.length};
         }
-        async function mfPerfV2AppendJournal(){
-            const patch=mfPerfV2BuildPatch();
-            if(!patch) return {seq:mfPerfV2Seq,changed:false};
-            if(patch.full){
-                // Full imports/restores are already explicitly persisted by their existing paths.
-                mfPerfV2Seq=Number(mfPerfV2Seq||0); return {seq:mfPerfV2Seq,changed:false,full:true};
-            }
-            const db=await openMfDb();
-            const seq=Number(mfPerfV2Seq||0)+1;
-            const rec={id:'j-'+seq,seq,version:1,createdAt:new Date().toISOString(),patch};
-            await new Promise((resolve,reject)=>{
-                const tx=db.transaction(MF_IDB_JOURNAL_STORE,'readwrite');
-                tx.objectStore(MF_IDB_JOURNAL_STORE).put(rec);
-                tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error||new Error('Performance journal save failed')); tx.onabort=()=>reject(tx.error||new Error('Performance journal save aborted'));
-            });
-            mfPerfV2Seq=seq; mfPerfV2JournalCount+=1;
-            return {seq,changed:true};
-        }
-        async function mfPerfV2DeleteJournalThrough(seq){
-            const db=await openMfDb();
-            await new Promise((resolve,reject)=>{
-                const tx=db.transaction(MF_IDB_JOURNAL_STORE,'readwrite');
-                const st=tx.objectStore(MF_IDB_JOURNAL_STORE), idx=st.index('seq'), req=idx.openCursor();
-                req.onsuccess=e=>{const c=e.target.result;if(!c)return resolve();if(Number(c.value?.seq||0)<=Number(seq||0)){c.delete();c.continue();}else resolve();};
-                req.onerror=()=>reject(req.error||new Error('Performance journal cleanup failed'));
-                tx.onerror=()=>reject(tx.error||new Error('Performance journal cleanup failed'));
-            });
-        }
-        async function mfPerfV2Compact(reason='threshold'){
-            if(mfPerfV2Compacting||!mfPerfV2JournalCount)return;
-            mfPerfV2Compacting=true;
-            const targetSeq=mfPerfV2Seq;
-            try{
-                await idbPutSnapshot({journalSeq:targetSeq});
-                await mfPerfV2DeleteJournalThrough(targetSeq);
-                mfPerfV2JournalCount=0; mfPerfV2LastCompactAt=Date.now();
-                console.debug('Performance Architecture V2 compacted local journal:',reason,targetSeq);
-            }catch(e){console.warn('Performance Architecture V2 compaction deferred:',e);}
-            finally{mfPerfV2Compacting=false;}
-        }
-        function mfPerfV2ScheduleCompact(seq){
-            const dueCount=mfPerfV2JournalCount>=MF_PERF_V2.compactEvery;
-            const dueTime=(Date.now()-Number(mfPerfV2LastCompactAt||0))>=MF_PERF_V2.compactAfterMs;
-            if(dueCount||dueTime) setTimeout(()=>mfPerfV2Compact(dueCount?'count':'time').catch(()=>{}),0);
-            if(mfPerfV2JournalCount>MF_PERF_V2.maxJournal) setTimeout(()=>mfPerfV2Compact('safety-limit').catch(()=>{}),0);
-        }
         function mfPerfV2QueuePersist(){
-            mfPerfV2WriteChain=mfPerfV2WriteChain.then(async()=>{
-                const result=await mfPerfV2AppendJournal();
-                mfPerfV2ScheduleCompact(result.seq);
-                return result;
-            }).catch(e=>{console.warn('Performance Architecture V2 local journal skipped; legacy snapshot path will protect data:',e);return null;});
-            return mfPerfV2WriteChain;
+            return idbPutSnapshot();
         }
         // ================= END PERFORMANCE ARCHITECTURE V2 =================
 
@@ -4825,13 +4760,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             try{
                 const clearPending=localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1';
                 const snap=await idbGetSnapshot();
-                const hasData=obj=>!!(obj && obj.products && (
-                    (Array.isArray(obj.loans)?obj.loans.length:0)+
-                    (Array.isArray(obj.borrowings)?obj.borrowings.length:0)+
-                    (Array.isArray(obj.staff)?obj.staff.length:0)+
-                    (Array.isArray(obj.expenses)?obj.expenses.length:0)
-                ));
-                const validLocalSnapshot=!clearPending && !!(snap?.state && (hasData(snap.state) || String(snap.state.bizName||'').trim() || String(snap.state.companyProfile?.legalName||'').trim()));
+                mfLocalRevision=mfSnapshotRevision(snap);
+                const replay=clearPending ? null : await mfPerfV2ReplayJournal(snap || {state:mfCloneStateForPersistence(),journalSeq:0});
+                const validLocalSnapshot=!clearPending && !!(snap?.state || replay?.replayed);
 
                 if(clearPending){
                     // Never reload a pre-clear snapshot. Reassert the blank state and finish
@@ -4841,14 +4772,10 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     await mfClearAllLocalBusinessStores();
                     try{mfV2SetHash(mfV2Fingerprint());mfV2ArmBaseline();}catch(e){}
                 }else if(validLocalSnapshot){
-                    state=snap.state;
-                    try{
-                        const replay=await mfPerfV2ReplayJournal(snap);
-                        if(replay?.state) state=replay.state;
-                    }catch(e){ console.warn('Performance Architecture V2 journal replay skipped; canonical snapshot remains authoritative:',e); }
+                    state=replay.state;
                     try{
                         localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_READY','1');
-                        localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_HASH',String(mfStateFingerprintObject(state)||snap.stateFingerprint||''));
+                        localStorage.setItem('MF_V2_LOCAL_SNAPSHOT_HASH',String(mfStateFingerprintObject(state)||snap?.stateFingerprint||''));
                     }catch(e){}
                 }else{
                     // A missing local snapshot is never permission to push the startup/default
@@ -5229,6 +5156,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             entities.staff.length===0 && entities.expenses.length===0 && entities.borrowings.length===0 &&
             mfStateFingerprintObject(verifiedCandidate)===String(meta.stateFingerprint||'');
           if(!entities.loans.length && mfV2HasBusinessData() && !verifiedCloudClear) throw new Error('Cloud database is incomplete: zero loan records returned. Local data was protected.');
+          if(!showConfirm && mfV2DirtyAt()) return false;
           state={...shell,...entities};
           mfScaleReinstallStateProxy(); normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
           await idbPutSnapshot();
@@ -5274,7 +5202,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           }
           const meta={ownerUid:mfFirebaseUser.uid,version,schemaVersion:'AMARA-SYNC-V2',updatedByDevice:mfFirebaseDeviceId,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAtLabel:new Date().toLocaleString('en-IN'),stateFingerprint:localHash,businessDataCleared:localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1',counts:{loans:(state.loans||[]).length,products:Object.keys(state.products||{}).length,staff:(state.staff||[]).length,expenses:(state.expenses||[]).length,borrowings:(state.borrowings||[]).length,payments:(state.loans||[]).reduce((n,l)=>n+(Array.isArray(l.payments)?l.payments.length:0),0)},shell:mfV2Shell()};
           await rootRef.set(meta,{mergeFields:Object.keys(meta)});
-          mfV2SetHash(localHash);mfSetKnownCloudVersion(version);mfV2ClearDirty();if(!syntheticFull)mfV2ClearPendingDirty(dirty);
+          mfV2SetHash(localHash);mfSetKnownCloudVersion(version);if(mfStateFingerprintObject(state)===localHash)mfV2ClearDirty();if(!syntheticFull)mfV2ClearPendingDirty(dirty);
           mfV2SetStatus('🟢 Secure cloud updated from this device — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
           return true;
         }
@@ -5315,6 +5243,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           };
           for(const k of Object.keys(actualCounts)){
             if(expectedCounts[k]!==undefined && Number(expectedCounts[k])!==actualCounts[k])throw new Error('SECURE_BOOTSTRAP_REJECTED: cloud record count verification failed for '+k+'. Local data was not overwritten.');
+          }
+          if(!mfV2LocalStateReady || (mfV2DirtyAt() && mfV2Fingerprint()!==expected)){
+            throw new Error('Local edits are awaiting sync. Automatic cloud restore paused to preserve them.');
           }
           state=candidate;
           mfScaleReinstallStateProxy();
@@ -5588,9 +5519,16 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                         mfFirebaseUser=user||null;
                         if(previousUid && previousUid!==String(user?.uid||'')){
                             googleAccessToken=null; googleTokenExpiresAt=0; googleDriveFileId=null; googleDriveFolderId=null;
-                            try{ localStorage.removeItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY); }catch(e){}
+                            clearPersistedGoogleAccessToken();
+                            if(localStorage.getItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY)==='1') localStorage.setItem('MF_DRIVE_FIREBASE_OWNER',previousUid);
                         }
                         if(user) {
+                            const owner=localStorage.getItem('MF_DRIVE_FIREBASE_OWNER');
+                            if(owner && owner!==user.uid){
+                                googleDriveFolderId=null; googleDriveFileId=null;
+                                clearPersistedGoogleAccessToken();
+                                localStorage.removeItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY);
+                            }
                             mfAuthStatus('🟢 Signed in: '+(user.email||user.uid));
                             if(mfSecureSyncEnabled && mfFirestoreDb && mfFirebaseSyncCode) {
                                 const cfgRaw=localStorage.getItem('MF_FIREBASE_CONFIG');
@@ -6014,7 +5952,15 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             if (inp) inp.addEventListener('keyup', e => { if (e.key === 'Enter') attemptAppUnlock(); });
         });
 
+        let mfSaveRequest=0, mfLastCommittedSave=0;
+        window.addEventListener('beforeunload',event=>{
+            if(mfSaveRequest!==mfLastCommittedSave){
+                event.preventDefault();
+                event.returnValue='';
+            }
+        });
         function persist(options={}){
+            const request=++mfSaveRequest;
             const now=new Date();
             try{ mfV2MarkDirty(); }catch(e){}
             try{ mfFinancialReconciliationCache=null; mfGrowthCache=null; }catch(e){}
@@ -6024,37 +5970,20 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 // distinguish a newer local compatibility copy from an older IndexedDB copy.
                 localStorage.setItem("MF_LOCAL_SAVED_AT", now.toISOString());
             }catch(e){}
-            mfPerfV2QueuePersist().then(async result=>{
-                const el=document.getElementById("last-sync-time");
-                if(el) el.innerHTML=`<i class="fa-solid fa-check text-success me-1"></i> Saved: ${now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+            const label=document.getElementById('mf-local-save-status');
+            if(label) label.textContent='Saving locally…';
+            mfPerfV2QueuePersist().then(()=>{
+                mfLastCommittedSave=request;
+                if(request===mfSaveRequest && label) label.textContent='Saved locally · '+now.toLocaleTimeString();
                 mfSchedulePersistRender(options.renderScope||'all');
-                // Version history remains a full-state audit snapshot, but it is now queued
-                // behind the incremental journal instead of being part of every save burst.
                 queueAutomaticVersionedBackup();
-                try{ const mirrored=await mfScaleBuildLocalEntities(false); if(mirrored) mfScaleResetDirty(); }catch(e){ console.warn('Scalable entity refresh skipped:',e); }
-            }).catch(err=>{
-                console.error("Incremental local save failed",err);
-                const el=document.getElementById("last-sync-time");
-                if(el) el.innerHTML=`<i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> Local save warning`;
-                mfSchedulePersistRender(options.renderScope||'all');
-            }).finally(()=>{
-                // PRIMARY OPERATIONAL CLOUD COPY: Firebase Secure Sync must not depend on
-                // IndexedDB success. A transient IndexedDB failure must never block the
-                // automatic cloud save when the compatibility localStorage copy succeeded.
-                // Google Drive remains the encrypted secondary backup/recovery layer.
-                try{ mfV2MarkDirty(); scheduleFirebasePush(); }catch(e){ console.warn('Automatic Secure Firebase sync scheduling skipped:',e); }
-                try{
-                    mfScaleScheduleMirror();
-                    // The scheduled render above is the single owner of UI refresh for
-                    // every save (including the active dashboard/feed). Rendering the feed
-                    // again here caused a duplicate full portfolio rebuild after ordinary
-                    // saves, even when another tab was active. On larger loan/payment sets
-                    // this occupied the main thread and could make the next click feel
-                    // ignored until the browser caught up. Keep one scoped render only.
-                }catch(e){}
-                // Google Drive is a secondary encrypted backup. Schedule a debounced upload
-                // only when the operator previously connected Drive; the worker never opens OAuth.
-                try{ scheduleAutomaticCloudSync(); }catch(e){ console.warn('Drive backup scheduling skipped:',e); }
+                scheduleFirebasePush();
+                mfScaleBuildLocalEntities(false).then(mirrored=>{if(mirrored) mfScaleResetDirty();}).catch(console.warn);
+                mfScaleScheduleMirror();
+            },err=>{
+                const message='Local save failed. Keep this tab open. '+(err?.message||err);
+                if(label) label.textContent=message;
+                alert(message);
             });
         }
 
@@ -6069,18 +5998,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function scheduleAutomaticCloudSync(){
             clearTimeout(cloudSyncTimer);
             cloudSyncTimer=null;
-            // Only previously configured devices are eligible. No OAuth request, popup,
-            // restore, reconciliation, or token refresh is ever started by this scheduler.
-            if(!mfGoogleDriveIsConfigured()) return;
-            if(isAppLockSet() && !mfAppUnlockedThisSession) return;
-            const last=Date.parse(localStorage.getItem(MF_LAST_DRIVE_BACKUP_AT_KEY)||'')||0;
-            const remaining=last ? Math.max(0,MF_DRIVE_AUTO_BACKUP_MIN_INTERVAL_MS-(Date.now()-last)) : 0;
-            const delay=Math.max(MF_DRIVE_AUTO_BACKUP_DEBOUNCE_MS,remaining);
-            cloudSyncTimer=setTimeout(async()=>{
-                cloudSyncTimer=null;
-                try{ await syncNowToGoogleDrive(true); }
-                catch(e){ mfDriveAutoBackupPending(e?.message||'Backup could not run.'); }
-            },delay);
+            // Drive uploads are started only by the manual backup button.
         }
 
         function markCloudSynced(){
@@ -6138,7 +6056,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             try{
                 if(mfGoogleDriveIsConfigured()){
                     el.innerHTML='<i class="fa-solid fa-circle-check text-success me-1"></i> Google Drive Connected';
-                    el.title='Google Drive is connected on this device. Encrypted background backup is eligible while this page is open and the saved authorization remains valid.';
+                    el.title='Drive setup is saved on this device. Use Backup to Google Drive for a manual backup.';
                 }else{
                     el.innerHTML='<i class="fa-solid fa-gear me-1"></i> Connect Gmail Drive';
                     el.title='Open Cloud & Local Safe settings to connect Google Drive.';
@@ -6155,11 +6073,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     ds.textContent='⚠ Partial backup: Current Database uploaded '+when+', but the timestamped recovery point failed. Retry Backup to Google Drive to complete a verified backup.';
                     return;
                 }
-                const pending=localStorage.getItem('MF_DRIVE_AUTO_BACKUP_PENDING');
-                if(pending){ let info=null; try{info=JSON.parse(pending);}catch(e){} ds.textContent='🟡 Automatic Drive backup pending: '+(info?.reason||'Reconnect Google Drive manually if needed.'); return; }
                 const last=localStorage.getItem(MF_LAST_DRIVE_BACKUP_AT_KEY);
                 if(last){ ds.textContent='Last complete encrypted backup: '+new Date(last).toLocaleString('en-IN')+' · Current Database and timestamped recovery point both uploaded.'; }
-                else ds.textContent='Automatic encrypted Drive backup is enabled after one-time connection. It runs after a quiet period, at most once every 6 hours while this page is open. Use Backup to Google Drive for an immediate manual backup.';
+                else ds.textContent='Use Backup to Google Drive to create an encrypted backup manually.';
             }catch(e){}
         }
         function updateSecureCloudStatus(message,warning=false){
@@ -6175,7 +6091,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 el.style.color='#fde68a'; return;
             }
             if(googleAccessToken) el.textContent="🟢 Google Drive connected for this session — manual encrypted backup is ready.";
-            else if(mfGoogleDriveIsConfigured()) el.textContent="🟢 Google Drive is configured on this device. Background backup uses only a still-valid saved authorization; if it expires, a manual reconnect is required.";
+            else if(mfGoogleDriveIsConfigured()) el.textContent="🟢 Google Drive is configured on this device. Press Backup to Google Drive. Google may ask you to authorize the backup.";
             else if(localStorage.getItem('MF_GOOGLE_CLIENT_ID')) el.textContent="🟡 Cloud Encryption PIN is active. Connect Google Drive once on this device to enable manual backup.";
             else el.textContent="🟢 IndexedDB local database active. Use Backup to Google Drive for a manual encrypted off-device backup.";
         }
@@ -11748,8 +11664,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 await mfWaitForGoogleIdentityServices();
             }
             if(googleAccessToken && googleTokenExpiresAt && Date.now() < googleTokenExpiresAt-60000) return googleAccessToken;
-            if(await restoreGoogleAccessTokenWrapped()) return googleAccessToken;
-            if(!interactive && !googleAccessToken) return null;
+            if(!interactive) return await restoreGoogleAccessTokenWrapped() ? googleAccessToken : null;
 
             // One token client for the whole app. The callback is registered at init time,
             // exactly as Google documents, rather than being replaced after initialization.
@@ -12049,12 +11964,12 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             if(response.status===401){
                 clearPersistedGoogleAccessToken();
                 if(background) throw new Error('Saved Google authorization expired or was revoked. Press Connect Google Drive manually; no popup was opened.');
-                throw new Error('Google Drive authorization expired. Please reconnect and retry.');
+                throw new Error('Google authorization expired during upload. Press Backup to Google Drive again.');
             }
             return response;
         }
         async function syncNowToGoogleDrive(background=false){
-            if(cloudSyncBusy) return false; cloudSyncBusy=true;
+            if(background || cloudSyncBusy) return false; cloudSyncBusy=true;
             let currentDatabaseUploaded=false;
             let recoveryPointUploaded=false;
             let currentDatabaseAt=null;
@@ -12062,32 +11977,21 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             try{
                 const pin=getCloudPin();
                 if(!mfFirebaseUser){
-                    if(background){ mfDriveAutoBackupPending('Firebase sign-in is required.'); return false; }
                     updateSecureCloudStatus('🟡 Google Drive backup is locked — Firebase sign-in is required.',true);
                     alert('Sign in to Firebase before creating a Google Drive backup.');
                     return false;
                 }
                 if(!pin){
-                    if(background){ mfDriveAutoBackupPending('Cloud Encryption PIN is not available after unlock.'); return false; }
                     updateSecureCloudStatus('🟡 Google Drive backup is locked — Cloud Encryption PIN is required.',true);
                     alert('Activate your Cloud Encryption PIN before creating a Google Drive backup.');
                     return false;
                 }
                 if(!mfGoogleDriveIsConfigured()){
-                    if(background){ mfDriveAutoBackupPending('Connect Google Drive manually once on this device.'); return false; }
                     updateSecureCloudStatus('🟡 Google Drive backup is locked — connect Google Drive once on this device.',true);
                     alert('Connect Google Drive once before creating a backup. No backup was created.');
                     return false;
                 }
-                if(background){
-                    if(!(googleAccessToken && googleTokenExpiresAt && Date.now()<googleTokenExpiresAt-60000)){
-                        const restored=await restoreGoogleAccessTokenWrapped();
-                        if(!restored || !(googleAccessToken && googleTokenExpiresAt && Date.now()<googleTokenExpiresAt-60000)){
-                            mfDriveAutoBackupPending('Saved Google authorization is missing or expired. Press Connect Google Drive manually; no popup was opened.');
-                            return false;
-                        }
-                    }
-                }else if(!googleAccessToken) await mfEnsureGoogleAccessForUser();
+                await mfEnsureGoogleAccessForUser();
                 if(!googleAccessToken) throw new Error('Google Drive authorization is not available.');
                 backupStage='preparing encrypted database';
                 const {folder,files}=await driveListCurrent(!background);
@@ -12219,6 +12123,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 // verification both succeed. If the field is later cleared, the input handler
                 // removes this value and the cached authorization so refresh cannot restore it.
                 localStorage.setItem('MF_GOOGLE_CLIENT_ID',clientId);
+                localStorage.setItem('MF_DRIVE_FIREBASE_OWNER',mfFirebaseUser.uid);
                 localStorage.setItem(MF_GOOGLE_DRIVE_CONFIGURED_KEY,'1');
                 document.getElementById('sync-target-text').innerText='Google Drive Connected';
                 updateSecureCloudStatus('🟢 Google Drive connected and verified. No backup was created. Use “Backup to Google Drive” only when you want to create an encrypted backup.');
@@ -14445,7 +14350,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                             cur.continue();
                         };
                         const blank=mfCloneStateForPersistence();
-                        store.put({id:'current',version:1,updatedAt:new Date().toISOString(),state:blank,journalSeq:0,stateFingerprint:mfStateFingerprintObject(blank)});
+                        const updatedAt=new Date().toISOString();
+                        tx.addEventListener('complete',()=>{mfLocalRevision=updatedAt;mfPerfV2JournalCount=0;});
+                        store.put({id:'current',version:1,updatedAt,state:blank,journalSeq:0,stateFingerprint:mfStateFingerprintObject(blank)});
                     }else store.clear();
                 }
                 tx.oncomplete=resolve;
@@ -14628,7 +14535,14 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
 
 
 <script id="amara-clean-v2-startup">
-window.addEventListener('load',()=>setTimeout(()=>{try{initializeSecureStorage();}catch(e){console.error('Clean storage startup failed',e);}},50));
+document.addEventListener('DOMContentLoaded',initializeSecureStorage);
+document.addEventListener('submit',event=>{
+  if(!mfDbReady && event.target.closest('#modal-client, #modal-collect')){
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    alert('Local database is still opening. Keep this form open and try saving again.');
+  }
+},true);
 (function(){
   // Mobile browsers freeze timers/sockets when the app is in the background. When the app comes back to the
   // foreground, reconcile once so (a) edits made just before leaving are pushed and (b) changes made on the other device are pulled.
@@ -15271,16 +15185,7 @@ try{renderPhaseB();}catch(e){console.warn('Phase B linked workflow initial rende
   function persistPhaseB(){
     try{ if(typeof mfScaleMarkDirty==='function') mfScaleMarkDirty('root'); }catch(e){}
     try{ if(typeof mfV2MarkDirty==='function') mfV2MarkDirty(); }catch(e){}
-    try{
-      if(typeof mfPerfV2QueuePersist==='function'){
-        mfPerfV2QueuePersist().then(async()=>{
-          try{ if(typeof idbPutSnapshot==='function') await idbPutSnapshot({clearJournal:true}); }catch(e){console.warn('Phase-B snapshot flush deferred',e);}
-          try{ if(typeof scheduleFirebasePush==='function') scheduleFirebasePush(); }catch(e){}
-        }).catch(()=>{try{if(typeof persist==='function')persist();}catch(e){}});
-      }else if(typeof persist==='function'){
-        persist();
-      }
-    }catch(e){try{if(typeof persist==='function')persist();}catch(_){} }
+    persist();
   }
 
   function receiptRows(p){
