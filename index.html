@@ -3499,24 +3499,11 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
 
             if (!dSel || !mSel || !ySel) return;
 
-            dSel.innerHTML = "";
-            for (let d = 1; d <= 31; d++) {
-                const val = d < 10 ? "0" + d : "" + d;
-                dSel.innerHTML += `<option value="${val}">${val}</option>`;
-            }
-
-            mSel.innerHTML = "";
-            for (let m = 0; m < 12; m++) {
-                const val = (m + 1) < 10 ? "0" + (m + 1) : "" + (m + 1);
-                mSel.innerHTML += `<option value="${val}">${MONTH_NAMES[m]}</option>`;
-            }
-
-            const currYear = new Date().getFullYear();
-            ySel.innerHTML = "";
-            for (let y = currYear - 3; y <= currYear + 3; y++) {
-                ySel.innerHTML += `<option value="${y}">${y}</option>`;
-            }
-
+            const option=(value,label)=>`<option value="${value}">${label}</option>`;
+            dSel.innerHTML=Array.from({length:31},(_,i)=>{const d=String(i+1).padStart(2,'0');return option(d,d);}).join('');
+            mSel.innerHTML=MONTH_NAMES.map((name,i)=>option(String(i+1).padStart(2,'0'),name)).join('');
+            const year=new Date().getFullYear();
+            ySel.innerHTML=Array.from({length:7},(_,i)=>option(year-3+i,year-3+i)).join('');
             setDmyValues(prefix, mfIsoToday());
         }
 
@@ -3528,6 +3515,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const mEl = document.getElementById(prefix + "-month");
                 const dEl = document.getElementById(prefix + "-day");
                 if (yEl && mEl && dEl) {
+                    if(/^\d{4}$/.test(parts[0]) && !Array.from(yEl.options).some(o=>o.value===parts[0])){
+                        yEl.add(new Option(parts[0],parts[0]));
+                    }
                     yEl.value = parts[0];
                     mEl.value = parts[1];
                     dEl.value = parts[2];
@@ -8131,6 +8121,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function openAddBorrowingModal() {
             document.getElementById("b-mode").value = "ADD";
             document.getElementById("modal-borrowing-heading").innerText = "Add Borrowed Capital Loan";
+            document.getElementById("b-category").selectedIndex=0;
+            document.getElementById("b-type").selectedIndex=0;
             const receiveMode=document.getElementById('b-received-mode');if(receiveMode)receiveMode.value='Bank Transfer';
             document.getElementById("b-lender-name").value = "";
             document.getElementById("b-amount").value = "";
@@ -8338,7 +8330,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const category = document.getElementById("b-category").value;
             const amount = parseFloat(document.getElementById("b-amount").value);
             const rate = parseFloat(document.getElementById("b-rate").value);
-            const tenure = parseInt(document.getElementById("b-tenure").value, 10);
+            const tenure = Number(document.getElementById("b-tenure").value);
             const interestBasis = document.getElementById("b-interest-basis").value;
             const type = document.getElementById("b-type").value;
             const processingFeePctText = mfExactText('b-processing-fee-pct','0');
@@ -8359,17 +8351,18 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const interestGstPct = Math.max(0, Number(document.getElementById("b-interest-gst-pct")?.value || 18));
             const date = getDmyIsoString("b");
             const firstEmiDate = getDmyIsoString("b-first");
-            const receivedMode=$('b-received-mode')?.value||'Bank Transfer';
-            const netBorrowingReceived=Math.max(0,amount-processingFee-processingGst-otherCharges-otherGst);
-            const receivedSourceResult={ok:true,meta:null}; // Capital borrowing records the receipt channel only; detailed payment-source allocation belongs to actual repayment/collection forms.
-
-            if (!Number.isFinite(tenure) || tenure < 1) {
-                alert("Please enter a valid loan tenure in months.");
-                return;
+            const receivedMode=document.getElementById('b-received-mode').value;
+            if(!lenderName.trim() || !(amount>0) || !Number.isFinite(amount) || !Number.isFinite(rate) || rate<0){
+                alert('Enter a lender name, a positive borrowing amount and a non-negative interest rate.');return;
             }
-            if (!date || !firstEmiDate || firstEmiDate < date) {
-                alert("First EMI due date cannot be earlier than the borrowing date.");
-                return;
+            if(!Number.isInteger(tenure) || tenure<1 || tenure>600){
+                alert('Enter a loan tenure from 1 to 600 whole months.');return;
+            }
+            if(!mfValidIsoDate(date) || !mfValidIsoDate(firstEmiDate)){
+                alert('Select valid calendar dates for the borrowing and first EMI.');return;
+            }
+            if(firstEmiDate<date){
+                alert('First EMI due date cannot be earlier than the borrowing date.');return;
             }
 
             if (mode === "ADD") {
@@ -8380,7 +8373,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     category: category,
                     amount: amount,
                     receivedMode: receivedMode,
-                    receivedPaymentMeta: receivedSourceResult.meta,
+                    receivedPaymentMeta: null,
                     rate: rate,
                     tenure: tenure,
                     interestBasis: interestBasis,
@@ -8407,6 +8400,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             } else {
                 const id = document.getElementById("b-id").value;
                 const b = state.borrowings.find(x => x.id === id);
+                if(!b){alert('Borrowing record is no longer available. Reopen the borrowing list.');return;}
                 b.lenderName = lenderName;
                 b.category = category;
                 b.amount = amount;
@@ -8447,6 +8441,14 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             }
         }
 
+        function mfBorrowingReceived(b){
+            return Number(b.receivedPaymentMeta?.transactionAmount ?? b.netBorrowingReceived ??
+                Math.max(0,Number(b.amount??b.principal??0)-borrowingUpfrontCharges(b)));
+        }
+        function mfLenderPaidAmount(r){
+            if([r.principal,r.interest,r.gst].every(v=>v==null||v===''))return Number(r.totalPaid)||0;
+            return (Number(r.principal)||0)+(Number(r.interest)||0)+(Number(r.gst)||0);
+        }
         function borrowingUpfrontCharges(b) {
             return (Number(b.processingFee)||0) + (Number(b.processingGst)||0) +
                    (Number(b.otherCharges)||0) + (Number(b.otherGst)||0);
@@ -8820,6 +8822,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             b.repayments=Array.isArray(b.repayments)?b.repayments:[];
             const editIndex=Number(document.getElementById('lp-edit-index')?.value||-1);
             const actualPaidDate=getDmyIsoString('lp');
+            if(!mfValidIsoDate(actualPaidDate)){alert('Select a valid calendar date for the lender payment.');return;}
             const mode=document.getElementById('lp-mode')?.value||'Bank Transfer / UPI';
             const p=Number(document.getElementById('lp-principal')?.value)||0;
             const i=Number(document.getElementById('lp-interest')?.value)||0;
@@ -13343,8 +13346,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const pm=l.postMaturitySettlement;if(pm){const parts=Array.isArray(pm.partialPaymentParts)&&pm.partialPaymentParts.length?pm.partialPaymentParts:((Number(pm.partialAmountAlreadyCollected)||0)>0?[{date:pm.settlementDate,amount:pm.partialAmountAlreadyCollected,mode:'Mode Not Recorded',paymentMeta:null}]:[]);parts.forEach(part=>{if(mfPeriodMatch(part.date,{year:r.year,basis:r.basis}))add(part.date,'Partial EMI before settlement',`${l.name||'Customer'} · ${l.id||''}`,part.mode,part.amount,part.paymentMeta);});if(mfPeriodMatch(pm.settlementDate,{year:r.year,basis:r.basis}))add(pm.settlementDate,'Post-maturity settlement',`${l.name||'Customer'} · ${l.id||''}`,pm.mode,pm.actualReceived,pm.paymentMeta);}
             });
             (state.borrowings||[]).forEach(b=>{
-                if(mfPeriodMatch(b.date,{year:r.year,basis:r.basis}))add(b.date,'Borrowing receipt',b.lenderName||b.name||b.id||'Lender',b.receivedMode||b.mode,b.receivedPaymentMeta?.transactionAmount??b.netBorrowingReceived??Math.max(0,Number(b.amount)-borrowingUpfrontCharges(b)),b.receivedPaymentMeta||b.paymentMeta);
-                (b.repayments||[]).forEach(x=>{if(mfPeriodMatch(x.date,{year:r.year,basis:r.basis}))add(x.date,'Lender repayment',b.lenderName||b.name||b.id||'Lender',x.mode,x.totalPaid??((Number(x.principal)||0)+(Number(x.interest)||0)+(Number(x.gst)||0)),x.paymentMeta);});
+                if(mfPeriodMatch(b.date,{year:r.year,basis:r.basis}))add(b.date,'Borrowing receipt',b.lenderName||b.name||b.id||'Lender',b.receivedMode||b.mode,mfBorrowingReceived(b),b.receivedPaymentMeta||b.paymentMeta);
+                (b.repayments||[]).forEach(x=>{if(mfPeriodMatch(x.date,{year:r.year,basis:r.basis}))add(x.date,'Lender repayment',b.lenderName||b.name||b.id||'Lender',x.mode,mfLenderPaidAmount(x),x.paymentMeta);});
             });
             (state.expenses||[]).forEach(x=>{if(mfPeriodMatch(x.date,{year:r.year,basis:r.basis}))add(x.date,'Expense',x.desc||x.category||'Business expense',x.mode,x.amount,x.paymentMeta);});
             (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(x=>{if(mfPeriodMatch(x.date,{year:r.year,basis:r.basis}))add(x.date,'Payroll',st.name||'Staff',x.mode,x.amount,x.paymentMeta);}));
@@ -13396,8 +13399,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 if(l.postMaturitySettlement)add(l.postMaturitySettlement.settlementDate,'Customer Collection','IN',l.postMaturitySettlement.actualReceived,l.postMaturitySettlement.mode,l.postMaturitySettlement.paymentMeta);
             });
             (state.borrowings||[]).forEach(b=>{
-                if(b.receivedPaymentMeta)add(b.date||b.borrowDate,'Capital Borrowing Received','IN',Number(b.receivedPaymentMeta.transactionAmount??Math.max(0,(Number(b.amount)||0)-borrowingUpfrontCharges(b))),b.receivedMode,b.receivedPaymentMeta);
-                (b.repayments||[]).forEach(x=>add(x.date,'Capital Borrowing Repayment','OUT',x.totalPaid||((Number(x.principal)||0)+(Number(x.interest)||0)+(Number(x.gst)||0)),x.mode,x.paymentMeta));
+                add(b.date||b.borrowDate,'Capital Borrowing Received','IN',mfBorrowingReceived(b),b.receivedMode,b.receivedPaymentMeta);
+                (b.repayments||[]).forEach(x=>add(x.date,'Capital Borrowing Repayment','OUT',mfLenderPaidAmount(x),x.mode,x.paymentMeta));
             });
             (state.expenses||[]).forEach(x=>add(x.date,'Expense','OUT',x.amount,x.mode,x.paymentMeta));
             (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(x=>add(x.date,'Payroll','OUT',x.amount,x.mode,x.paymentMeta)));
@@ -13430,7 +13433,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const root=metaOf(meta);let parts=partsOf(root);
                 if(!parts.length)parts=[{amount:total,mode:mode||root.mode,paymentMeta:root}];
                 const partTotal=parts.reduce((a,c)=>a+(Number(c.amount)||0),0);
-                if(Math.abs(partTotal-total)>0.02){const row=ensureReceipt('UNALLOCATED','Receipt source not reconciled','UNCLASSIFIED');row.unallocated+=total;row.collections+=total;return;}
+                if(Math.abs(partTotal-total)>0.005){const row=ensureReceipt('UNALLOCATED','Receipt source not reconciled','UNCLASSIFIED');row.unallocated+=total;row.collections+=total;return;}
                 parts.forEach(c=>{
                     const cm=metaOf(c),cmode=String(c.mode||cm.mode||mode||''),v=Number(c.amount)||0;if(v<=0)return;
                     const cash=cmode.toLowerCase()==='cash'||String(cm.channel||'').toUpperCase()==='CASH';
@@ -13728,7 +13731,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach((x,i)=>inspect(x.date,`SAL-${st.id}-${i}`,'Payroll','OUT',x.amount,st.name,x.mode,x.paymentMeta)));
             (state.borrowings||[]).forEach(b=>{
                 if(b.receivedPaymentMeta)inspect(b.date||b.borrowDate,`BORROW-IN-${b.id}`,'Capital Borrowing Received','IN',b.receivedPaymentMeta.transactionAmount??b.amount,b.name||b.lenderName,b.receivedMode,b.receivedPaymentMeta);
-                (b.repayments||[]).forEach((x,i)=>inspect(x.date,`BORROW-PAY-${b.id}-${i}`,'Capital Borrowing Repayment','OUT',x.totalPaid??((Number(x.principal)||0)+(Number(x.interest)||0)+(Number(x.gst)||0)),b.name||b.lenderName,x.mode,x.paymentMeta));
+                (b.repayments||[]).forEach((x,i)=>inspect(x.date,`BORROW-PAY-${b.id}-${i}`,'Capital Borrowing Repayment','OUT',mfLenderPaidAmount(x),b.name||b.lenderName,x.mode,x.paymentMeta));
             });
             return out;
         }
@@ -13781,7 +13784,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             });
             // Money Out: actual recorded disbursal payout source, lender repayments, expenses and payroll.
             (state.loans||[]).forEach(l=>{if(!inPeriod(l.disbursalDate))return;const meta=l.disbursalPaymentMeta||null,prod=state.products?.[l.product]||{};const amount=mfNetLoanPayout(l,prod);if(meta)add('out',l.disbursalMode||meta.mode,amount,meta);else add('out',l.disbursalMode||'Mode Not Recorded',amount,null);});
-            (state.borrowings||[]).forEach(b=>(b.repayments||[]).forEach(x=>{if(inPeriod(x.date))add('out',x.mode,Number(x.totalPaid??((Number(x.principal)||0)+(Number(x.interest)||0)+(Number(x.gst)||0))),x.paymentMeta||null);}));
+            (state.borrowings||[]).forEach(b=>(b.repayments||[]).forEach(x=>{if(inPeriod(x.date))add('out',x.mode,Number(mfLenderPaidAmount(x)),x.paymentMeta||null);}));
             (state.expenses||[]).forEach(x=>{if(inPeriod(x.date))add('out',x.mode,x.amount,x.paymentMeta||null);});
             (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach(x=>{if(inPeriod(x.date))add('out',x.mode,x.amount,x.paymentMeta||null);}));
             const bankRows=[...banks.values()];
@@ -17205,8 +17208,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     (state.expenses||[]).forEach((e,i)=>{if(e.paymentMeta)push({id:e.paymentMeta?.transactionId||'EXP-'+(e.id||i),date:e.date,type:'Expense',direction:'OUT',amount:e.amount,mode:e.mode,meta:e.paymentMeta,reference:e.paymentMeta?.reference||'',narration:e.desc||e.category});});
     (state.staff||[]).forEach(st=>(st.salaryPayments||[]).forEach((p,i)=>{if(p.paymentMeta)push({id:p.paymentMeta?.transactionId||`SAL-${st.id}-${i}`,date:p.date,type:'Payroll',direction:'OUT',amount:p.amount,mode:p.mode,meta:p.paymentMeta,narration:st.name,reference:p.paymentMeta?.reference||''});}));
     (state.borrowings||[]).forEach(b=>{
-      if(b.receivedPaymentMeta)push({id:b.receivedPaymentMeta.transactionId||'BORROW-IN-'+b.id,date:b.date||b.borrowDate,type:'Capital Borrowing Received',direction:'IN',amount:b.receivedPaymentMeta.transactionAmount??Math.max(0,(Number(b.amount)||Number(b.principal)||0)-(Number(b.processingFee)||0)-(Number(b.processingGst)||0)-(Number(b.otherCharges)||0)-(Number(b.otherGst)||0)),mode:b.receivedMode,meta:b.receivedPaymentMeta});
-      (b.repayments||[]).forEach((p,i)=>{if(p.paymentMeta)push({id:p.paymentMeta?.transactionId||`BORROW-PAY-${b.id}-${i}`,date:p.date,type:'Capital Borrowing Repayment',direction:'OUT',amount:p.totalPaid||((Number(p.principal)||0)+(Number(p.interest)||0)+(Number(p.gst)||0)),mode:p.mode,meta:p.paymentMeta,reference:p.paymentMeta?.reference||''});});
+      push({id:b.receivedPaymentMeta?.transactionId||'BORROW-IN-'+b.id,date:b.date||b.borrowDate,type:'Capital Borrowing Received',direction:'IN',amount:mfBorrowingReceived(b),mode:b.receivedMode,meta:b.receivedPaymentMeta});
+      (b.repayments||[]).forEach((p,i)=>{if(p.paymentMeta)push({id:p.paymentMeta?.transactionId||`BORROW-PAY-${b.id}-${i}`,date:p.date,type:'Capital Borrowing Repayment',direction:'OUT',amount:mfLenderPaidAmount(p),mode:p.mode,meta:p.paymentMeta,reference:p.paymentMeta?.reference||''});});
     });
     (state.paymentTransfers||[]).forEach(m=>{
       if(m.status==='VOID')return;
