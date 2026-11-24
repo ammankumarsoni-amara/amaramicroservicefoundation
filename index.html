@@ -4991,7 +4991,23 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           return (memory?.until||0)>(saved?.until||0)?memory:saved;
         }
         function mfQuotaPaused(){return Number(mfQuotaRecord()?.until)>Date.now();}
-        function mfQuotaLabel(){return 'Firebase quota reached · showing this device’s records. Next sync attempt after '+new Date(mfQuotaRecord().until).toLocaleTimeString()+'.';}
+        function mfQuotaLabel(){
+          const time=new Date(mfQuotaRecord().until).toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',second:'2-digit',hour12:true});
+          const local=mfV2DirtyAt()?'Local changes awaiting upload. Keep or reopen this device’s tab.':'Showing this device’s records. Cloud version unconfirmed.';
+          return 'Firebase quota reached. '+local+' Automatic retry at '+time+' (device clock).';
+        }
+        function mfQuotaManualRetry(){
+          if(!mfQuotaPaused())return true;
+          const key=mfQuotaKey(),lastKey=key+':manual',now=Date.now();
+          let last=window.mfManualQuotaAttempts?.[key]||0;
+          try{last=Math.max(last,Number(localStorage.getItem(lastKey))||0);}catch(e){}
+          if(last && now-last<60000){mfV2SetStatus(mfQuotaLabel(),true);return false;}
+          (window.mfManualQuotaAttempts||={})[key]=now;
+          try{localStorage.setItem(lastKey,String(now));localStorage.removeItem(key);}catch(e){}
+          if(window.mfQuotaMemory)delete window.mfQuotaMemory[key];
+          if(window.mfQuotaAlarm?.key===key){clearTimeout(window.mfQuotaAlarm.timer);window.mfQuotaAlarm=null;}
+          return !mfQuotaPaused();
+        }
         function mfQuotaWait(){
           if(!mfQuotaPaused())return false;
           const key=mfQuotaKey(),until=mfQuotaRecord().until;
@@ -5056,7 +5072,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           const connected=!!(mfFirestoreDb&&mfFirebaseSyncCode&&mfFirebaseUser);
           const baseline=mfV2BaselineReady();
           const push=document.getElementById('mf-push-sync-btn'),pull=document.getElementById('mf-pull-sync-btn');
-          if(push){push.disabled=!(connected&&baseline);push.innerHTML='<i class="fa-solid fa-arrows-rotate"></i> Sync Now';}
+          if(push){push.disabled=!(connected&&(baseline||mfQuotaPaused()));push.innerHTML='<i class="fa-solid fa-arrows-rotate"></i> Sync Now';}
           if(pull)pull.disabled=!(connected&&baseline);
         }
         function mfFirebaseErrorLabel(err,action='Firebase operation'){return mfV2Error(err,action);}
@@ -5208,13 +5224,13 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           if(head.syncWriting||mfSyncHead(head)!==mfSyncHead(meta))throw Error('Cloud update in progress. Waiting for the completed version.');
           return out;
         }
-        async function mfV2PullFromServer(showConfirm=false){
+        async function mfV2PullFromServer(showConfirm=false,serverSnapshot=null){
           mfQuotaGuard();
           if(!mfDbReady||!mfV2LocalStateReady||!mfFirestoreDb||!mfFirebaseUser||!mfFirebaseSyncCode)return false;
           if(showConfirm&&!confirm('Replace the records on this device with the verified cloud version?'))return false;
           if(!showConfirm&&(mfV2DirtyAt()||localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'))return false;
           const root=mfV2Root(), target=mfSyncTarget(), uid=mfFirebaseUser.uid, epoch=mfStateMutationEpoch, save=mfSaveRequest;
-          const snap=await root.get({source:'server'});if(!snap.exists){mfV2SetStatus('No published cloud baseline is available yet.',true);return false;}
+          const snap=serverSnapshot||await root.get({source:'server'});if(!snap.exists){mfV2SetStatus('No published cloud baseline is available yet.',true);return false;}
           const meta=snap.data();
           if(meta.ownerUid!==uid||!meta.stateFingerprint||!meta.shell||meta.syncWriting)throw Error('Cloud version is not ready for verification. Local records retained.');
           let candidate;
@@ -5255,14 +5271,14 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         async function mfV2AdoptVerifiedCloudBaseline(){
           return mfV2BaselineReady()||await mfV2PullFromServer(false);
         }
-        async function mfV2PushToServer(force=false,review=null){
+        async function mfV2PushToServer(force=false,review=null,serverSnapshot=null){
           mfQuotaGuard();
           if((!mfV2BaselineReady()&&!review)||!mfDbReady||!mfFirebaseUser||!mfFirestoreDb||!mfFirebaseSyncCode)throw Error('Local database and signed-in Firebase connection are required.');
           const target=mfSyncTarget(),uid=mfFirebaseUser.uid,root=mfV2Root(), db=mfFirestoreDb;
           const capturedEpoch=mfStateMutationEpoch,capturedSave=mfSaveRequest;
           const snapshot=mfV2SafeClone(state), hash=mfStateFingerprintObject(snapshot), digest=await mfSyncDigest(snapshot);
           mfSyncCheckLoans(snapshot);
-          const start=await mfV2GetRootServer(), remote=start.data()||{}, head=mfSyncHead(remote);
+          const start=serverSnapshot||await mfV2GetRootServer(), remote=start.data()||{}, head=mfSyncHead(remote);
           if(review && (head!==review.head || target!==review.target || review.epoch!==capturedEpoch))throw Error('The reviewed version changed. Compare again.');
           if(remote.ownerUid && remote.ownerUid!==uid)throw Error('Cloud account mismatch.');
           if(!force && mfSyncVerified(remote) && mfSyncKnownHead() && mfSyncKnownHead()!==head && remote.verifiedSync.digest!==digest)
@@ -5317,9 +5333,11 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           }
           if(target!==mfSyncTarget())return false;
           mfSyncBase={target,head:mfSyncHead(meta),data:snapshot};mfSyncRemember(meta);mfV2SetHash(hash);mfSetKnownCloudVersion(version);
-          if(capturedEpoch===mfStateMutationEpoch && capturedSave===mfSaveRequest && mfStateFingerprintObject(state)===hash){mfV2ClearDirty();mfV2ClearPendingDirty(mfV2PendingDirtySnapshot());}
-          else mfSyncAgain=true;
-          mfV2SetStatus('Verified cloud version '+version+' published · '+new Date().toLocaleTimeString());return true;
+          if(capturedEpoch!==mfStateMutationEpoch || capturedSave!==mfSaveRequest || mfStateFingerprintObject(state)!==hash){
+            mfSyncAgain=true;mfV2SetStatus('Newer changes awaiting cloud confirmation. Keep this tab open.',true);return true;
+          }
+          mfV2ClearDirty();mfV2ClearPendingDirty(mfV2PendingDirtySnapshot());
+          mfV2SetStatus('Verified cloud version '+version+' published · available to your other device');return true;
         }
 
         async function mfSyncCombineSeparateLoans(cloud){
@@ -5349,7 +5367,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           mfV2MarkDirty();renderAll();mfScaleBuildLocalEntities(true).catch(console.warn);
           return await mfV2PushToServer(false);
         }
-        async function mfV2Reconcile(reason='auto'){
+        async function mfV2Reconcile(reason='auto',notification=null){
           // A confirmed Clear All Data must never be undone by an automatic cloud pull.
           // Pending clears are resolved only by an explicit Clear All Data / Sync Now / Restore action.
           if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'){
@@ -5365,22 +5383,32 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           if(mfCleanSyncBusy){mfSyncAgain=true;return false;}
           mfCleanSyncBusy=true;
           try{
+            const target=mfSyncTarget();
+            // A server-originated notification can start a download directly. The pull
+            // still verifies the complete ledger and rereads the head before local commit.
+            if(notification?.target===target && notification.snapshot.exists &&
+               !mfV2DirtyAt() && notification.snapshot.data().ownerUid===mfFirebaseUser.uid &&
+               mfSyncVerified(notification.snapshot.data()) && mfSyncBase?.target===target &&
+               mfSyncBase.head!==mfSyncHead(notification.snapshot.data())){
+              return await mfV2PullFromServer(false,notification.snapshot);
+            }
             if(!mfV2BaselineReady())return await mfV2AdoptVerifiedCloudBaseline(reason);
             const root=await mfV2GetRootServer();
+            if(target!==mfSyncTarget())return false;
             const localHash=mfV2Fingerprint();
             if(!root.exists){
-              if(mfV2BaselineReady() && mfV2HasBusinessData()){await mfV2PushToServer(false);}
+              if(mfV2BaselineReady() && mfV2HasBusinessData()){await mfV2PushToServer(false,null,root);}
               else {mfV2SetStatus('No published cloud baseline is available yet.',true);return false;}
               return true;
             }
             const cloud=root.data()||{};
             if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
             if(cloud.syncWriting){
-              if(cloud.syncWriting.device===mfFirebaseDeviceId && (mfV2DirtyAt()||cloud.stateFingerprint===localHash))return await mfV2PushToServer(false);
+              if(cloud.syncWriting.device===mfFirebaseDeviceId && (mfV2DirtyAt()||cloud.stateFingerprint===localHash))return await mfV2PushToServer(false,null,root);
               mfV2SetStatus('Cloud update pending · displaying local records',true);return false;
             }
             if(cloud.stateFingerprint && cloud.stateFingerprint===localHash){
-              if(!mfSyncVerified(cloud))return await mfV2PushToServer(false);
+              if(!mfSyncVerified(cloud))return await mfV2PushToServer(false,null,root);
               const data=mfV2SafeClone(state), epoch=mfStateMutationEpoch;
               const digest=await mfSyncDigest(data);
               if(epoch!==mfStateMutationEpoch){mfSyncAgain=true;return false;}
@@ -5396,14 +5424,14 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             // independently changed, preserve the local edit and stop automatic reconciliation.
             if(dirty){
               if(knownCloudHash && String(cloud.stateFingerprint||'')===String(knownCloudHash) && (!mfSyncKnownHead()||mfSyncKnownHead()===mfSyncHead(cloud))){
-                await mfV2PushToServer(false);
+                await mfV2PushToServer(false,null,root);
                 return true;
               }
               if(await mfSyncCombineSeparateLoans(cloud))return true;
               mfSyncShowReview(true);mfV2SetStatus('🟠 Local changes are waiting: secure cloud changed on another device. Local data was preserved; no automatic overwrite occurred.',true);
               return false;
             }
-            return await mfV2PullFromServer(false);
+            return await mfV2PullFromServer(false,root);
           }catch(e){
             mfV2SetStatus(mfV2Error(e,'Cloud verification'),true);
             if(!mfQuotaError(e) && /^(unavailable|deadline-exceeded|aborted)$/.test(e?.code||'')){clearTimeout(mfSyncRetry);mfSyncRetry=setTimeout(()=>mfV2Reconcile('retry').catch(()=>{}),15000);}
@@ -5413,8 +5441,11 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             if(mfSyncAgain && !mfQuotaWait()){mfSyncAgain=false;clearTimeout(mfSyncRetry);mfSyncRetry=setTimeout(()=>mfV2Reconcile('queued').catch(()=>{}),0);}
           }
         }
-        function scheduleFirebasePush(){clearTimeout(mfFirebasePushTimer);mfV2MarkDirty();mfV2SetStatus('Saved locally · awaiting cloud confirmation',true);mfFirebasePushTimer=setTimeout(()=>mfV2Reconcile('scheduled').catch(e=>mfV2SetStatus(mfV2Error(e,'Automatic sync'),true)),60);}
-        async function pushStateToFirebase(silent=false){try{
+        function scheduleFirebasePush(){clearTimeout(mfFirebasePushTimer);mfV2MarkDirty();mfV2SetStatus('Saved on this device · waiting for cloud confirmation. Keep this tab open.',true);mfFirebasePushTimer=setTimeout(()=>mfV2Reconcile('scheduled').catch(e=>mfV2SetStatus(mfV2Error(e,'Automatic sync'),true)),0);}
+        async function pushStateToFirebase(silent=false){
+          const retry=!silent && mfDbReady && mfV2LocalStateReady && mfFirebaseUser && mfQuotaPaused() && localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')!=='1';
+          if(retry && (mfCleanSyncBusy || !mfQuotaManualRetry()))return false;
+          try{
           if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'){
             if(!mfV2LocalStateReady||!mfDbReady) throw new Error('Local database is still initializing. Please wait and try again.');
             if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser) throw new Error('Connect Firebase and sign in first.');
@@ -5430,26 +5461,30 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             return pushed;
           }
           return await mfV2Reconcile('manual');
-        }catch(e){mfV2SetStatus(mfV2Error(e,'Sync Now'),true);if(!silent)alert(mfV2Error(e,'Sync Now'));}}
+        }catch(e){mfV2SetStatus(mfV2Error(e,'Sync Now'),true);if(!silent)alert(mfV2Error(e,'Sync Now'));}
+          finally{if(retry && !mfQuotaPaused() && window.mfFirebaseInitialSyncReady)startFirebaseListener();}
+        }
         async function pullStateFromFirebase(showConfirm=false){try{return await mfV2PullFromServer(!!showConfirm);}catch(e){mfV2SetStatus(mfV2Error(e,'Pull Latest'),true);if(showConfirm)alert(mfV2Error(e,'Pull Latest'));}}
         function startFirebaseListener(){
           if(!mfV2LocalStateReady || !mfDbReady)return;
           if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return;
           if(mfQuotaWait()){mfV2SetStatus(mfQuotaLabel(),true);return;}
-          const key=String(mfFirebaseUser.uid)+'|'+mfFirebaseSyncCode;
+          const key=mfSyncTarget();
           // Keep an already-active listener for the same Firebase account/sync target.
           // The previous order unsubscribed first and then returned for the same key,
           // silently leaving realtime sync detached after a repeated initialization.
           if(mfFirebaseListenerUnsub && mfFirebaseListenerKey===key)return;
           if(mfFirebaseListenerUnsub){try{mfFirebaseListenerUnsub();}catch(e){}mfFirebaseListenerUnsub=null;}
           mfFirebaseListenerKey=key;
-          mfFirebaseListenerUnsub=mfV2Root().onSnapshot(snap=>{
+          mfFirebaseListenerUnsub=mfV2Root().onSnapshot({includeMetadataChanges:true},snap=>{
+            if(key!==mfSyncTarget())return;
             if(window.mfFirebaseInitialSyncReady!==true||!snap.exists)return;
             const cloud=snap.data()||{};if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid)return;
             if(snap.metadata?.hasPendingWrites||snap.metadata?.fromCache||cloud.syncWriting)return;
             if(mfSyncBase?.target===mfSyncTarget() && mfSyncBase.head===mfSyncHead(cloud) && !mfV2DirtyAt())return;
-            clearTimeout(window.__AMARA_V2_LISTENER_TIMER);window.__AMARA_V2_LISTENER_TIMER=setTimeout(()=>mfV2Reconcile('listener').catch(e=>mfV2SetStatus(mfV2Error(e,'Realtime sync'),true)),25);
+            clearTimeout(window.__AMARA_V2_LISTENER_TIMER);window.__AMARA_V2_LISTENER_TIMER=setTimeout(()=>mfV2Reconcile('listener',{target:key,snapshot:snap}).catch(e=>mfV2SetStatus(mfV2Error(e,'Realtime sync'),true)),0);
           },err=>{
+            if(key!==mfSyncTarget())return;
             mfFirebaseListenerUnsub=null;mfFirebaseListenerKey='';mfV2SetStatus(mfV2Error(err,'Secure realtime listener'),true);
             if(!mfQuotaError(err) && err?.code!=='permission-denied')setTimeout(()=>{if(mfFirebaseUser)startFirebaseListener();},15000);
           });
@@ -6060,7 +6095,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function persist(options={}){
             const request=++mfSaveRequest;
             const now=new Date();
-            try{ mfV2MarkDirty(); }catch(e){}
+            try{ mfV2MarkDirty(); mfV2SetStatus('Saving changes · keep this tab open until cloud confirmation.',true); }catch(e){}
             try{ mfFinancialReconciliationCache=null; mfGrowthCache=null; }catch(e){}
             try{
                 localStorage.setItem("MF_LOCAL_DIRTY_AT", now.toISOString());
