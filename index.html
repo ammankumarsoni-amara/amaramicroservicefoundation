@@ -1551,6 +1551,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 <span class="cloud-dot"></span>
                 <span><b>Cloud & Local Safe:</b> <span id="sync-target-text">Device Storage</span></span>
             </div>
+            <div id="mf-live-sync-status" role="status" style="font-size:.74rem;color:#cbd5e1">Local data · cloud verification pending</div>
             <div id="mf-local-save-status" role="status" style="font-size:.72rem"></div>
             <div style="font-size: 0.72rem; color: #38bdf8; cursor: pointer;" onclick="openCloudModal()" id="last-sync-time"><i class="fa-solid fa-gear me-1"></i> Connect Gmail Drive</div>
         </div>
@@ -3163,6 +3164,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     <button type="button" class="btn-header btn-blue" style="justify-content:center;" id="mf-push-sync-btn" onclick="pushStateToFirebase(false)"><i class="fa-solid fa-cloud-arrow-up"></i> Sync Now</button>
                     <button type="button" class="btn-header btn-blue" style="background:#1e293b;color:#fff;border:1px solid var(--border-subtle);justify-content:center;" id="mf-pull-sync-btn" onclick="pullStateFromFirebase(true)"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Latest</button>
                 </div>
+                <button type="button" id="mf-sync-review" class="btn-header btn-blue" style="display:none" onclick="mfSyncReviewCopies()">Compare device and cloud copies</button>
                 <div class="mf-cloud-safe-note"><b>Automatic sync:</b> Firebase sync runs automatically after a save. Use <b>Sync Now</b> only when you want an immediate manual sync.</div>
                 <details class="mf-cloud-config-details">
                     <summary><span><i class="fa-solid fa-sliders me-1"></i> Connection settings</span><span style="font-weight:600;color:#64748b;">Advanced</span></summary>
@@ -3919,9 +3921,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function mfSnapshotRevision(row){
             return row?.revision || row?.updatedAt || '';
         }
-        async function idbPutSnapshot(){
+        async function idbPutSnapshot(candidate,stillCurrent){
             if(!mfDbReady) throw new Error('Local database is still opening. Keep this tab open.');
-            const savedState=mfCloneStateForPersistence();
+            const savedState=candidate ?? mfCloneStateForPersistence();
             const commit=async()=>{
                 const db=await openMfDb();
                 const updatedAt=new Date().toISOString();
@@ -3935,7 +3937,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     let conflict=false;
                     const request=store.get('current');
                     request.onsuccess=()=>{
-                        if(mfSnapshotRevision(request.result)!==mfLocalRevision){
+                        if((stillCurrent && !stillCurrent()) || mfSnapshotRevision(request.result)!==mfLocalRevision){
                             conflict=true; tx.abort(); return;
                         }
                         store.put(payload);
@@ -4085,6 +4087,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         const mfScaleDirtyLoanRefs=new Map();
         const mfV2PendingDirty={loans:new Set(),products:new Set(),staff:new Set(),expenses:new Set(),borrowings:new Set(),shell:false,full:false};
         const mfV2DirtyGeneration={loans:new Map(),products:new Map(),staff:new Map(),expenses:new Map(),borrowings:new Map(),shell:0,full:0};
+        let mfScaleRawRoot=null;
         let mfScaleProxySuspend=false;
         let mfScaleStateProxyInstalled=false;
         // Monotonic mutation epoch: every proxied state write invalidates derived
@@ -4128,12 +4131,13 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 set(target,prop,val,receiver){
                     const old=target[prop];
                     const derivedId=(kind==='products' && id==='' ? String(prop) : (Array.isArray(target) && /^\d+$/.test(String(prop)) ? String(val?.id || old?.id || id || '') : id));
-                    const wrapped=mfScaleWrapObject(val,kind,derivedId,seen);
+                    const collectionRoot=target===mfScaleRawRoot && ['loans','products','staff','expenses','borrowings'].includes(prop);
+                    const wrapped=mfScaleWrapObject(val,collectionRoot?prop:kind,collectionRoot?'':derivedId,seen);
                     const ok=Reflect.set(target,prop,wrapped,receiver);
                     if(ok && old!==wrapped){
                         if(kind && derivedId) mfScaleMarkDirty(kind,derivedId);
                         else if(kind && prop!=='length') mfScaleMarkDirty(kind,id);
-                        else if(prop==='loans'||prop==='products'||prop==='staff'||prop==='expenses'||prop==='borrowings') mfScaleMarkDirty('root');
+                        else mfScaleMarkDirty('root');
                     }
                     return ok;
                 },
@@ -4141,7 +4145,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     const old=target[prop];
                     const derivedId=(kind==='products' && id==='' ? String(prop) : (Array.isArray(target) && /^\d+$/.test(String(prop)) ? String(old?.id || id || '') : id));
                     const ok=Reflect.deleteProperty(target,prop);
-                    if(ok){ if(kind && derivedId) mfScaleMarkDirty(kind,derivedId); else if(kind) mfScaleMarkDirty(kind,id); else if(prop==='loans'||prop==='products'||prop==='staff'||prop==='expenses'||prop==='borrowings') mfScaleMarkDirty('root'); }
+                    if(ok){ if(kind && derivedId) mfScaleMarkDirty(kind,derivedId); else if(kind) mfScaleMarkDirty(kind,id); else mfScaleMarkDirty('root'); }
                     return ok;
                 }
             };
@@ -4156,11 +4160,11 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     if(!kind && ['loans','products','staff','expenses','borrowings'].includes(k)){
                         childKind=k;
                         if(k==='products' && v && typeof v==='object' && !Array.isArray(v)){
-                            for(const [pid,pv] of Object.entries(v)) v[pid]=mfScaleWrapObject(pv,k,pid,seen);
+                            value[k]=mfScaleWrapObject(v,k,'',seen);
                             continue;
                         }
                     }
-                    value[k]=mfScaleWrapObject(v,childKind,childKind?(v?.id||id):id,seen);
+                    value[k]=mfScaleWrapObject(v,childKind,kind==='products'&&!id?k:(childKind?(v?.id||id):id),seen);
                 }
             }
             return proxy;
@@ -4168,11 +4172,12 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function mfScaleInstallStateProxy(){
             if(mfScaleStateProxyInstalled || !state || typeof state!=='object') return;
             mfScaleProxySuspend=true;
-            try{ state=mfScaleWrapObject(state); mfScaleStateProxyInstalled=true; } finally { mfScaleProxySuspend=false; }
+            try{ mfScaleRawRoot=state;state=mfScaleWrapObject(state); mfScaleStateProxyInstalled=true; } finally { mfScaleProxySuspend=false; }
         }
         function mfScaleReinstallStateProxy(){
+            mfStateMutationEpoch++;mfLocalFingerprintCache.epoch=-1;
             mfScaleStateProxyInstalled=false; mfScaleProxySuspend=true;
-            try{ state=mfScaleWrapObject(state); } finally { mfScaleProxySuspend=false; mfScaleStateProxyInstalled=true; }
+            try{ mfScaleRawRoot=state;state=mfScaleWrapObject(state); } finally { mfScaleProxySuspend=false; mfScaleStateProxyInstalled=true; }
             // Replaced/restored state invalidates all derived finance/dashboard caches.
             try{ mfFinancialReconciliationCache=null; mfGrowthCache=null; }catch(e){}
         }
@@ -4802,11 +4807,9 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     renderAll();
                 }else if(mfFirestoreDb && mfFirebaseSyncCode && mfFirebaseUser){
                     try{
-                        await mfV2Reconcile(validLocalSnapshot?'local-ready':'server-bootstrap');
-                        window.mfFirebaseInitialSyncReady=true;
-                        startFirebaseListener();
-                        markStorageReady();
-                        renderAll();
+                        window.mfFirebaseInitialSyncReady=true;startFirebaseListener();
+                        const verified=await mfV2Reconcile(validLocalSnapshot?'local-ready':'server-bootstrap');
+                        if(validLocalSnapshot || verified && mfV2BaselineReady()){markStorageReady();renderAll();}
                     }catch(e){
                         if(validLocalSnapshot){
                             markStorageReady();
@@ -4988,7 +4991,12 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           }
           try{mfRefreshFirebaseSyncControls();}catch(e){}
         }
-        function mfV2SetStatus(msg,warn=false){setFirebaseStatus(msg,warn);}
+        window.addEventListener('offline',()=>mfV2SetStatus('Offline · displaying this device’s saved records',true));
+        function mfV2SetStatus(msg,warn=false){
+          setFirebaseStatus(msg,warn);
+          const el=document.getElementById('mf-live-sync-status');
+          if(el){el.textContent=msg;el.style.color=warn?'#fcd34d':'#cbd5e1';}
+        }
 
         async function mfV2EnsureFirebase(cfg){
           if(typeof firebase==='undefined'||!firebase.initializeApp) throw new Error('Firebase SDK is not loaded.');
@@ -5035,223 +5043,258 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           // write was in flight. Entity-level generations protect same-loan rapid edits.
           if(dirty.full && mfV2DirtyGeneration.full===dirty.fullGeneration && !mfV2PendingDirty.loans.size && !mfV2PendingDirty.products.size && !mfV2PendingDirty.staff.size && !mfV2PendingDirty.expenses.size && !mfV2PendingDirty.borrowings.size && !mfV2PendingDirty.shell) mfV2PendingDirty.full=false;
         }
-        async function mfV2WriteEntities(ownerUid,version,dirty){
-          if(dirty.full){
-            // Preflight every local entity before the first full-sync batch is committed.
-            // This prevents a known oversized document from causing a partial full upload.
-            const sizeAudit=mfRunFirestoreEntitySizeDiagnostics();
-            if(sizeAudit.oversizeCount) throw new Error('Full Firebase sync stopped: '+sizeAudit.oversizeCount+' entity document(s) exceed the Firestore 1 MiB limit. Run mfRunFirestoreEntitySizeDiagnostics() for the largest records.');
-            const kinds={loans:mfV2EntityRows('loans'),products:mfV2EntityRows('products'),staff:mfV2EntityRows('staff'),expenses:mfV2EntityRows('expenses'),borrowings:mfV2EntityRows('borrowings'),payments:mfV2PaymentRows()};
-            await Promise.all(MF_SYNC_V2_KINDS.map(async kind=>{
-              const col=mfV2Col(kind), rows=kinds[kind];
-              for(let i=0;i<rows.length;i+=400){
-                const batch=mfFirestoreDb.batch();
-                rows.slice(i,i+400).forEach(e=>{const ref=col.doc(e.id);const payload={...e.row,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp(),...(kind==='payments'?{loanId:e.loanId,paymentIndex:e.paymentIndex}:{})};mfV2AssertDocumentSize(kind,e.id,payload);batch.set(ref,payload);});
-                await batch.commit();
-              }
-            }));
-            return;
-          }
-          if(dirty.shell){
-            await mfV2Root().set({shell:mfV2Shell()}, {mergeFields:['shell']});
-          }
-          const writeKind=async(kind,ids)=>{
-            if(!ids.size)return;
-            const col=mfV2Col(kind), list=[...ids];
-            for(let start=0;start<list.length;start+=400){
-              const batch=mfFirestoreDb.batch();
-              for(const id of list.slice(start,start+400)){
-                const row=kind==='products'?(state.products?.[id]||null):((state[kind]||[]).find(x=>String(x?.id)===String(id))||null);
-                const ref=col.doc(String(id));
-                if(row){const y=mfV2SafeClone(row);delete y.id;delete y._ownerUid;delete y._syncMeta;const payload={...y,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp()};mfV2AssertDocumentSize(kind,id,payload);batch.set(ref,payload);}
-                else batch.delete(ref);
-              }
-              await batch.commit();
-            }
-          };
-          await Promise.all([
-            writeKind('products',dirty.products),writeKind('staff',dirty.staff),writeKind('expenses',dirty.expenses),writeKind('borrowings',dirty.borrowings)
-          ]);
-          // A changed loan is the natural unit for payments. Write only that loan and its
-          // payment rows; reconcile stale payment rows for that loan instead of scanning every
-          // payment in the business.
-          for(const loanId of dirty.loans){
-            const loan=(state.loans||[]).find(x=>String(x?.id)===String(loanId));
-            const loanCol=mfV2Col('loans'), loanRef=loanCol.doc(String(loanId));
-            if(loan){const y=mfV2SafeClone(loan);delete y.id;delete y._ownerUid;delete y._syncMeta;const payload={...y,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp()};mfV2AssertDocumentSize('loans',loanId,payload);await loanRef.set(payload);}
-            else await loanRef.delete();
-            const pcol=mfV2Col('payments');
-            const previousCount=Number(mfScalePaymentCounts.get(String(loanId))||0);
-            const nextCount=loan&&Array.isArray(loan.payments)?loan.payments.length:0;
-            if(loan && Array.isArray(loan.payments)){
-              for(let i=0;i<loan.payments.length;i+=400){
-                const batch=mfFirestoreDb.batch();
-                for(let j=i;j<Math.min(i+400,loan.payments.length);j++){
-                  const p=loan.payments[j], id=String(loanId)+'-'+j; const y=mfV2SafeClone(p);delete y.id;delete y._ownerUid;delete y._syncMeta;
-                  const payload={...y,_ownerUid:ownerUid,_syncVersion:version,_updatedAt:firebase.firestore.FieldValue.serverTimestamp(),loanId:String(loanId),paymentIndex:j};mfV2AssertDocumentSize('payments',id,payload);batch.set(pcol.doc(id),payload);
-                }
-                await batch.commit();
-              }
-            }
-            // Payment document IDs are loanId-index. If a payment was removed, only the
-            // trailing index range can be stale; every remaining index is overwritten above.
-            if(previousCount>nextCount){
-              for(let start=nextCount;start<previousCount;start+=400){
-                const batch=mfFirestoreDb.batch();
-                for(let j=start;j<Math.min(start+400,previousCount);j++) batch.delete(pcol.doc(String(loanId)+'-'+j));
-                await batch.commit();
-              }
-            }
-            mfScalePaymentCounts.set(String(loanId),nextCount);
-          }
+        const mfSyncKinds=['loans','products','staff','expenses','borrowings'];
+        let mfSyncBase=null, mfSyncAgain=false, mfSyncRetry=0;
+        function mfSyncTarget(){return [mfFirebaseApp?.options?.projectId,mfFirebaseUser?.uid,mfFirebaseSyncCode].join('|');}
+        function mfSyncHead(meta){return JSON.stringify([meta.version||0,meta.stateFingerprint||'',meta.verifiedSync?.digest||'']);}
+        function mfSyncShowReview(show){
+          const button=document.getElementById('mf-sync-review');if(button)button.style.display=show?'':'none';
         }
-
-        async function mfV2ReadEntities(ownerUid){
-          const out={loans:[],products:{},staff:[],expenses:[],borrowings:[],payments:[]};
-          // Child collections remain authoritative server reads. They are independent,
-          // so fetch them in parallel instead of waiting for six network round-trips.
-          const snaps=await Promise.all(MF_SYNC_V2_KINDS.map(kind=>
-            mfV2Col(kind).where('_ownerUid','==',ownerUid).get({source:'server'})
-          ));
-          MF_SYNC_V2_KINDS.forEach((kind,index)=>{
-            const snap=snaps[index];
-            snap.forEach(d=>{const x=mfV2SafeClone(d.data()||{});delete x._ownerUid;delete x._syncVersion;delete x._updatedAt;delete x.id; if(kind==='products')out.products[String(d.id)]=x;else if(kind==='payments')out.payments.push({...x,id:String(d.id)});else out[kind].push({...x,id:String(d.id)});});
-          });
-          const byLoan=new Map(out.loans.map(l=>[String(l.id),l]));
-          out.loans.forEach(l=>l.payments=[]);
-          out.payments.sort((a,b)=>{const ai=Number(a.paymentIndex)||0,bi=Number(b.paymentIndex)||0;return String(a.loanId).localeCompare(String(b.loanId))||ai-bi;});
-          out.payments.forEach(p=>{const l=byLoan.get(String(p.loanId));if(l){const y=mfV2SafeClone(p);delete y.id;delete y.loanId;delete y.paymentIndex;l.payments.push(y);}});
-          delete out.payments; return out;
+        async function mfSyncReviewCopies(){
+          if(mfCleanSyncBusy||!mfFirebaseUser)return;
+          mfCleanSyncBusy=true;
+          try{
+            const target=mfSyncTarget(),root=mfV2Root(),uid=mfFirebaseUser.uid,epoch=mfStateMutationEpoch;
+            const snap=await root.get({source:'server'}),meta=snap.data()||{};
+            if(meta.ownerUid!==uid || meta.syncWriting || !meta.stateFingerprint)throw Error('A completed cloud version is required for comparison.');
+            const local=mfV2SafeClone(state),remote=await mfSyncRead(root,meta,uid,false);
+            mfSyncCheckLoans(local);
+            const describe=s=>{
+              const capital=s.loans.reduce((n,l)=>n+(Number(s.products[l.product]?.amount)||0),0);
+              return s.loans.length+' loans, market disbursed ₹'+capital.toLocaleString('en-IN')+', '+mfSyncCounts(s).payments+' EMI entries';
+            };
+            const safe=()=>target===mfSyncTarget()&&epoch===mfStateMutationEpoch;
+            if(!safe())throw Error('Records changed during comparison. Please compare again.');
+            if(!confirm('This device: '+describe(local)+'\nCloud: '+describe(remote)+'\n\nUse THIS device as the complete business copy on both devices? Cloud-only entries will be replaced. Both copies will be saved in local Version History first. Cancel to keep both versions as they are.'))return;
+            const db=await openMfDb();
+            await new Promise((resolve,reject)=>{
+              const tx=db.transaction(MF_IDB_HISTORY_STORE,'readwrite',{durability:'strict'}),store=tx.objectStore(MF_IDB_HISTORY_STORE);
+              for(const [name,data] of [['device',local],['cloud',remote]])store.put({id:'review-'+cryptoRandomId(),version:1,createdAt:new Date().toISOString(),reason:'Before sync conflict resolution · '+name,state:data});
+              tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('Version history could not be saved.'));
+            });
+            if(!safe())throw Error('Local records changed. Compare again.');
+            await mfV2PushToServer(true,{head:mfSyncHead(meta),target,epoch});
+            mfV2ArmBaseline();mfSyncShowReview(false);
+          }catch(e){mfV2SetStatus(mfV2Error(e,'Compare copies'),true);}
+          finally{mfCleanSyncBusy=false;if(mfSyncAgain){mfSyncAgain=false;mfV2Reconcile('queued').catch(()=>{});}}
+        }
+        function mfSyncRemember(meta){
+          mfSyncShowReview(false);
+          localStorage.setItem('MF_VERIFIED_HEAD_'+mfSyncTarget(),mfSyncHead(meta));
+        }
+        function mfSyncKnownHead(){
+          return mfSyncBase?.target===mfSyncTarget()?mfSyncBase.head:localStorage.getItem('MF_VERIFIED_HEAD_'+mfSyncTarget());
+        }
+        function mfSyncVerified(meta){return !!meta.verifiedSync?.digest && meta.verifiedSync.version===meta.version && meta.verifiedSync.hash===meta.stateFingerprint;}
+        function mfSyncRows(s,k){
+          const pairs=k==='products'?Object.entries(s.products||{}):(s[k]||[]).map(x=>[String(x.id??''),x]);
+          const rows=new Map(pairs);
+          if(rows.size!==pairs.length||[...rows.keys()].some(id=>!id||id.includes('/')))throw Error('Invalid or duplicate record ID in '+k+'. Local data is preserved.');
+          return rows;
+        }
+        function mfSyncCounts(s){return Object.fromEntries([...mfSyncKinds.map(k=>[k,k==='products'?Object.keys(s.products||{}).length:s[k].length]),['payments',s.loans.reduce((n,l)=>n+(l.payments||[]).length,0)]]);}
+        async function mfSyncDigest(s){
+          const bytes=new TextEncoder().encode(mfStableStringify(s));
+          const hash=await crypto.subtle.digest('SHA-256',bytes);
+          return Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
+        }
+        function mfSyncShell(s){return Object.fromEntries(Object.entries(s).filter(([k])=>!mfSyncKinds.includes(k)));}
+        function mfSyncRemoveMeta(raw){const x={...raw};delete x._ownerUid;delete x._syncVersion;delete x._updatedAt;return x;}
+        function mfSyncCheckLoans(s){
+          for(const loan of s.loans)if(!Object.prototype.hasOwnProperty.call(s.products||{},loan.product)||!s.products[loan.product])
+            throw Error('Loan '+loan.id+' references a missing product. Cloud sync paused; local records retained.');
+        }
+        function mfSyncCheckCounts(candidate,meta){
+          const actual=mfSyncCounts(candidate);
+          for(const [k,n] of Object.entries(actual))if(meta.counts?.[k]==null||Number(meta.counts[k])!==n)
+            throw Error('Cloud verification failed for '+k+'. Showing the previous local records.');
+        }
+        async function mfSyncRead(root,meta,uid,allowDelta=true){
+          const modern=mfSyncVerified(meta), layout=modern?meta.verifiedSync:null;
+          const out={...meta.shell};
+          const delta=allowDelta && layout?.delta && mfSyncBase?.target===mfSyncTarget() && mfSyncBase.head===layout.delta.parent ? layout.delta : null;
+          const groups=await Promise.all((modern?mfSyncKinds:MF_SYNC_V2_KINDS).map(async k=>{
+            const col=root.collection('structured_v1_'+k);
+            if(delta){
+              const rows=mfSyncRows(mfSyncBase.data,k);
+              await Promise.all((delta.ids[k]||[]).map(async id=>{
+                if(delta.removed[k]?.includes(id)){rows.delete(id);return;}
+                const doc=await col.doc(id).get({source:'server'});
+                if(!doc.exists){rows.delete(id);return;}
+                const raw=doc.data();if(raw._ownerUid!==uid)throw Error('Cloud record ownership mismatch.');
+                rows.set(id,mfSyncRemoveMeta(raw));
+              }));
+              return [k,rows];
+            }
+            const snap=await col.where('_ownerUid','==',uid).get({source:'server'});
+            const rows=new Map();snap.forEach(doc=>{
+              const x=mfSyncRemoveMeta(doc.data());
+              if(!modern && k!=='payments' && k!=='products')x.id=doc.id;
+              rows.set(doc.id,x);
+            });return [k,rows];
+          }));
+          const maps=Object.fromEntries(groups);
+          for(const kind of mfSyncKinds){
+            const rows=maps[kind];
+            if(kind==='products'){out.products=Object.fromEntries(rows);continue;}
+            let ids=layout?.order?.[kind]||[...rows.keys()];
+            if(ids.length!==rows.size||new Set(ids).size!==rows.size||ids.some(id=>!rows.has(id)))throw Error('Incomplete cloud '+kind+' list. Local records retained.');
+            out[kind]=ids.map(id=>{const row=rows.get(id);return row.id==null?{...row,id}:row;});
+          }
+          mfSyncCheckCounts(out,meta);mfSyncCheckLoans(out);
+          if(modern){
+            if(await mfSyncDigest(out)!==layout.digest)throw Error('Cloud content does not match its published checksum. Local records retained.');
+          }else{
+            // Older releases stored payments twice and did not record the original array order.
+            // Prefer the embedded receipts only if the entire reconstructed ledger verifies.
+            if(mfStateFingerprintObject(out)!==meta.stateFingerprint){
+              for(const k of mfSyncKinds.filter(k=>k!=='products')){
+                const localIds=new Map((state[k]||[]).map((r,i)=>[String(r.id),i]));
+                out[k].sort((a,b)=>(localIds.get(String(a.id))??Infinity)-(localIds.get(String(b.id))??Infinity));
+              }
+              if(mfStateFingerprintObject(out)!==meta.stateFingerprint)throw Error('Legacy cloud data could not be verified. Open Rev13 on the device with the complete accounts to publish a verified copy.');
+            }
+          }
+          const last=await root.get({source:'server'}), head=last.data()||{};
+          if(head.syncWriting||mfSyncHead(head)!==mfSyncHead(meta))throw Error('Cloud update in progress. Waiting for the completed version.');
+          return out;
         }
         async function mfV2PullFromServer(showConfirm=false){
-          if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1' && !showConfirm) return false;
-          if(!mfV2LocalStateReady || !mfDbReady) throw new Error('Local database is still initializing. Please wait a moment and try again.');
-          if(!mfV2BaselineReady()) throw new Error('V2 baseline is not initialized. Restore the verified Google Drive backup on this device first.');
-          if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser) throw new Error('Connect Firebase and sign in first.');
-          if(showConfirm&&!confirm('This will replace the data on THIS device with the latest NEW secure cloud database. Continue?')) return false;
-          const root=await mfV2GetRootServer(); if(!root.exists) return false;
-          const meta=root.data()||{}; if(meta.ownerUid&&meta.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
-          const entities=await mfV2ReadEntities(mfFirebaseUser.uid);
-          if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1' && !showConfirm) return false;
-          // A verified, explicit Clear All Data is different from a partial/failed cloud read.
-          // The cloud tombstone is written only by the confirmed clear workflow; it authorizes
-          // an empty cloud snapshot to replace stale records on the other device.
-          const shell=meta.shell&&typeof meta.shell==='object'?meta.shell:{};
-          const verifiedCandidate={...shell,...entities};
-          const verifiedCloudClear=meta.businessDataCleared===true &&
-            Number(meta.counts?.loans||0)===0 && Number(meta.counts?.products||0)===0 &&
-            Number(meta.counts?.staff||0)===0 && Number(meta.counts?.expenses||0)===0 &&
-            Number(meta.counts?.borrowings||0)===0 && Number(meta.counts?.payments||0)===0 &&
-            entities.loans.length===0 && Object.keys(entities.products||{}).length===0 &&
-            entities.staff.length===0 && entities.expenses.length===0 && entities.borrowings.length===0 &&
-            mfStateFingerprintObject(verifiedCandidate)===String(meta.stateFingerprint||'');
-          if(!entities.loans.length && mfV2HasBusinessData() && !verifiedCloudClear) throw new Error('Cloud database is incomplete: zero loan records returned. Local data was protected.');
-          if(!showConfirm && mfV2DirtyAt()) return false;
-          state={...shell,...entities};
-          mfScaleReinstallStateProxy(); normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
-          await idbPutSnapshot();
-          mfV2SetHash(String(meta.stateFingerprint||'')); mfSetKnownCloudVersion(Number(meta.version||0)); mfV2ClearDirty();
-          try{localStorage.removeItem('MF_LOCAL_DIRTY_AT');localStorage.removeItem('MF_CLEAR_ALL_DATA_PENDING');localStorage.removeItem('MF_CLEAR_ALL_DATA_TARGET');}catch(e){}
-          renderAll(); mfV2SetStatus('🟢 New secure cloud data loaded — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+          if(!mfDbReady||!mfV2LocalStateReady||!mfFirestoreDb||!mfFirebaseUser||!mfFirebaseSyncCode)return false;
+          if(showConfirm&&!confirm('Replace the records on this device with the verified cloud version?'))return false;
+          if(!showConfirm&&(mfV2DirtyAt()||localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'))return false;
+          const root=mfV2Root(), target=mfSyncTarget(), uid=mfFirebaseUser.uid, epoch=mfStateMutationEpoch, save=mfSaveRequest;
+          const snap=await root.get({source:'server'});if(!snap.exists)return false;
+          const meta=snap.data();
+          if(meta.ownerUid!==uid||!meta.stateFingerprint||!meta.shell||meta.syncWriting)throw Error('Cloud version is not ready for verification. Local records retained.');
+          let candidate;
+          try{candidate=await mfSyncRead(root,meta,uid);}
+          catch(err){
+            if(!meta.verifiedSync?.delta || mfSyncBase?.head!==meta.verifiedSync.delta.parent)throw err;
+            candidate=await mfSyncRead(root,meta,uid,false);
+          }
+          if(!candidate.loans.length && state.loans?.length && !meta.businessDataCleared && !(mfSyncVerified(meta)&&meta.verifiedSync.removedLastLoan) && !showConfirm)throw Error('Empty loan list requires explicit confirmation. Local loans retained.');
+          if(!showConfirm && !mfSyncKnownHead() && state.loans?.length){
+            const remote=mfSyncRows(candidate,'loans');
+            const risk=state.loans.some(l=>{
+              const r=remote.get(String(l.id));if(!r)return true;
+              return Number(state.products?.[l.product]?.amount||0)>Number(candidate.products[r.product]?.amount||0) ||
+                (l.payments?.length||0)>(r.payments?.length||0);
+            });
+            if(risk){
+              mfSyncShowReview(true);mfV2SetStatus('First verification: this device has loans, principal or receipts missing from the cloud copy. Local data retained. Compare your records before choosing Pull Latest or restoring a verified backup.',true);
+              return false;
+            }
+          }
+          const safe=()=>target===mfSyncTarget()&&epoch===mfStateMutationEpoch&&save===mfSaveRequest;
+          if(!safe())throw Error('A local edit arrived during download. Local changes retained.');
+          if(showConfirm)await idbPutVersionedBackup('Before confirmed Firebase download',true);
+          await idbPutSnapshot(candidate,safe);
+          if(!safe()){await idbPutSnapshot();throw Error('Local changes retained during cloud download.');}
+          mfSyncBase={target,head:mfSyncHead(meta),data:mfV2SafeClone(candidate)};
+          state=candidate;mfScaleReinstallStateProxy();mfScaleSetFullDirty();mfResetBorrowingAggregateCache();
+          mfScaleReady=false;mfScaleSearchReady=false;mfScaleLoanMasterSearchIndexReady=false;
+          mfV2ClearPendingDirty(mfV2PendingDirtySnapshot());
+          mfV2ArmBaseline();mfSyncRemember(meta);mfV2SetHash(meta.stateFingerprint);mfSetKnownCloudVersion(meta.version);mfV2ClearDirty();
+          localStorage.removeItem('MF_LOCAL_DIRTY_AT');if(showConfirm){localStorage.removeItem('MF_CLEAR_ALL_DATA_PENDING');localStorage.removeItem('MF_CLEAR_ALL_DATA_TARGET');}
+          markStorageReady();renderAll();
+          mfScaleBuildLocalEntities(true).catch(console.warn);
+          mfV2SetStatus('Verified cloud version '+meta.version+' loaded · '+new Date().toLocaleTimeString());
           return true;
         }
-        async function mfV2PushToServer(force=false){
-          if(!mfV2BaselineReady()) throw new Error('V2 baseline is not initialized. Restore the verified Google Drive backup on this device first.');
-          if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser) throw new Error('Connect Firebase and sign in first.');
-          const localHash=mfV2Fingerprint(); const root=await mfV2GetRootServer(); const cloud=root.exists?(root.data()||{}):{};
-          if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
-          const knownCloudHash=mfV2LastHash();
-          // Local edits are pushed when the cloud still equals the last acknowledged cloud version.
-          // Never compare a device clock with Firestore serverTimestamp(); mobile/laptop clock skew
-          // must not turn a legitimate local edit into an accidental pull of older cloud metadata.
-          if(root.exists && cloud.stateFingerprint && cloud.stateFingerprint!==localHash && !force && (!knownCloudHash || cloud.stateFingerprint!==knownCloudHash)) throw new Error('SYNC_CONFLICT: secure cloud changed on another device. Local changes were not overwritten.');
-          const version=mfV2NextVersion(Number(cloud.version||0));
-          const dirty=mfV2PendingDirtySnapshot();
-          const syntheticFull=!dirty.full && !dirty.shell && !dirty.loans.size && !dirty.products.size && !dirty.staff.size && !dirty.expenses.size && !dirty.borrowings.size;
-          if(syntheticFull){
-            // A manual Sync Now after a restored/legacy state still gets a safe full write.
-            dirty.full=true;
-          }
-          // Firestore Rules require the parent business document to exist before any
-          // structured_v1_* child collection can be written. Create/refresh the owner
-          // envelope first, then write children, then publish the final fingerprint.
-          const rootRef=mfV2Root();
-          await rootRef.set({ownerUid:mfFirebaseUser.uid,schemaVersion:'AMARA-SYNC-V2',version,updatedByDevice:mfFirebaseDeviceId,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAtLabel:new Date().toLocaleString('en-IN')},{merge:true});
-          // Targeted cloud persistence: normal saves touch only changed entities. A full
-          // owner-scoped cleanup remains available for imports/restores, where deletions may
-          // span the entire database.
-          await mfV2WriteEntities(mfFirebaseUser.uid,version,dirty);
-          if(dirty.full){
-            const currentIds={};
-            for(const kind of MF_SYNC_V2_KINDS){currentIds[kind]=new Set((kind==='payments'?mfV2PaymentRows():mfV2EntityRows(kind)).map(x=>String(x.id)));}
-            await Promise.all(MF_SYNC_V2_KINDS.map(async kind=>{
-              const snap=await mfV2Col(kind).where('_ownerUid','==',mfFirebaseUser.uid).get({source:'server'});
-              const stale=snap.docs.filter(d=>!currentIds[kind].has(String(d.id)));
-              for(let i=0;i<stale.length;i+=400){const b=mfFirestoreDb.batch();stale.slice(i,i+400).forEach(d=>b.delete(d.ref));await b.commit();}
-            }));
-          }
-          const meta={ownerUid:mfFirebaseUser.uid,version,schemaVersion:'AMARA-SYNC-V2',updatedByDevice:mfFirebaseDeviceId,updatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedAtLabel:new Date().toLocaleString('en-IN'),stateFingerprint:localHash,businessDataCleared:localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1',counts:{loans:(state.loans||[]).length,products:Object.keys(state.products||{}).length,staff:(state.staff||[]).length,expenses:(state.expenses||[]).length,borrowings:(state.borrowings||[]).length,payments:(state.loans||[]).reduce((n,l)=>n+(Array.isArray(l.payments)?l.payments.length:0),0)},shell:mfV2Shell()};
-          await rootRef.set(meta,{mergeFields:Object.keys(meta)});
-          mfV2SetHash(localHash);mfSetKnownCloudVersion(version);if(mfStateFingerprintObject(state)===localHash)mfV2ClearDirty();if(!syntheticFull)mfV2ClearPendingDirty(dirty);
-          mfV2SetStatus('🟢 Secure cloud updated from this device — '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
-          return true;
+        async function mfV2AdoptVerifiedCloudBaseline(){
+          return mfV2BaselineReady()||await mfV2PullFromServer(false);
         }
-        async function mfV2AdoptVerifiedCloudBaseline(reason='cloud-bootstrap'){
-          // A Clear All Data action is authoritative on this device. Never auto-adopt stale cloud data while its explicit cloud-clear is pending.
-          if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'){
-            mfV2SetStatus('🟠 Clear All Data is pending cloud completion. Automatic cloud restore is paused; use Clear All Data, Sync Now, or an explicit backup restore.',true);
-            return false;
+        async function mfV2PushToServer(force=false,review=null){
+          if((!mfV2BaselineReady()&&!review)||!mfDbReady||!mfFirebaseUser||!mfFirestoreDb||!mfFirebaseSyncCode)throw Error('Local database and signed-in Firebase connection are required.');
+          const target=mfSyncTarget(),uid=mfFirebaseUser.uid,root=mfV2Root(), db=mfFirestoreDb;
+          const capturedEpoch=mfStateMutationEpoch,capturedSave=mfSaveRequest;
+          const snapshot=mfV2SafeClone(state), hash=mfStateFingerprintObject(snapshot), digest=await mfSyncDigest(snapshot);
+          mfSyncCheckLoans(snapshot);
+          const start=await mfV2GetRootServer(), remote=start.data()||{}, head=mfSyncHead(remote);
+          if(review && (head!==review.head || target!==review.target || review.epoch!==capturedEpoch))throw Error('The reviewed version changed. Compare again.');
+          if(remote.ownerUid && remote.ownerUid!==uid)throw Error('Cloud account mismatch.');
+          if(!force && mfSyncVerified(remote) && mfSyncKnownHead() && mfSyncKnownHead()!==head && remote.verifiedSync.digest!==digest)
+            throw Error('A newer verified version exists. Local edits retained.');
+          if(!force && remote.stateFingerprint && remote.stateFingerprint!==hash && remote.stateFingerprint!==mfV2LastHash())throw Error('Cloud changed on another device. Local edits retained.');
+          if(remote.syncWriting && remote.syncWriting.device!==mfFirebaseDeviceId && remote.syncWriting.until>Date.now())throw Error('Another device is publishing. Local edits retained.');
+          const version=mfV2NextVersion(remote.version), sameBase=mfSyncBase?.target===target&&mfSyncBase.head===head;
+          const full=force||!sameBase||!mfSyncVerified(remote)||!!remote.syncWriting;
+          const operations=[],order={},changed={},removed={}, stamp=firebase.firestore.FieldValue.serverTimestamp();
+          for(const k of MF_SYNC_V2_KINDS){
+            const paymentMap=s=>new Map(s.loans.flatMap(l=>(l.payments||[]).map((p,i)=>[l.id+'-'+i,{...p,loanId:String(l.id),paymentIndex:i}])));
+            const rows=k==='payments'?paymentMap(snapshot):mfSyncRows(snapshot,k);
+            changed[k]=[];removed[k]=[];
+            const col=root.collection('structured_v1_'+k);
+            const prior=full?null:(k==='payments'?paymentMap(mfSyncBase.data):mfSyncRows(mfSyncBase.data,k));
+            if(k!=='products'&&k!=='payments')order[k]=[...rows.keys()];
+            for(const [id,row] of rows){
+              if(prior?.has(id)&&mfStableStringify(row)===mfStableStringify(prior.get(id)))continue;
+              const data={...row,_ownerUid:uid,_syncVersion:version,_updatedAt:stamp};
+              const size=mfV2AssertDocumentSize(k,id,data).bytes;
+              operations.push({ref:col.doc(id),data,size});if(k!=='payments')changed[k].push(id);
+            }
+            let ids=prior?.keys()||[];
+            if(full&&start.exists){const q=await col.where('_ownerUid','==',uid).get({source:'server'});ids=q.docs.map(d=>d.id);}
+            for(const id of ids)if(!rows.has(id)){operations.push({ref:col.doc(id),size:100});if(k!=='payments'){changed[k].push(id);removed[k].push(id);}}
           }
-          // FRESH-DEVICE BOOTSTRAP: a verified baseline is a business/cloud property,
-          // not a device-local Drive flag. A second device may read the existing secure
-          // cloud baseline, but it must prove ownership and verify the reconstructed
-          // structured data before adopting it. This path is READ-ONLY until verification
-          // succeeds; it can never push the phone's blank/default startup state.
-          if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return false;
-          if(mfV2BaselineReady())return true;
-          const root=await mfV2GetRootServer();
-          if(!root.exists)return false;
-          const cloud=root.data()||{};
-          if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
-          if(String(cloud.schemaVersion||'')!=='AMARA-SYNC-V2')return false;
-          const expected=String(cloud.stateFingerprint||'');
-          if(!expected)return false;
-          const entities=await mfV2ReadEntities(mfFirebaseUser.uid);
-          if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1') return false;
-          const shell=cloud.shell&&typeof cloud.shell==='object'?cloud.shell:{};
-          const candidate={...shell,...entities};
-          const actualFingerprint=mfStateFingerprintObject(candidate);
-          if(actualFingerprint!==expected)throw new Error('SECURE_BOOTSTRAP_REJECTED: cloud structured data fingerprint does not match the secure cloud baseline. Local data was not overwritten.');
-          const expectedCounts=cloud.counts&&typeof cloud.counts==='object'?cloud.counts:{};
-          const actualCounts={
-            loans:Array.isArray(candidate.loans)?candidate.loans.length:0,
-            products:candidate.products&&typeof candidate.products==='object'?Object.keys(candidate.products).length:0,
-            staff:Array.isArray(candidate.staff)?candidate.staff.length:0,
-            expenses:Array.isArray(candidate.expenses)?candidate.expenses.length:0,
-            borrowings:Array.isArray(candidate.borrowings)?candidate.borrowings.length:0,
-            payments:Array.isArray(candidate.loans)?candidate.loans.reduce((n,l)=>n+(Array.isArray(l.payments)?l.payments.length:0),0):0
-          };
-          for(const k of Object.keys(actualCounts)){
-            if(expectedCounts[k]!==undefined && Number(expectedCounts[k])!==actualCounts[k])throw new Error('SECURE_BOOTSTRAP_REJECTED: cloud record count verification failed for '+k+'. Local data was not overwritten.');
+          const meta={ownerUid:uid,version,schemaVersion:'AMARA-SYNC-V2',updatedByDevice:mfFirebaseDeviceId,updatedAt:stamp,updatedAtLabel:new Date().toLocaleString('en-IN'),stateFingerprint:hash,counts:mfSyncCounts(snapshot),shell:mfSyncShell(snapshot),businessDataCleared:localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1',verifiedSync:{version,hash,digest,order,removedLastLoan:!snapshot.loans.length && !!remote.counts?.loans},syncWriting:null};
+          if(!full && operations.length<=24)meta.verifiedSync.delta={parent:head,ids:changed,removed};
+          const rootSize=mfV2AssertDocumentSize('business','metadata',meta).bytes;
+          const token=cryptoRandomId(), marker=()=>({token,device:mfFirebaseDeviceId,until:Date.now()+120000});
+          const write=async(ops,fields,locked)=>db.runTransaction(async tx=>{
+            const latest=await tx.get(root), cur=latest.data()||{};
+            if(target!==mfSyncTarget()||mfSyncHead(cur)!==head||cur.ownerUid&&cur.ownerUid!==uid||
+              (locked?cur.syncWriting?.token!==token:(cur.syncWriting?.token||'')!==(remote.syncWriting?.token||'')))throw Error('Another device changed this version. No local entry was discarded.');
+            for(const op of ops){if(op.data)tx.set(op.ref,op.data);else tx.delete(op.ref);}
+            if(fields)tx.set(root,fields,{mergeFields:Object.keys(fields)});
+          });
+          if(start.exists && operations.length<390 && operations.reduce((n,op)=>n+op.size,rootSize)<4000000){
+            await write(operations,meta,false);
+          }else{
+            await write([],{ownerUid:uid,schemaVersion:'AMARA-SYNC-V2',syncWriting:marker()},false);
+            let block=[],bytes=0;
+            for(const op of operations){
+              if(block.length>=380||bytes+op.size>4000000){await write(block,{syncWriting:marker()},true);block=[];bytes=0;}
+              block.push(op);bytes+=op.size;
+            }
+            if(block.length)await write(block,{syncWriting:marker()},true);
+            await write([],meta,true);
           }
-          if(!mfV2LocalStateReady || (mfV2DirtyAt() && mfV2Fingerprint()!==expected)){
-            throw new Error('Local edits are awaiting sync. Automatic cloud restore paused to preserve them.');
-          }
-          state=candidate;
-          mfScaleReinstallStateProxy();
-          normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
-          const persisted=await idbPutSnapshot();
-          if(!persisted?.state || !localStorage.getItem('MF_V2_LOCAL_SNAPSHOT_READY'))throw new Error('SECURE_BOOTSTRAP_REJECTED: verified cloud data could not be committed to the protected local snapshot.');
-          mfV2ArmBaseline();
-          mfV2SetHash(expected);
-          mfSetKnownCloudVersion(Number(cloud.version||0));
-          mfV2ClearDirty();
-          try{localStorage.removeItem('MF_LOCAL_DIRTY_AT');}catch(e){}
-          markStorageReady();
-          renderAll();
-          return true;
+          if(target!==mfSyncTarget())return false;
+          mfSyncBase={target,head:mfSyncHead(meta),data:snapshot};mfSyncRemember(meta);mfV2SetHash(hash);mfSetKnownCloudVersion(version);
+          if(capturedEpoch===mfStateMutationEpoch && capturedSave===mfSaveRequest && mfStateFingerprintObject(state)===hash){mfV2ClearDirty();mfV2ClearPendingDirty(mfV2PendingDirtySnapshot());}
+          else mfSyncAgain=true;
+          mfV2SetStatus('Verified cloud version '+version+' published · '+new Date().toLocaleTimeString());return true;
         }
 
+        async function mfSyncCombineSeparateLoans(cloud){
+          const target=mfSyncTarget(),base=mfSyncBase;
+          if(!base||base.target!==target||!mfSyncVerified(cloud))return false;
+          const epoch=mfStateMutationEpoch, save=mfSaveRequest, local=mfV2SafeClone(state);
+          const stable=x=>mfStableStringify(x);
+          const rest=s=>stable({...s,loans:s.loans.map(l=>l.id)});
+          const unchanged=rest(base.data);
+          if(rest(local)!==unchanged)return false;
+          const remote=await mfSyncRead(mfV2Root(),cloud,mfFirebaseUser.uid);
+          if(rest(remote)!==unchanged)return false;
+          const merged=mfV2SafeClone(remote);
+          for(let i=0;i<local.loans.length;i++){
+            const original=stable(base.data.loans[i]),left=stable(local.loans[i]),right=stable(remote.loans[i]);
+            if(left===original)continue;
+            if(right!==original && right!==left)return false;
+            merged.loans[i]=local.loans[i];
+          }
+          const safe=()=>target===mfSyncTarget() && epoch===mfStateMutationEpoch && save===mfSaveRequest;
+          if(!safe()){mfSyncAgain=true;return false;}
+          await idbPutSnapshot(merged,safe);
+          if(!safe()){await idbPutSnapshot();mfSyncAgain=true;return false;}
+          state=merged;mfScaleReinstallStateProxy();mfScaleSetFullDirty();mfResetBorrowingAggregateCache();
+          mfScaleReady=false;mfScaleSearchReady=false;mfScaleLoanMasterSearchIndexReady=false;
+          mfSyncBase={target,head:mfSyncHead(cloud),data:remote};mfSyncRemember(cloud);mfV2SetHash(cloud.stateFingerprint);
+          mfV2MarkDirty();renderAll();mfScaleBuildLocalEntities(true).catch(console.warn);
+          return await mfV2PushToServer(false);
+        }
         async function mfV2Reconcile(reason='auto'){
           // A confirmed Clear All Data must never be undone by an automatic cloud pull.
           // Pending clears are resolved only by an explicit Clear All Data / Sync Now / Restore action.
@@ -5263,40 +5306,59 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           // state. IndexedDB/local restore must finish first. A fresh device may first
           // adopt the already-verified cloud baseline; only then can reconciliation run.
           if(!mfV2LocalStateReady || !mfDbReady)return false;
-          if(!mfV2BaselineReady()){
-            try{if(!await mfV2AdoptVerifiedCloudBaseline('reconcile'))return false;}
-            catch(e){mfV2SetStatus(mfV2Error(e,'Secure cloud verification'),true);return false;}
-          }
-          if(mfCleanSyncBusy||!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return false;
+          if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return false;
+          if(mfCleanSyncBusy){mfSyncAgain=true;return false;}
           mfCleanSyncBusy=true;
           try{
+            if(!mfV2BaselineReady()&&!await mfV2AdoptVerifiedCloudBaseline(reason))return false;
             const root=await mfV2GetRootServer();
             const localHash=mfV2Fingerprint();
             if(!root.exists){
-              if(mfV2BaselineReady() && mfV2HasBusinessData()){await mfV2PushToServer(true);}
-              else mfV2SetStatus('🟡 New secure cloud database is waiting for the verified Google Drive restore on this device.',false);
+              if(mfV2BaselineReady() && mfV2HasBusinessData()){await mfV2PushToServer(false);}
+              else {mfV2SetStatus('No published cloud baseline is available yet.',true);return false;}
               return true;
             }
             const cloud=root.data()||{};
             if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid)throw new Error('SECURITY_DENIED: this business belongs to another account.');
-            if(String(cloud.stateFingerprint||'')===String(localHash)){mfV2SetHash(localHash);mfSetKnownCloudVersion(Number(cloud.version||0));mfV2ClearDirty();mfV2SetStatus('🟢 Laptop/mobile are synchronized with the new secure cloud.',false);return true;}
+            if(cloud.syncWriting){
+              if(cloud.syncWriting.device===mfFirebaseDeviceId && (mfV2DirtyAt()||cloud.stateFingerprint===localHash))return await mfV2PushToServer(false);
+              mfV2SetStatus('Cloud update pending · displaying local records',true);return false;
+            }
+            if(cloud.stateFingerprint && cloud.stateFingerprint===localHash){
+              if(!mfSyncVerified(cloud))return await mfV2PushToServer(false);
+              const data=mfV2SafeClone(state), epoch=mfStateMutationEpoch;
+              const digest=await mfSyncDigest(data);
+              if(epoch!==mfStateMutationEpoch){mfSyncAgain=true;return false;}
+              if(digest===cloud.verifiedSync.digest){
+                mfSyncBase={target:mfSyncTarget(),head:mfSyncHead(cloud),data};mfSyncRemember(cloud);mfV2SetHash(localHash);mfSetKnownCloudVersion(cloud.version);mfV2ClearDirty();
+                mfV2SetStatus('Verified cloud version '+cloud.version+' · this device is up to date');return true;
+              }
+            }
             const dirty=mfV2DirtyAt();
             const knownCloudHash=mfV2LastHash();
             // A dirty local edit is never silently discarded. If the cloud is still the
             // version this device last acknowledged, push the local edit. If the cloud has
             // independently changed, preserve the local edit and stop automatic reconciliation.
             if(dirty){
-              if(knownCloudHash && String(cloud.stateFingerprint||'')===String(knownCloudHash)){
+              if(knownCloudHash && String(cloud.stateFingerprint||'')===String(knownCloudHash) && (!mfSyncKnownHead()||mfSyncKnownHead()===mfSyncHead(cloud))){
                 await mfV2PushToServer(false);
                 return true;
               }
-              mfV2SetStatus('🟠 Local changes are waiting: secure cloud changed on another device. Local data was preserved; no automatic overwrite occurred.',true);
+              if(await mfSyncCombineSeparateLoans(cloud))return true;
+              mfSyncShowReview(true);mfV2SetStatus('🟠 Local changes are waiting: secure cloud changed on another device. Local data was preserved; no automatic overwrite occurred.',true);
               return false;
             }
-            await mfV2PullFromServer(false);return true;
-          }finally{mfCleanSyncBusy=false;}
+            return await mfV2PullFromServer(false);
+          }catch(e){
+            mfV2SetStatus(mfV2Error(e,'Cloud verification'),true);
+            clearTimeout(mfSyncRetry);mfSyncRetry=setTimeout(()=>mfV2Reconcile('retry').catch(()=>{}),5000);
+            throw e;
+          }finally{
+            mfCleanSyncBusy=false;
+            if(mfSyncAgain){mfSyncAgain=false;clearTimeout(mfSyncRetry);mfSyncRetry=setTimeout(()=>mfV2Reconcile('queued').catch(()=>{}),0);}
+          }
         }
-        function scheduleFirebasePush(){clearTimeout(mfFirebasePushTimer);mfV2MarkDirty();mfFirebasePushTimer=setTimeout(()=>mfV2Reconcile('scheduled').catch(e=>mfV2SetStatus(mfV2Error(e,'Automatic sync'),true)),250);}
+        function scheduleFirebasePush(){clearTimeout(mfFirebasePushTimer);mfV2MarkDirty();mfV2SetStatus('Saved locally · awaiting cloud confirmation',true);mfFirebasePushTimer=setTimeout(()=>mfV2Reconcile('scheduled').catch(e=>mfV2SetStatus(mfV2Error(e,'Automatic sync'),true)),60);}
         async function pushStateToFirebase(silent=false){try{
           if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'){
             if(!mfV2LocalStateReady||!mfDbReady) throw new Error('Local database is still initializing. Please wait and try again.');
@@ -5312,7 +5374,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             if(pushed){localStorage.removeItem('MF_CLEAR_ALL_DATA_PENDING');localStorage.removeItem('MF_CLEAR_ALL_DATA_TARGET');window.mfFirebaseInitialSyncReady=true;try{startFirebaseListener();}catch(e){}mfV2SetStatus('🟢 Explicit Sync Now completed. Current local data was pushed; automatic sync is active.',false);}
             return pushed;
           }
-          mfV2MarkDirty();return await mfV2Reconcile('manual');
+          return await mfV2Reconcile('manual');
         }catch(e){mfV2SetStatus(mfV2Error(e,'Sync Now'),true);if(!silent)alert(mfV2Error(e,'Sync Now'));}}
         async function pullStateFromFirebase(showConfirm=false){try{return await mfV2PullFromServer(!!showConfirm);}catch(e){mfV2SetStatus(mfV2Error(e,'Pull Latest'),true);if(showConfirm)alert(mfV2Error(e,'Pull Latest'));}}
         function startFirebaseListener(){
@@ -5328,9 +5390,13 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           mfFirebaseListenerUnsub=mfV2Root().onSnapshot(snap=>{
             if(window.mfFirebaseInitialSyncReady!==true||!snap.exists)return;
             const cloud=snap.data()||{};if(cloud.ownerUid&&cloud.ownerUid!==mfFirebaseUser.uid)return;
-            if(String(cloud.stateFingerprint||'')===String(mfV2Fingerprint())){mfSetKnownCloudVersion(Number(cloud.version||0));return;}
-            clearTimeout(window.__AMARA_V2_LISTENER_TIMER);window.__AMARA_V2_LISTENER_TIMER=setTimeout(()=>mfV2Reconcile('listener').catch(e=>console.warn('V2 listener reconcile:',e)),300);
-          },err=>mfV2SetStatus(mfV2Error(err,'Secure realtime listener'),true));
+            if(snap.metadata?.hasPendingWrites||snap.metadata?.fromCache||cloud.syncWriting)return;
+            if(mfSyncBase?.target===mfSyncTarget() && mfSyncBase.head===mfSyncHead(cloud) && !mfV2DirtyAt())return;
+            clearTimeout(window.__AMARA_V2_LISTENER_TIMER);window.__AMARA_V2_LISTENER_TIMER=setTimeout(()=>mfV2Reconcile('listener').catch(e=>mfV2SetStatus(mfV2Error(e,'Realtime sync'),true)),25);
+          },err=>{
+            mfFirebaseListenerUnsub=null;mfFirebaseListenerKey='';mfV2SetStatus(mfV2Error(err,'Secure realtime listener'),true);
+            setTimeout(()=>{if(mfFirebaseUser)startFirebaseListener();},5000);
+          });
         }
         async function initFirebaseSync(cfg,syncCode,showAlerts=false){
           try{
@@ -5344,14 +5410,13 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
               return;
             }
             if(mfV2LocalStateReady && mfDbReady){
+              window.mfFirebaseInitialSyncReady=true;startFirebaseListener();
               const adopted=mfV2BaselineReady() || await mfV2AdoptVerifiedCloudBaseline('firebase-connect');
               if(adopted){
                 await mfV2Reconcile('connect');
-                window.mfFirebaseInitialSyncReady=true;
-                startFirebaseListener();
-                mfV2SetStatus('🟢 Secure Firebase connected. Verified cloud baseline loaded; automatic sync is active.',false);
+                
               }else{
-                mfV2SetStatus('🟡 Firebase connected. No verified cloud baseline was found yet; Google Drive recovery remains available.',false);
+                if(document.getElementById('mf-sync-review')?.style.display!=='')mfV2SetStatus('Firebase connected · cloud baseline verification pending',true);
               }
             }else{
               mfV2SetStatus('🟡 Firebase connected. Restoring the local database before automatic sync.',false);
@@ -5404,14 +5469,13 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
               if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'){
                 mfV2SetStatus('🟠 Clear All Data is pending. No cloud data was fetched; use Sync Now to push the current local state or explicitly restore a backup.',true);
               }else if(mfV2LocalStateReady && mfDbReady){
-                const adopted=mfV2BaselineReady() || await mfV2AdoptVerifiedCloudBaseline('firebase-connect');
+                window.mfFirebaseInitialSyncReady=true;startFirebaseListener();
+              const adopted=mfV2BaselineReady() || await mfV2AdoptVerifiedCloudBaseline('firebase-connect');
                 if(adopted){
                   await mfV2Reconcile('connect');
-                  window.mfFirebaseInitialSyncReady=true;
-                  startFirebaseListener();
-                  mfV2SetStatus('🟢 Secure Firebase connected. Verified cloud baseline loaded; automatic sync is active.',false);
+                  
                 }else{
-                  mfV2SetStatus('🟡 Firebase connected. No verified cloud baseline was found yet; Google Drive recovery remains available.',false);
+                  if(document.getElementById('mf-sync-review')?.style.display!=='')mfV2SetStatus('Firebase connected · cloud baseline verification pending',true);
                 }
               }else{
                 mfV2SetStatus('🟡 Firebase connected. Restoring the local database before automatic sync.',false);
@@ -6819,7 +6883,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const date = getDmyIsoString("st");
 
             if (mode === "ADD") {
-                const newId = "ST-" + (10 + state.staff.length + 1);
+                const newId = 'ST-'+cryptoRandomId();
                 state.staff.push({
                     id: newId,
                     name: name,
@@ -6988,7 +7052,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const rec={category:cat,amount:amt,mode,paymentMeta:sourceResult.meta,desc,date,expenseMonth,expenseYear,month:monthsList[expenseMonth-1],year:expenseYear};
             const action=document.getElementById('ex-mode-action').value, idx=Number(document.getElementById('ex-edit-index').value);
             if(action==='EDIT' && state.expenses[idx]) { rec.id=state.expenses[idx].id; state.expenses[idx]=rec; }
-            else { rec.id='EXP-'+(100+state.expenses.length+1); state.expenses.push(rec); }
+            else { rec.id='EXP-'+cryptoRandomId(); state.expenses.push(rec); }
             closeModal('modal-expense'); persist();
         }
 
@@ -14691,15 +14755,15 @@ document.addEventListener('submit',event=>{
   // foreground, reconcile once so (a) edits made just before leaving are pushed and (b) changes made on the other device are pulled.
   let last=0;
   const kick=()=>{try{
-    const now=Date.now(); if(now-last<15000) return; last=now;
-    if(typeof mfV2BaselineReady==='function' && mfV2BaselineReady() && typeof mfV2Reconcile==='function' && typeof mfV2LocalStateReady!=='undefined' && mfV2LocalStateReady) mfV2Reconcile('foreground').catch(e=>console.warn('foreground sync',e));
+    const now=Date.now(); if(now-last<400) return; last=now;
+    if(typeof mfV2Reconcile==='function' && typeof mfV2LocalStateReady!=='undefined' && mfV2LocalStateReady) mfV2Reconcile('foreground').catch(e=>console.warn('foreground sync',e));
   }catch(e){console.warn('foreground sync guard',e);}};
   document.addEventListener('visibilitychange',()=>{ if(!document.hidden) kick(); });
   window.addEventListener('pageshow',kick);
   window.addEventListener('focus',kick);
 })();
 window.addEventListener('online',()=>{try{
-  if(typeof mfV2BaselineReady==='function' && mfV2BaselineReady() && typeof mfV2Reconcile==='function' && typeof mfV2LocalStateReady!=='undefined' && mfV2LocalStateReady) mfV2Reconcile('online');
+  if(typeof mfV2Reconcile==='function' && typeof mfV2LocalStateReady!=='undefined' && mfV2LocalStateReady) mfV2Reconcile('online').catch(e=>mfV2SetStatus(mfV2Error(e,'Reconnection'),true));
 }catch(e){console.error('V2 online reconciliation guard',e);}});
 </script>
 
