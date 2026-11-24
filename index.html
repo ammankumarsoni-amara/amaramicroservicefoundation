@@ -1549,7 +1549,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         <div class="cloud-banner">
             <div style="display: flex; align-items: center;">
                 <span class="cloud-dot"></span>
-                <span><b>Cloud & Local Safe:</b> <span id="sync-target-text">Device Storage</span></span>
+                <span><b>Storage:</b> <span id="sync-target-text">Device Storage</span></span>
             </div>
             <div id="mf-live-sync-status" role="status" style="font-size:.74rem;color:#cbd5e1">Local data · cloud verification pending</div>
             <div id="mf-local-save-status" role="status" style="font-size:.72rem"></div>
@@ -4978,7 +4978,53 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function mfV2ClearDirty(){try{localStorage.removeItem('MF_LOCAL_DIRTY_AT_V2');}catch(e){}}
         function mfV2LastHash(){return String(localStorage.getItem('MF_V2_FINAL_CLEAN_LAST_HASH')||'');}
         function mfV2SetHash(h){try{localStorage.setItem('MF_V2_FINAL_CLEAN_LAST_HASH',String(h||''));}catch(e){}}
-        function mfV2Error(e,action){const m=String(e?.message||e||'').replace(/^FirebaseError:\s*/,'');return '⚠️ '+action+' failed: '+m;}
+        function mfQuotaError(e){
+          return e?.name!=='QuotaExceededError' && (/(^|\/)resource-exhausted$/.test(e?.code||'') ||
+            /^(?:FirebaseError: )?Quota exceeded[.!]?$/i.test(String(e?.message||'').trim()));
+        }
+        function mfQuotaKey(){return 'MF_FIRESTORE_QUOTA_V1:'+mfSyncTarget();}
+        function mfQuotaRecord(){
+          const key=mfQuotaKey();
+          let saved;
+          try{saved=JSON.parse(localStorage.getItem(key));}catch(e){}
+          const memory=window.mfQuotaMemory?.[key];
+          return (memory?.until||0)>(saved?.until||0)?memory:saved;
+        }
+        function mfQuotaPaused(){return Number(mfQuotaRecord()?.until)>Date.now();}
+        function mfQuotaLabel(){return 'Firebase quota reached · showing this device’s records. Next sync attempt after '+new Date(mfQuotaRecord().until).toLocaleTimeString()+'.';}
+        function mfQuotaWait(){
+          if(!mfQuotaPaused())return false;
+          const key=mfQuotaKey(),until=mfQuotaRecord().until;
+          if(window.mfQuotaAlarm?.key!==key || window.mfQuotaAlarm.until!==until){
+            clearTimeout(window.mfQuotaAlarm?.timer);
+            const timer=setTimeout(()=>{
+              window.mfQuotaAlarm=null;
+              if(key!==mfQuotaKey() || !mfFirebaseUser || !mfV2LocalStateReady || !mfDbReady)return;
+              if(mfQuotaWait())return;
+              if(localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'){mfV2Reconcile('quota retry').catch(console.warn);return;}
+              window.mfFirebaseInitialSyncReady=true;
+              startFirebaseListener();
+              mfV2Reconcile('quota retry').catch(console.warn);
+            },Math.max(1,until-Date.now()));
+            window.mfQuotaAlarm={key,until,timer};
+          }
+          return true;
+        }
+        function mfQuotaGuard(){
+          if(mfQuotaWait())throw Object.assign(Error(mfQuotaLabel()),{code:'resource-exhausted'});
+        }
+        function mfQuotaFailure(){
+          if(!mfQuotaPaused()){
+            const prev=mfQuotaRecord(),now=Date.now();
+            const step=prev && now-prev.until<3600000 ? Math.min(5,(Number(prev.step)||0)+1):0;
+            const record={step,until:now+Math.min(3600000,300000*2**step)};
+            (window.mfQuotaMemory||={})[mfQuotaKey()]=record;
+            try{localStorage.setItem(mfQuotaKey(),JSON.stringify(record));}catch(e){}
+          }
+          if(mfFirebaseListenerUnsub){mfFirebaseListenerUnsub();mfFirebaseListenerUnsub=null;mfFirebaseListenerKey='';}
+          mfQuotaWait();return mfQuotaLabel();
+        }
+        function mfV2Error(e,action){if(mfQuotaError(e))return mfQuotaFailure();const m=String(e?.message||e||'').replace(/^FirebaseError:\s*/,'');return '⚠️ '+action+' failed: '+m;}
         function mfV2HasBusinessData(){return !!((state.loans||[]).length||(state.borrowings||[]).length||(state.products&&Object.keys(state.products).length)||(state.staff||[]).length||(state.expenses||[]).length||(state.paymentAccounts||[]).length||(state.paymentTransfers||[]).length||(state.paymentStatementLines||[]).length||(Number(state.paymentCashOpeningBalance)||0));}
         function mfV2BaselineReady(){return localStorage.getItem('MF_V2_FINAL_CLEAN_BASELINE_READY')==='1';}
         function mfV2ArmBaseline(){try{localStorage.setItem('MF_V2_FINAL_CLEAN_BASELINE_READY','1');}catch(e){}}
@@ -4993,6 +5039,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         }
         window.addEventListener('offline',()=>mfV2SetStatus('Offline · displaying this device’s saved records',true));
         function mfV2SetStatus(msg,warn=false){
+          if(mfFirebaseUser && mfQuotaWait()){msg=mfQuotaLabel();warn=true;}
           setFirebaseStatus(msg,warn);
           const el=document.getElementById('mf-live-sync-status');
           if(el){el.textContent=msg;el.style.color=warn?'#fcd34d':'#cbd5e1';}
@@ -5016,6 +5063,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function mfSetKnownCloudVersion(v){try{localStorage.setItem('MF_V2_FINAL_CLEAN_CLOUD_VERSION',String(Number(v)||0));}catch(e){}}
         function mfV2NextVersion(cloudVersion){return Math.max(Number(cloudVersion)||0,Number(localStorage.getItem('MF_V2_FINAL_CLEAN_LOCAL_VERSION')||0))+1;}
         async function mfV2GetRootServer(){
+          mfQuotaGuard();
           const ref=mfV2Root();
           try{return await ref.get({source:'server'});}catch(e){
             if(e?.code==='permission-denied' && mfFirebaseUser){
@@ -5054,6 +5102,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           if(mfCleanSyncBusy||!mfFirebaseUser)return;
           mfCleanSyncBusy=true;
           try{
+            mfQuotaGuard();
             const target=mfSyncTarget(),root=mfV2Root(),uid=mfFirebaseUser.uid,epoch=mfStateMutationEpoch;
             const snap=await root.get({source:'server'}),meta=snap.data()||{};
             if(meta.ownerUid!==uid || meta.syncWriting || !meta.stateFingerprint)throw Error('A completed cloud version is required for comparison.');
@@ -5076,7 +5125,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             await mfV2PushToServer(true,{head:mfSyncHead(meta),target,epoch});
             mfV2ArmBaseline();mfSyncShowReview(false);
           }catch(e){mfV2SetStatus(mfV2Error(e,'Compare copies'),true);}
-          finally{mfCleanSyncBusy=false;if(mfSyncAgain){mfSyncAgain=false;mfV2Reconcile('queued').catch(()=>{});}}
+          finally{mfCleanSyncBusy=false;if(mfSyncAgain && !mfQuotaWait()){mfSyncAgain=false;mfV2Reconcile('queued').catch(()=>{});}}
         }
         function mfSyncRemember(meta){
           mfSyncShowReview(false);
@@ -5152,7 +5201,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const localIds=new Map((state[k]||[]).map((r,i)=>[String(r.id),i]));
                 out[k].sort((a,b)=>(localIds.get(String(a.id))??Infinity)-(localIds.get(String(b.id))??Infinity));
               }
-              if(mfStateFingerprintObject(out)!==meta.stateFingerprint)throw Error('Legacy cloud data could not be verified. Open Rev13 on the device with the complete accounts to publish a verified copy.');
+              if(mfStateFingerprintObject(out)!==meta.stateFingerprint)throw Error('Legacy cloud data could not be verified. Open this release on the device with the complete accounts to publish a verified copy.');
             }
           }
           const last=await root.get({source:'server'}), head=last.data()||{};
@@ -5160,17 +5209,18 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           return out;
         }
         async function mfV2PullFromServer(showConfirm=false){
+          mfQuotaGuard();
           if(!mfDbReady||!mfV2LocalStateReady||!mfFirestoreDb||!mfFirebaseUser||!mfFirebaseSyncCode)return false;
           if(showConfirm&&!confirm('Replace the records on this device with the verified cloud version?'))return false;
           if(!showConfirm&&(mfV2DirtyAt()||localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1'))return false;
           const root=mfV2Root(), target=mfSyncTarget(), uid=mfFirebaseUser.uid, epoch=mfStateMutationEpoch, save=mfSaveRequest;
-          const snap=await root.get({source:'server'});if(!snap.exists)return false;
+          const snap=await root.get({source:'server'});if(!snap.exists){mfV2SetStatus('No published cloud baseline is available yet.',true);return false;}
           const meta=snap.data();
           if(meta.ownerUid!==uid||!meta.stateFingerprint||!meta.shell||meta.syncWriting)throw Error('Cloud version is not ready for verification. Local records retained.');
           let candidate;
           try{candidate=await mfSyncRead(root,meta,uid);}
           catch(err){
-            if(!meta.verifiedSync?.delta || mfSyncBase?.head!==meta.verifiedSync.delta.parent)throw err;
+            if(mfQuotaError(err) || !meta.verifiedSync?.delta || mfSyncBase?.head!==meta.verifiedSync.delta.parent)throw err;
             candidate=await mfSyncRead(root,meta,uid,false);
           }
           if(!candidate.loans.length && state.loans?.length && !meta.businessDataCleared && !(mfSyncVerified(meta)&&meta.verifiedSync.removedLastLoan) && !showConfirm)throw Error('Empty loan list requires explicit confirmation. Local loans retained.');
@@ -5206,6 +5256,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           return mfV2BaselineReady()||await mfV2PullFromServer(false);
         }
         async function mfV2PushToServer(force=false,review=null){
+          mfQuotaGuard();
           if((!mfV2BaselineReady()&&!review)||!mfDbReady||!mfFirebaseUser||!mfFirestoreDb||!mfFirebaseSyncCode)throw Error('Local database and signed-in Firebase connection are required.');
           const target=mfSyncTarget(),uid=mfFirebaseUser.uid,root=mfV2Root(), db=mfFirestoreDb;
           const capturedEpoch=mfStateMutationEpoch,capturedSave=mfSaveRequest;
@@ -5226,7 +5277,11 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             const rows=k==='payments'?paymentMap(snapshot):mfSyncRows(snapshot,k);
             changed[k]=[];removed[k]=[];
             const col=root.collection('structured_v1_'+k);
-            const prior=full?null:(k==='payments'?paymentMap(mfSyncBase.data):mfSyncRows(mfSyncBase.data,k));
+            let prior=full?null:(k==='payments'?paymentMap(mfSyncBase.data):mfSyncRows(mfSyncBase.data,k));
+            if(full && start.exists){
+              const existing=await col.where('_ownerUid','==',uid).get({source:'server'});
+              prior=new Map(existing.docs.map(doc=>[doc.id,mfSyncRemoveMeta(doc.data())]));
+            }
             if(k!=='products'&&k!=='payments')order[k]=[...rows.keys()];
             for(const [id,row] of rows){
               if(prior?.has(id)&&mfStableStringify(row)===mfStableStringify(prior.get(id)))continue;
@@ -5234,8 +5289,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
               const size=mfV2AssertDocumentSize(k,id,data).bytes;
               operations.push({ref:col.doc(id),data,size});if(k!=='payments')changed[k].push(id);
             }
-            let ids=prior?.keys()||[];
-            if(full&&start.exists){const q=await col.where('_ownerUid','==',uid).get({source:'server'});ids=q.docs.map(d=>d.id);}
+            const ids=prior?.keys()||[];
             for(const id of ids)if(!rows.has(id)){operations.push({ref:col.doc(id),size:100});if(k!=='payments'){changed[k].push(id);removed[k].push(id);}}
           }
           const meta={ownerUid:uid,version,schemaVersion:'AMARA-SYNC-V2',updatedByDevice:mfFirebaseDeviceId,updatedAt:stamp,updatedAtLabel:new Date().toLocaleString('en-IN'),stateFingerprint:hash,counts:mfSyncCounts(snapshot),shell:mfSyncShell(snapshot),businessDataCleared:localStorage.getItem('MF_CLEAR_ALL_DATA_PENDING')==='1',verifiedSync:{version,hash,digest,order,removedLastLoan:!snapshot.loans.length && !!remote.counts?.loans},syncWriting:null};
@@ -5307,10 +5361,11 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
           // adopt the already-verified cloud baseline; only then can reconciliation run.
           if(!mfV2LocalStateReady || !mfDbReady)return false;
           if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return false;
+          if(mfQuotaWait()){mfV2SetStatus(mfQuotaLabel(),true);return false;}
           if(mfCleanSyncBusy){mfSyncAgain=true;return false;}
           mfCleanSyncBusy=true;
           try{
-            if(!mfV2BaselineReady()&&!await mfV2AdoptVerifiedCloudBaseline(reason))return false;
+            if(!mfV2BaselineReady())return await mfV2AdoptVerifiedCloudBaseline(reason);
             const root=await mfV2GetRootServer();
             const localHash=mfV2Fingerprint();
             if(!root.exists){
@@ -5351,11 +5406,11 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             return await mfV2PullFromServer(false);
           }catch(e){
             mfV2SetStatus(mfV2Error(e,'Cloud verification'),true);
-            clearTimeout(mfSyncRetry);mfSyncRetry=setTimeout(()=>mfV2Reconcile('retry').catch(()=>{}),5000);
+            if(!mfQuotaError(e) && /^(unavailable|deadline-exceeded|aborted)$/.test(e?.code||'')){clearTimeout(mfSyncRetry);mfSyncRetry=setTimeout(()=>mfV2Reconcile('retry').catch(()=>{}),15000);}
             throw e;
           }finally{
             mfCleanSyncBusy=false;
-            if(mfSyncAgain){mfSyncAgain=false;clearTimeout(mfSyncRetry);mfSyncRetry=setTimeout(()=>mfV2Reconcile('queued').catch(()=>{}),0);}
+            if(mfSyncAgain && !mfQuotaWait()){mfSyncAgain=false;clearTimeout(mfSyncRetry);mfSyncRetry=setTimeout(()=>mfV2Reconcile('queued').catch(()=>{}),0);}
           }
         }
         function scheduleFirebasePush(){clearTimeout(mfFirebasePushTimer);mfV2MarkDirty();mfV2SetStatus('Saved locally · awaiting cloud confirmation',true);mfFirebasePushTimer=setTimeout(()=>mfV2Reconcile('scheduled').catch(e=>mfV2SetStatus(mfV2Error(e,'Automatic sync'),true)),60);}
@@ -5366,7 +5421,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             if(!mfClearAllPendingTargetMatches()){
               // A clear initiated offline or against another Firebase account must not erase
               // a different company's existing cloud. A new empty cloud can be initialized safely.
-              const root=await mfV2Root().get({source:'server'});
+              mfQuotaGuard();const root=await mfV2Root().get({source:'server'});
               if(root.exists) throw new Error('The pending Clear All Data belongs to a different or unverified Firebase target. No cloud data was changed. If you intend to clear this connected database, click Clear All Data while connected; if you intend to load it, use the confirmed Pull Latest or Restore action.');
             }
             mfScaleSetFullDirty();
@@ -5380,6 +5435,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function startFirebaseListener(){
           if(!mfV2LocalStateReady || !mfDbReady)return;
           if(!mfFirestoreDb||!mfFirebaseSyncCode||!mfFirebaseUser)return;
+          if(mfQuotaWait()){mfV2SetStatus(mfQuotaLabel(),true);return;}
           const key=String(mfFirebaseUser.uid)+'|'+mfFirebaseSyncCode;
           // Keep an already-active listener for the same Firebase account/sync target.
           // The previous order unsubscribed first and then returned for the same key,
@@ -5395,7 +5451,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             clearTimeout(window.__AMARA_V2_LISTENER_TIMER);window.__AMARA_V2_LISTENER_TIMER=setTimeout(()=>mfV2Reconcile('listener').catch(e=>mfV2SetStatus(mfV2Error(e,'Realtime sync'),true)),25);
           },err=>{
             mfFirebaseListenerUnsub=null;mfFirebaseListenerKey='';mfV2SetStatus(mfV2Error(err,'Secure realtime listener'),true);
-            setTimeout(()=>{if(mfFirebaseUser)startFirebaseListener();},5000);
+            if(!mfQuotaError(err) && err?.code!=='permission-denied')setTimeout(()=>{if(mfFirebaseUser)startFirebaseListener();},15000);
           });
         }
         async function initFirebaseSync(cfg,syncCode,showAlerts=false){
@@ -5411,13 +5467,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             }
             if(mfV2LocalStateReady && mfDbReady){
               window.mfFirebaseInitialSyncReady=true;startFirebaseListener();
-              const adopted=mfV2BaselineReady() || await mfV2AdoptVerifiedCloudBaseline('firebase-connect');
-              if(adopted){
-                await mfV2Reconcile('connect');
-                
-              }else{
-                if(document.getElementById('mf-sync-review')?.style.display!=='')mfV2SetStatus('Firebase connected · cloud baseline verification pending',true);
-              }
+              await mfV2Reconcile('connect');
             }else{
               mfV2SetStatus('🟡 Firebase connected. Restoring the local database before automatic sync.',false);
             }
@@ -5470,13 +5520,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 mfV2SetStatus('🟠 Clear All Data is pending. No cloud data was fetched; use Sync Now to push the current local state or explicitly restore a backup.',true);
               }else if(mfV2LocalStateReady && mfDbReady){
                 window.mfFirebaseInitialSyncReady=true;startFirebaseListener();
-              const adopted=mfV2BaselineReady() || await mfV2AdoptVerifiedCloudBaseline('firebase-connect');
-                if(adopted){
-                  await mfV2Reconcile('connect');
-                  
-                }else{
-                  if(document.getElementById('mf-sync-review')?.style.display!=='')mfV2SetStatus('Firebase connected · cloud baseline verification pending',true);
-                }
+              await mfV2Reconcile('connect');
               }else{
                 mfV2SetStatus('🟡 Firebase connected. Restoring the local database before automatic sync.',false);
               }
