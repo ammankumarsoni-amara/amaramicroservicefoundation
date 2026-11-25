@@ -3747,8 +3747,8 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         }
 
         // Normalize legacy payroll/expense records without disturbing existing data.
-        function normalizeBorrowingCosts() {
-            (state.borrowings || []).forEach(b => {
+        function normalizeBorrowingCosts(record=state) {
+            (record.borrowings || []).forEach(b => {
                 b.processingFee = Number(b.processingFee || 0);
                 b.processingFeePct = Number(b.processingFeePct || 0);
                 if (!b.processingFeePct && (Number(b.amount)||0) > 0 && b.processingFee) {
@@ -3779,15 +3779,15 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             });
         }
 
-        function normalizeOperationalPeriods() {
+        function normalizeOperationalPeriods(record=state) {
             const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
-            (state.staff||[]).forEach(s=>(s.salaryPayments||[]).forEach(p=>{
+            (record.staff||[]).forEach(s=>(s.salaryPayments||[]).forEach(p=>{
                 if (!p.salaryMonth && p.month) p.salaryMonth=String(p.month).split(' ')[0];
                 if (!p.salaryYear) { const m=String(p.month||'').match(/\d{4}/); if(m) p.salaryYear=Number(m[0]); }
                 if (!p.salaryMonth && p.date) { const d=new Date(p.date); if(!isNaN(d)) p.salaryMonth=months[d.getMonth()]; }
                 if (!p.salaryYear && p.date) { const d=new Date(p.date); if(!isNaN(d)) p.salaryYear=d.getFullYear(); }
             }));
-            (state.expenses||[]).forEach(e=>{
+            (record.expenses||[]).forEach(e=>{
                 if (!e.expenseMonth || !e.expenseYear) { const d=new Date(e.date); if(!isNaN(d)){ e.expenseMonth=e.expenseMonth||d.getMonth()+1; e.expenseYear=e.expenseYear||d.getFullYear(); } }
                 if (!e.month && e.expenseMonth) e.month=months[Number(e.expenseMonth)-1];
                 if (!e.year && e.expenseYear) e.year=e.expenseYear;
@@ -3923,7 +3923,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
         function mfSnapshotRevision(row){
             return row?.revision || row?.updatedAt || '';
         }
-        async function idbPutSnapshot(candidate,stillCurrent){
+        async function idbPutSnapshot(candidate,stillCurrent,restoreHistory=null){
             if(!mfDbReady) throw new Error('Local database is still opening. Keep this tab open.');
             const savedState=candidate ?? mfCloneStateForPersistence();
             const commit=async()=>{
@@ -3934,6 +3934,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                     journalSeq:0,stateFingerprint:mfStateFingerprintObject(savedState)};
                 await new Promise((resolve,reject)=>{
                     const stores=[MF_IDB_STORE,MF_IDB_JOURNAL_STORE];
+                    if(restoreHistory)stores.push(MF_IDB_HISTORY_STORE);
                     const tx=db.transaction(stores,'readwrite',{durability:'strict'});
                     const store=tx.objectStore(MF_IDB_STORE);
                     let conflict=false;
@@ -3942,6 +3943,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                         if((stillCurrent && !stillCurrent()) || mfSnapshotRevision(request.result)!==mfLocalRevision){
                             conflict=true; tx.abort(); return;
                         }
+                        if(restoreHistory)tx.objectStore(MF_IDB_HISTORY_STORE).put(restoreHistory);
                         store.put(payload);
                         tx.objectStore(MF_IDB_JOURNAL_STORE).clear();
                     };
@@ -6241,10 +6243,10 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             return isoDateStr;
         }
 
-        function normalizeCompanyProfile(){
+        function normalizeCompanyProfile(record=state){
             const defaults={legalName:'',tagline:'Microfinance & Lending Solutions',address:'',cityState:'',phone:'',email:'',website:'',registrationNo:'',gstin:'',licenseNo:''};
-            state.companyProfile=Object.assign({},defaults,state.companyProfile||{});
-            if(!state.companyProfile.legalName && state.bizName) state.companyProfile.legalName=state.bizName;
+            record.companyProfile=Object.assign({},defaults,record.companyProfile||{});
+            if(!record.companyProfile.legalName && record.bizName) record.companyProfile.legalName=record.bizName;
         }
         normalizeCompanyProfile();
 
@@ -11997,7 +11999,10 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 headers=Object.assign({'Authorization':'Bearer '+googleAccessToken},options.headers||{});
                 r=await fetch('https://www.googleapis.com/drive/v3/'+path,Object.assign({},options,{headers}));
             }
-            if(!r.ok) throw new Error('Google Drive API '+r.status+': '+await r.text());
+            if(!r.ok){
+                const body=await r.json().catch(()=>null);
+                throw new Error('Google Drive request failed (HTTP '+r.status+'): '+(body?.error?.message||r.statusText||'Request rejected'));
+            }
             return r;
         }
 
@@ -12180,7 +12185,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                         const verifyObj={format:env.format,business:env.business,updatedAt:env.updatedAt,state:env.state};
                         if(env.checksum!==await sha256Hex(JSON.stringify(verifyObj))) throw new Error('V3 backup checksum failed.');
                     }
-                    if(!backupLooksValid(env.state)) throw new Error('Backup database structure is invalid.');
+                    if(!backupLooksValid(env.state)||Array.isArray(env.state.products)||['borrowings','staff','expenses','companyExpenses'].some(k=>env.state[k]!=null&&!Array.isArray(env.state[k]))) throw new Error('Backup database structure is invalid.');
                     return normalizeRecoveredState(env.state);
                 }catch(e){ lastReason=e?.message||lastReason; }
             }
@@ -12363,6 +12368,41 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 alert('Google Drive connected successfully and verified. No backup was created. Your encrypted backup remains a separate manual action.');
             }catch(err){ alert('Google Drive connection failed: '+err.message); }
         }
+        function mfDriveRestoreSession(){
+            if(!mfFirebaseUser || !getCloudPin())throw Error('Sign in and activate your backup PIN before restoring.');
+            return {target:mfSyncTarget(),uid:mfFirebaseUser.uid,pin:getCloudPin(),epoch:mfStateMutationEpoch,save:mfSaveRequest};
+        }
+        async function mfCommitDriveRestore(parsed,session,label){
+            const current=()=>mfFirebaseUser?.uid===session.uid && mfSyncTarget()===session.target &&
+                getCloudPin()===session.pin && mfStateMutationEpoch===session.epoch && mfSaveRequest===session.save;
+            if(!current())throw Error('The account, PIN or local records changed during download. Re-select the backup.');
+            if(mfCleanSyncBusy)throw Error('Another sync is finishing. Please retry the restore when it completes.');
+            mfCleanSyncBusy=true;
+            try{
+                normalizeOperationalPeriods(parsed);normalizeBorrowingCosts(parsed);normalizeCompanyProfile(parsed);
+                mfSyncCheckLoans(parsed);
+                const history={id:'before-drive-'+cryptoRandomId(),version:1,createdAt:new Date().toISOString(),reason:'Before Google Drive restore',state:mfCloneStateForPersistence()};
+                try{await idbPutSnapshot(parsed,current,history);}
+                catch(e){throw Error('Local restore was not committed. '+(e?.name==='QuotaExceededError'?'This browser has insufficient space for the restored records and safety copy.':e.message||e));}
+                state=parsed;mfScaleReinstallStateProxy();mfScaleSetFullDirty();mfResetBorrowingAggregateCache();
+                mfScaleReady=false;mfScaleSearchReady=false;mfScaleLoanMasterSearchIndexReady=false;
+                mfV2LocalStateReady=true;mfV2MarkDirty();mfV2ArmBaseline();mfSyncBase=null;
+                try{localStorage.removeItem('MF_CLEAR_ALL_DATA_PENDING');localStorage.removeItem('MF_CLEAR_ALL_DATA_TARGET');}catch(e){}
+                window.mfFirebaseInitialSyncReady=true;
+            }finally{mfCleanSyncBusy=false;}
+            renderAll();
+            let detail;
+            try{
+                startFirebaseListener();
+                const verified=await mfV2Reconcile('drive restore');
+                detail=verified && !mfV2DirtyAt()?'Firebase confirmed this version.':
+                    mfQuotaPaused()?mfQuotaLabel():'Firebase has not confirmed this version. Check Cloud Sync for pending changes or a comparison request.';
+            }catch(e){detail=mfV2Error(e,'Firebase sync');}
+            const message=label+' restored on this device. '+detail;
+            updateSecureCloudStatus(message,!detail.startsWith('Firebase confirmed'));
+            const ds=document.getElementById('drive-last-sync');if(ds)ds.textContent=message;
+            alert(message);
+        }
         async function restoreLatestFromGoogleDrive(){
             try{
                 if(!mfFirebaseUser) return alert('Please sign in to Firebase before using Google Drive restore.');
@@ -12371,24 +12411,29 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 if(!googleAccessToken){
                     await mfEnsureGoogleAccessForUser();
                 }
+                const session=mfDriveRestoreSession();
                 const {files}=await driveListCurrent(true);
                 if(!files.length) return alert('No encrypted cloud database backup found in Google Drive.');
                 if(!confirm('Restore the latest encrypted Google Drive database? Your current device data will first be preserved in local version history.')) return;
-                try{ const safety={id:'pre-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()}; const db=await openMfDb(); await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
-                const r=await driveApi('files/'+files[0].id+'?alt=media'); const env=await r.json(); const parsed=await parseCloudBackup(env);
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleSetFullDirty(); normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
-                const persisted=await idbPutSnapshot();
-                if(!persisted?.state || !localStorage.getItem('MF_V2_LOCAL_SNAPSHOT_READY')) throw new Error('Restored data could not be committed to the protected local database. Cloud baseline was not changed.');
-                renderAll(); await mfV2PublishVerifiedDriveBaseline('latest-drive-restore'); updateSecureCloudStatus('🟢 Latest encrypted Google Drive backup restored, validated, and published as the new secure baseline.'); const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Restored latest backup: '+new Date().toLocaleString('en-IN'); alert('Latest encrypted Google Drive backup restored successfully and established as the new secure cloud baseline.'); closeModal('modal-cloud'); setTab('feed');
+                const r=await driveApi('files/'+encodeURIComponent(files[0].id)+'?alt=media');const parsed=await parseCloudBackup(await r.json());
+                await mfCommitDriveRestore(parsed,session,'Latest Google Drive backup');
+                closeModal('modal-cloud');setTab('feed');
             }catch(err){alert('Cloud restore failed: '+(err?.message||err));}
         }
 
 
+        async function mfListRestoreFiles(q){
+            const files=[];let token='';
+            do{
+                const page=await driveApi('files?q='+q+'&spaces=drive&fields=nextPageToken,files(id,name,modifiedTime,size)&pageSize=1000'+(token?'&pageToken='+encodeURIComponent(token):''));
+                const data=await page.json();files.push(...(data.files||[]));token=data.nextPageToken||'';
+            }while(token);
+            return files;
+        }
         async function listDriveTimestampedRestorePoints(){
             const folder=await ensureDriveFolder();
             const q=encodeURIComponent("name contains 'Backup_' and trashed=false and '"+folder+"' in parents");
-            const listResp=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=1000');
-            const files=(await listResp.json()).files||[];
+            const files=await mfListRestoreFiles(q);
             const stampOf=(name)=>{ const m=String(name||'').match(/^Backup_(\d{4}-\d{2}-\d{2})_(\d{10,})\.mfbackup\.json$/); return m?Number(m[2]):0; };
             files.sort((a,b)=>{
                 const sa=stampOf(a.name), sb=stampOf(b.name);
@@ -12422,6 +12467,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 if(!googleAccessToken){
                     await mfEnsureGoogleAccessForUser();
                 }
+                const pickerSession=mfDriveRestoreSession();
                 const {files}=await listDriveTimestampedRestorePoints();
                 closeDriveRestorePointPicker();
                 const overlay=document.createElement('div');
@@ -12432,11 +12478,11 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 card.className='modal-card';
                 card.style.cssText='max-width:720px;max-height:88vh;overflow:hidden;';
                 const rows=files.length?files.map((f,i)=>`
-                    <button type="button" data-drive-restore-id="${String(f.id).replace(/"/g,'&quot;')}" style="display:flex;width:100%;text-align:left;gap:10px;align-items:center;padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.035);color:#fff;margin-bottom:7px;cursor:pointer;">
+                    <button type="button" data-drive-restore-id="${financeEsc(f.id)}" style="display:flex;width:100%;text-align:left;gap:10px;align-items:center;padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.035);color:#fff;margin-bottom:7px;cursor:pointer;">
                         <span style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(96,165,250,.12);color:#93c5fd;font-weight:800;font-size:.72rem;">${i+1}</span>
                         <span style="flex:1;min-width:0;">
-                            <span style="display:block;font-size:.76rem;font-weight:800;">${formatDriveRestorePointTime(f)}</span>
-                            <span style="display:block;color:#64748b;font-size:.61rem;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${String(f.name||'')}</span>
+                            <span style="display:block;font-size:.76rem;font-weight:800;">${financeEsc(formatDriveRestorePointTime(f))}</span>
+                            <span style="display:block;color:#64748b;font-size:.61rem;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${financeEsc(f.name||'')}</span>
                         </span>
                         <i class="fa-solid fa-clock-rotate-left" style="color:#60a5fa;"></i>
                     </button>`).join('') :
@@ -12458,7 +12504,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 document.getElementById('mf-drive-restore-close').onclick=closeDriveRestorePointPicker;
                 document.getElementById('mf-drive-restore-cancel').onclick=closeDriveRestorePointPicker;
                 card.querySelectorAll('[data-drive-restore-id]').forEach(btn=>{
-                    btn.addEventListener('click',()=>restoreSelectedDriveTimestamp(btn.getAttribute('data-drive-restore-id'),files));
+                    btn.addEventListener('click',()=>restoreSelectedDriveTimestamp(btn.getAttribute('data-drive-restore-id'),files,pickerSession));
                 });
             }catch(err){
                 alert('Could not load Google Drive restore points: '+(err?.message||err));
@@ -12467,32 +12513,20 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
             }
         }
 
-        async function restoreSelectedDriveTimestamp(fileId,files){
+        async function restoreSelectedDriveTimestamp(fileId,files,pickerSession=null){
             const file=(files||[]).find(f=>String(f.id)===String(fileId));
             if(!file) return alert('Restore point not found.');
             try{
+                const session=mfDriveRestoreSession();
+                if(pickerSession && (pickerSession.target!==session.target||pickerSession.uid!==session.uid||pickerSession.pin!==session.pin))throw Error('Sign-in or PIN changed. Open the restore list again.');
                 closeDriveRestorePointPicker();
                 const when=formatDriveRestorePointTime(file);
                 if(!confirm('Restore the Google Drive backup from '+when+'? Your current device data will first be preserved locally. This will NOT overwrite any Drive backup file.')) return;
-                const r=await driveApi('files/'+file.id+'?alt=media');
+                const r=await driveApi('files/'+encodeURIComponent(file.id)+'?alt=media');
                 const raw=await r.json();
                 const parsed=await parseCloudBackup(raw);
-                try{
-                    const safety={id:'pre-timestamp-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()};
-                    const db=await openMfDb();
-                    await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
-                }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleSetFullDirty();
-                normalizeOperationalPeriods(); normalizeBorrowingCosts(); normalizeCompanyProfile();
-                const persisted=await idbPutSnapshot();
-                if(!persisted?.state || !localStorage.getItem('MF_V2_LOCAL_SNAPSHOT_READY')) throw new Error('Restored data could not be committed to the protected local database. Cloud baseline was not changed.');
-                renderAll();
-                await mfV2PublishVerifiedDriveBaseline('timestamped-drive-restore');
-                updateSecureCloudStatus('🟢 Timestamped Google Drive backup restored, validated, and published as the new secure cloud baseline.');
-                const ds=document.getElementById('drive-last-sync'); if(ds) ds.textContent='Restored backup: '+when;
-                alert('Timestamped Google Drive backup restored successfully:\\n\\n'+when);
-                closeModal('modal-cloud');
-                setTab('feed');
+                await mfCommitDriveRestore(parsed,session,'Google Drive backup from '+when);
+                closeModal('modal-cloud');setTab('feed');
             }catch(err){
                 alert('Timestamped cloud restore failed: '+(err?.message||err));
             }
@@ -12505,10 +12539,10 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const pin=getCloudPin();
                 if(!pin) return alert('Enter the Cloud Encryption PIN before restoring a Google Drive recovery snapshot.');
                 if(!googleAccessToken) await mfEnsureGoogleAccessForUser();
+                const session=mfDriveRestoreSession();
                 const folder=await ensureDriveFolder(true);
                 const q=encodeURIComponent("name contains 'Snapshot_' and trashed=false and '"+folder+"' in parents");
-                const listResp=await driveApi('files?q='+q+'&spaces=drive&fields=files(id,name,modifiedTime,size)&pageSize=100');
-                const files=(await listResp.json()).files||[];
+                const files=await mfListRestoreFiles(q);
                 if(!files.length) return alert('No immutable recovery snapshot was found in Google Drive.');
 
                 // Prefer the timestamp embedded in the immutable filename, with Drive modifiedTime
@@ -12525,12 +12559,12 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 let parsed=null, used=null, failures=[];
                 for(const snap of files){
                     try{
-                        const r=await driveApi('files/'+snap.id+'?alt=media');
+                        const r=await driveApi('files/'+encodeURIComponent(snap.id)+'?alt=media');
                         const raw=await r.json();
                         parsed=await parseCloudBackup(raw);
                         used=snap;
                         break;
-                    }catch(e){ failures.push((snap.name||'snapshot')+': '+(e?.message||'validation failed')); }
+                    }catch(e){ if(String(e?.message).startsWith('Google Drive request failed')||e instanceof TypeError)throw e; failures.push((snap.name||'snapshot')+': '+(e?.message||'validation failed')); }
                 }
                 if(!parsed){
                     throw new Error('No usable encrypted recovery snapshot could be validated. '+failures.slice(0,3).join(' | '));
@@ -12539,22 +12573,7 @@ button.mf-summary-kpi:hover{border-color:rgba(56,189,248,.65);transform:translat
                 const when=used.modifiedTime?new Date(used.modifiedTime).toLocaleString('en-IN'):used.name;
                 if(!confirm('Restore the latest valid immutable recovery snapshot from '+when+'? Your current device data will first be preserved locally. This restore will NOT upload or overwrite the Google Drive Current Database file.')) return;
 
-                // Preserve the exact current device state before changing anything.
-                try{
-                    const safety={id:'pre-recovery-restore-'+Date.now(),version:1,updatedAt:new Date().toISOString(),state:mfCloneStateForPersistence()};
-                    const db=await openMfDb();
-                    await new Promise((resolve,reject)=>{const tx=db.transaction(MF_IDB_STORE,'readwrite');tx.objectStore(MF_IDB_STORE).put(safety);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});
-                }catch(e){ throw new Error('Could not create the local pre-restore safety snapshot. Restore was cancelled.'); }
-
-                state=parsed; mfScaleReinstallStateProxy(); mfScaleSetFullDirty();
-                normalizeOperationalPeriods();
-                normalizeBorrowingCosts();
-                normalizeCompanyProfile();
-                await idbPutSnapshot();
-                renderAll();
-                await mfV2PublishVerifiedDriveBaseline('immutable-recovery-restore');
-                updateSecureCloudStatus('🟢 Immutable Google Drive recovery snapshot restored and published as the new secure cloud baseline.');
-                alert('Recovery snapshot restored successfully and established as the new secure cloud baseline.\n\nSnapshot: '+(used.name||when));
+                await mfCommitDriveRestore(parsed,session,'Recovery snapshot from '+when);
             }catch(err){
                 console.error('Recovery restore failed',err);
                 alert('Recovery snapshot restore failed: '+err.message);
